@@ -3,7 +3,7 @@
 ## Prerequisite
 
 ### golang
-Install golang v1.19+
+Install golang v1.21+
 
 ### protoc (protobuf compiler)
 ```bash
