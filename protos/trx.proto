@@ -1,0 +1,52 @@
+syntax = "proto3";
+package types;
+option go_package = "github.com/beatoz/beatoz-go/ctrlers/types";
+
+message TrxProto {
+  uint32 version = 1;
+  int64 time = 2;
+  uint64 nonce = 3;
+  bytes from = 4;
+  bytes to = 5;
+  bytes _amount = 6;
+  uint64 gas = 7;
+  bytes _gasPrice = 8;
+  int32 type = 9;
+  bytes _payload = 10;
+  bytes sig = 11;
+}
+
+message TrxPayloadAssetTransferProto {}
+
+message TrxPayloadStakingProto {}
+
+message TrxPayloadUnstakingProto {
+  bytes tx_hash = 1;
+}
+message TrxPayloadWithdrawProto {
+  bytes _reqAmt = 1;
+}
+
+message TrxPayloadContractProto {
+  bytes _data = 1;
+}
+
+message TrxPayloadProposalProto {
+  string message = 1;
+  int64 start_voting_height = 2;
+  int64 voting_blocks = 3;
+  int64 applying_height = 6;
+  int32 opt_type = 4;
+  repeated bytes options = 5;
+}
+
+message TrxPayloadVotingProto {
+  bytes tx_hash = 1;
+  int32 choice = 2;
+}
+
+
+message TrxPayloadSetDocProto {
+  string name = 1;
+  string url = 2;
+}
