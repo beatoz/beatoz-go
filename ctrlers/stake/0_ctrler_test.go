@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 
 	acctMock00 = mocks.NewAccountHandlerMock(100 + int(govParams00.MaxValidatorCnt()))
 	acctMock00.Iterate(func(idx int, w *web3.Wallet) bool {
-		w.GetAccount().SetBalance(beatoztypes.ToMote(1_000_000_000))
+		w.GetAccount().SetBalance(beatoztypes.ToFons(1_000_000_000))
 		return true
 	})
 	for i := 0; i < 5; i++ {

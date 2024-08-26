@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/libs/web3"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -90,7 +90,7 @@ func TestProposalDuplicate(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, c := range cases2 {
-		key := ledger.ToLedgerKey(c.txctx.TxHash)
+		key := v0.ToLedgerKey(c.txctx.TxHash)
 		prop, xerr := govCtrler.proposalLedger.Get(key)
 		require.NoError(t, xerr)
 		require.NotNil(t, prop)

@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -74,10 +74,10 @@ func DefaultGovParams() *GovParams {
 
 		// hotfix: because reward ledger and appHash is continually updated, block time is not controlled to 3s.
 		// so, reward = original reward / 3 = 4756468797
-		rewardPerPower:          uint256.NewInt(4_756_468_797),   // mote
+		rewardPerPower:          uint256.NewInt(4_756_468_797),   // fons
 		lazyRewardBlocks:        2592000,                         // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
 		lazyApplyingBlocks:      259200,                          // = 60 * 60 * 24 * 3 => 3 days * 3(block intervals) => 9days
-		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gmote
+		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
 		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
 		maxTrxGas:               25_000_000,
 		maxBlockGas:             math.MaxUint64,
@@ -231,8 +231,8 @@ func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
 	return ret, nil
 }
 
-func (r *GovParams) Key() ledger.LedgerKey {
-	return ledger.ToLedgerKey(bytes.ZeroBytes(32))
+func (r *GovParams) Key() v0.LedgerKey {
+	return v0.ToLedgerKey(bytes.ZeroBytes(32))
 }
 
 func (r *GovParams) Decode(bz []byte) xerrors.XError {
@@ -710,5 +710,5 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 	}
 }
 
-var _ ledger.ILedgerItem = (*GovParams)(nil)
+var _ v0.ILedgerItem = (*GovParams)(nil)
 var _ IGovHandler = (*GovParams)(nil)

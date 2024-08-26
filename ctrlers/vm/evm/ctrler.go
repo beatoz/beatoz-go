@@ -228,7 +228,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// Account.Code 에 현재 Tx(Contract 생성) 의 Hash 를 기록.
 		contAcct := ctx.AcctHandler.FindAccount(createdAddr[:], ctx.Exec)
 		contAcct.SetCode(ctx.TxHash)
-		if xerr := ctx.AcctHandler.SetAccountCommittable(contAcct, ctx.Exec); xerr != nil {
+		if xerr := ctx.AcctHandler.SetAccount(contAcct, ctx.Exec); xerr != nil {
 			return xerr
 		}
 
@@ -371,7 +371,7 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 	return nil
 }
 
-func (ctrler *EVMCtrler) ImmutableStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
+func (ctrler *EVMCtrler) MemStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
 	hash, err := ctrler.metadb.Get(blockKey(height))
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -382,15 +382,15 @@ func (ctrler *EVMCtrler) ImmutableStateAt(height int64) (*StateDBWrapper, xerror
 		return nil, xerrors.From(err)
 	}
 
-	immuAcctHandler, xerr := ctrler.acctHandler.ImmutableAcctCtrlerAt(height)
+	memAcctHandler, xerr := ctrler.acctHandler.MempoolAcctCtrlerAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}
 	return &StateDBWrapper{
 		StateDB:          stateDB,
-		acctHandler:      immuAcctHandler,
+		acctHandler:      memAcctHandler,
 		accessedObjAddrs: make(map[common.Address]int),
-		immutable:        true,
+		exec:             false,
 		logger:           ctrler.logger,
 	}, nil
 }

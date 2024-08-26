@@ -3,7 +3,7 @@ package stake
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -86,8 +86,8 @@ func (rwd *Reward) Slash(r *uint256.Int, h int64) xerrors.XError {
 	return nil
 }
 
-func (rwd *Reward) Key() ledger.LedgerKey {
-	return ledger.ToLedgerKey(rwd.address)
+func (rwd *Reward) Key() v0.LedgerKey {
+	return v0.ToLedgerKey(rwd.address)
 }
 
 func (rwd *Reward) Encode() ([]byte, xerrors.XError) {
@@ -226,4 +226,4 @@ func (rwd *Reward) String() string {
 	return string(bz)
 }
 
-var _ ledger.ILedgerItem = (*Reward)(nil)
+var _ v0.ILedgerItem = (*Reward)(nil)

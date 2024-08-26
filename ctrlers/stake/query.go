@@ -3,7 +3,7 @@ package stake
 import (
 	"fmt"
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -23,7 +23,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		rwd, xerr := atledger.Read(ledger.ToLedgerKey(req.Data))
+		rwd, xerr := atledger.Read(v0.ToLedgerKey(req.Data))
 		if rwd == nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
@@ -59,7 +59,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
-		if delegatee, xerr := atledger.Read(ledger.ToLedgerKey(req.Data)); xerr != nil {
+		if delegatee, xerr := atledger.Read(v0.ToLedgerKey(req.Data)); xerr != nil {
 			if xerr == xerrors.ErrNotFoundResult {
 				return nil, xerrors.ErrQuery.Wrap(xerrors.ErrNotFoundDelegatee)
 			}

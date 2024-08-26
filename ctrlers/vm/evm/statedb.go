@@ -18,7 +18,6 @@ import (
 type StateDBWrapper struct {
 	*state.StateDB
 	acctHandler ctrlertypes.IAccountHandler
-	immutable   bool
 
 	accessedObjAddrs map[common.Address]int
 	snapshot         int
@@ -62,7 +61,7 @@ func (s *StateDBWrapper) Finish() {
 		acct.SetBalance(amt)
 		acct.SetNonce(nonce)
 
-		_ = s.acctHandler.SetAccountCommittable(acct, s.exec)
+		_ = s.acctHandler.SetAccount(acct, s.exec)
 
 		//s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec(), "snap", v)
 	}

@@ -10,12 +10,12 @@ import (
 )
 
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	immuLedger, xerr := ctrler.acctLedger.ImmutableLedgerAt(req.Height, 0)
-	if xerr != nil {
-		return nil, xerrors.ErrQuery.Wrap(xerr)
-	}
+	//immuLedger, xerr := ctrler.acctState.ImmutableLedgerAt(req.Height, 0)
+	//if xerr != nil {
+	//	return nil, xerrors.ErrQuery.Wrap(xerr)
+	//}
 
-	acct, xerr := immuLedger.Read(types.Address(req.Data).Array32())
+	acct, xerr := ctrler.acctState.GetLedger(false).Get(req.Data)
 	if xerr != nil {
 		acct = types2.NewAccount(req.Data)
 	}
@@ -31,12 +31,12 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		Code    bytes.HexBytes `json:"code,omitempty"`
 		DocURL  string         `json:"docURL,omitempty"`
 	}{
-		Address: acct.Address,
-		Name:    acct.Name,
-		Nonce:   acct.Nonce,
-		Balance: acct.Balance.Dec(),
-		Code:    acct.Code,
-		DocURL:  acct.DocURL,
+		Address: acct.(*types2.Account).Address,
+		Name:    acct.(*types2.Account).Name,
+		Nonce:   acct.(*types2.Account).Nonce,
+		Balance: acct.(*types2.Account).Balance.Dec(),
+		Code:    acct.(*types2.Account).Code,
+		DocURL:  acct.(*types2.Account).DocURL,
 	}
 	if raw, err := tmjson.Marshal(_acct); err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)

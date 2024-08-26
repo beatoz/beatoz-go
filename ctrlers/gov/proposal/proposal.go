@@ -2,7 +2,7 @@ package proposal
 
 import (
 	"encoding/json"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -37,7 +37,7 @@ func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlo
 	}, nil
 }
 
-func (prop *GovProposal) Key() ledger.LedgerKey {
+func (prop *GovProposal) Key() v0.LedgerKey {
 	prop.mtx.RLock()
 	defer prop.mtx.RUnlock()
 
@@ -65,7 +65,7 @@ func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
 	return nil
 }
 
-var _ ledger.ILedgerItem = (*GovProposal)(nil)
+var _ v0.ILedgerItem = (*GovProposal)(nil)
 
 func (prop *GovProposal) DoVote(addr types.Address, choice int32) xerrors.XError {
 	prop.mtx.Lock()

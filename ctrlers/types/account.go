@@ -3,7 +3,7 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/beatoz/beatoz-go/ledger"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -188,11 +188,11 @@ func (acct *Account) Type() int16 {
 	return types.ACCT_COMMON_TYPE
 }
 
-func (acct *Account) Key() ledger.LedgerKey {
+func (acct *Account) Key() v1.LedgerKey {
 	acct.mtx.RLock()
 	acct.mtx.RUnlock()
 
-	return acct.Address.Array32()
+	return acct.Address
 }
 
 func (acct *Account) Encode() ([]byte, xerrors.XError) {
@@ -225,7 +225,7 @@ func (acct *Account) Decode(d []byte) xerrors.XError {
 	return nil
 }
 
-var _ ledger.ILedgerItem = (*Account)(nil)
+var _ v1.ILedgerItem = (*Account)(nil)
 
 ////
 

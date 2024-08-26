@@ -263,7 +263,7 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		//// setting deploy txhash in contract account
 		//acct.SetCode(ctx.TxHash)
 		//
-		//if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
+		//if xerr := ctx.AcctHandler.SetAccount(acct, ctx.Exec); xerr != nil {
 		//	return xerr
 		//}
 	}
@@ -282,7 +282,7 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		// processing nonce
 		ctx.Sender.AddNonce()
 
-		if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {
+		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
 			return xerr
 		}
 

@@ -7,7 +7,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -24,9 +24,9 @@ type GovCtrler struct {
 	ctrlertypes.GovParams
 	newGovParams *ctrlertypes.GovParams
 
-	paramsLedger   ledger.IFinalityLedger[*ctrlertypes.GovParams]
-	proposalLedger ledger.IFinalityLedger[*proposal.GovProposal]
-	frozenLedger   ledger.IFinalityLedger[*proposal.GovProposal]
+	paramsLedger   v0.IFinalityLedger[*ctrlertypes.GovParams]
+	proposalLedger v0.IFinalityLedger[*proposal.GovProposal]
+	frozenLedger   v0.IFinalityLedger[*proposal.GovProposal]
 
 	logger log.Logger
 	mtx    sync.RWMutex
@@ -38,12 +38,12 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 		return &proposal.GovProposal{}
 	}
 
-	paramsLedger, xerr := ledger.NewFinalityLedger[*ctrlertypes.GovParams]("gov_params", config.DBDir(), 1, newGovParamsProvider)
+	paramsLedger, xerr := v0.NewFinalityLedger[*ctrlertypes.GovParams]("gov_params", config.DBDir(), 1, newGovParamsProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	params, xerr := paramsLedger.Get(ledger.ToLedgerKey(abytes.ZeroBytes(32)))
+	params, xerr := paramsLedger.Get(v0.ToLedgerKey(abytes.ZeroBytes(32)))
 	// `params` could be nil
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return nil, xerr
@@ -51,12 +51,12 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 		params = &ctrlertypes.GovParams{} // empty params
 	}
 
-	proposalLedger, xerr := ledger.NewFinalityLedger[*proposal.GovProposal]("proposal", config.DBDir(), 1, newProposalProvider)
+	proposalLedger, xerr := v0.NewFinalityLedger[*proposal.GovProposal]("proposal", config.DBDir(), 1, newProposalProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	frozenLedger, xerr := ledger.NewFinalityLedger[*proposal.GovProposal]("frozen_proposal", config.DBDir(), 1, newProposalProvider)
+	frozenLedger, xerr := v0.NewFinalityLedger[*proposal.GovProposal]("frozen_proposal", config.DBDir(), 1, newProposalProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -123,7 +123,7 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 	targetAddr := types.Address(evi.Validator.Address)
 
 	// punish in `proposalLedger`
-	var targetPropsKeys []ledger.LedgerKey
+	var targetPropsKeys []v0.LedgerKey
 	ctrler.proposalLedger.IterateReadAllFinalityItems(func(prop *proposal.GovProposal) xerrors.XError {
 		for _, v := range prop.Voters {
 			if bytes.Compare(v.Addr, targetAddr) == 0 {
@@ -306,7 +306,7 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	}
 
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadVoting)
-	prop, xerr := getProposal(ledger.ToLedgerKey(txpayload.TxHash))
+	prop, xerr := getProposal(v0.ToLedgerKey(txpayload.TxHash))
 	if xerr != nil {
 		return xerr
 	}
@@ -524,7 +524,7 @@ func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes) (*proposal.GovProp
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if prop, xerr := ctrler.proposalLedger.Read(ledger.ToLedgerKey(txhash)); xerr != nil {
+	if prop, xerr := ctrler.proposalLedger.Read(v0.ToLedgerKey(txhash)); xerr != nil {
 		if xerr == xerrors.ErrNotFoundResult {
 			return nil, xerrors.ErrNotFoundProposal
 		}

@@ -39,13 +39,14 @@ func TestWithdraw(t *testing.T) {
 
 	// try to withdraw amount more than current reward
 	reqAmt := new(uint256.Int).AddUint64(rwd0.GetCumulated(), uint64(1))
+	fmt.Println("try to withdraw amount", reqAmt.Dec(), "more than the cumulated reward", rwd0.GetCumulated().Dec())
 	retTxCommit, err := val0.WithdrawCommit(defGas, defGasPrice, reqAmt, bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, retTxCommit.CheckTx.Code, retTxCommit.CheckTx.Log)
 
 	// try to withdraw amount less than current reward
-
 	reqAmt = bytes.RandU256IntN(rwd0.GetCumulated())
+	fmt.Println("try to withdraw amount", reqAmt.Dec(), "less than the cumulated reward", rwd0.GetCumulated().Dec())
 	retTxCommit, err = val0.WithdrawCommit(defGas, defGasPrice, reqAmt, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTxCommit.CheckTx.Code, retTxCommit.CheckTx.Log)
@@ -67,6 +68,8 @@ func TestWithdraw(t *testing.T) {
 
 	// check balance of val0
 	oriBal := val0.GetBalance()
+
+	time.Sleep(3 * time.Second)
 
 	require.NoError(t, val0.SyncAccount(bzweb3))
 

@@ -1,15 +1,15 @@
-package ledger
+package v0
 
 import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
-	tmdb "github.com/tendermint/tm-db"
+	dbm "github.com/cosmos/iavl/db"
 	"sync"
 )
 
 type SimpleLedger[T ILedgerItem] struct {
-	db          tmdb.DB
+	db          dbm.DB
 	tree        *iavl.MutableTree
 	cachedItems *memItems[T]
 	getNewItem  func() T
@@ -18,12 +18,13 @@ type SimpleLedger[T ILedgerItem] struct {
 }
 
 func NewSimpleLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func() T) (*SimpleLedger[T], xerrors.XError) {
-	if db, err := tmdb.NewDB(name, "goleveldb", dbDir); err != nil {
+	db, err := dbm.NewGoLevelDB(name, dbDir)
+	if err != nil {
 		return nil, xerrors.From(err)
-	} else if tree, err := iavl.NewMutableTree(db, cacheSize); err != nil {
-		_ = db.Close()
-		return nil, xerrors.From(err)
-	} else if _, err := tree.Load(); err != nil {
+	}
+
+	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger())
+	if _, err := tree.Load(); err != nil {
 		_ = db.Close()
 		return nil, xerrors.From(err)
 	} else {
@@ -40,15 +41,17 @@ func (ledger *SimpleLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (*Simpl
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	tree, err := iavl.NewMutableTree(ledger.db, cacheSize)
+	// todo: Use GetImmutable()
+	tree := iavl.NewMutableTree(ledger.db, cacheSize, false, iavl.NewNopLogger())
+	_, err := tree.LoadVersion(n)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	_, err = tree.LazyLoadVersion(n)
-	if err != nil {
-		return nil, xerrors.From(err)
-	}
+	//tree, err := ledger.tree.GetImmutable(n)
+	//if err != nil {
+	//	return nil, xerrors.From(err)
+	//}
 
 	return &SimpleLedger[T]{
 		tree:        tree,
@@ -265,8 +268,13 @@ func (ledger *SimpleLedger[T]) Close() xerrors.XError {
 			return xerrors.From(err)
 		}
 	}
-
 	ledger.db = nil
+
+	if ledger.tree != nil {
+		if err := ledger.tree.Close(); err != nil {
+			return xerrors.From(err)
+		}
+	}
 	ledger.tree = nil
 	return nil
 }

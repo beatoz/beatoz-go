@@ -10,10 +10,10 @@ import (
 
 func TestConvertAsset(t *testing.T) {
 	r := rand.Uint64()
-	sau := types.ToMote(r)
+	sau := types.ToFons(r)
 	require.Equal(t, strconv.FormatUint(r, 10)+"000000000000000000", sau.Dec())
 
-	xco, rem := types.FromMote(sau)
+	xco, rem := types.FromFons(sau)
 	require.Equal(t, r, xco)
 	require.Equal(t, uint64(0), rem)
 }

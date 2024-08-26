@@ -4,7 +4,7 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	atypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
-	"github.com/beatoz/beatoz-go/ledger"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -14,33 +14,21 @@ import (
 )
 
 type AcctCtrler struct {
-	acctLedger ledger.IFinalityLedger[*atypes.Account]
+	acctState *v1.StateLedger
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
 
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
-	if execLedger, err := ledger.NewFinalityLedger[*atypes.Account]("accounts", config.DBDir(), 128, func() *atypes.Account { return &atypes.Account{} }); err != nil {
-		return nil, err
+	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 2048, func() v1.ILedgerItem { return &atypes.Account{} }); xerr != nil {
+		return nil, xerr
 	} else {
 		return &AcctCtrler{
-			acctLedger: execLedger,
-			logger:     logger.With("module", "beatoz_AcctCtrler"),
+			acctState: _state,
+			logger:    logger.With("module", "beatoz_AcctCtrler"),
 		}, nil
 	}
-}
-
-func (ctrler *AcctCtrler) ImmutableAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
-	ledger0, xerr := ctrler.acctLedger.ImmutableLedgerAt(height, 128)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &ImmuAcctCtrler{
-		immuLedger: ledger0,
-		logger:     ctrler.logger,
-	}, nil
 }
 
 func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
@@ -58,7 +46,7 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 			Address: addr,
 			Balance: holder.Balance.Clone(),
 		}
-		if xerr := ctrler.setAccountCommittable(acct, true); xerr != nil {
+		if xerr := ctrler.setAccount(acct, true); xerr != nil {
 			return xerr
 		}
 	}
@@ -96,9 +84,9 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *atypes.TrxContext) xerrors.XError {
 			ctx.Tx.Payload.(*atypes.TrxPayloadSetDoc).URL)
 	}
 
-	_ = ctrler.setAccountCommittable(ctx.Sender, ctx.Exec)
+	_ = ctrler.setAccount(ctx.Sender, ctx.Exec)
 	if ctx.Receiver != nil {
-		_ = ctrler.setAccountCommittable(ctx.Receiver, ctx.Exec)
+		_ = ctrler.setAccount(ctx.Receiver, ctx.Exec)
 	}
 
 	return nil
@@ -128,7 +116,7 @@ func (ctrler *AcctCtrler) EndBlock(ctx *atypes.BlockContext) ([]abcitypes.Event,
 			return nil, xerr
 		}
 
-		return nil, ctrler.setAccountCommittable(acct, true)
+		return nil, ctrler.setAccount(acct, true)
 	}
 	return nil, nil
 }
@@ -137,36 +125,29 @@ func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.acctLedger.Commit()
+	return ctrler.acctState.Commit()
 }
 
 func (ctrler *AcctCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.acctLedger != nil {
-		if xerr := ctrler.acctLedger.Close(); xerr != nil {
+	if ctrler.acctState != nil {
+		if xerr := ctrler.acctState.Close(); xerr != nil {
 			ctrler.logger.Error("AcctCtrler", "acctLedger.Close() returns error", xerr.Error())
 		}
 		ctrler.logger.Debug("AcctCtrler - close ledgers")
-		ctrler.acctLedger = nil
+		ctrler.acctState = nil
 	}
 	return nil
 }
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Account {
-	k := ledger.ToLedgerKey(addr)
-
-	fn := ctrler.acctLedger.Get
-	if exec {
-		fn = ctrler.acctLedger.GetFinality
-	}
-
-	if acct, xerr := fn(k); xerr != nil {
+	if acct, xerr := ctrler.acctState.GetLedger(exec).Get(addr); xerr != nil {
 		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
-		return acct
+		return acct.(*atypes.Account)
 	}
 }
 
@@ -174,14 +155,14 @@ func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atype
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// `AcctCtrler` MUST be locked until new account is set to acctLedger (issue #32)
+	// `AcctCtrler` MUST be locked until new account is set to acctState (issue #32)
 
 	if acct := ctrler.findAccount(addr, exec); acct != nil {
 		return acct
 	}
 
 	newAcct := atypes.NewAccountWithName(addr, "")
-	ctrler.setAccountCommittable(newAcct, exec)
+	_ = ctrler.setAccount(newAcct, exec)
 	return newAcct
 }
 
@@ -190,22 +171,6 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Acc
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.findAccount(addr, exec)
-}
-
-func (ctrler *AcctCtrler) ReadAccount(addr types.Address) *atypes.Account {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	return ctrler.readAccount(addr)
-}
-
-func (ctrler *AcctCtrler) readAccount(addr types.Address) *atypes.Account {
-	if acct, xerr := ctrler.acctLedger.Read(addr.Array32()); xerr != nil {
-		// db error or not found
-		return atypes.NewAccount(addr)
-	} else {
-		return acct
-	}
 }
 
 func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
@@ -225,10 +190,10 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 		return xerr
 	}
 
-	if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+	if xerr := ctrler.setAccount(acct0, exec); xerr != nil {
 		return xerr
 	}
-	if xerr := ctrler.setAccountCommittable(acct1, exec); xerr != nil {
+	if xerr := ctrler.setAccount(acct1, exec); xerr != nil {
 		return xerr
 	}
 	return nil
@@ -256,7 +221,7 @@ func (ctrler *AcctCtrler) SetCode(addr types.Address, code []byte, exec bool) xe
 
 	acct0.SetCode(code)
 
-	if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+	if xerr := ctrler.setAccount(acct0, exec); xerr != nil {
 		return xerr
 	}
 	return nil
@@ -273,7 +238,7 @@ func (ctrler *AcctCtrler) SetDoc(addr types.Address, name, url string, exec bool
 
 	ctrler.setDoc(acct0, name, url)
 
-	if xerr := ctrler.setAccountCommittable(acct0, exec); xerr != nil {
+	if xerr := ctrler.setAccount(acct0, exec); xerr != nil {
 		return xerr
 	}
 	return nil
@@ -288,29 +253,43 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if acct := ctrler.findAccount(to, exec); acct == nil {
+	acct := ctrler.findAccount(to, exec)
+	if acct == nil {
 		return xerrors.ErrNotFoundAccount.Wrapf("Reward - address: %v", to)
-	} else if xerr := acct.AddBalance(amt); xerr != nil {
-		return xerr
-	} else if xerr := ctrler.setAccountCommittable(acct, exec); xerr != nil {
+	}
+
+	if xerr := acct.AddBalance(amt); xerr != nil {
 		return xerr
 	}
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+
 	return nil
 }
 
-func (ctrler *AcctCtrler) SetAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
+func (ctrler *AcctCtrler) SetAccount(acct *atypes.Account, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.setAccountCommittable(acct, exec)
+	return ctrler.setAccount(acct, exec)
 }
 
-func (ctrler *AcctCtrler) setAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
-	fn := ctrler.acctLedger.Set
-	if exec {
-		fn = ctrler.acctLedger.SetFinality
+func (ctrler *AcctCtrler) setAccount(acct *atypes.Account, exec bool) xerrors.XError {
+	return ctrler.acctState.GetLedger(exec).Set(acct)
+}
+
+func (ctrler *AcctCtrler) MempoolAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
+	_ledger := ctrler.acctState.GetLedger(true)
+	memLedger, xerr := _ledger.MempoolLedgerAt(height)
+	if xerr != nil {
+		return nil, xerr
 	}
-	return fn(acct)
+
+	return &MempoolAcctCtrler{
+		mempoolLedger: memLedger,
+		logger:        ctrler.logger,
+	}, nil
 }
 
 var _ atypes.ILedgerHandler = (*AcctCtrler)(nil)
@@ -318,109 +297,57 @@ var _ atypes.ITrxHandler = (*AcctCtrler)(nil)
 var _ atypes.IBlockHandler = (*AcctCtrler)(nil)
 var _ atypes.IAccountHandler = (*AcctCtrler)(nil)
 
-type ImmuAcctCtrler struct {
-	immuLedger ledger.ILedger[*atypes.Account]
-	logger     tmlog.Logger
+type MempoolAcctCtrler struct {
+	mempoolLedger v1.ILedger
+	logger        tmlog.Logger
+	mtx           sync.RWMutex
 }
 
-//func (immuCtrler *ImmuAcctCtrler) SetCode(addr types.Address, code []byte, exec bool) xerrors.XError {
-//	acct0 := immuCtrler.FindAccount(addr, exec)
-//	if acct0 == nil {
-//		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", addr)
-//	}
-//
-//	acct0.SetCode(code)
-//
-//	if xerr := immuCtrler.SetAccountCommittable(acct0, exec); xerr != nil {
-//		return xerr
-//	}
-//	return nil
-//}
-//
-//func (immuCtrler *ImmuAcctCtrler) SetDoc(addr types.Address, name string, url string, exec bool) xerrors.XError {
-//	acct0 := immuCtrler.FindAccount(addr, exec)
-//	if acct0 == nil {
-//		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", addr)
-//	}
-//
-//	acct0.SetName(url)
-//	acct0.SetDocURL(url)
-//
-//	if xerr := immuCtrler.SetAccountCommittable(acct0, exec); xerr != nil {
-//		return xerr
-//	}
-//	return nil
-//}
+func (memCtrler *MempoolAcctCtrler) SetAccount(acct *atypes.Account, exec bool) xerrors.XError {
+	return memCtrler.mempoolLedger.Set(acct)
+}
 
-func (immuCtrler *ImmuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
-	// `AcctCtrler` MUST be locked until new account is set to acctLedger (issue #32)
+func (memCtrler *MempoolAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
+	memCtrler.mtx.Lock()
+	defer memCtrler.mtx.Unlock()
 
-	if acct := immuCtrler.FindAccount(addr, exec); acct != nil {
+	if acct := memCtrler.findAccount(addr, exec); acct != nil {
 		return acct
 	}
 
 	newAcct := atypes.NewAccountWithName(addr, "")
 	if newAcct != nil {
-		_ = immuCtrler.SetAccountCommittable(newAcct, exec)
+		_ = memCtrler.SetAccount(newAcct, exec)
 	}
 	return newAcct
 }
 
-func (immuCtrler *ImmuAcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Account {
-	k := ledger.ToLedgerKey(addr)
+func (memCtrler *MempoolAcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Account {
+	memCtrler.mtx.RLock()
+	defer memCtrler.mtx.RUnlock()
 
-	if acct, xerr := immuCtrler.immuLedger.Get(k); xerr != nil {
-		//immuCtrler.logger.Debug("ImmuAcctCtrler - not found account", "address", addr, "error", xerr)
+	return memCtrler.findAccount(addr, exec)
+}
+
+func (memCtrler *MempoolAcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Account {
+	if acct, xerr := memCtrler.mempoolLedger.Get(addr); xerr != nil {
+		//memCtrler.logger.Debug("MempoolAcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
-		return acct
+		return acct.(*atypes.Account)
 	}
 }
 
-func (immuCtrler *ImmuAcctCtrler) Transfer(from types.Address, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	acct0 := immuCtrler.FindAccount(from, exec)
-	if acct0 == nil {
-		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", from)
-	}
-	acct1 := immuCtrler.FindAccount(to, exec)
-	if acct1 == nil {
-		acct1 = atypes.NewAccountWithName(to, "")
-	}
-
-	if xerr := acct0.SubBalance(amt); xerr != nil {
-		return xerr
-	}
-	if xerr := acct1.AddBalance(amt); xerr != nil {
-		_ = acct0.AddBalance(amt) // refund
-		return xerr
-	}
-
-	if xerr := immuCtrler.SetAccountCommittable(acct0, exec); xerr != nil {
-		return xerr
-	}
-	if xerr := immuCtrler.SetAccountCommittable(acct1, exec); xerr != nil {
-		return xerr
-	}
-	return nil
+func (memCtrler *MempoolAcctCtrler) Transfer(from types.Address, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	panic("MempoolAcctCtrler can not have this method")
 }
 
-func (immuCtrler *ImmuAcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if acct := immuCtrler.FindAccount(to, exec); acct == nil {
-		return xerrors.ErrNotFoundAccount.Wrapf("address: %v", to)
-	} else if xerr := acct.AddBalance(amt); xerr != nil {
-		return xerr
-	} else if xerr := immuCtrler.SetAccountCommittable(acct, exec); xerr != nil {
-		return xerr
-	}
-	return nil
+func (memCtrler *MempoolAcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	panic("MempoolAcctCtrler can not have this method")
 }
 
-func (immuCtrler *ImmuAcctCtrler) ImmutableAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
-	panic("ImmuAcctCtrler can not create ImmutableAcctCtrlerAt")
+func (memCtrler *MempoolAcctCtrler) MempoolAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
+	panic("MempoolAcctCtrler can not create ImmutableAcctCtrlerAt")
 }
 
-func (immuCtrler *ImmuAcctCtrler) SetAccountCommittable(acct *atypes.Account, exec bool) xerrors.XError {
-	return immuCtrler.immuLedger.Set(acct)
-}
-
-var _ atypes.IAccountHandler = (*ImmuAcctCtrler)(nil)
+var _ atypes.IAccountHandler = (*MempoolAcctCtrler)(nil)

@@ -2,7 +2,7 @@ package gov
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -56,11 +56,11 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 			return v, nil
 		} else {
-			prop, xerr := atProposalLedger.Read(ledger.ToLedgerKey(txhash))
+			prop, xerr := atProposalLedger.Read(v0.ToLedgerKey(txhash))
 			readProposal := &_prop{}
 			if xerr != nil {
 				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
-					prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
+					prop, xerr = atFrozenLedger.Read(v0.ToLedgerKey(txhash))
 					if xerr != nil {
 						return nil, xerrors.ErrQuery.Wrap(xerr)
 					}
@@ -85,7 +85,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		govParams, xerr := atledger.Read(ledger.ToLedgerKey(bytes.ZeroBytes(32)))
+		govParams, xerr := atledger.Read(v0.ToLedgerKey(bytes.ZeroBytes(32)))
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}

@@ -108,7 +108,12 @@ func (a *acctHelperMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHan
 	panic("implement me")
 }
 
-func (a *acctHelperMock) SetAccountCommittable(account *ctrlertypes.Account, b bool) xerrors.XError {
+func (a *acctHelperMock) MempoolAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *acctHelperMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
 	//TODO implement me
 	panic("implement me")
 }

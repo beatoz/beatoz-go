@@ -104,7 +104,7 @@ func Test_Fallback(t *testing.T) {
 		Height:      bctx.Height(),
 		BlockTime:   time.Now().Unix(),
 		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToMote(100)),
+		Tx:          web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToFons(100)),
 		TxIdx:       1,
 		Exec:        true,
 		Sender:      fromAcct,
@@ -123,8 +123,8 @@ func Test_Fallback(t *testing.T) {
 
 	gasAmt := new(uint256.Int).Mul(uint256.NewInt(txctx.GasUsed), govParams.GasPrice())
 
-	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToMote(100))
-	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToMote(100))
+	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToFons(100))
+	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToFons(100))
 
 	//fmt.Println("sender", expectedBalance0.Dec(), "contract", expectedBalance1.Dec(), "gas", gasAmt.Dec())
 	require.Equal(t, expectedBalance0.Dec(), fromAcct.Balance.Dec())

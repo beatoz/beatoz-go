@@ -39,12 +39,12 @@ type IGovHandler interface {
 }
 
 type IAccountHandler interface {
+	SetAccount(*Account, bool) xerrors.XError
 	FindOrNewAccount(types.Address, bool) *Account
 	FindAccount(types.Address, bool) *Account
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
-	ImmutableAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
-	SetAccountCommittable(*Account, bool) xerrors.XError
+	MempoolAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
 }
 
 type IStakeHandler interface {

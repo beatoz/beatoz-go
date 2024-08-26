@@ -4,7 +4,7 @@ import (
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/v0"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -28,9 +28,9 @@ type StakeCtrler struct {
 
 	allDelegatees     DelegateeArray
 	lastValidators    DelegateeArray
-	delegateeLedger   ledger.IFinalityLedger[*Delegatee]
-	frozenLedger      ledger.IFinalityLedger[*Stake]
-	rewardLedger      ledger.IFinalityLedger[*Reward]
+	delegateeLedger   v0.IFinalityLedger[*Delegatee]
+	frozenLedger      v0.IFinalityLedger[*Stake]
+	rewardLedger      v0.IFinalityLedger[*Reward]
 	rwdLedgUpInterval int64
 	lastRwdHash       []byte
 	stakeLimiter      *StakeLimiter
@@ -51,17 +51,17 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logg
 	newRewardProvider := func() *Reward { return &Reward{} }
 
 	// for all delegatees
-	delegateeLedger, xerr := ledger.NewFinalityLedger[*Delegatee]("delegatees", config.DBDir(), 128, newDelegateeProvider)
+	delegateeLedger, xerr := v0.NewFinalityLedger[*Delegatee]("delegatees", config.DBDir(), 128, newDelegateeProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	frozenLedger, xerr := ledger.NewFinalityLedger[*Stake]("frozen", config.DBDir(), 128, newStakeProvider)
+	frozenLedger, xerr := v0.NewFinalityLedger[*Stake]("frozen", config.DBDir(), 128, newStakeProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	rewardLedger, xerr := ledger.NewFinalityLedger[*Reward]("rewards", config.DBDir(), 2048, newRewardProvider)
+	rewardLedger, xerr := v0.NewFinalityLedger[*Reward]("rewards", config.DBDir(), 2048, newRewardProvider)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -190,10 +190,10 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		heightOfPower = 1
 	}
 
-	// todo: remove ImmutableLedgerAt. How? => Rewarding is started after 4 blocks, but un-staking
-	// ImmutableLedgerAt is used to know the delegator's stake in the block [height-4] and give rewards based on it.
-	// Solution: When stake is locked, rewards start after 4 blocks from the block containing staking tx, (check by using Stake.StartHeight)
-	// and when staking is released, rewards stop immediately. (don't give rewards to the stakes that existed 4 blocks ago but does not exist now.)
+	// todo: remove ImmutableLedgerAt. How? => Rewarding is started after 4 blocks, but is immediately stopped in un-staking
+	// ImmutableLedgerAt is used to get the delegator's stakes at the block[height-4] and to give rewards based on it.
+	// Solution: When a stake is deposited, the rewards start after 4 blocks from the block containing TrxPayloadStaking, (check by using Stake.StartHeight)
+	// and when staking is un-staking(executing TrxPayloadUnstaking), immediately stop to reward. (don't reward for stakes existed 4 blocks ago and un-staked at now.)
 	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(heightOfPower, 128)
 	if xerr != nil {
 		return nil, xerr
@@ -202,7 +202,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	for _, vote := range blockCtx.BlockInfo().LastCommitInfo.Votes {
 		if vote.SignedLastBlock {
 			// Reward
-			delegatee, xerr := immuDelegateeLedger.Get(ledger.ToLedgerKey(vote.Validator.Address))
+			delegatee, xerr := immuDelegateeLedger.Get(v0.ToLedgerKey(vote.Validator.Address))
 			if xerr != nil || delegatee == nil {
 				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
 				continue
@@ -220,7 +220,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		} else {
 			// check MinSignedBlocks
 			signedHeight := blockCtx.Height() - 1
-			delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(vote.Validator.Address))
+			delegatee, xerr := ctrler.delegateeLedger.GetFinality(v0.ToLedgerKey(vote.Validator.Address))
 			if xerr != nil {
 				// it's possible that a `delegatee` is not found.
 				// `vote.Validator.Address` has existed since block[height - 4],
@@ -278,7 +278,7 @@ func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (
 }
 
 func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
-	delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(evi.Validator.Address))
+	delegatee, xerr := ctrler.delegateeLedger.GetFinality(v0.ToLedgerKey(evi.Validator.Address))
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -311,7 +311,7 @@ func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) (*
 
 	for _, vote := range votes {
 		if vote.SignedLastBlock {
-			delegatee, xerr := immuDelegateeLedger.Get(ledger.ToLedgerKey(vote.Validator.Address))
+			delegatee, xerr := immuDelegateeLedger.Get(v0.ToLedgerKey(vote.Validator.Address))
 			if xerr != nil || delegatee == nil {
 				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
 				continue
@@ -337,7 +337,7 @@ func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint
 	issuedReward := uint256.NewInt(0)
 
 	for _, s0 := range delegatee.Stakes {
-		rwdObj, xerr := ctrler.rewardLedger.GetFinality(ledger.ToLedgerKey(s0.From))
+		rwdObj, xerr := ctrler.rewardLedger.GetFinality(v0.ToLedgerKey(s0.From))
 		if xerr == xerrors.ErrNotFoundResult {
 			rwdObj = NewReward(s0.From)
 		} else if xerr != nil {
@@ -383,7 +383,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		txPower := ctrlertypes.AmountToPower(ctx.Tx.Amount)
 		totalPower := int64(0)
 
-		delegatee, xerr := getDelegatee(ledger.ToLedgerKey(ctx.Tx.To))
+		delegatee, xerr := getDelegatee(v0.ToLedgerKey(ctx.Tx.To))
 		if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 			return xerr
 		}
@@ -452,7 +452,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		//
 		// begin: issue #34: check updatable stake ratio
 		// find delegatee
-		delegatee, xerr := getDelegatee(ledger.ToLedgerKey(ctx.Tx.To))
+		delegatee, xerr := getDelegatee(v0.ToLedgerKey(ctx.Tx.To))
 		if xerr != nil {
 			return xerr
 		}
@@ -492,7 +492,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		if ctx.Exec {
 			getReward = ctrler.rewardLedger.GetFinality
 		}
-		rwd, xerr := getReward(ledger.ToLedgerKey(ctx.Tx.From))
+		rwd, xerr := getReward(v0.ToLedgerKey(ctx.Tx.From))
 		if xerr != nil {
 			return xerr
 		}
@@ -533,7 +533,7 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 		setUpdateDelegatee = ctrler.delegateeLedger.SetFinality
 	}
 
-	delegatee, xerr := getDelegatee(ledger.ToLedgerKey(ctx.Tx.To))
+	delegatee, xerr := getDelegatee(v0.ToLedgerKey(ctx.Tx.To))
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return xerr
 	}
@@ -552,7 +552,7 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
 		return xerr
 	}
-	_ = ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec)
+	_ = ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec)
 
 	// create stake and delegate it to `delegatee`
 	// the reward for this stake will be started at ctx.Height + 1. (issue #29)
@@ -582,7 +582,7 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	}
 
 	// find delegatee
-	delegatee, xerr := getDelegatee(ledger.ToLedgerKey(ctx.Tx.To))
+	delegatee, xerr := getDelegatee(v0.ToLedgerKey(ctx.Tx.To))
 	if xerr != nil {
 		return xerr
 	}
@@ -647,7 +647,7 @@ func (ctrler *StakeCtrler) exeWithdraw(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		setReward = ctrler.rewardLedger.SetFinality
 		cancelSetReward = ctrler.rewardLedger.CancelSetFinality
 	}
-	rwd, xerr := getReward(ledger.ToLedgerKey(ctx.Tx.From))
+	rwd, xerr := getReward(v0.ToLedgerKey(ctx.Tx.From))
 	if xerr != nil {
 		return xerr
 	}
@@ -696,7 +696,7 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 				return xerr
 			}
 
-			_, _ = ctrler.frozenLedger.DelFinality(ledger.ToLedgerKey(s0.TxHash))
+			_, _ = ctrler.frozenLedger.DelFinality(v0.ToLedgerKey(s0.TxHash))
 		}
 		return nil
 	})
@@ -709,9 +709,9 @@ func (ctrler *StakeCtrler) UpdateValidators(maxVals int) []abcitypes.ValidatorUp
 	return ctrler.updateValidators(maxVals)
 }
 
-// UpdateValidators is called after executing staking/unstaking txs and before committing the result of the txs executing.
-// This means that the updated values of ledger is not committed yet.
-// So, use ledger.IterateReadAllItems/IterateReadAllFinalityItems to get not changed values.
+// UpdateValidators is called after executing staking/unstaking txs and before committing the result of the executing.
+// `ctrler.allDelegatees` has delegatees committed at previous block.
+// It means that UpdateValidators consider the stakes updated at the previous block, not the current block.
 func (ctrler *StakeCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUpdate {
 
 	newValidators := selectValidators(PowerOrderDelegatees(ctrler.allDelegatees), maxVals)
@@ -861,7 +861,7 @@ func (ctrler *StakeCtrler) Delegatee(addr types.Address) *Delegatee {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(v0.ToLedgerKey(addr)); xerr != nil {
 		return nil
 	} else {
 		return delegatee
@@ -872,7 +872,7 @@ func (ctrler *StakeCtrler) TotalPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(v0.ToLedgerKey(addr)); xerr != nil {
 		return 0
 	} else if delegatee == nil {
 		return 0
@@ -885,7 +885,7 @@ func (ctrler *StakeCtrler) SelfPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(v0.ToLedgerKey(addr)); xerr != nil {
 		return 0
 	} else if delegatee == nil {
 		return 0
@@ -898,7 +898,7 @@ func (ctrler *StakeCtrler) DelegatedPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(ledger.ToLedgerKey(addr)); xerr != nil {
+	if delegatee, xerr := ctrler.delegateeLedger.GetFinality(v0.ToLedgerKey(addr)); xerr != nil {
 		return 0
 	} else if delegatee == nil {
 		return 0
@@ -948,7 +948,7 @@ func (ctrler *StakeCtrler) RewardOf(addr types.Address) *Reward {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	rwd, xerr := ctrler.rewardLedger.GetFinality(ledger.ToLedgerKey(addr))
+	rwd, xerr := ctrler.rewardLedger.GetFinality(v0.ToLedgerKey(addr))
 	if xerr != nil {
 		return nil
 	}
@@ -959,7 +959,7 @@ func (ctrler *StakeCtrler) ReadRewardOf(addr types.Address) *Reward {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	rwd, xerr := ctrler.rewardLedger.Read(ledger.ToLedgerKey(addr))
+	rwd, xerr := ctrler.rewardLedger.Read(v0.ToLedgerKey(addr))
 	if xerr != nil {
 		return nil
 	}

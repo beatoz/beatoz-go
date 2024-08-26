@@ -147,7 +147,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 }
 
 func Test_callEVM_Transfer(t *testing.T) {
-	state, xerr := erc20EVM.ImmutableStateAt(erc20EVM.lastBlockHeight)
+	state, xerr := erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
@@ -177,7 +177,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("Commit block", height)
 
-	state, xerr = erc20EVM.ImmutableStateAt(erc20EVM.lastBlockHeight)
+	state, xerr = erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
 	ret, xerr = callMethod(abiERC20Contract, queryAcct.Address(), erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
@@ -202,7 +202,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 
 	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
 
-	state, xerr = erc20EVM.ImmutableStateAt(erc20EVM.lastBlockHeight)
+	state, xerr = erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
 	ret, xerr = callMethod(abiERC20Contract, queryAcct.Address(), erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
@@ -342,6 +342,9 @@ func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) 
 }
 
 func (handler *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+	return nil, nil
+}
+func (handler *acctHandlerMock) MempoolAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	walletsMap := make(map[string]*web3.Wallet)
 	walletsArr := make([]*web3.Wallet, len(handler.walletsArr))
 	for i, w := range handler.walletsArr {
@@ -361,8 +364,7 @@ func (handler *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAcc
 		origin:     false,
 	}, nil
 }
-
-func (handler *acctHandlerMock) SetAccountCommittable(acct *ctrlertypes.Account, exec bool) xerrors.XError {
+func (handler *acctHandlerMock) SetAccount(acct *ctrlertypes.Account, exec bool) xerrors.XError {
 	return nil
 }
 

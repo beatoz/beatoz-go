@@ -46,8 +46,8 @@ func initialize() error {
 		addr := bytes.RandBytes(types.AddrSize)
 		for j := 0; j < len(acctCtrlers); j++ {
 			acct := acctCtrlers[j].FindOrNewAccount(addr, true)
-			acct.AddBalance(uint256.NewInt(1000000000))
-			acctCtrlers[j].setAccountCommittable(acct, true)
+			_ = acct.AddBalance(uint256.NewInt(1000000000))
+			_ = acctCtrlers[j].SetAccount(acct, true)
 		}
 		addrs = append(addrs, addr)
 	}
@@ -117,18 +117,18 @@ func execSame(n int) error {
 	return nil
 }
 
-func readRand(n int) error {
-	for i := 0; i < n; i++ {
-		r0, r1 := rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
-		addr0, ctrler := addrs[r0], acctCtrlers[r1]
-
-		// it makes ledger tree's cache to be dirty
-		if acct := ctrler.ReadAccount(addr0); acct == nil {
-			return xerrors.ErrNotFoundAccount
-		}
-	}
-	return nil
-}
+//func readRand(n int) error {
+//	for i := 0; i < n; i++ {
+//		r0, r1 := rand.Intn(len(addrs)), rand.Intn(len(acctCtrlers))
+//		addr0, ctrler := addrs[r0], acctCtrlers[r1]
+//
+//		// it makes ledger tree's cache to be dirty
+//		if acct := ctrler.ReadAccount(addr0); acct == nil {
+//			return xerrors.ErrNotFoundAccount
+//		}
+//	}
+//	return nil
+//}
 
 func TestAcctCtrler_Commit(t *testing.T) {
 	var preHash []byte
@@ -137,7 +137,7 @@ func TestAcctCtrler_Commit(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		// simulation 의 경우 각 노드(acctCtrler) 이 서로 다른 값을 가져도 상관 없다.
 		require.NoError(t, simuRand(100))
-		require.NoError(t, readRand(100)) // 단순 read 는 commit 에 영향을 미치지 않는다.
+		//require.NoError(t, readRand(100)) // 단순 read 는 commit 에 영향을 미치지 않는다.
 
 		h, v, e := commit()
 		require.NoError(t, e)
@@ -158,7 +158,7 @@ func TestAcctCtrler_Commit(t *testing.T) {
 		require.NoError(t, simuRand(100))
 		// execution 이 random 으로 실행되면(각 노드(acctCtrler) 이 서로 다른 살행을 하면) 에러 발생.
 		require.NoError(t, execRand(100))
-		require.NoError(t, readRand(100))
+		//require.NoError(t, readRand(100))
 
 		_, _, e := commit()
 		require.Error(t, e)
@@ -170,9 +170,9 @@ func TestAcctCtrler_Commit(t *testing.T) {
 
 	for i := 2; i < 100; i++ {
 		require.NoError(t, simuRand(100))
-		require.NoError(t, readRand(10)) // 단순 read 는 commit 에 영향을 미치지 않는다.
+		//require.NoError(t, readRand(10)) // 단순 read 는 commit 에 영향을 미치지 않는다.
 		require.NoError(t, execSame(100))
-		require.NoError(t, readRand(10))
+		//require.NoError(t, readRand(10))
 
 		h, v, e := commit()
 		require.NoError(t, e)

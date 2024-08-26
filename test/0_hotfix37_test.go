@@ -20,7 +20,7 @@ func TestTransfer0(t *testing.T) {
 
 	receiver := randCommonWallet()
 
-	txRet, err := sender.TransferCommit(receiver.Address(), defGas, defGasPrice, types3.ToMote(1), bzweb3)
+	txRet, err := sender.TransferCommit(receiver.Address(), defGas, defGasPrice, types3.ToFons(1), bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.CheckTx.Code, txRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.DeliverTx.Code, txRet.DeliverTx.Log)

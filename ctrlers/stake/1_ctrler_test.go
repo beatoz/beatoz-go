@@ -47,7 +47,7 @@ func wrongIndividualLimit(t *testing.T) {
 	// previous power       = 10_000_000
 	// added power          = 400_000
 	// (10_000_000 + 400_000) * 100 / (30_000_000 + 400_000) = 34(34.21052632) > 33(IndividualLimitRatio)
-	tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(400_000)))
+	tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(400_000)))
 	_, _, err := w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
 
@@ -72,7 +72,7 @@ func wrongIndividualLimit(t *testing.T) {
 	//
 	// Fail expected
 	// 15_460_000 * 100 / (30_000_000 + 15_460_000) = 34(34.00791905) > 33(IndividualLimitRatio)
-	tx = web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(15_460_000)))
+	tx = web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(15_460_000)))
 	_, _, err = w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
 
@@ -93,7 +93,7 @@ func wrongIndividualLimit(t *testing.T) {
 	//
 	// Success expected
 	// 15_450_000 * 100 / (30_000_000 + 15_450_000) = 33(33.99339934) == 33(IndividualLimitRatio)
-	tx = web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(15_450_000)))
+	tx = web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(15_450_000)))
 	_, _, err = w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
 
@@ -114,7 +114,7 @@ func wrongIndividualLimit(t *testing.T) {
 	// Fail expected
 	// Updated power of `w` is 15_450_000 at now by previous tx.
 	// Additional power update(10_000) should be fail.
-	tx = web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(10_000)))
+	tx = web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000)))
 	_, _, err = w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
 
@@ -157,7 +157,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 		//
 		// new validator
 		// the power 10_000_000 is excluded by the following tx.
-		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(10_000_001)))
+		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000_001)))
 		_, _, err := w.SignTrxRLP(tx, "test-chain")
 		require.NoError(t, err)
 
@@ -178,7 +178,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 	w := acctMock01.GetWallet(validatorCnt + 4)
 	//
 	// the power 10_000_000 is excluded by the following tx.
-	tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(10_000_001)))
+	tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000_001)))
 	_, _, err := w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
 
@@ -220,7 +220,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 		w := acctMock01.GetWallet(validatorCnt + i) // this is not validator
 		//
 		// new candidate
-		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(9_999_999)))
+		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(9_999_999)))
 		_, _, err := w.SignTrxRLP(tx, "test-chain")
 		require.NoError(t, err)
 
@@ -249,7 +249,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 		// candidate power = 9_999_999
 		// delegating to candidate = 2
 		// candidate final power = 10_000_001. it makes a validator to be excluded.
-		tx := web3.NewTrxStaking(w.Address(), candidate.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(2)))
+		tx := web3.NewTrxStaking(w.Address(), candidate.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(2)))
 		_, _, err := w.SignTrxRLP(tx, "test-chain")
 		require.NoError(t, err)
 
@@ -273,7 +273,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 	// candidate power = 9_999_999
 	// delegating to candidate = 2
 	// candidate final power = 10_000_001. it makes a validator to be excluded.
-	tx := web3.NewTrxStaking(w.Address(), candidate.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(2)))
+	tx := web3.NewTrxStaking(w.Address(), candidate.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(2)))
 	_, _, err := w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
 
@@ -309,7 +309,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 	for i := validatorCnt; int64(i) < govParams01.MaxValidatorCnt(); i++ {
 		w := acctMock01.GetWallet(i)
 
-		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(10_000_000)))
+		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000_000)))
 		_, _, err := w.SignTrxRLP(tx, "test-chain")
 		require.NoError(t, err)
 
@@ -378,7 +378,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 func resetTest(t *testing.T, valCnt int) {
 	acctMock01 = mocks.NewAccountHandlerMock(100)
 	acctMock01.Iterate(func(idx int, w *web3.Wallet) bool {
-		w.GetAccount().SetBalance(types.ToMote(1_000_000_000))
+		w.GetAccount().SetBalance(types.ToFons(1_000_000_000))
 		return true
 	})
 
@@ -412,7 +412,7 @@ func genesisStaking(t *testing.T, cnt int) {
 		if i == cnt {
 			break
 		}
-		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToMote(uint64(power0)))
+		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(power0)))
 		_, _, err := w.SignTrxRLP(tx, "test-chain")
 		require.NoError(t, err)
 
