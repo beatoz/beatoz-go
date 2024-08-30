@@ -16,9 +16,11 @@ import (
 )
 
 var (
-	dbDir       string
-	testItemV0s []*TestItemV0
-	testItemV1s []*TestItemV1
+	dbDir            string
+	testItemV0s      []*TestItemV0
+	testItemV1s      []*TestItemV1
+	cntWirttenItemV0 = 0
+	cntWirttenItemV1 = 0
 )
 
 func init() {
@@ -28,10 +30,10 @@ func init() {
 		dbDir = _dir
 	}
 
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 100000; i++ {
 		testItemV0s = append(testItemV0s, newTestItemV0(i, bytes.RandHexString(512)))
 	}
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 100000; i++ {
 		testItemV1s = append(testItemV1s, newTestItemV1(i, bytes.RandHexString(512)))
 	}
 }
@@ -58,7 +60,9 @@ func Benchmark_Set_V0(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		require.NoError(b, ledger.SetFinality(testItemV0s[i%len(testItemV0s)]))
+		cntWirttenItemV0 = i + 1
 	}
+	b.StopTimer()
 
 	//_start := time.Now()
 	_, _, err = ledger.Commit()
@@ -66,8 +70,9 @@ func Benchmark_Set_V0(b *testing.B) {
 	//fmt.Println("V0 elapsed time", _elapsed)
 	require.NoError(b, err)
 
-	b.StopTimer()
 	require.NoError(b, ledger.Close())
+	//fmt.Println("written item/v0 count:", cntWirttenItemV0)
+	//fmt.Printf("last key:%x\n", testItemV0s[cntWirttenItemV0-1].Key())
 }
 
 func Benchmark_Set_V1(b *testing.B) {
@@ -78,13 +83,50 @@ func Benchmark_Set_V1(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		require.NoError(b, ledger.Set(testItemV1s[i%len(testItemV1s)]))
+		cntWirttenItemV1 = i + 1
 	}
+	b.StopTimer()
 
 	//_start := time.Now()
 	_, _, err = ledger.Commit()
 	//_elapsed := time.Since(_start)
 	//fmt.Println("V1 elapsed time", _elapsed)
 	require.NoError(b, err)
+
+	require.NoError(b, ledger.Close())
+	//fmt.Println("written item/v1 count:", cntWirttenItemV1)
+	//fmt.Printf("last key:%x\n", testItemV1s[cntWirttenItemV1-1].Key())
+}
+
+func Benchmark_Get_V0(b *testing.B) {
+	b.StopTimer()
+	ledger, err := v0.NewFinalityLedger("ledgerV0", dbDir, 1_000_000, emptyTestItemV0)
+	require.NoError(b, err)
+
+	cntSavedItems := min(cntWirttenItemV0, len(testItemV0s))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ledger.GetFinality(testItemV0s[i%cntSavedItems].Key())
+		require.NoError(b, err, fmt.Sprintf("tyr to read %d/%d, key:%x", i%cntSavedItems, cntSavedItems, testItemV0s[i%cntSavedItems].Key()))
+	}
+
+	b.StopTimer()
+	require.NoError(b, ledger.Close())
+}
+
+func Benchmark_Get_V1(b *testing.B) {
+	b.StopTimer()
+	ledger, err := v1.NewLedger("ledgerV1", dbDir, 1_000_000, emptyTestItemV1, log.NewNopLogger())
+	require.NoError(b, err)
+
+	cntSavedItems := min(cntWirttenItemV1, len(testItemV0s))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ledger.Get(testItemV1s[i%cntSavedItems].Key())
+		require.NoError(b, err, fmt.Sprintf("tyr to read %d/%d, key:%x", i%cntSavedItems, cntSavedItems, testItemV1s[i%cntSavedItems].Key()))
+	}
 
 	b.StopTimer()
 	require.NoError(b, ledger.Close())
@@ -145,7 +187,7 @@ func emptyTestItemV1() v1.ILedgerItem {
 }
 
 func (i *TestItemV1) Key() v1.LedgerKey {
-	bs := make([]byte, 4)
+	bs := make([]byte, 32)
 	binary.BigEndian.PutUint32(bs, uint32(i.key))
 	return bs
 }
