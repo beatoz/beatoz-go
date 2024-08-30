@@ -16,20 +16,35 @@ type ILedger interface {
 	Version() int64
 	Set(ILedgerItem) xerrors.XError
 	Get(LedgerKey) (ILedgerItem, xerrors.XError)
-	Del(LedgerKey)
+	Del(LedgerKey) xerrors.XError
 	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
 	Commit() ([]byte, int64, xerrors.XError)
 	Close() xerrors.XError
 
 	Snapshot() int
-	RevertToSnapshot(snap int)
-	RevertAll()
-	ApplyRevisions() xerrors.XError
+	RevertToSnapshot(snap int) xerrors.XError
+	//RevertAll()
+	//ApplyRevisions() xerrors.XError
 	ImmutableLedgerAt(int64) (ILedger, xerrors.XError)
 	MempoolLedgerAt(int64) (ILedger, xerrors.XError)
 }
 
 type LedgerKey = []byte
+
+//const LEDGERKEYSIZE = 32
+//
+//type LedgerKey = [LEDGERKEYSIZE]byte
+//
+//func ToLedgerKey(s []byte) LedgerKey {
+//	var ret LedgerKey
+//	n := len(s)
+//	if n > LEDGERKEYSIZE {
+//		n = LEDGERKEYSIZE
+//	}
+//	copy(ret[:], s[:n])
+//	return ret
+//}
+
 type LedgerKeyList []LedgerKey
 
 func (a LedgerKeyList) Len() int {

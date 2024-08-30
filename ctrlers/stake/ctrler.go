@@ -691,6 +691,7 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 			// return s0. not only s0.ReceivedReward but also s0.Amount
 
 			refundAmt := ctrlertypes.PowerToAmount(s0.Power)
+
 			xerr := acctHandler.Reward(s0.From, refundAmt, true)
 			if xerr != nil {
 				return xerr

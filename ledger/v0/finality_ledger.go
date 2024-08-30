@@ -150,6 +150,9 @@ func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
+	ledger.tree.SetCommitting()
+	defer ledger.tree.UnsetCommitting()
+
 	// remove
 	for _, k := range ledger.finalityItems.removedKeys {
 		var vk LedgerKey

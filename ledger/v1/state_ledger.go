@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
 
@@ -9,16 +10,17 @@ type StateLedger struct {
 	consensusLedger *Ledger
 	mempoolLedger   *MempoolLedger
 
-	mtx sync.Mutex
+	logger tmlog.Logger
+	mtx    sync.Mutex
 }
 
-func NewStateLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem) (*StateLedger, xerrors.XError) {
-	_consensusLedger, xerr := NewLedger(name, dbDir, cacheSize, newItem)
+func NewStateLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*StateLedger, xerrors.XError) {
+	_consensusLedger, xerr := NewLedger(name, dbDir, cacheSize, newItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 	_mempoolLedger, xerr := NewMempoolLedger(
-		_consensusLedger.DB(), cacheSize, newItem, 0)
+		_consensusLedger.DB(), cacheSize, newItem, lg, 0)
 	if xerr != nil {
 		_ = _consensusLedger.Close()
 		return nil, xerr
@@ -27,6 +29,7 @@ func NewStateLedger(name, dbDir string, cacheSize int, newItem func() ILedgerIte
 	return &StateLedger{
 		consensusLedger: _consensusLedger,
 		mempoolLedger:   _mempoolLedger,
+		logger:          lg,
 	}, nil
 }
 
@@ -49,27 +52,28 @@ func (ledger *StateLedger) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mempoolLedger, xerr = NewMempoolLedger(
 		ledger.consensusLedger.DB(),
 		ledger.consensusLedger.CacheSize(),
-		ledger.consensusLedger.NewItemFunc(), 0)
+		ledger.consensusLedger.NewItemFunc(), ledger.logger, ver)
 	if xerr != nil {
 		return nil, 0, xerr
 	}
-
 	return hash, ver, nil
 }
 
 func (ledger *StateLedger) Close() xerrors.XError {
-	if ledger.consensusLedger != nil {
-		if xerr := ledger.consensusLedger.Close(); xerr != nil {
-			return xerr
-		}
-		ledger.consensusLedger = nil
-	}
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
 
 	if ledger.mempoolLedger != nil {
 		if xerr := ledger.mempoolLedger.Close(); xerr != nil {
 			return xerr
 		}
 		ledger.mempoolLedger = nil
+	}
+	if ledger.consensusLedger != nil {
+		if xerr := ledger.consensusLedger.Close(); xerr != nil {
+			return xerr
+		}
+		ledger.consensusLedger = nil
 	}
 
 	return nil

@@ -21,12 +21,14 @@ type AcctCtrler struct {
 }
 
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
-	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 2048, func() v1.ILedgerItem { return &atypes.Account{} }); xerr != nil {
+
+	lg := logger.With("module", "beatoz_AcctCtrler")
+	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 2048, func() v1.ILedgerItem { return &atypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
 			acctState: _state,
-			logger:    logger.With("module", "beatoz_AcctCtrler"),
+			logger:    lg,
 		}, nil
 	}
 }
@@ -142,15 +144,6 @@ func (ctrler *AcctCtrler) Close() xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Account {
-	if acct, xerr := ctrler.acctState.GetLedger(exec).Get(addr); xerr != nil {
-		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
-		return nil
-	} else {
-		return acct.(*atypes.Account)
-	}
-}
-
 func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *atypes.Account {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -171,6 +164,15 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Acc
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.findAccount(addr, exec)
+}
+
+func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Account {
+	if acct, xerr := ctrler.acctState.GetLedger(exec).Get(addr); xerr != nil {
+		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
+		return nil
+	} else {
+		return acct.(*atypes.Account)
+	}
 }
 
 func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
@@ -194,6 +196,7 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 		return xerr
 	}
 	if xerr := ctrler.setAccount(acct1, exec); xerr != nil {
+		// todo: cancel ctrler.setAccount(acct0,exec)
 		return xerr
 	}
 	return nil

@@ -6,7 +6,9 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	dbm "github.com/cosmos/iavl/db"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
+	"unsafe"
 )
 
 type Ledger struct {
@@ -15,18 +17,21 @@ type Ledger struct {
 	cacheSize   int
 	newItemFunc func() ILedgerItem
 
-	revisions []*kvRevision
+	cachedItems map[string]ILedgerItem
+	snapshots   *snapshotList
 
-	mtx sync.RWMutex
+	logger tmlog.Logger
+	mtx    sync.RWMutex
 }
 
-func NewLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem) (*Ledger, xerrors.XError) {
+func NewLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*Ledger, xerrors.XError) {
 	db, err := dbm.NewGoLevelDB(name, dbDir)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), func(opt *iavl.Options) { opt.Sync = true })
+	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger())
+
 	if _, err := tree.Load(); err != nil {
 		_ = db.Close()
 		return nil, xerrors.From(err)
@@ -37,7 +42,9 @@ func NewLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem) (*
 		db:          db,
 		cacheSize:   cacheSize,
 		newItemFunc: newItem,
-		revisions:   make([]*kvRevision, 0),
+		cachedItems: make(map[string]ILedgerItem),
+		snapshots:   NewSnapshotList(),
+		logger:      lg,
 	}, nil
 }
 
@@ -65,45 +72,62 @@ func (ledger *Ledger) Set(item ILedgerItem) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	key := item.Key()
-	val, xerr := item.Encode()
+	oldVal, err := ledger.MutableTree.Get(key)
+	if err != nil {
+		return xerrors.From(err)
+	}
+	newVal, xerr := item.Encode()
 	if xerr != nil {
 		return xerr
 	}
 
-	ledger.revisionForSet(key[:], val)
+	_, err = ledger.MutableTree.Set(key, newVal)
+	if err != nil {
+		return xerrors.From(err)
+	}
+	ledger.cachedItems[unsafe.String(&key[0], len(key))] = item
+
+	if oldVal == nil || bytes.Compare(oldVal, newVal) != 0 {
+		// created or updated
+		ledger.snapshots.set(key, oldVal)
+	}
 	return nil
 }
 
 func (ledger *Ledger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) {
-	ledger.mtx.RLock()
-	defer ledger.mtx.RUnlock()
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
 
-	var bzVal []byte
-	if rev := ledger.findRevision(key); rev != nil {
-		bzVal = rev.Value
-	} else if bz, err := ledger.ImmutableTree.Get(key[:]); err != nil {
+	if ret, ok := ledger.cachedItems[unsafe.String(&key[0], len(key))]; ok {
+		return ret, nil
+	}
+
+	if bz, err := ledger.MutableTree.Get(key); err != nil {
 		return nil, xerrors.From(err)
 	} else if bz == nil {
 		return nil, xerrors.ErrNotFoundResult
 	} else {
-		bzVal = bz
+		item := ledger.newItemFunc()
+		if xerr := item.Decode(bz); xerr != nil {
+			return nil, xerr
+		} else if bytes.Compare(item.Key(), key) != 0 {
+			return nil, xerrors.From(fmt.Errorf("Ledger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
+		}
+		ledger.cachedItems[unsafe.String(&key[0], len(key))] = item
+		return item, nil
 	}
-
-	item := ledger.newItemFunc()
-	if xerr := item.Decode(bzVal); xerr != nil {
-		return nil, xerr
-	} else if bytes.Compare(item.Key(), key) != 0 {
-		return nil, xerrors.NewOrdinary("Ledger: the key is compromised - the requested key is not equal to the key encoded in value")
-	}
-
-	return item, nil
 }
 
-func (ledger *Ledger) Del(key LedgerKey) {
+func (ledger *Ledger) Del(key LedgerKey) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	ledger.revisionForDel(key)
+	if oldVal, removed, err := ledger.MutableTree.Remove(key); err != nil {
+		return xerrors.From(err)
+	} else if oldVal != nil && removed {
+		ledger.snapshots.set(key, oldVal)
+	}
+	return nil
 }
 
 func (ledger *Ledger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError {
@@ -114,10 +138,10 @@ func (ledger *Ledger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XErro
 	stopped, err := ledger.MutableTree.Iterate(func(key []byte, value []byte) bool {
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(value); xerr != nil {
-			xerrStop = xerrors.NewOrdinary(fmt.Sprintf("item decode error - Key:%X vs. err:%v", key, xerr))
+			xerrStop = xerr
 			return true
 		} else if bytes.Compare(item.Key(), key) != 0 {
-			xerrStop = xerrors.NewOrdinary(fmt.Sprintf("wrong key - Key:%X vs. stake's txhash:%X", key, item.Key()))
+			xerrStop = xerrors.From(fmt.Errorf("Ledger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
 			return true
 		} else if xerr := cb(item); xerr != nil {
 			xerrStop = xerr
@@ -141,14 +165,11 @@ func (ledger *Ledger) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.MutableTree.SetCommitting()
 	defer ledger.MutableTree.UnsetCommitting()
 
-	// apply revisions
-	if xerr := ledger.applyRevisions(); xerr != nil {
-		return nil, 0, xerr
-	}
-
 	if r1, r2, err := ledger.MutableTree.SaveVersion(); err != nil {
 		return r1, r2, xerrors.From(err)
 	} else {
+		//clear(ledger.cachedItems)
+		ledger.snapshots.reset()
 		return r1, r2, nil
 	}
 }
@@ -167,6 +188,38 @@ func (ledger *Ledger) Close() xerrors.XError {
 		}
 	}
 	ledger.MutableTree = nil
+
+	clear(ledger.cachedItems)
+	ledger.snapshots.reset()
+
+	return nil
+}
+
+func (ledger *Ledger) Snapshot() int {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.snapshots.snapshot()
+}
+
+func (ledger *Ledger) RevertToSnapshot(snap int) xerrors.XError {
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
+
+	restores := ledger.snapshots.revisions[snap:]
+	for i := len(restores) - 1; i >= 0; i-- {
+		item := restores[i]
+		if item.val != nil {
+			if _, err := ledger.MutableTree.Set(item.key, item.val); err != nil {
+				return xerrors.From(err)
+			}
+		} else {
+			if _, _, err := ledger.MutableTree.Remove(item.key); err != nil {
+				return xerrors.From(err)
+			}
+		}
+	}
+	ledger.snapshots.revert(snap)
 	return nil
 }
 
@@ -179,7 +232,7 @@ func (ledger *Ledger) ImmutableLedgerAt(ver int64) (ILedger, xerrors.XError) {
 		return nil, xerrors.From(err)
 	}
 
-	_ledger := newImmutableLedger(immuTree, ledger.newItemFunc)
+	_ledger := newImmutableLedger(immuTree, ledger.newItemFunc, ledger.logger)
 	return _ledger, nil
 }
 
@@ -187,7 +240,7 @@ func (ledger *Ledger) MempoolLedgerAt(ver int64) (ILedger, xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	return NewMempoolLedger(ledger.db, ledger.cacheSize, ledger.newItemFunc, ver)
+	return NewMempoolLedger(ledger.db, ledger.cacheSize, ledger.newItemFunc, ledger.logger, ver)
 }
 
 var _ ILedger = (*Ledger)(nil)

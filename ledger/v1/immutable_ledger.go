@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
 
@@ -12,13 +13,15 @@ type ImmutableLedger struct {
 	*iavl.ImmutableTree
 	newItemFunc func() ILedgerItem
 
-	mtx sync.RWMutex
+	logger tmlog.Logger
+	mtx    sync.RWMutex
 }
 
-func newImmutableLedger(immuTree *iavl.ImmutableTree, newItem func() ILedgerItem) *ImmutableLedger {
+func newImmutableLedger(immuTree *iavl.ImmutableTree, newItem func() ILedgerItem, lg tmlog.Logger) *ImmutableLedger {
 	return &ImmutableLedger{
 		ImmutableTree: immuTree,
 		newItemFunc:   newItem,
+		logger:        lg,
 	}
 }
 
@@ -41,13 +44,13 @@ func (ledger *ImmutableLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) 
 	if xerr := item.Decode(val); xerr != nil {
 		return nil, xerr
 	} else if bytes.Compare(item.Key(), key) != 0 {
-		return nil, xerrors.NewOrdinary("ImmutableLedger: the key is compromised - the requested key is not equal to the key encoded in value")
+		return nil, xerrors.From(fmt.Errorf("ImmutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
 	}
 
 	return item, nil
 }
 
-func (ledger *ImmutableLedger) Del(key LedgerKey) {
+func (ledger *ImmutableLedger) Del(key LedgerKey) xerrors.XError {
 	panic("ImmutableLedger can not have this method")
 }
 
@@ -59,10 +62,10 @@ func (ledger *ImmutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerr
 	stopped, err := ledger.ImmutableTree.Iterate(func(key []byte, value []byte) bool {
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(value); xerr != nil {
-			xerrStop = xerrors.NewOrdinary(fmt.Sprintf("item decode error - Key:%X vs. err:%v", key, xerr))
+			xerrStop = xerr
 			return true
 		} else if bytes.Compare(item.Key(), key) != 0 {
-			xerrStop = xerrors.NewOrdinary(fmt.Sprintf("wrong key - Key:%X vs. stake's txhash:%X", key, item.Key()))
+			xerrStop = xerrors.From(fmt.Errorf("ImmutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
 			return true
 		} else if xerr := cb(item); xerr != nil {
 			xerrStop = xerr
@@ -91,15 +94,7 @@ func (ledger *ImmutableLedger) Snapshot() int {
 	panic("ImmutableLedger can not have this method")
 }
 
-func (ledger *ImmutableLedger) RevertToSnapshot(snap int) {
-	panic("ImmutableLedger can not have this method")
-}
-
-func (ledger *ImmutableLedger) RevertAll() {
-	panic("ImmutableLedger can not have this method")
-}
-
-func (ledger *ImmutableLedger) ApplyRevisions() xerrors.XError {
+func (ledger *ImmutableLedger) RevertToSnapshot(snap int) xerrors.XError {
 	panic("ImmutableLedger can not have this method")
 }
 

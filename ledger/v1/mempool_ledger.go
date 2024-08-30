@@ -4,6 +4,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	dbm "github.com/cosmos/iavl/db"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
 
@@ -13,7 +14,7 @@ type MempoolLedger struct {
 	mtx sync.RWMutex
 }
 
-func NewMempoolLedger(db dbm.DB, cacheSize int, newItem func() ILedgerItem, ver int64) (*MempoolLedger, xerrors.XError) {
+func NewMempoolLedger(db dbm.DB, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger, ver int64) (*MempoolLedger, xerrors.XError) {
 	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger())
 	if _, err := tree.LoadVersion(ver); err != nil {
 		return nil, xerrors.From(err)
@@ -23,13 +24,15 @@ func NewMempoolLedger(db dbm.DB, cacheSize int, newItem func() ILedgerItem, ver 
 		Ledger: &Ledger{
 			MutableTree: tree,
 			// Do not set the `db` field
-			// This field is only set in the original Ledger instance.
+			// This field is only add in the original Ledger instance.
 			// Because the 'db' field is nil, MempoolLedger.Close() can not close the 'db'.
 			// The `db` can only be closed by the original Ledger.Close().
 			db:          nil,
 			cacheSize:   cacheSize,
 			newItemFunc: newItem,
-			revisions:   make([]*kvRevision, 0),
+			cachedItems: make(map[string]ILedgerItem),
+			snapshots:   NewSnapshotList(),
+			logger:      lg,
 		},
 	}, nil
 }
