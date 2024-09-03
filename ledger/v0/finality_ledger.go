@@ -21,7 +21,7 @@ func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func
 		return nil, xerrors.From(err)
 	}
 
-	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger())
+	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), iavl.SyncOption(true))
 	if _, err := tree.Load(); err != nil {
 		_ = db.Close()
 		return nil, xerrors.From(err)

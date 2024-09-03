@@ -30,7 +30,7 @@ func NewLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg
 		return nil, xerrors.From(err)
 	}
 
-	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger())
+	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), iavl.SyncOption(true))
 
 	if _, err := tree.Load(); err != nil {
 		_ = db.Close()
@@ -125,6 +125,7 @@ func (ledger *Ledger) Del(key LedgerKey) xerrors.XError {
 	if oldVal, removed, err := ledger.MutableTree.Remove(key); err != nil {
 		return xerrors.From(err)
 	} else if oldVal != nil && removed {
+		delete(ledger.cachedItems, unsafe.String(&key[0], len(key)))
 		ledger.snapshots.set(key, oldVal)
 	}
 	return nil
@@ -168,7 +169,7 @@ func (ledger *Ledger) Commit() ([]byte, int64, xerrors.XError) {
 	if r1, r2, err := ledger.MutableTree.SaveVersion(); err != nil {
 		return r1, r2, xerrors.From(err)
 	} else {
-		//clear(ledger.cachedItems)
+		clear(ledger.cachedItems)
 		ledger.snapshots.reset()
 		return r1, r2, nil
 	}
