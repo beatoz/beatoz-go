@@ -6,16 +6,16 @@ import (
 	"sync"
 )
 
-type StateLedger struct {
-	consensusLedger *Ledger
+type Ledger struct {
+	consensusLedger *MutableLedger
 	mempoolLedger   *MempoolLedger
 
 	logger tmlog.Logger
 	mtx    sync.Mutex
 }
 
-func NewStateLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*StateLedger, xerrors.XError) {
-	_consensusLedger, xerr := NewLedger(name, dbDir, cacheSize, newItem, lg)
+func NewLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*Ledger, xerrors.XError) {
+	_consensusLedger, xerr := NewMutableLedger(name, dbDir, cacheSize, newItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -26,21 +26,21 @@ func NewStateLedger(name, dbDir string, cacheSize int, newItem func() ILedgerIte
 		return nil, xerr
 	}
 
-	return &StateLedger{
+	return &Ledger{
 		consensusLedger: _consensusLedger,
 		mempoolLedger:   _mempoolLedger,
 		logger:          lg,
 	}, nil
 }
 
-func (ledger *StateLedger) GetLedger(exec bool) ILedger {
+func (ledger *Ledger) GetLedger(exec bool) ILedger {
 	if exec == true {
 		return ledger.consensusLedger
 	}
 	return ledger.mempoolLedger
 }
 
-func (ledger *StateLedger) Commit() ([]byte, int64, xerrors.XError) {
+func (ledger *Ledger) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
@@ -59,7 +59,7 @@ func (ledger *StateLedger) Commit() ([]byte, int64, xerrors.XError) {
 	return hash, ver, nil
 }
 
-func (ledger *StateLedger) Close() xerrors.XError {
+func (ledger *Ledger) Close() xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 

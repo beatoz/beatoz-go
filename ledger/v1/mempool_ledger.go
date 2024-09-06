@@ -8,9 +8,9 @@ import (
 	"sync"
 )
 
-// MempoolLedger cannot be committed, everything else is like Ledger.
+// MempoolLedger cannot be committed, everything else is like MutableLedger.
 type MempoolLedger struct {
-	*Ledger
+	*MutableLedger
 	mtx sync.RWMutex
 }
 
@@ -21,12 +21,12 @@ func NewMempoolLedger(db dbm.DB, cacheSize int, newItem func() ILedgerItem, lg t
 	}
 
 	return &MempoolLedger{
-		Ledger: &Ledger{
+		MutableLedger: &MutableLedger{
 			MutableTree: tree,
 			// Do not set the `db` field
-			// This field is only add in the original Ledger instance.
+			// This field is only add in the original MutableLedger instance.
 			// Because the 'db' field is nil, MempoolLedger.Close() can not close the 'db'.
-			// The `db` can only be closed by the original Ledger.Close().
+			// The `db` can only be closed by the original MutableLedger.Close().
 			db:          nil,
 			cacheSize:   cacheSize,
 			newItemFunc: newItem,

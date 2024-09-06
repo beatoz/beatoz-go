@@ -16,7 +16,7 @@ func TestLedger_RevertToSnapshot_Set(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
 
-	ledger, xerr := NewLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)
@@ -82,7 +82,7 @@ func TestLedger_RevertToSnapshot_Set2(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
 
-	ledger, xerr := NewLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)
@@ -118,7 +118,7 @@ func TestLedger_RevertToSnapshot_Set2(t *testing.T) {
 func TestLedger_RevertToSnapshot_Del(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
-	ledger, xerr := NewLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)

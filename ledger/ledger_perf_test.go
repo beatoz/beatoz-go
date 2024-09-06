@@ -52,7 +52,7 @@ func Benchmark_Set_V0(b *testing.B) {
 func Benchmark_Set_V1(b *testing.B) {
 	dbDir, err := os.MkdirTemp("", "ledger_performance_test_set_v1")
 	require.NoError(b, err)
-	ledger, err := v1.NewLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
+	ledger, err := v1.NewMutableLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
 
 	b.ResetTimer()
@@ -88,7 +88,7 @@ func Benchmark_Get_V0(b *testing.B) {
 func Benchmark_Get_V1(b *testing.B) {
 	dbDir, err := os.MkdirTemp("", "ledger_performance_test_get_v1")
 	require.NoError(b, err)
-	ledger, err := v1.NewLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
+	ledger, err := v1.NewMutableLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
 
 	cntSavedItems := min(cntWirttenItemV1, len(testItemV0s))
@@ -129,7 +129,7 @@ func Benchmark_Commit_V0(b *testing.B) {
 func Benchmark_Commit_V1(b *testing.B) {
 	dbDir, err := os.MkdirTemp("", "ledger_performance_test_commit_v1_*")
 	require.NoError(b, err)
-	ledger, err := v1.NewLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
+	ledger, err := v1.NewMutableLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
 
 	b.ResetTimer()
