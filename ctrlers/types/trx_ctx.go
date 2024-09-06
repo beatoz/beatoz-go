@@ -3,6 +3,7 @@ package types
 import (
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/types"
 )
@@ -61,6 +62,27 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 			return nil, err
 		}
 	}
+
+	//
+	// begin of code from commonValidation0
+	{
+		if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
+			return nil, xerrors.ErrInvalidGasPrice
+		}
+
+		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+		if feeAmt.Cmp(txctx.GovHandler.MinTrxFee()) < 0 {
+			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+		}
+
+		_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
+		if xerr != nil {
+			return nil, xerr
+		}
+		txctx.SenderPubKey = pubKeyBytes
+	}
+	// end of code from commonValidation0
+	//
 
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
 	if txctx.Sender == nil {

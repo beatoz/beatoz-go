@@ -7,7 +7,6 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
-	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -106,34 +105,40 @@ func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	//
 	// the following CAN be parellely done
 	//
-	tx := ctx.Tx
+	//tx := ctx.Tx
 
-	if len(tx.From) != rtypes.AddrSize {
-		return xerrors.ErrInvalidAddress
-	}
-	if len(tx.To) != rtypes.AddrSize {
-		return xerrors.ErrInvalidAddress
-	}
-	if tx.Amount.Sign() < 0 {
-		return xerrors.ErrInvalidAmount
-	}
-	if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
-		return xerrors.ErrInvalidGas
-	}
-	if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
-		return xerrors.ErrInvalidGasPrice
-	}
+	// move to `tx.validate()`
+	//if len(tx.From) != rtypes.AddrSize {
+	//	return xerrors.ErrInvalidAddress
+	//}
+	//if len(tx.To) != rtypes.AddrSize {
+	//	return xerrors.ErrInvalidAddress
+	//}
+	//if tx.Amount.Sign() < 0 {
+	//	return xerrors.ErrInvalidAmount
+	//}
+	//if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
+	//	return xerrors.ErrInvalidGas
+	//}
 
-	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
-	if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
-		return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
-	}
+	//
+	// move to NewTrxContext()
+	//
 
-	_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
-	if xerr != nil {
-		return xerr
-	}
-	ctx.SenderPubKey = pubKeyBytes
+	//if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
+	//	return xerrors.ErrInvalidGasPrice
+	//}
+	//
+	//feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	//if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
+	//	return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+	//}
+	//
+	//_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
+	//if xerr != nil {
+	//	return xerr
+	//}
+	//ctx.SenderPubKey = pubKeyBytes
 
 	return nil
 }
