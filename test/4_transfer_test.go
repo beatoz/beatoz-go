@@ -79,18 +79,15 @@ func TestTransferCommit_Bulk(t *testing.T) {
 		allAcctObjs = append(allAcctObjs, newAcctTestObj)
 	}
 
-	fmt.Println("Sender Count", len(senderAcctObjs))
-
+	fmt.Printf("TestTransferCommit_Bulk - sender accounts: %d, receiver accounts: %d\n", len(senderAcctObjs), len(allAcctObjs))
 	for _, v := range senderAcctObjs {
 		wg.Add(1)
 		go bulkTransferCommit(t, &wg, v, allAcctObjs, 10) // 100 txs per sender
 	}
 
-	fmt.Printf("TestBulkTransfer - Sender accounts: %d, Receiver accounts: %d\n", len(senderAcctObjs), len(allAcctObjs))
-
 	wg.Wait()
 
-	fmt.Printf("TestBulkTransfer - Check %v accounts ...\n", len(allAcctObjs))
+	fmt.Printf("TestTransferCommit_Bulk - Check %v accounts ...\n", len(allAcctObjs))
 
 	sentTxsCnt, retTxsCnt := 0, 0
 	for _, acctObj := range allAcctObjs {
@@ -124,60 +121,60 @@ func TestTransferCommit_Bulk(t *testing.T) {
 var mtx sync.Mutex
 var peerConns = make(map[string]int)
 
-func bulkTransferCommit(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, receivers []*acctObj, cnt int) {
-	w := senderAcctObj.w
-	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
+func TestTransfer_OverBalance(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
 
-	mtx.Lock()
-	peer := randPeer()
-	_bzweb3 := web3.NewBeatozWeb3(web3.NewHttpProvider(peer.RPCURL))
-	n, ok := peerConns[peer.PeerID]
-	if ok {
-		peerConns[peer.PeerID] = n + 1
-	} else {
-		peerConns[peer.PeerID] = 1
-	}
-	mtx.Unlock()
-	fmt.Printf("bulkTransferCommit - account: %v, balance: %v, nonce: %v, txcnt: %v, rpcPeerIdx: %v, conns: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), cnt, peer.PeerID, peerConns[peer.PeerID])
+	require.NoError(t, W0.SyncBalance(bzweb3))
+	require.NoError(t, W1.SyncBalance(bzweb3))
+	require.NoError(t, W0.Unlock(defaultRpcNode.Pass))
 
-	maxAmt := new(uint256.Int).Div(senderAcctObj.originBalance, uint256.NewInt(uint64(cnt)))
-	maxAmt = new(uint256.Int).Sub(maxAmt, baseFee)
+	testObj0 := newAcctObj(W0)
+	testObj1 := newAcctObj(W1)
 
-	for i := 0; i < cnt; i++ {
-		rn := rand.Intn(len(receivers))
-		if bytes.Compare(receivers[rn].w.Address(), w.Address()) == 0 {
-			rn = (rn + 1) % len(receivers)
-		}
+	overAmt := W0.GetBalance() // baseFee is not included
 
-		racctObj := receivers[rn]
-		raddr := racctObj.w.Address()
-		randAmt := rbytes.RandU256IntN(maxAmt)
-		if randAmt.Sign() == 0 {
-			randAmt = uint256.NewInt(1)
-		}
-		needAmt := new(uint256.Int).Add(randAmt, baseFee)
-		//fmt.Printf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
+	ret, err := W0.TransferSync(W1.Address(), defGas, defGasPrice, overAmt, bzweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
+	//require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
 
-		ret, err := w.TransferCommit(raddr, defGas, defGasPrice, randAmt, _bzweb3)
-		require.NoError(t, err, fmt.Sprintf("peerId: %v, conns: %v", peer.PeerID, peerConns[peer.PeerID]))
-		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
-		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.NoError(t, W0.SyncBalance(bzweb3))
+	require.NoError(t, W1.SyncBalance(bzweb3))
 
-		senderAcctObj.addTxHashOfAddr(ret.Hash, w.Address())
+	require.Equal(t, testObj0.originBalance, W0.GetBalance())
+	require.Equal(t, testObj1.originBalance, W1.GetBalance())
+	require.Equal(t, testObj0.originNonce, W0.GetNonce())
 
-		//fmt.Printf("Send Tx [block:%v, txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Height, ret.Hash, w.Address(), racctObj.w.Address(), w.GetNonce(), randAmt)
+	overAmt = new(uint256.Int).Add(new(uint256.Int).Sub(W0.GetBalance(), baseFee), uint256.NewInt(1)) // amt - baseFee + 1
+	ret, err = W0.TransferSync(W1.Address(), defGas, defGasPrice, overAmt, bzweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
+	//require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
 
-		w.AddNonce()
+	require.NoError(t, W0.SyncBalance(bzweb3))
+	require.NoError(t, W1.SyncBalance(bzweb3))
 
-		racctObj.addExpectedBalance(randAmt)
-		senderAcctObj.addSpentGas(baseFee)
-		senderAcctObj.subExpectedBalance(needAmt)
-		senderAcctObj.addExpectedNonce()
-		senderAcctObj.sentTxsCnt++
-	}
-	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	require.Equal(t, testObj0.originBalance, W0.GetBalance())
+	require.Equal(t, testObj1.originBalance, W1.GetBalance())
+	require.Equal(t, testObj0.originNonce, W0.GetNonce())
 
-	wg.Done()
+}
+
+func TestTransfer_WrongAddr(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	require.NoError(t, W0.SyncBalance(bzweb3))
+	require.NoError(t, W0.Unlock(defaultRpcNode.Pass))
+	require.NotEqual(t, uint256.NewInt(0).String(), W0.GetBalance().String())
+
+	tmpAmt := new(uint256.Int).Div(W0.GetBalance(), uint256.NewInt(2))
+	ret, err := W0.TransferSync(nil, defGas, defGasPrice, tmpAmt, bzweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
+
+	ret, err = W0.TransferSync([]byte{0x00}, defGas, defGasPrice, tmpAmt, bzweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
 }
 
 func bulkTransferSync(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, receivers []*acctObj, cnt int) {
@@ -185,7 +182,7 @@ func bulkTransferSync(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, 
 	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 
 	rpcNode := randPeer()
-	fmt.Printf("Begin of bulkTransfer - account: %v, balance: %v, nonce: %v, rpcPeerIdx: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), rpcNode.PeerID)
+	fmt.Printf("bulkTransferSync - account: %v, balance: %v, nonce: %v, rpcPeerIdx: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), rpcNode.PeerID)
 	_bzweb3 := web3.NewBeatozWeb3(web3.NewHttpProvider(rpcNode.RPCURL))
 
 	subWg := &sync.WaitGroup{}
@@ -310,58 +307,58 @@ func bulkTransferSync(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, 
 	//fmt.Printf("End of bulkTransfer - account: %v, balance: %v, nonce: %v\n", w.Address(), w.GetBalance(), w.GetNonce())
 }
 
-func TestTransfer_OverBalance(t *testing.T) {
-	bzweb3 := randBeatozWeb3()
+func bulkTransferCommit(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, receivers []*acctObj, cnt int) {
+	w := senderAcctObj.w
+	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 
-	require.NoError(t, W0.SyncBalance(bzweb3))
-	require.NoError(t, W1.SyncBalance(bzweb3))
-	require.NoError(t, W0.Unlock(defaultRpcNode.Pass))
+	mtx.Lock()
+	peer := randPeer()
+	_bzweb3 := web3.NewBeatozWeb3(web3.NewHttpProvider(peer.RPCURL))
+	n, ok := peerConns[peer.PeerID]
+	if ok {
+		peerConns[peer.PeerID] = n + 1
+	} else {
+		peerConns[peer.PeerID] = 1
+	}
+	mtx.Unlock()
+	//fmt.Printf("bulkTransferCommit - account: %v, balance: %v, nonce: %v, txcnt: %v, rpcPeerIdx: %v, conns: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), cnt, peer.PeerID, peerConns[peer.PeerID])
 
-	testObj0 := newAcctObj(W0)
-	testObj1 := newAcctObj(W1)
+	maxAmt := new(uint256.Int).Div(senderAcctObj.originBalance, uint256.NewInt(uint64(cnt)))
+	maxAmt = new(uint256.Int).Sub(maxAmt, baseFee)
 
-	overAmt := W0.GetBalance() // baseFee is not included
+	for i := 0; i < cnt; i++ {
+		rn := rand.Intn(len(receivers))
+		if bytes.Compare(receivers[rn].w.Address(), w.Address()) == 0 {
+			rn = (rn + 1) % len(receivers)
+		}
 
-	ret, err := W0.TransferSync(W1.Address(), defGas, defGasPrice, overAmt, bzweb3)
-	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
-	//require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
+		racctObj := receivers[rn]
+		raddr := racctObj.w.Address()
+		randAmt := rbytes.RandU256IntN(maxAmt)
+		if randAmt.Sign() == 0 {
+			randAmt = uint256.NewInt(1)
+		}
+		needAmt := new(uint256.Int).Add(randAmt, baseFee)
+		//fmt.Printf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
 
-	require.NoError(t, W0.SyncBalance(bzweb3))
-	require.NoError(t, W1.SyncBalance(bzweb3))
+		ret, err := w.TransferCommit(raddr, defGas, defGasPrice, randAmt, _bzweb3)
+		require.NoError(t, err, fmt.Sprintf("peerId: %v, conns: %v", peer.PeerID, peerConns[peer.PeerID]))
+		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
-	require.Equal(t, testObj0.originBalance, W0.GetBalance())
-	require.Equal(t, testObj1.originBalance, W1.GetBalance())
-	require.Equal(t, testObj0.originNonce, W0.GetNonce())
+		senderAcctObj.addTxHashOfAddr(ret.Hash, w.Address())
 
-	overAmt = new(uint256.Int).Add(new(uint256.Int).Sub(W0.GetBalance(), baseFee), uint256.NewInt(1)) // amt - baseFee + 1
-	ret, err = W0.TransferSync(W1.Address(), defGas, defGasPrice, overAmt, bzweb3)
-	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)
-	//require.Equal(t, xerrors.ErrCheckTx.Wrap(xerrors.ErrInsufficientFund).Error(), ret.Log)
+		//fmt.Printf("Send Tx [block:%v, txHash: %v, from: %v, to: %v, nonce: %v, amt: %v]\n", ret.Height, ret.Hash, w.Address(), racctObj.w.Address(), w.GetNonce(), randAmt)
 
-	require.NoError(t, W0.SyncBalance(bzweb3))
-	require.NoError(t, W1.SyncBalance(bzweb3))
+		w.AddNonce()
 
-	require.Equal(t, testObj0.originBalance, W0.GetBalance())
-	require.Equal(t, testObj1.originBalance, W1.GetBalance())
-	require.Equal(t, testObj0.originNonce, W0.GetNonce())
+		racctObj.addExpectedBalance(randAmt)
+		senderAcctObj.addSpentGas(baseFee)
+		senderAcctObj.subExpectedBalance(needAmt)
+		senderAcctObj.addExpectedNonce()
+		senderAcctObj.sentTxsCnt++
+	}
+	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 
-}
-
-func TestTransfer_WrongAddr(t *testing.T) {
-	bzweb3 := randBeatozWeb3()
-
-	require.NoError(t, W0.SyncBalance(bzweb3))
-	require.NoError(t, W0.Unlock(defaultRpcNode.Pass))
-	require.NotEqual(t, uint256.NewInt(0).String(), W0.GetBalance().String())
-
-	tmpAmt := new(uint256.Int).Div(W0.GetBalance(), uint256.NewInt(2))
-	ret, err := W0.TransferSync(nil, defGas, defGasPrice, tmpAmt, bzweb3)
-	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
-
-	ret, err = W0.TransferSync([]byte{0x00}, defGas, defGasPrice, tmpAmt, bzweb3)
-	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Code)
+	wg.Done()
 }

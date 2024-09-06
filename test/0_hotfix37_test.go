@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// when validator does not exist in ledger and tx fee should be given to the validator.
+// when tx fee should be given to the validator(proposer) but the validator does not exist in ledger,
 // a panic is generated in previous version.
 func TestTransfer0(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
