@@ -3,8 +3,8 @@ package stake_test
 import (
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
-	"github.com/beatoz/beatoz-go/ctrlers/stake/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/web3"
 	"github.com/beatoz/beatoz-go/types"
