@@ -109,6 +109,7 @@ func Benchmark_Commit_V0(b *testing.B) {
 	ledger, err := v0.NewFinalityLedger("ledgerV0", dbDir, 100_000, emptyTestItemV0)
 	require.NoError(b, err)
 
+	totalTxs := int64(0)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -116,6 +117,7 @@ func Benchmark_Commit_V0(b *testing.B) {
 		for j := 0; j < 10_000; j++ {
 			item := newTestItemV0(j, bytes.RandHexString(512))
 			require.NoError(b, ledger.SetFinality(item))
+			totalTxs++
 		}
 
 		b.StartTimer()
@@ -132,6 +134,7 @@ func Benchmark_Commit_V1(b *testing.B) {
 	ledger, err := v1.NewMutableLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
 
+	totalTxs := int64(0)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -139,6 +142,7 @@ func Benchmark_Commit_V1(b *testing.B) {
 		for j := 0; j < 10_000; j++ {
 			item := newTestItemV1(j, bytes.RandHexString(512))
 			require.NoError(b, ledger.Set(item))
+			totalTxs++
 		}
 
 		b.StartTimer()

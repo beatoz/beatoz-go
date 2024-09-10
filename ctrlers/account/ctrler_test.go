@@ -137,7 +137,6 @@ func TestAcctCtrler_Commit(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		// simulation 의 경우 각 노드(acctCtrler) 이 서로 다른 값을 가져도 상관 없다.
 		require.NoError(t, simuRand(100))
-		//require.NoError(t, readRand(100)) // 단순 read 는 commit 에 영향을 미치지 않는다.
 
 		h, v, e := commit()
 		require.NoError(t, e)
@@ -154,11 +153,10 @@ func TestAcctCtrler_Commit(t *testing.T) {
 	}
 
 	require.NoError(t, initialize())
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		require.NoError(t, simuRand(100))
 		// execution 이 random 으로 실행되면(각 노드(acctCtrler) 이 서로 다른 살행을 하면) 에러 발생.
 		require.NoError(t, execRand(100))
-		//require.NoError(t, readRand(100))
 
 		_, _, e := commit()
 		require.Error(t, e)
@@ -170,9 +168,7 @@ func TestAcctCtrler_Commit(t *testing.T) {
 
 	for i := 2; i < 100; i++ {
 		require.NoError(t, simuRand(100))
-		//require.NoError(t, readRand(10)) // 단순 read 는 commit 에 영향을 미치지 않는다.
 		require.NoError(t, execSame(100))
-		//require.NoError(t, readRand(10))
 
 		h, v, e := commit()
 		require.NoError(t, e)

@@ -30,7 +30,7 @@ func NewMutableLedger(name, dbDir string, cacheSize int, newItem func() ILedgerI
 		return nil, xerrors.From(err)
 	}
 
-	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), iavl.SyncOption(false))
+	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), iavl.SyncOption(true))
 
 	if _, err := tree.Load(); err != nil {
 		_ = db.Close()

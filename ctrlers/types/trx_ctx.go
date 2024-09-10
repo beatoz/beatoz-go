@@ -86,12 +86,12 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
 	if txctx.Sender == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.From)
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From)
 	}
 	// RG-91:  Also find the account object with the destination address 0x0.
 	txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(tx.To, txctx.Exec)
 	if txctx.Receiver == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.To)
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}
 	return txctx, nil
 }
