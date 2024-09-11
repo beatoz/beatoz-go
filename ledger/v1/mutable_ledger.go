@@ -140,13 +140,13 @@ func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(value); xerr != nil {
 			xerrStop = xerr
-			return true
+			return true // stop
 		} else if bytes.Compare(item.Key(), key) != 0 {
 			xerrStop = xerrors.From(fmt.Errorf("MutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-			return true
+			return true // stop
 		} else if xerr := cb(item); xerr != nil {
 			xerrStop = xerr
-			return true
+			return true // stop
 		}
 		return false // continue iteration
 	})

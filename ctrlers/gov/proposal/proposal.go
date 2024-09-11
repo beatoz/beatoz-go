@@ -3,6 +3,7 @@ package proposal
 import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -37,11 +38,13 @@ func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlo
 	}, nil
 }
 
-func (prop *GovProposal) Key() v0.LedgerKey {
+func (prop *GovProposal) Key() v1.LedgerKey {
 	prop.mtx.RLock()
 	defer prop.mtx.RUnlock()
 
-	return prop.TxHash.Array32()
+	_key := make([]byte, len(prop.TxHash))
+	copy(_key, prop.TxHash)
+	return _key
 }
 
 func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {

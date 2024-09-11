@@ -8,6 +8,7 @@ import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -24,49 +25,56 @@ type GovCtrler struct {
 	ctrlertypes.GovParams
 	newGovParams *ctrlertypes.GovParams
 
-	paramsLedger   v0.IFinalityLedger[*ctrlertypes.GovParams]
-	proposalLedger v0.IFinalityLedger[*proposal.GovProposal]
-	frozenLedger   v0.IFinalityLedger[*proposal.GovProposal]
+	//paramsLedger   v0.IFinalityLedger[*ctrlertypes.GovParams]
+	//proposalLedger v0.IFinalityLedger[*proposal.GovProposal]
+	// frozenLedger v0.IFinalityLedger[*proposal.GovProposal]
+
+	paramsState   *v1.Ledger
+	proposalState *v1.Ledger
+	frozenState   *v1.Ledger
 
 	logger log.Logger
 	mtx    sync.RWMutex
 }
 
 func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
-	newGovParamsProvider := func() *ctrlertypes.GovParams { return &ctrlertypes.GovParams{} }
-	newProposalProvider := func() *proposal.GovProposal {
+	newGovParamsProvider := func() v1.ILedgerItem { return &ctrlertypes.GovParams{} }
+	newProposalProvider := func() v1.ILedgerItem {
 		return &proposal.GovProposal{}
 	}
+	lg := logger.With("module", "beatoz_GovCtrler")
 
-	paramsLedger, xerr := v0.NewFinalityLedger[*ctrlertypes.GovParams]("gov_params", config.DBDir(), 1, newGovParamsProvider)
+	paramsState, xerr := v1.NewLedger("gov_params", config.DBDir(), 2048, newGovParamsProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	params, xerr := paramsLedger.Get(v0.ToLedgerKey(abytes.ZeroBytes(32)))
+	var params *ctrlertypes.GovParams
+	_item, xerr := paramsState.GetLedger(true).Get(abytes.ZeroBytes(32))
 	// `params` could be nil
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return nil, xerr
-	} else if params == nil {
+	}
+	params = _item.(*ctrlertypes.GovParams)
+	if params == nil {
 		params = &ctrlertypes.GovParams{} // empty params
 	}
 
-	proposalLedger, xerr := v0.NewFinalityLedger[*proposal.GovProposal]("proposal", config.DBDir(), 1, newProposalProvider)
+	proposalState, xerr := v1.NewLedger("proposal", config.DBDir(), 2048, newProposalProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	frozenLedger, xerr := v0.NewFinalityLedger[*proposal.GovProposal]("frozen_proposal", config.DBDir(), 1, newProposalProvider)
+	frozenState, xerr := v1.NewLedger("frozen_proposal", config.DBDir(), 1, newProposalProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	return &GovCtrler{
-		GovParams:      *params,
-		paramsLedger:   paramsLedger,
-		proposalLedger: proposalLedger,
-		frozenLedger:   frozenLedger,
-		logger:         logger.With("module", "beatoz_GovCtrler"),
+		GovParams:     *params,
+		paramsState:   paramsState,
+		proposalState: proposalState,
+		frozenState:   frozenState,
+		logger:        lg,
 	}, nil
 }
 
@@ -79,7 +87,7 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 		return xerrors.ErrInitChain.Wrapf("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
 	ctrler.GovParams = *genAppState.GovParams
-	_ = ctrler.paramsLedger.SetFinality(&ctrler.GovParams)
+	_ = ctrler.writeParams(&ctrler.GovParams, true)
 	return nil
 }
 
@@ -111,7 +119,9 @@ func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcit
 	return evts, nil
 }
 
-// DoPunish is called from BeatozApp::BeginBlock.
+// DoPunish slashes the voting power of the byzantine validator(voter).
+// If the voter has already voted, it will be canceled.
+// This function is called from BeatozApp::BeginBlock.
 func (ctrler *GovCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -120,28 +130,27 @@ func (ctrler *GovCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 }
 
 func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+	slashedPower := int64(0)
 	targetAddr := types.Address(evi.Validator.Address)
 
-	// punish in `proposalLedger`
-	var targetPropsKeys []v0.LedgerKey
-	ctrler.proposalLedger.IterateReadAllFinalityItems(func(prop *proposal.GovProposal) xerrors.XError {
+	_ = ctrler.proposalState.GetLedger(true).Iterate(func(item v1.ILedgerItem) xerrors.XError {
+		prop := item.(*proposal.GovProposal)
 		for _, v := range prop.Voters {
 			if bytes.Compare(v.Addr, targetAddr) == 0 {
-				targetPropsKeys = append(targetPropsKeys, prop.Key())
+				// the voting power of `targetAddr` will be slashed and
+				// the vote of `targetAddr` will be canceled.
+				slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRatio())
+				slashedPower += slashed
+
+				if xerr := ctrler.writeProposal(prop, true); xerr != nil {
+					return xerr
+				}
 				break
 			}
 		}
+
 		return nil
 	})
-
-	slashedPower := int64(0)
-	for _, k := range targetPropsKeys {
-		prop, _ := ctrler.proposalLedger.GetFinality(k)
-		slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRatio())
-		slashedPower += slashed
-
-		_ = ctrler.proposalLedger.SetFinality(prop)
-	}
 
 	return slashedPower, nil
 }
@@ -149,11 +158,6 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
-
-	getProposal := ctrler.proposalLedger.Get
-	if ctx.Exec {
-		getProposal = ctrler.proposalLedger.GetFinality
-	}
 
 	// validation by tx type
 	switch ctx.Tx.GetType() {
@@ -174,7 +178,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check already exist
-		if prop, xerr := getProposal(ctx.TxHash.Array32()); xerr != nil && xerr != xerrors.ErrNotFoundResult {
+		if prop, xerr := ctrler.readProposal(ctx.TxHash, ctx.Exec); xerr != nil && xerr != xerrors.ErrNotFoundResult {
 			return xerr
 		} else if prop != nil {
 			return xerrors.ErrDuplicatedKey
@@ -226,7 +230,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check already exist
-		prop, xerr := getProposal(txpayload.TxHash.Array32())
+		prop, xerr := ctrler.readProposal(txpayload.TxHash, ctx.Exec)
 		if xerr != nil {
 			return xerr
 		}
@@ -266,12 +270,6 @@ func (ctrler *GovCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 }
 
 func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
-	setProposal := ctrler.proposalLedger.Set
-	if ctx.Exec {
-		setProposal = ctrler.proposalLedger.SetFinality
-	}
-
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 
 	voters := make(map[string]*proposal.Voter)
@@ -290,7 +288,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	if xerr != nil {
 		return xerr
 	}
-	if xerr = setProposal(prop); xerr != nil {
+	if xerr = ctrler.writeProposal(prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -298,22 +296,15 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 }
 
 func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	getProposal := ctrler.proposalLedger.Get
-	setProposal := ctrler.proposalLedger.Set
-	if ctx.Exec {
-		getProposal = ctrler.proposalLedger.GetFinality
-		setProposal = ctrler.proposalLedger.SetFinality
-	}
-
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadVoting)
-	prop, xerr := getProposal(v0.ToLedgerKey(txpayload.TxHash))
+	prop, xerr := ctrler.readProposal(txpayload.TxHash, ctx.Exec)
 	if xerr != nil {
 		return xerr
 	}
 	if xerr = prop.DoVote(ctx.Tx.From, txpayload.Choice); xerr != nil {
 		return xerr
 	}
-	if xerr = setProposal(prop); xerr != nil {
+	if xerr = ctrler.writeProposal(prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
 	if prop.MajorOption != nil {
@@ -532,6 +523,43 @@ func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes) (*proposal.GovProp
 	} else {
 		return prop, nil
 	}
+}
+
+// todo: move the followings to the `v1.Ledger` structure
+func (ctrler *GovCtrler) readParams(key v1.LedgerKey, exec bool) (*ctrlertypes.GovParams, xerrors.XError) {
+	item, xerr := ctrler.paramsState.GetLedger(exec).Get(key)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return item.(*ctrlertypes.GovParams), nil
+}
+
+func (ctrler *GovCtrler) writeParams(params *ctrlertypes.GovParams, exec bool) xerrors.XError {
+	return ctrler.paramsState.GetLedger(exec).Set(params)
+}
+
+func (ctrler *GovCtrler) readProposal(key v1.LedgerKey, exec bool) (*proposal.GovProposal, xerrors.XError) {
+	item, xerr := ctrler.proposalState.GetLedger(exec).Get(key)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return item.(*proposal.GovProposal), nil
+}
+
+func (ctrler *GovCtrler) writeProposal(params *proposal.GovProposal, exec bool) xerrors.XError {
+	return ctrler.proposalState.GetLedger(exec).Set(params)
+}
+
+func (ctrler *GovCtrler) readFrozenProposal(key v1.LedgerKey, exec bool) (*proposal.GovProposal, xerrors.XError) {
+	item, xerr := ctrler.frozenState.GetLedger(exec).Get(key)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return item.(*proposal.GovProposal), nil
+}
+
+func (ctrler *GovCtrler) writeFrozenProposal(params *proposal.GovProposal, exec bool) xerrors.XError {
+	return ctrler.frozenState.GetLedger(exec).Set(params)
 }
 
 var _ ctrlertypes.ILedgerHandler = (*GovCtrler)(nil)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -231,8 +232,8 @@ func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
 	return ret, nil
 }
 
-func (r *GovParams) Key() v0.LedgerKey {
-	return v0.ToLedgerKey(bytes.ZeroBytes(32))
+func (r *GovParams) Key() v1.LedgerKey {
+	return bytes.ZeroBytes(32)
 }
 
 func (r *GovParams) Decode(bz []byte) xerrors.XError {
