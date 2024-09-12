@@ -14,7 +14,7 @@ import (
 )
 
 type AcctCtrler struct {
-	acctState *v1.Ledger
+	acctState *v1.Ledger[*atypes.Account]
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
@@ -23,7 +23,7 @@ type AcctCtrler struct {
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
 
 	lg := logger.With("module", "beatoz_AcctCtrler")
-	if _state, xerr := v1.NewLedger("accounts", config.DBDir(), 2048, func() v1.ILedgerItem { return &atypes.Account{} }, lg); xerr != nil {
+	if _state, xerr := v1.NewLedger[*atypes.Account]("accounts", config.DBDir(), 2048, func() *atypes.Account { return &atypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{

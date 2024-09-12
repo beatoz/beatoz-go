@@ -29,9 +29,9 @@ type GovCtrler struct {
 	//proposalLedger v0.IFinalityLedger[*proposal.GovProposal]
 	// frozenLedger v0.IFinalityLedger[*proposal.GovProposal]
 
-	paramsState   *v1.Ledger
-	proposalState *v1.Ledger
-	frozenState   *v1.Ledger
+	paramsState   *v1.Ledger[*ctrlertypes.GovParams]
+	proposalState *v1.Ledger[*proposal.GovProposal]
+	frozenState   *v1.Ledger[*proposal.GovProposal]
 
 	logger log.Logger
 	mtx    sync.RWMutex
@@ -357,9 +357,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Ev
 	return evts, nil
 }
 
-// The following function is called by the Block Executor
-//
-
+// freezeProposals is called from EndBlock
 func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []abytes.HexBytes, xerrors.XError) {
 	var frozen []abytes.HexBytes
 	var removed []abytes.HexBytes
