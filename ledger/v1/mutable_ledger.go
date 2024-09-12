@@ -12,8 +12,8 @@ import (
 )
 
 type MutableLedger struct {
-	*iavl.MutableTree
 	db          dbm.DB
+	tree        *iavl.MutableTree
 	cacheSize   int
 	newItemFunc func() ILedgerItem
 
@@ -38,7 +38,7 @@ func NewMutableLedger(name, dbDir string, cacheSize int, newItem func() ILedgerI
 	}
 
 	return &MutableLedger{
-		MutableTree: tree,
+		tree:        tree,
 		db:          db,
 		cacheSize:   cacheSize,
 		newItemFunc: newItem,
@@ -64,7 +64,7 @@ func (ledger *MutableLedger) Version() int64 {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	return ledger.MutableTree.Version()
+	return ledger.tree.Version()
 }
 
 func (ledger *MutableLedger) Set(item ILedgerItem) xerrors.XError {
@@ -72,7 +72,7 @@ func (ledger *MutableLedger) Set(item ILedgerItem) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	key := item.Key()
-	oldVal, err := ledger.MutableTree.Get(key)
+	oldVal, err := ledger.tree.Get(key)
 	if err != nil {
 		return xerrors.From(err)
 	}
@@ -81,7 +81,7 @@ func (ledger *MutableLedger) Set(item ILedgerItem) xerrors.XError {
 		return xerr
 	}
 
-	_, err = ledger.MutableTree.Set(key, newVal)
+	_, err = ledger.tree.Set(key, newVal)
 	if err != nil {
 		return xerrors.From(err)
 	}
@@ -102,7 +102,7 @@ func (ledger *MutableLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 		return ret, nil
 	}
 
-	if bz, err := ledger.MutableTree.Get(key); err != nil {
+	if bz, err := ledger.tree.Get(key); err != nil {
 		return nil, xerrors.From(err)
 	} else if bz == nil {
 		return nil, xerrors.ErrNotFoundResult
@@ -122,7 +122,7 @@ func (ledger *MutableLedger) Del(key LedgerKey) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	if oldVal, removed, err := ledger.MutableTree.Remove(key); err != nil {
+	if oldVal, removed, err := ledger.tree.Remove(key); err != nil {
 		return xerrors.From(err)
 	} else if oldVal != nil && removed {
 		delete(ledger.cachedItems, unsafe.String(&key[0], len(key)))
@@ -136,7 +136,7 @@ func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 	defer ledger.mtx.RUnlock()
 
 	var xerrStop xerrors.XError
-	stopped, err := ledger.MutableTree.Iterate(func(key []byte, value []byte) bool {
+	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(value); xerr != nil {
 			xerrStop = xerr
@@ -163,10 +163,10 @@ func (ledger *MutableLedger) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	ledger.MutableTree.SetCommitting()
-	defer ledger.MutableTree.UnsetCommitting()
+	ledger.tree.SetCommitting()
+	defer ledger.tree.UnsetCommitting()
 
-	if r1, r2, err := ledger.MutableTree.SaveVersion(); err != nil {
+	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
 		return r1, r2, xerrors.From(err)
 	} else {
 		clear(ledger.cachedItems)
@@ -183,12 +183,12 @@ func (ledger *MutableLedger) Close() xerrors.XError {
 	}
 	ledger.db = nil
 
-	if ledger.MutableTree != nil {
-		if err := ledger.MutableTree.Close(); err != nil {
+	if ledger.tree != nil {
+		if err := ledger.tree.Close(); err != nil {
 			return xerrors.From(err)
 		}
 	}
-	ledger.MutableTree = nil
+	ledger.tree = nil
 
 	clear(ledger.cachedItems)
 	ledger.snapshots.reset()
@@ -211,11 +211,11 @@ func (ledger *MutableLedger) RevertToSnapshot(snap int) xerrors.XError {
 	for i := len(restores) - 1; i >= 0; i-- {
 		item := restores[i]
 		if item.val != nil {
-			if _, err := ledger.MutableTree.Set(item.key, item.val); err != nil {
+			if _, err := ledger.tree.Set(item.key, item.val); err != nil {
 				return xerrors.From(err)
 			}
 		} else {
-			if _, _, err := ledger.MutableTree.Remove(item.key); err != nil {
+			if _, _, err := ledger.tree.Remove(item.key); err != nil {
 				return xerrors.From(err)
 			}
 		}
@@ -228,7 +228,7 @@ func (ledger *MutableLedger) ImmutableLedgerAt(ver int64) (ILedger, xerrors.XErr
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	immuTree, err := ledger.MutableTree.GetImmutable(ver)
+	immuTree, err := ledger.tree.GetImmutable(ver)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
