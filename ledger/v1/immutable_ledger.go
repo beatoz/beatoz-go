@@ -82,27 +82,27 @@ func (ledger *ImmutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerr
 	return nil
 }
 
-func (ledger *ImmutableLedger) Commit() ([]byte, int64, xerrors.XError) {
-	panic("ImmutableLedger can not have this method")
-}
+//func (ledger *ImmutableLedger) Commit() ([]byte, int64, xerrors.XError) {
+//	panic("ImmutableLedger can not have this method")
+//}
+//
+//func (ledger *ImmutableLedger) Close() xerrors.XError {
+//	panic("ImmutableLedger can not have this method")
+//}
+//
+//func (ledger *ImmutableLedger) Snapshot() int {
+//	panic("ImmutableLedger can not have this method")
+//}
+//
+//func (ledger *ImmutableLedger) RevertToSnapshot(snap int) xerrors.XError {
+//	panic("ImmutableLedger can not have this method")
+//}
+//
+//func (ledger *ImmutableLedger) ImmutableLedgerAt(i int64) (ILedger, xerrors.XError) {
+//	panic("ImmutableLedger can not have this method")
+//}
+//func (ledger *ImmutableLedger) MempoolLedgerAt(i int64) (ILedger, xerrors.XError) {
+//	panic("ImmutableLedger can not have this method")
+//}
 
-func (ledger *ImmutableLedger) Close() xerrors.XError {
-	panic("ImmutableLedger can not have this method")
-}
-
-func (ledger *ImmutableLedger) Snapshot() int {
-	panic("ImmutableLedger can not have this method")
-}
-
-func (ledger *ImmutableLedger) RevertToSnapshot(snap int) xerrors.XError {
-	panic("ImmutableLedger can not have this method")
-}
-
-func (ledger *ImmutableLedger) ImmutableLedgerAt(i int64) (ILedger, xerrors.XError) {
-	panic("ImmutableLedger can not have this method")
-}
-func (ledger *ImmutableLedger) MempoolLedgerAt(i int64) (ILedger, xerrors.XError) {
-	panic("ImmutableLedger can not have this method")
-}
-
-var _ ILedger = (*ImmutableLedger)(nil)
+//var _ ILedger = (*ImmutableLedger)(nil)

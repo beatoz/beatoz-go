@@ -77,16 +77,16 @@ func (ledger *MempoolLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 	return nil
 }
 
-func (ledger *MempoolLedger) Commit() ([]byte, int64, xerrors.XError) {
-	panic("MempoolLedger can not have the method `Commit`")
-}
-
-func (ledger *MempoolLedger) ImmutableLedgerAt(ver int64) (ILedger, xerrors.XError) {
-	panic("MempoolLedger can not have the method `ImmutableLedgerAt`")
-}
-
-func (ledger *MempoolLedger) MempoolLedgerAt(ver int64) (ILedger, xerrors.XError) {
-	panic("MempoolLedger can not have the method `MempoolLedgerAt`")
-}
-
-var _ ILedger = (*MempoolLedger)(nil)
+//func (ledger *MempoolLedger) Commit() ([]byte, int64, xerrors.XError) {
+//	panic("MempoolLedger can not have the method `Commit`")
+//}
+//
+//func (ledger *MempoolLedger) ImmutableLedgerAt(ver int64) (ILedger, xerrors.XError) {
+//	panic("MempoolLedger can not have the method `ImmutableLedgerAt`")
+//}
+//
+//func (ledger *MempoolLedger) MempoolLedgerAt(ver int64) (ILedger, xerrors.XError) {
+//	panic("MempoolLedger can not have the method `MempoolLedgerAt`")
+//}
+//
+//var _ ILedger = (*MempoolLedger)(nil)

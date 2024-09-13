@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/beatoz/beatoz-go/ledger/v0"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -711,5 +710,5 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 	}
 }
 
-var _ v0.ILedgerItem = (*GovParams)(nil)
+var _ v1.ILedgerItem = (*GovParams)(nil)
 var _ IGovHandler = (*GovParams)(nil)

@@ -49,17 +49,33 @@ func (ledger *Ledger[T]) getLedger(exec bool) ILedger {
 	return ledger.mempoolLedger
 }
 
-func (ledger *Ledger[T]) Write(item T, exec bool) xerrors.XError {
-	return ledger.GetLedger(exec).Set(item)
+func (ledger *Ledger[T]) Set(item T, exec bool) xerrors.XError {
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
+
+	return ledger.getLedger(exec).Set(item)
 }
 
-func (ledger *Ledger[T]) Read(key LedgerKey, exec bool) (T, xerrors.XError) {
-	v, xerr := ledger.GetLedger(exec).Get(key)
+func (ledger *Ledger[T]) Get(key LedgerKey, exec bool) (T, xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	v, xerr := ledger.getLedger(exec).Get(key)
 	return v.(T), xerr
 }
 
+func (ledger *Ledger[T]) Del(key LedgerKey, exec bool) xerrors.XError {
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
+
+	return ledger.getLedger(exec).Del(key)
+}
+
 func (ledger *Ledger[T]) Iterate(cb func(T) xerrors.XError, exec bool) xerrors.XError {
-	return ledger.GetLedger(exec).Iterate(func(item ILedgerItem) xerrors.XError {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.getLedger(exec).Iterate(func(item ILedgerItem) xerrors.XError {
 		return cb(item.(T))
 	})
 }
@@ -102,3 +118,21 @@ func (ledger *Ledger[T]) Close() xerrors.XError {
 
 	return nil
 }
+
+// ImmutableLedgerAt returns the ledger that is immutable and not committable.
+func (ledger *Ledger[T]) ImmutableLedgerAt(height int64) (ILedger, xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.consensusLedger.ImmutableLedgerAt(height)
+}
+
+// MempoolLedgerAt returns the ledger that is mutable and not committable.
+func (ledger *Ledger[T]) MempoolLedgerAt(height int64) (ILedger, xerrors.XError) {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.consensusLedger.MempoolLedgerAt(height)
+}
+
+//var _ ILedger = (*Ledger)(nil)

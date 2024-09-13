@@ -13,12 +13,12 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	txhash := req.Data
 	switch req.Path {
 	case "proposal":
-		atProposalLedger, xerr := ctrler.proposalLedger.ImmutableLedgerAt(req.Height, 0)
+		atProposalLedger, xerr := ctrler.proposalState.ImmutableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
-		atFrozenLedger, xerr := ctrler.frozenLedger.ImmutableLedgerAt(req.Height, 0)
+		atFrozenLedger, xerr := ctrler.frozenState.ImmutableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
@@ -30,11 +30,11 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 
 		if txhash == nil || len(txhash) == 0 {
 			var readProposals []*_prop
-			if xerr := atProposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
+			if xerr := atProposalLedger.Iterate(func(prop *proposal.GovProposal) xerrors.XError {
 				readProposals = append(readProposals, &_prop{
 					Status:   "voting",
 					Proposal: prop,
-				})
+				}, false)
 				return nil
 			}); xerr != nil {
 				return nil, xerrors.ErrQuery.Wrap(xerr)

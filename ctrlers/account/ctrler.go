@@ -167,11 +167,11 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *atypes.Acc
 }
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *atypes.Account {
-	if acct, xerr := ctrler.acctState.GetLedger(exec).Get(addr); xerr != nil {
+	if acct, xerr := ctrler.acctState.Get(addr, exec); xerr != nil {
 		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
-		return acct.(*atypes.Account)
+		return acct
 	}
 }
 
@@ -279,12 +279,11 @@ func (ctrler *AcctCtrler) SetAccount(acct *atypes.Account, exec bool) xerrors.XE
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *atypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.GetLedger(exec).Set(acct)
+	return ctrler.acctState.Set(acct, exec)
 }
 
 func (ctrler *AcctCtrler) MempoolAcctCtrlerAt(height int64) (atypes.IAccountHandler, xerrors.XError) {
-	_ledger := ctrler.acctState.GetLedger(true)
-	memLedger, xerr := _ledger.MempoolLedgerAt(height)
+	memLedger, xerr := ctrler.acctState.MempoolLedgerAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}

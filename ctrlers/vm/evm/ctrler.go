@@ -371,6 +371,15 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 	return nil
 }
 
+// MemStateAt returns the ledger of EVM and AcctCtrler with the state values at the `height`.
+// THIS LEDGER MUST BE NOT COMMITED.
+// MemStateAt is called from `QueryCode` and `callVM`.
+// When it is called from `QueryCode`, this ledger is only read (not updated).
+// In this case, the ledger can be immutable.
+// When it is called from `callVM`, this ledger may be updated.
+// In this case, the ledger should not be immutable.
+// In both cases, the ledger SHOULD NOT BE COMMITTED.
+// To satisfy all conditions, MemStateAt returns the mempool ledger which can be updated but not committed.
 func (ctrler *EVMCtrler) MemStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
 	hash, err := ctrler.metadb.Get(blockKey(height))
 	if err != nil {

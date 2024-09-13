@@ -2,7 +2,6 @@ package proposal
 
 import (
 	"encoding/json"
-	"github.com/beatoz/beatoz-go/ledger/v0"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -68,7 +67,7 @@ func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
 	return nil
 }
 
-var _ v0.ILedgerItem = (*GovProposal)(nil)
+var _ v1.ILedgerItem = (*GovProposal)(nil)
 
 func (prop *GovProposal) DoVote(addr types.Address, choice int32) xerrors.XError {
 	prop.mtx.Lock()
