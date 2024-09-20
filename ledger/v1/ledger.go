@@ -124,7 +124,7 @@ func (ledger *Ledger[T]) ImmutableLedgerAt(height int64) (ILedger, xerrors.XErro
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	return ledger.consensusLedger.ImmutableLedgerAt(height)
+	return nil, nil //ledger.consensusLedger.ImmutableLedgerAt(height)
 }
 
 // MempoolLedgerAt returns the ledger that is mutable and not committable.
@@ -132,7 +132,7 @@ func (ledger *Ledger[T]) MempoolLedgerAt(height int64) (ILedger, xerrors.XError)
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	return ledger.consensusLedger.MempoolLedgerAt(height)
+	return nil, nil //ledger.consensusLedger.MempoolLedgerAt(height)
 }
 
 //var _ ILedger = (*Ledger)(nil)

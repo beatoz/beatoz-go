@@ -2,9 +2,9 @@
 
 usage | committable | gettable | settable | at height | type
 -|:-----------:|:--------:|:--------:|:---------:|-
-query        |      X      |    O     |    X     |     O     | immutable
-evm call |      X      |    O     |    O     |     O     | mempool?
-tx exec |      O      |    O     |    O     |     X     | mutable 
+query        |      X      |    O     |    X     |     O     | ImmutableLedger
+evm call |      X      |    O     |    O     |     O     | ImmutableLedger ~~mempool?~~ (copy from mutable tree)
+tx exec |      O      |    O     |    O     |     X     | MutableLedger 
 
 
 ```go

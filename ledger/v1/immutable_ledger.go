@@ -10,30 +10,56 @@ import (
 )
 
 type ImmutableLedger struct {
-	*iavl.ImmutableTree
+	tree        *iavl.ImmutableTree
 	newItemFunc func() ILedgerItem
-
-	logger tmlog.Logger
-	mtx    sync.RWMutex
+	mtx         sync.RWMutex
 }
 
 func newImmutableLedger(immuTree *iavl.ImmutableTree, newItem func() ILedgerItem, lg tmlog.Logger) *ImmutableLedger {
 	return &ImmutableLedger{
-		ImmutableTree: immuTree,
-		newItemFunc:   newItem,
-		logger:        lg,
+		//MutableLedger: &MutableLedger{
+		//	db:          nil,
+		//	tree:        nil,
+		//	cacheSize:   123,
+		//	newItemFunc: newItem,
+		//	usedItems:   make(map[string]ILedgerItem),
+		//	snapshots:   NewSnapshotList(),
+		//	logger:      lg,
+		//	mtx:         sync.RWMutex{},
+		//},
+		tree:        immuTree,
+		newItemFunc: newItem,
 	}
 }
 
+// Set writes `item` to only `cachedItem` which is on memory not tree.
 func (ledger *ImmutableLedger) Set(item ILedgerItem) xerrors.XError {
-	panic("ImmutableLedger can not have this method")
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
+
+	//key := item.Key()
+	//oldVal, err := ledger.tree.Get(key)
+	//if err != nil {
+	//	return xerrors.From(err)
+	//}
+	//newVal, xerr := item.Encode()
+	//if xerr != nil {
+	//	return xerr
+	//}
+	//
+	//ledger.MutableLedger.cachedItems[unsafe.String(&key[0], len(key))] = item
+	//if oldVal == nil || bytes.Compare(oldVal, newVal) != 0 {
+	//	// created or updated
+	//	ledger.snapshots.set(key, oldVal)
+	//}
+	return nil
 }
 
 func (ledger *ImmutableLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	val, err := ledger.ImmutableTree.Get(key)
+	val, err := ledger.tree.Get(key)
 	if err != nil {
 		return nil, xerrors.From(err)
 	} else if val == nil {
@@ -41,11 +67,11 @@ func (ledger *ImmutableLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) 
 	}
 
 	item := ledger.newItemFunc()
-	if xerr := item.Decode(val); xerr != nil {
-		return nil, xerr
-	} else if bytes.Compare(item.Key(), key) != 0 {
-		return nil, xerrors.From(fmt.Errorf("ImmutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-	}
+	//if xerr := item.Decode(val); xerr != nil {
+	//	return nil, xerr
+	//} else if bytes.Compare(item.Key(), key) != 0 {
+	//	return nil, xerrors.From(fmt.Errorf("ImmutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
+	//}
 
 	return item, nil
 }
@@ -59,7 +85,7 @@ func (ledger *ImmutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerr
 	defer ledger.mtx.RUnlock()
 
 	var xerrStop xerrors.XError
-	stopped, err := ledger.ImmutableTree.Iterate(func(key []byte, value []byte) bool {
+	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(value); xerr != nil {
 			xerrStop = xerr

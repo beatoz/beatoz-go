@@ -8,10 +8,10 @@ import (
 	dbm "github.com/cosmos/iavl/db"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
-	"unsafe"
 )
 
 // MempoolLedger cannot be committed, everything else is like MutableLedger.
+// DEPRECATED
 type MempoolLedger struct {
 	*MutableLedger
 	mtx sync.RWMutex
@@ -33,9 +33,9 @@ func NewMempoolLedger(db dbm.DB, cacheSize int, newItem func() ILedgerItem, lg t
 			db:          nil,
 			cacheSize:   cacheSize,
 			newItemFunc: newItem,
-			cachedItems: make(map[string]ILedgerItem),
-			snapshots:   NewSnapshotList(),
-			logger:      lg,
+			//usedItems:   make(map[string]ILedgerItem),
+			snapshots: NewSnapshotList(),
+			logger:    lg,
 		},
 	}, nil
 }
@@ -48,12 +48,12 @@ func (ledger *MempoolLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
 
 		// if the item is cached, return it to `cb`.
-		if item, ok := ledger.cachedItems[unsafe.String(&key[0], len(key))]; ok {
-			if xerr := cb(item); xerr != nil {
-				xerrStop = xerr
-				return true // stop
-			}
-		}
+		//if item, ok := ledger.usedItems[unsafe.String(&key[0], len(key))]; ok {
+		//	if xerr := cb(item); xerr != nil {
+		//		xerrStop = xerr
+		//		return true // stop
+		//	}
+		//}
 
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(value); xerr != nil {

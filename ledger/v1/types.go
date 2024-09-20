@@ -25,8 +25,8 @@ type ILedger interface {
 	RevertToSnapshot(snap int) xerrors.XError
 	//RevertAll()
 	//ApplyRevisions() xerrors.XError
-	ImmutableLedgerAt(int64) (ILedger, xerrors.XError)
-	MempoolLedgerAt(int64) (ILedger, xerrors.XError)
+	//ImmutableLedgerAt(int64) (ILedger, xerrors.XError)
+	//MempoolLedgerAt(int64) (ILedger, xerrors.XError)
 }
 
 type LedgerKey = []byte

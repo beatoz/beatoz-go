@@ -12,7 +12,51 @@ import (
 	"testing"
 )
 
-func TestLedger_RevertToSnapshot_Set(t *testing.T) {
+func TestLedger_RevertToSnapshot_Set0(t *testing.T) {
+	dbDir, err := os.MkdirTemp("", "ledger_test")
+	require.NoError(t, err)
+
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+		return &Item{}
+	}, log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	item0 := newItem(0, "test item0 value")
+	require.NoError(t, ledger.Set(item0))
+
+	snap := ledger.Snapshot()
+	fmt.Println("snapshot", snap, ": item0 exists, but item1 does not exist.")
+
+	item1 := newItem(1, "test item1 value")
+	require.NoError(t, ledger.Set(item1))
+
+	// item0 exists
+	_item, xerr := ledger.Get(item0.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, item0, _item)
+
+	// item1 exists
+	_item, xerr = ledger.Get(item1.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, item1, _item)
+
+	// item0 should be not removed but item1 should be removed.
+	require.NoError(t, ledger.RevertToSnapshot(snap))
+
+	_item, xerr = ledger.Get(item0.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, item0, _item)
+
+	_item, xerr = ledger.Get(item1.Key())
+	require.Error(t, xerr)
+	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+	require.Nil(t, _item)
+
+	require.NoError(t, ledger.Close())
+	require.NoError(t, os.RemoveAll(dbDir))
+}
+
+func TestLedger_RevertToSnapshot_Set1(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
 
