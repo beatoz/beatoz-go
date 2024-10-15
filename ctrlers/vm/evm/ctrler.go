@@ -246,53 +246,15 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		}
 	}
 
-	logs := ctrler.stateDBWrapper.GetLogs(ctx.TxHash.Array32(), common.Hash{})
-	if logs != nil && len(logs) > 0 {
-		for _, l := range logs {
-			// Contract Address
-			strVal := hex.EncodeToString(l.Address[:])
-			attrs = append(attrs, abcitypes.EventAttribute{
-				Key:   []byte("contract"),
-				Value: []byte(strVal),
-				Index: true,
-			})
-
-			// Topics (indexed)
-			for i, t := range l.Topics {
-				strVal = hex.EncodeToString(t.Bytes())
-				attrs = append(attrs, abcitypes.EventAttribute{
-					Key:   []byte(fmt.Sprintf("topic.%d", i)),
-					Value: []byte(strings.ToUpper(strVal)),
-					Index: true,
-				})
-			}
-
-			// Data (not indexed)
-			if l.Data != nil && len(l.Data) > 0 {
-				strVal = hex.EncodeToString(l.Data)
-				attrs = append(attrs, abcitypes.EventAttribute{
-					Key:   []byte("data"),
-					Value: []byte(strVal),
-					Index: false,
-				})
-			}
-
-			// Removed
-			strVal = "false"
-			if l.Removed {
-				strVal = "true"
-			}
-			attrs = append(attrs, abcitypes.EventAttribute{
-				Key:   []byte("removed"),
-				Value: []byte(strVal),
-				Index: false,
-			})
-		}
+	evmEvts := ctrler.evmLogsToEvent(ctx.TxHash.Array32())
+	if len(attrs) > 0 {
+		evmEvts = append(evmEvts, abcitypes.Event{
+			Type:       "evm",
+			Attributes: attrs,
+		})
 	}
-	ctx.Events = append(ctx.Events, abcitypes.Event{
-		Type:       "evm",
-		Attributes: attrs,
-	})
+
+	ctx.Events = append(ctx.Events, evmEvts...)
 
 	return nil
 }
@@ -314,6 +276,61 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPr
 	}
 
 	return result, nil
+}
+
+func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
+	var evts []abcitypes.Event // log : event = 1 : 1
+	logs := ctrler.stateDBWrapper.GetLogs(txHash, common.Hash{})
+	if logs != nil && len(logs) > 0 {
+		for _, l := range logs {
+			evt := abcitypes.Event{
+				Type: "evm", //fmt.Sprintf("evm.%X", l.Address),
+			}
+
+			// Contract Address
+			strVal := hex.EncodeToString(l.Address[:])
+			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+				Key:   []byte("address"),
+				Value: []byte(strVal),
+				Index: true,
+			})
+
+			// Topics (indexed)
+			for i, t := range l.Topics {
+				strVal = hex.EncodeToString(t.Bytes())
+				evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+					Key:   []byte(fmt.Sprintf("topic.%d", i)),
+					Value: []byte(strings.ToUpper(strVal)),
+					Index: true,
+				})
+			}
+
+			// Data (not indexed)
+			if l.Data != nil && len(l.Data) > 0 {
+				strVal = hex.EncodeToString(l.Data)
+				evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+					Key:   []byte("data"),
+					Value: []byte(strVal),
+					Index: false,
+				})
+			}
+
+			// Removed
+			strVal = "false"
+			if l.Removed {
+				strVal = "true"
+			}
+			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+				Key:   []byte("removed"),
+				Value: []byte(strVal),
+				Index: false,
+			})
+
+			evts = append(evts, evt)
+		}
+	}
+
+	return evts
 }
 
 func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
