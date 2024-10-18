@@ -3,30 +3,79 @@ package v1
 import (
 	"bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/cosmos/iavl"
 	"sort"
 )
+
+type IGettable interface {
+	Get(LedgerKey) (ILedgerItem, xerrors.XError)
+	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
+}
+
+type ISettable interface {
+	Set(ILedgerItem) xerrors.XError
+	Del(LedgerKey) xerrors.XError
+	Snapshot() int
+	RevertToSnapshot(int) xerrors.XError
+}
+
+type ICommittable interface {
+	Commit() ([]byte, int64, xerrors.XError)
+}
+
+type IImitable interface {
+	IGettable
+	ISettable
+}
+
+type IMutable interface {
+	IGettable
+	ISettable
+	ICommittable
+	Version() int64
+	GetReadOnlyTree(int64) (*iavl.ImmutableTree, xerrors.XError)
+	Close() xerrors.XError
+}
+
+type IStateLedger[T ILedgerItem] interface {
+	Version() int64
+	Get(LedgerKey, bool) (T, xerrors.XError)
+	Iterate(func(T) xerrors.XError, bool) xerrors.XError
+	Set(T, bool) xerrors.XError
+	Snapshot(bool) int
+	RevertToSnapshot(int, bool) xerrors.XError
+	Del(LedgerKey, bool) xerrors.XError
+	Commit() ([]byte, int64, xerrors.XError)
+	Close() xerrors.XError
+	ImitableLedgerAt(int64) (IImitable, xerrors.XError)
+
+	//RevertAll()
+	//ApplyRevisions() xerrors.XError
+	//ImitableLedgerAt(int64) (ILedger, xerrors.XError)
+	//MempoolLedgerAt(int64) (ILedger, xerrors.XError)
+}
+
+//type ILedger interface {
+//	Version() int64
+//	Set(ILedgerItem) xerrors.XError
+//	Get(LedgerKey) (ILedgerItem, xerrors.XError)
+//	Del(LedgerKey) xerrors.XError
+//	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
+//	Commit() ([]byte, int64, xerrors.XError)
+//	Close() xerrors.XError
+//
+//	Snapshot() int
+//	RevertToSnapshot(int) xerrors.XError
+//	//RevertAll()
+//	//ApplyRevisions() xerrors.XError
+//	//ImitableLedgerAt(int64) (ILedger, xerrors.XError)
+//	//MempoolLedgerAt(int64) (ILedger, xerrors.XError)
+//}
 
 type ILedgerItem interface {
 	Key() LedgerKey
 	Encode() ([]byte, xerrors.XError)
 	Decode([]byte) xerrors.XError
-}
-
-type ILedger interface {
-	Version() int64
-	Set(ILedgerItem) xerrors.XError
-	Get(LedgerKey) (ILedgerItem, xerrors.XError)
-	Del(LedgerKey) xerrors.XError
-	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
-	Commit() ([]byte, int64, xerrors.XError)
-	Close() xerrors.XError
-
-	Snapshot() int
-	RevertToSnapshot(snap int) xerrors.XError
-	//RevertAll()
-	//ApplyRevisions() xerrors.XError
-	//ImmutableLedgerAt(int64) (ILedger, xerrors.XError)
-	//MempoolLedgerAt(int64) (ILedger, xerrors.XError)
 }
 
 type LedgerKey = []byte

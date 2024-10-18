@@ -2,6 +2,7 @@ package web3
 
 import (
 	"errors"
+	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	bzweb3types "github.com/beatoz/beatoz-go/libs/web3/types"
@@ -197,6 +198,29 @@ func (bzweb3 *BeatozWeb3) QueryVotingPower(height int64) (int64, error) {
 		return -1, err
 	} else if ret, err := strconv.ParseInt(string(queryResp.Value), 10, 64); err != nil {
 		return -1, err
+	} else {
+		return ret, nil
+	}
+}
+
+type QueryProposalResult struct {
+	Status   string                `json:"status"`
+	Proposal *proposal.GovProposal `json:"proposal"`
+}
+
+func (bzweb3 *BeatozWeb3) QueryProposal(txhash []byte, height int64) (*QueryProposalResult, error) {
+	ret := &QueryProposalResult{}
+	queryResp := &rpc.QueryResult{}
+	if req, err := bzweb3.NewRequest("proposal", txhash, strconv.FormatInt(height, 10)); err != nil {
+		panic(err)
+	} else if resp, err := bzweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, ret); err != nil {
+		return nil, err
 	} else {
 		return ret, nil
 	}

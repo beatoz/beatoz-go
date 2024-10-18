@@ -1,7 +1,7 @@
 package web3
 
 import (
-	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -14,7 +14,7 @@ import (
 
 type Wallet struct {
 	wkey *crypto.WalletKey
-	acct *types2.Account
+	acct *ctrlertypes.Account
 
 	mtx sync.RWMutex
 }
@@ -24,7 +24,7 @@ func NewWallet(s []byte) *Wallet {
 	wkey := crypto.NewWalletKeyWith(prvKey, s)
 	return &Wallet{
 		wkey: wkey,
-		acct: types2.NewAccount(wkey.Address),
+		acct: ctrlertypes.NewAccount(wkey.Address),
 	}
 }
 
@@ -32,7 +32,7 @@ func ImportKey(prvKey, s []byte) *Wallet {
 	wkey := crypto.NewWalletKeyWith(prvKey, s)
 	return &Wallet{
 		wkey: wkey,
-		acct: types2.NewAccount(wkey.Address),
+		acct: ctrlertypes.NewAccount(wkey.Address),
 	}
 }
 
@@ -77,7 +77,7 @@ func (w *Wallet) Address() types.Address {
 	return w.wkey.Address
 }
 
-func (w *Wallet) GetAccount() *types2.Account {
+func (w *Wallet) GetAccount() *ctrlertypes.Account {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
@@ -134,11 +134,11 @@ func (w *Wallet) Unlock(s []byte) error {
 	return w.wkey.Unlock(s)
 }
 
-func (w *Wallet) SignTrxProto(tx *types2.Trx, chainId string) (bytes.HexBytes, bytes.HexBytes, error) {
+func (w *Wallet) SignTrxProto(tx *ctrlertypes.Trx, chainId string) (bytes.HexBytes, bytes.HexBytes, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
-	preimg, xerr := types2.PreImageToSignTrxProto(tx, chainId)
+	preimg, xerr := ctrlertypes.PreImageToSignTrxProto(tx, chainId)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -152,11 +152,11 @@ func (w *Wallet) SignTrxProto(tx *types2.Trx, chainId string) (bytes.HexBytes, b
 	return sig, preimg, nil
 }
 
-func (w *Wallet) SignTrxRLP(tx *types2.Trx, chainId string) (bytes.HexBytes, bytes.HexBytes, error) {
+func (w *Wallet) SignTrxRLP(tx *ctrlertypes.Trx, chainId string) (bytes.HexBytes, bytes.HexBytes, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 
-	preimg, xerr := types2.PreImageToSignTrxRLP(tx, chainId)
+	preimg, xerr := ctrlertypes.PreImageToSignTrxRLP(tx, chainId)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -170,7 +170,7 @@ func (w *Wallet) SignTrxRLP(tx *types2.Trx, chainId string) (bytes.HexBytes, byt
 	return sig, preimg, nil
 }
 
-func (w *Wallet) SendTxAsync(tx *types2.Trx, bzweb3 *BeatozWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) SendTxAsync(tx *ctrlertypes.Trx, bzweb3 *BeatozWeb3) (*coretypes.ResultBroadcastTx, error) {
 	if _, _, err := w.SignTrxRLP(tx, bzweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
@@ -178,7 +178,7 @@ func (w *Wallet) SendTxAsync(tx *types2.Trx, bzweb3 *BeatozWeb3) (*coretypes.Res
 	}
 }
 
-func (w *Wallet) SendTxSync(tx *types2.Trx, bzweb3 *BeatozWeb3) (*coretypes.ResultBroadcastTx, error) {
+func (w *Wallet) SendTxSync(tx *ctrlertypes.Trx, bzweb3 *BeatozWeb3) (*coretypes.ResultBroadcastTx, error) {
 	if _, _, err := w.SignTrxRLP(tx, bzweb3.ChainID()); err != nil {
 		return nil, err
 	} else {
@@ -186,7 +186,7 @@ func (w *Wallet) SendTxSync(tx *types2.Trx, bzweb3 *BeatozWeb3) (*coretypes.Resu
 	}
 }
 
-func (w *Wallet) SendTxCommit(tx *types2.Trx, bzweb3 *BeatozWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
+func (w *Wallet) SendTxCommit(tx *ctrlertypes.Trx, bzweb3 *BeatozWeb3) (*coretypes.ResultBroadcastTxCommit, error) {
 	if _, _, err := w.SignTrxRLP(tx, bzweb3.ChainID()); err != nil {
 		return nil, err
 	} else {

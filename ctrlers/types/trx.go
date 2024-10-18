@@ -10,7 +10,6 @@ import (
 	"github.com/holiman/uint256"
 	"google.golang.org/protobuf/proto"
 	"io"
-	"math"
 	"time"
 )
 
@@ -351,21 +350,16 @@ func (tx *Trx) validate() xerrors.XError {
 	if tx.Amount.Sign() < 0 {
 		return xerrors.ErrInvalidAmount
 	}
-	if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
-		return xerrors.ErrInvalidGas
-	}
-	if tx.GasPrice == nil || tx.GasPrice.Sign() < 0 {
-		return xerrors.ErrInvalidGasPrice
-	}
 	if tx.Type < TRX_MIN_TYPE && tx.Type > TRX_MAX_TYPE {
 		return xerrors.ErrInvalidTrxType
 	}
 	if tx.Payload != nil && tx.Type != tx.Payload.Type() {
 		return xerrors.ErrInvalidTrxPayloadType
 	}
-	if tx.Sig == nil {
-		return xerrors.ErrInvalidTrxSig
-	}
+	// signature is checked in NewTrxContext()
+	//if tx.Sig == nil {
+	//	return xerrors.ErrInvalidTrxSig
+	//}
 	return nil
 }
 

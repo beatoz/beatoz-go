@@ -163,12 +163,8 @@ func TestTrxStakingByTx(t *testing.T) {
 					break
 				}
 			}
-			//// todo: remove
-			//fmt.Println("error stakes....", err)
 			continue
 		} else {
-			//// todo: remove
-			//fmt.Println("updated stakes....")
 			require.NoError(t, err, fmt.Sprintf("index:%v", i), txctx.Tx)
 		}
 

@@ -408,7 +408,7 @@ func (ctrler *EVMCtrler) MemStateAt(height int64) (*StateDBWrapper, xerrors.XErr
 		return nil, xerrors.From(err)
 	}
 
-	memAcctHandler, xerr := ctrler.acctHandler.MempoolAcctCtrlerAt(height)
+	memAcctHandler, xerr := ctrler.acctHandler.SimuAcctCtrlerAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}

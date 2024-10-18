@@ -344,7 +344,7 @@ func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) 
 func (handler *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return nil, nil
 }
-func (handler *acctHandlerMock) MempoolAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+func (handler *acctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	walletsMap := make(map[string]*web3.Wallet)
 	walletsArr := make([]*web3.Wallet, len(handler.walletsArr))
 	for i, w := range handler.walletsArr {

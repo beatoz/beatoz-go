@@ -1,16 +1,47 @@
 ## Usages and features
 
-usage | committable | gettable | settable | at height | type
--|:-----------:|:--------:|:--------:|:---------:|-
-query        |      X      |    O     |    X     |     O     | ImmutableLedger
-evm call |      X      |    O     |    O     |     O     | ImmutableLedger ~~mempool?~~ (copy from mutable tree)
-tx exec |      O      |    O     |    O     |     X     | MutableLedger 
+type | gettable | settable | committable | at height | usage
+-|:--------:|:--------:|:-----------:|:---------:|-
+ImitableLedger        |    O     |    X     |      X      |     O     | query
+MemLedger |    O     |    O     |      X      |     O     | checkTx, evmCall(?)
+MutableLedger |    O     |    O     |      O      |     X     | deliverTx
 
 
 ```go
+type IGettable interface {
+	Get(...)
+	Iterate(...)
+}
+
+type ISettable interface {
+	Set(...)
+	Del(...)
+    Snapshot(...)
+    RevertToSnapshot(...)
+}
+
+type ICommittable interface {
+	Commit(...)
+}
+
+type IImitable interface {
+    IGettable
+	ISettable
+}
+
+type IMutable interface {
+    IImitable
+	ICommittable
+}
+
+type ILedger interface {
+    IMutable
+    ImitableLedgerAt(...)
+}
+
 type StateLedger struct {
     storageTree iavl.MutableTree
-	memTree map[key]Item
+    memTree map[key]Item
 }
 
 func (ledger *StateLedger) Set_From_Simulation(...) {
@@ -36,11 +67,11 @@ func (ledger *StateLedger) Iterate(...) {
 	// if not found at memTree, return item in storageTree
 }
 
-func (ledger *StateLedger) ImmutableLedgerAt(...) {
+func (ledger *StateLedger) ImitableLedgerAt(...) {
 	// return StateLedger that contains storageTree.GetImmutable()
 }
 
-func (ledger *StateLedger) MempoolLedgerAt(...) {
+func (ledger *StateLedger) MemLedgerAt(...) {
 // return StateLedger that contains new MutableTree copied from storageTree
 }
 

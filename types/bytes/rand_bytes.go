@@ -24,7 +24,7 @@ func RandHexBytes(n int) HexBytes {
 
 func RandHexString(n int) string {
 	bz := RandBytes(n)
-	return "0x" + hex.EncodeToString(bz)
+	return hex.EncodeToString(bz)
 }
 
 func RandU256IntN(cap *uint256.Int) *uint256.Int {
@@ -33,7 +33,7 @@ func RandU256IntN(cap *uint256.Int) *uint256.Int {
 }
 
 func RandU256Int() *uint256.Int {
-	return new(uint256.Int).SetBytes(RandBytes(32))
+	return new(uint256.Int).SetBytes(RandBytes(31))
 }
 
 func RandInt64N(cap int64) int64 {

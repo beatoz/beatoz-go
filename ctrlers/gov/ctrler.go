@@ -24,13 +24,9 @@ type GovCtrler struct {
 	ctrlertypes.GovParams
 	newGovParams *ctrlertypes.GovParams
 
-	//paramsLedger   v0.IFinalityLedger[*ctrlertypes.GovParams]
-	//proposalLedger v0.IFinalityLedger[*proposal.GovProposal]
-	// frozenLedger v0.IFinalityLedger[*proposal.GovProposal]
-
-	paramsState   *v1.Ledger[*ctrlertypes.GovParams]
-	proposalState *v1.Ledger[*proposal.GovProposal]
-	frozenState   *v1.Ledger[*proposal.GovProposal]
+	paramsState   v1.IStateLedger[*ctrlertypes.GovParams]
+	proposalState v1.IStateLedger[*proposal.GovProposal]
+	frozenState   v1.IStateLedger[*proposal.GovProposal]
 
 	logger log.Logger
 	mtx    sync.RWMutex
@@ -43,7 +39,7 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 	}
 	lg := logger.With("module", "beatoz_GovCtrler")
 
-	paramsState, xerr := v1.NewLedger[*ctrlertypes.GovParams]("gov_params", config.DBDir(), 2048, newGovParamsProvider, lg)
+	paramsState, xerr := v1.NewStateLedger[*ctrlertypes.GovParams]("gov_params", config.DBDir(), 2048, newGovParamsProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -52,14 +48,16 @@ func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 	// `params` may be nil
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return nil, xerr
+	} else if params == nil {
+		params = &ctrlertypes.GovParams{} // empty params
 	}
 
-	proposalState, xerr := v1.NewLedger[*proposal.GovProposal]("proposal", config.DBDir(), 2048, newProposalProvider, lg)
+	proposalState, xerr := v1.NewStateLedger[*proposal.GovProposal]("proposal", config.DBDir(), 2048, newProposalProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	frozenState, xerr := v1.NewLedger[*proposal.GovProposal]("frozen_proposal", config.DBDir(), 1, newProposalProvider, lg)
+	frozenState, xerr := v1.NewStateLedger[*proposal.GovProposal]("frozen_proposal", config.DBDir(), 1, newProposalProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -128,8 +126,7 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 	slashedPower := int64(0)
 	targetAddr := types.Address(evi.Validator.Address)
 
-	_ = ctrler.proposalState.GetLedger(true).Iterate(func(item v1.ILedgerItem) xerrors.XError {
-		prop := item.(*proposal.GovProposal)
+	_ = ctrler.proposalState.Iterate(func(prop *proposal.GovProposal) xerrors.XError {
 		for _, v := range prop.Voters {
 			if bytes.Compare(v.Addr, targetAddr) == 0 {
 				// the voting power of `targetAddr` will be slashed and
@@ -143,9 +140,8 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 				break
 			}
 		}
-
 		return nil
-	})
+	}, true)
 
 	return slashedPower, nil
 }
@@ -517,7 +513,7 @@ func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes) (*proposal.GovProp
 	defer ctrler.mtx.RUnlock()
 
 	if prop, xerr := ctrler.proposalState.Get(txhash, false); xerr != nil {
-		if xerr == xerrors.ErrNotFoundResult {
+		if errors.Is(xerr, xerrors.ErrNotFoundResult) {
 			return nil, xerrors.ErrNotFoundProposal
 		}
 		return nil, xerr

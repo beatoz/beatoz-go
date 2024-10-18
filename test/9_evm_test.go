@@ -194,6 +194,7 @@ func testEvents(t *testing.T) {
 		sub.Stop()
 	}()
 	require.NoError(t, err)
+	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
 	query := fmt.Sprintf("tx.type='contract' AND evm.topic.0='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'")
 	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
 		event := &coretypes.ResultEvent{}
@@ -208,12 +209,11 @@ func testEvents(t *testing.T) {
 	subWg.Add(1)
 
 	rAddr := types.RandAddress()
-	// Transfer Event sig: ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
 	ret, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 
-	txRet, err := waitTrxResult(ret.Hash, 15, bzweb3)
+	txRet, err := waitTrxResult(ret.Hash, 30, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code)
 

@@ -11,11 +11,12 @@ import (
 )
 
 func TestWithdraw(t *testing.T) {
-
 	bzweb3 := randBeatozWeb3()
 	val0 := randValidatorWallet()
 	require.NoError(t, val0.SyncAccount(bzweb3))
 	require.NoError(t, val0.Unlock(defaultRpcNode.Pass))
+
+	fmt.Println("original balance", val0.GetBalance().Dec())
 
 	at := int64(0)
 	for {
@@ -51,6 +52,7 @@ func TestWithdraw(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTxCommit.CheckTx.Code, retTxCommit.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTxCommit.DeliverTx.Code, retTxCommit.DeliverTx.Log)
+	fmt.Println("Gas", retTxCommit.DeliverTx.GasWanted, retTxCommit.DeliverTx.GasUsed, "at", retTxCommit.Height)
 
 	// check reward status
 	rwd1, err := bzweb3.QueryReward(val0.Address(), retTxCommit.Height)

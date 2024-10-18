@@ -1,7 +1,7 @@
 package account
 
 import (
-	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
+	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -10,15 +10,23 @@ import (
 )
 
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	//immuLedger, xerr := ctrler.acctState.ImmutableLedgerAt(req.Height, 0)
-	//if xerr != nil {
-	//	return nil, xerrors.ErrQuery.Wrap(xerr)
-	//}
-
-	acct, xerr := ctrler.acctState.GetLedger(false).Get(req.Data)
+	immuLedger, xerr := ctrler.acctState.ImitableLedgerAt(req.Height)
 	if xerr != nil {
-		acct = types2.NewAccount(req.Data)
+		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
+
+	var acct *btztypes.Account
+	item, xerr := immuLedger.Get(req.Data)
+	if xerr != nil {
+		acct = btztypes.NewAccount(req.Data)
+	} else {
+		acct = item.(*btztypes.Account)
+	}
+
+	//acct, xerr := ctrler.acctState.Get(req.Data, false)
+	//if xerr != nil {
+	//	acct = btztypes.NewAccount(req.Data)
+	//}
 
 	// NOTE
 	// `Account::Balance`, which type is *uint256.Int, is marshaled to hex-string.
@@ -31,12 +39,12 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		Code    bytes.HexBytes `json:"code,omitempty"`
 		DocURL  string         `json:"docURL,omitempty"`
 	}{
-		Address: acct.(*types2.Account).Address,
-		Name:    acct.(*types2.Account).Name,
-		Nonce:   acct.(*types2.Account).Nonce,
-		Balance: acct.(*types2.Account).Balance.Dec(),
-		Code:    acct.(*types2.Account).Code,
-		DocURL:  acct.(*types2.Account).DocURL,
+		Address: acct.Address,
+		Name:    acct.Name,
+		Nonce:   acct.Nonce,
+		Balance: acct.Balance.Dec(),
+		Code:    acct.Code,
+		DocURL:  acct.DocURL,
 	}
 	if raw, err := tmjson.Marshal(_acct); err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)

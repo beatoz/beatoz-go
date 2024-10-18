@@ -108,7 +108,7 @@ func (mock *AcctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec boo
 func (mock *AcctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &AcctHandlerMock{}, nil
 }
-func (mock *AcctHandlerMock) MempoolAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+func (mock *AcctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &AcctHandlerMock{}, nil
 }
 func (mock *AcctHandlerMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {

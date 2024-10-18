@@ -57,6 +57,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
+		ctx.ChainID = "test-chain"
 		return nil
 	})
 	require.NoError(t, xerr)
@@ -82,6 +83,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txctx, xerr = ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
+		ctx.ChainID = "test-chain"
 		return nil
 	})
 	require.NoError(t, xerr)
@@ -103,6 +105,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txctx, xerr = ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
+		ctx.ChainID = "test-chain"
 		return nil
 	})
 	require.NoError(t, xerr)
@@ -124,6 +127,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txctx, xerr = ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
+		ctx.ChainID = "test-chain"
 		return nil
 	})
 	require.NoError(t, xerr)
@@ -167,6 +171,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
+			ctx.ChainID = "test-chain"
 			return nil
 		})
 		require.NoError(t, xerr)
@@ -188,6 +193,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
+		ctx.ChainID = "test-chain"
 		return nil
 	})
 	require.NoError(t, xerr)
@@ -230,6 +236,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
+			ctx.ChainID = "test-chain"
 			return nil
 		})
 		require.NoError(t, xerr)
@@ -259,6 +266,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
+			ctx.ChainID = "test-chain"
 			return nil
 		})
 		require.NoError(t, xerr)
@@ -283,6 +291,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
+		ctx.ChainID = "test-chain"
 		return nil
 	})
 	require.NoError(t, xerr)
@@ -319,6 +328,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
+			ctx.ChainID = "test-chain"
 			return nil
 		})
 		require.NoError(t, xerr)
@@ -352,6 +362,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
+			ctx.ChainID = "test-chain"
 			return nil
 		})
 		require.NoError(t, xerr)
@@ -422,6 +433,7 @@ func genesisStaking(t *testing.T, cnt int) {
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
+			ctx.ChainID = "test-chain"
 			return nil
 		})
 		require.NoError(t, xerr)

@@ -28,6 +28,8 @@ type Account struct {
 	mtx     sync.RWMutex
 }
 
+var _ v1.ILedgerItem = (*Account)(nil)
+
 func NewAccount(addr types.Address) *Account {
 	return &Account{
 		Address: addr,
@@ -224,8 +226,6 @@ func (acct *Account) Decode(d []byte) xerrors.XError {
 	acct.DocURL = pm.DocUrl
 	return nil
 }
-
-var _ v1.ILedgerItem = (*Account)(nil)
 
 ////
 

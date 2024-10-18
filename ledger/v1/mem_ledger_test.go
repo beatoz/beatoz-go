@@ -8,17 +8,83 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 )
 
-func TestLedger_RevertToSnapshot_Set0(t *testing.T) {
-	dbDir, err := os.MkdirTemp("", "ledger_test")
-	require.NoError(t, err)
+var sourceLedger *MutableLedger
+var preExistedItem *Item
 
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+func init() {
+	dbDir, err := os.MkdirTemp("", "ledger_test")
+	if err != nil {
+		panic(err)
+	}
+
+	_ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
+	if xerr != nil {
+		panic(xerr)
+	}
+
+	preExistedItem = newItem(001, "data001")
+	if xerr := _ledger.Set(preExistedItem); xerr != nil {
+		panic(xerr)
+	}
+	if _, _, xerr = _ledger.Commit(); xerr != nil {
+		panic(xerr)
+	}
+
+	sourceLedger = _ledger
+}
+
+func TestMemLedger_Del_MemItem(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	// set new item
+	item := newItem(123, "data123")
+	require.NoError(t, ledger.Set(item))
+
+	_item, xerr := ledger.Get(item.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, item.Key(), _item.Key())
+	require.Equal(t, item.data, _item.(*Item).data)
+
+	// delete item
+	require.NoError(t, ledger.Del(item.Key()))
+
+	_item, xerr = ledger.Get(item.Key())
+	require.Error(t, xerr)
+}
+
+func TestMemLedger_Del_PreItem(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	_item, xerr := ledger.Get(preExistedItem.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, preExistedItem.Key(), _item.Key())
+	require.Equal(t, preExistedItem.data, _item.(*Item).data)
+
+	// delete item
+	require.NoError(t, ledger.Del(preExistedItem.Key()))
+
+	_item, xerr = ledger.Get(preExistedItem.Key())
+	require.Error(t, xerr)
+
+	// the other MemLedger('otherLedger') must have the item which was deleted on the first MemLedger('ledger').
+	otherLedger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+	require.NoError(t, xerr)
+	_item, xerr = otherLedger.Get(preExistedItem.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, preExistedItem.Key(), _item.Key())
+	require.Equal(t, preExistedItem.data, _item.(*Item).data)
+
+}
+
+func TestMemLedger_RevertToSnapshot_Set0(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	item0 := newItem(0, "test item0 value")
@@ -51,18 +117,10 @@ func TestLedger_RevertToSnapshot_Set0(t *testing.T) {
 	require.Error(t, xerr)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, _item)
-
-	require.NoError(t, ledger.Close())
-	require.NoError(t, os.RemoveAll(dbDir))
 }
 
-func TestMutableLedger_RevertToSnapshot_Set1(t *testing.T) {
-	dbDir, err := os.MkdirTemp("", "ledger_test")
-	require.NoError(t, err)
-
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
-		return &Item{}
-	}, log.NewNopLogger())
+func TestMemLedger_RevertToSnapshot_Set1(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	var oriItems []*Item
@@ -116,18 +174,10 @@ func TestMutableLedger_RevertToSnapshot_Set1(t *testing.T) {
 		require.Nil(t, item)
 		require.Error(t, xerrors.ErrNotFoundResult, xerr)
 	}
-
-	require.NoError(t, ledger.Close())
-	require.NoError(t, os.RemoveAll(dbDir))
 }
 
-func TestMutableLedger_RevertToSnapshot_Set2(t *testing.T) {
-	dbDir, err := os.MkdirTemp("", "ledger_test")
-	require.NoError(t, err)
-
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
-		return &Item{}
-	}, log.NewNopLogger())
+func TestMemLedger_RevertToSnapshot_Set2(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	staticKey := 123
@@ -155,17 +205,10 @@ func TestMutableLedger_RevertToSnapshot_Set2(t *testing.T) {
 			require.Equal(t, strconv.Itoa(i-1), item.(*Item).data, fmt.Sprintf("current index: %d", i))
 		}
 	}
-
-	require.NoError(t, ledger.Close())
-	require.NoError(t, os.RemoveAll(dbDir))
 }
 
-func TestMutableLedger_RevertToSnapshot_Del(t *testing.T) {
-	dbDir, err := os.MkdirTemp("", "ledger_test")
-	require.NoError(t, err)
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
-		return &Item{}
-	}, log.NewNopLogger())
+func TestMemLedger_RevertToSnapshot_Del(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	item := newItem(123, "data123")
@@ -188,42 +231,4 @@ func TestMutableLedger_RevertToSnapshot_Del(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, item.Key(), _item.Key())
 	require.Equal(t, item.data, _item.(*Item).data)
-
-	require.NoError(t, ledger.Close())
-	require.NoError(t, os.RemoveAll(dbDir))
-}
-
-type Item struct {
-	key  int
-	data string
-}
-
-func newItem(key int, data string) *Item {
-	return &Item{
-		key:  key,
-		data: data,
-	}
-}
-
-func (i *Item) Key() []byte {
-	bs := make([]byte, 4)
-	binary.BigEndian.PutUint32(bs, uint32(i.key))
-	return bs
-}
-
-func (i *Item) Encode() ([]byte, xerrors.XError) {
-	return []byte(fmt.Sprintf("key:%v,data:%v", i.key, i.data)), nil
-}
-
-func (i *Item) Decode(bz []byte) xerrors.XError {
-	toks := strings.Split(string(bz), ",")
-	key, _ := strings.CutPrefix(toks[0], "key:")
-	data, _ := strings.CutPrefix(toks[1], "data:")
-
-	var err error
-	if i.key, err = strconv.Atoi(key); err != nil {
-		return xerrors.From(err)
-	}
-	i.data = data
-	return nil
 }

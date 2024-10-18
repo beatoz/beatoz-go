@@ -27,6 +27,8 @@ type StateDBWrapper struct {
 	mtx    sync.RWMutex
 }
 
+var _ vm.StateDB = (*StateDBWrapper)(nil)
+
 func NewStateDBWrapper(db ethdb.Database, rootHash bytes.HexBytes, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) (*StateDBWrapper, error) {
 	stateDB, err := state.New(rootHash.Array32(), state.NewDatabase(db), nil)
 	if err != nil {
@@ -241,5 +243,3 @@ func (s *StateDBWrapper) AddPreimage(hash common.Hash, preimage []byte) {
 func (s *StateDBWrapper) ForEachStorage(addr common.Address, cb func(common.Hash, common.Hash) bool) error {
 	return s.StateDB.ForEachStorage(addr, cb)
 }
-
-var _ vm.StateDB = (*StateDBWrapper)(nil)

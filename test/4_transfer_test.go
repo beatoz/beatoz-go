@@ -107,7 +107,7 @@ func TestTransferCommit_Bulk(t *testing.T) {
 		require.Equal(t, acctObj.expectedBalance, acctObj.w.GetBalance(), acctObj.w.Address().String())
 		require.Equal(t, acctObj.expectedNonce, acctObj.w.GetNonce(), acctObj.w.Address().String())
 
-		fmt.Println("TestBulkTransfer", "account", acctObj.w.Address(), "nonce", acctObj.w.GetNonce(), "balance", acctObj.w.GetBalance().Dec())
+		//fmt.Println("TestBulkTransfer", "account", acctObj.w.Address(), "nonce", acctObj.w.GetNonce(), "balance", acctObj.w.GetBalance().Dec())
 
 		sentTxsCnt += acctObj.sentTxsCnt
 		retTxsCnt += acctObj.retTxsCnt
@@ -298,9 +298,9 @@ func bulkTransferSync(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, 
 
 		senderAcctObj.sentTxsCnt++
 	}
-	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 	subWg.Wait()
-	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 
 	wg.Done()
 
@@ -358,7 +358,7 @@ func bulkTransferCommit(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj
 		senderAcctObj.addExpectedNonce()
 		senderAcctObj.sentTxsCnt++
 	}
-	fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
+	//fmt.Println(senderAcctObj.w.Address(), "sent", senderAcctObj.sentTxsCnt, "ret", senderAcctObj.retTxsCnt)
 
 	wg.Done()
 }

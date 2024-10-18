@@ -44,7 +44,7 @@ type IAccountHandler interface {
 	FindAccount(types.Address, bool) *Account
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
-	MempoolAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
+	SimuAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
 }
 
 type IStakeHandler interface {

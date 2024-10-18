@@ -108,7 +108,7 @@ func (a *acctHelperMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHan
 	panic("implement me")
 }
 
-func (a *acctHelperMock) MempoolAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+func (a *acctHelperMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -122,7 +122,7 @@ var _ ctrlertypes.IAccountHandler = (*acctHelperMock)(nil)
 
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 	txbz, _ := tx.Encode()
-	txctx, _ := ctrlertypes.NewTrxContext(txbz, height, time.Now().Unix(), exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr := ctrlertypes.NewTrxContext(txbz, height, time.Now().Unix(), exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 		_tx := _txctx.Tx
 		// find sender account
 		acct := acctHelper.FindAccount(_tx.From, _txctx.Exec)
@@ -135,6 +135,9 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 		_txctx.StakeHandler = stakeHelper
 		return nil
 	})
+	if xerr != nil {
+		panic(xerr)
+	}
 
 	return txctx
 }

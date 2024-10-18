@@ -190,8 +190,8 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		heightOfPower = 1
 	}
 
-	// todo: remove ImmutableLedgerAt. How? => Rewarding is started after 4 blocks, but is immediately stopped in un-staking
-	// ImmutableLedgerAt is used to get the delegator's stakes at the block[height-4] and to give rewards based on it.
+	// todo: remove ImitableLedgerAt. How? => Rewarding is started after 4 blocks, but is immediately stopped in un-staking
+	// ImitableLedgerAt is used to get the delegator's stakes at the block[height-4] and to give rewards based on it.
 	// Solution: When a stake is deposited, the rewards start after 4 blocks from the block containing TrxPayloadStaking, (check by using Stake.StartHeight)
 	// and when staking is un-staking(executing TrxPayloadUnstaking), immediately stop to reward. (don't reward for stakes existed 4 blocks ago and un-staked at now.)
 	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(heightOfPower, 128)

@@ -3,7 +3,6 @@ package types
 import (
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/types"
 )
@@ -65,14 +64,15 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 
 	//
 	// begin of code from commonValidation0
+	// The following can be performed in parallel.
 	{
-		if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
+		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
 			return nil, xerrors.ErrInvalidGasPrice
 		}
-
-		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
-		if feeAmt.Cmp(txctx.GovHandler.MinTrxFee()) < 0 {
+		if tx.Gas < txctx.GovHandler.MinTrxGas() {
 			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+		} else if tx.Gas > txctx.GovHandler.MaxTrxGas() {
+			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas(fee)")
 		}
 
 		_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)

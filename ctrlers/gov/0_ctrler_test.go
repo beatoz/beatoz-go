@@ -1,9 +1,11 @@
 package gov
 
 import (
+	"bytes"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/web3"
 	"github.com/beatoz/beatoz-go/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/rand"
@@ -25,6 +27,10 @@ var (
 	govParams3  = ctrlertypes.Test3GovParams()
 	govParams4  = ctrlertypes.Test4GovParams()
 	govParams5  = ctrlertypes.Test5GovParams()
+	defMinGas   = govParams0.MinTrxGas()
+	defGasPrice = govParams0.GasPrice()
+
+	wallets []*web3.Wallet
 )
 
 func init() {
@@ -40,24 +46,18 @@ func init() {
 
 	rand.Seed(time.Now().UnixNano())
 
+	var delegatees []*stake.Delegatee
+	for i := 0; i < 14; i++ {
+		w := web3.NewWallet(nil)
+		wallets = append(wallets, w)
+
+		d := &stake.Delegatee{Addr: w.Address(), TotalPower: rand.Int63n(1000000)}
+		delegatees = append(delegatees, d)
+	}
+
 	stakeHelper = &stakeHandlerMock{
-		valCnt: 5, // 5 delegatees is only validator.
-		delegatees: []*stake.Delegatee{
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-			{Addr: types.RandAddress(), TotalPower: rand.Int63n(1000000)},
-		},
+		valCnt:     5, // 5 delegatees is only validator.
+		delegatees: delegatees,
 	}
 	sort.Sort(stake.PowerOrderDelegatees(stakeHelper.delegatees))
 
@@ -74,4 +74,17 @@ func TestMain(m *testing.M) {
 	os.RemoveAll(config.DBPath)
 
 	os.Exit(exitCode)
+}
+
+func findWallet(address types.Address) *web3.Wallet {
+	for _, w := range wallets {
+		if bytes.Compare(w.Address(), address) == 0 {
+			return w
+		}
+	}
+	return nil
+}
+func signTrx(tx *ctrlertypes.Trx, signerAddr types.Address, chainId string) error {
+	_, _, err := findWallet(signerAddr).SignTrxRLP(tx, chainId)
+	return err
 }

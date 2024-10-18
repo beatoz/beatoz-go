@@ -101,52 +101,54 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 	}
 }
 
-func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	//
-	// the following CAN be parellely done
-	//
-	//tx := ctx.Tx
+//func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
+//	//
+//	// the following CAN be parellely done
+//	//
+//	//tx := ctx.Tx
+//
+//	// move to `tx.validate()`
+//	//if len(tx.From) != rtypes.AddrSize {
+//	//	return xerrors.ErrInvalidAddress
+//	//}
+//	//if len(tx.To) != rtypes.AddrSize {
+//	//	return xerrors.ErrInvalidAddress
+//	//}
+//	//if tx.Amount.Sign() < 0 {
+//	//	return xerrors.ErrInvalidAmount
+//	//}
+//	//if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
+//	//	return xerrors.ErrInvalidGas
+//	//}
+//
+//	//
+//	// move to NewTrxContext()
+//	//
+//
+//	//if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
+//	//	return xerrors.ErrInvalidGasPrice
+//	//}
+//	//
+//	//feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+//	//if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
+//	//	return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+//	//}
+//	//
+//	//_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
+//	//if xerr != nil {
+//	//	return xerr
+//	//}
+//	//ctx.SenderPubKey = pubKeyBytes
+//
+//	return nil
+//}
 
-	// move to `tx.validate()`
-	//if len(tx.From) != rtypes.AddrSize {
-	//	return xerrors.ErrInvalidAddress
-	//}
-	//if len(tx.To) != rtypes.AddrSize {
-	//	return xerrors.ErrInvalidAddress
-	//}
-	//if tx.Amount.Sign() < 0 {
-	//	return xerrors.ErrInvalidAmount
-	//}
-	//if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
-	//	return xerrors.ErrInvalidGas
-	//}
+func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
-	// move to NewTrxContext()
-	//
-
-	//if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
-	//	return xerrors.ErrInvalidGasPrice
-	//}
-	//
-	//feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
-	//if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
-	//	return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
-	//}
-	//
-	//_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
-	//if xerr != nil {
-	//	return xerr
-	//}
-	//ctx.SenderPubKey = pubKeyBytes
-
-	return nil
-}
-
-func commonValidation1(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
-	//
-	// this validation MUST be serially done
+	// This validation must be performed continuously
+	// after the previous tx was executed.
+	// (after the account balance and nonce have been updated by the previous tx execution.)
 	//
 	tx := ctx.Tx
 
@@ -156,7 +158,7 @@ func commonValidation1(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
-		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
+		return xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 	return nil
 }
@@ -165,10 +167,7 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx validation
-	if xerr := commonValidation0(ctx); xerr != nil {
-		return xerr
-	}
-	if xerr := commonValidation1(ctx); xerr != nil {
+	if xerr := commonValidation(ctx); xerr != nil {
 		return xerr
 	}
 
