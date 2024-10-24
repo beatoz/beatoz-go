@@ -3,7 +3,6 @@ package node
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
@@ -232,14 +231,6 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
-	if ctx.Exec &&
-		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
-		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
-		// the tx is to create(deploy) a new contract
-		// DO NOTHING.
-	}
-
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT &&
 		!(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
 		//
