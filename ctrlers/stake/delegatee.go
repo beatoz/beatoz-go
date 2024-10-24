@@ -22,7 +22,7 @@ type Delegatee struct {
 
 	Stakes []*Stake `json:"stakes"`
 
-	NotSignedHeights *BlockMarker
+	NotSignedHeights *BlockMarker `json:"notSignedBlocks"`
 
 	mtx sync.RWMutex
 }
