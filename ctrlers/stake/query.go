@@ -3,7 +3,7 @@ package stake
 import (
 	"fmt"
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -19,11 +19,11 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 
 	switch req.Path {
 	case "reward":
-		atledger, xerr := ctrler.rewardLedger.ImmutableLedgerAt(req.Height, 0)
+		atledger, xerr := ctrler.rewardLedger.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		rwd, xerr := atledger.Read(v0.ToLedgerKey(req.Data))
+		rwd, xerr := atledger.Get(req.Data)
 		if rwd == nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
@@ -33,13 +33,14 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		}
 		return bz, nil
 	case "stakes":
-		atledger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(req.Height, 0)
+		atledger, xerr := ctrler.delegateeLedger.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
 		var stakes []*Stake
-		if err := atledger.IterateReadAllItems(func(d *Delegatee) xerrors.XError {
+		if err := atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+			d := item.(*Delegatee)
 			for _, s0 := range d.Stakes {
 				if bytes.Compare(s0.From, types.Address(req.Data)) == 0 {
 					stakes = append(stakes, s0)
@@ -54,12 +55,12 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			return bz, nil
 		}
 	case "delegatee":
-		atledger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(req.Height, 0)
+		atledger, xerr := ctrler.delegateeLedger.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
-		if delegatee, xerr := atledger.Read(v0.ToLedgerKey(req.Data)); xerr != nil {
+		if delegatee, xerr := atledger.Get(req.Data); xerr != nil {
 			if xerr == xerrors.ErrNotFoundResult {
 				return nil, xerrors.ErrQuery.Wrap(xerrors.ErrNotFoundDelegatee)
 			}
@@ -70,13 +71,14 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 			return v, nil
 		}
 	case "stakes/total_power":
-		atledger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(req.Height, 0)
+		atledger, xerr := ctrler.delegateeLedger.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
 		retPower := int64(0)
-		xerr = atledger.IterateReadAllItems(func(d *Delegatee) xerrors.XError {
+		xerr = atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+			d := item.(*Delegatee)
 			retPower += d.TotalPower
 			return nil
 		})
@@ -86,13 +88,14 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		return []byte(fmt.Sprintf("%v", retPower)), nil
 
 	case "stakes/voting_power":
-		atledger, xerr := ctrler.delegateeLedger.ImmutableLedgerAt(req.Height, 0)
+		atledger, xerr := ctrler.delegateeLedger.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
 		var delegatees PowerOrderDelegatees
-		xerr = atledger.IterateReadAllItems(func(d *Delegatee) xerrors.XError {
+		xerr = atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+			d := item.(*Delegatee)
 			minPower := types2.AmountToPower(ctrler.govParams.MinValidatorStake())
 			if d.SelfPower >= minPower {
 				delegatees = append(delegatees, d)

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -27,11 +27,11 @@ type Delegatee struct {
 	mtx sync.RWMutex
 }
 
-func (delegatee *Delegatee) Key() v0.LedgerKey {
+func (delegatee *Delegatee) Key() v1.LedgerKey {
 	delegatee.mtx.RLock()
 	defer delegatee.mtx.RUnlock()
 
-	return v0.ToLedgerKey(delegatee.Addr)
+	return delegatee.Addr
 }
 
 func (delegatee *Delegatee) Encode() ([]byte, xerrors.XError) {
@@ -55,7 +55,7 @@ func (delegatee *Delegatee) Decode(d []byte) xerrors.XError {
 	return nil
 }
 
-var _ v0.ILedgerItem = (*Delegatee)(nil)
+var _ v1.ILedgerItem = (*Delegatee)(nil)
 
 func NewDelegatee(addr types.Address, pubKey bytes2.HexBytes) *Delegatee {
 	return &Delegatee{

@@ -9,34 +9,7 @@ import (
 	"sync"
 )
 
-type powerObj struct {
-	Addr  types.Address
-	Power int64
-}
-
-type orderedPowerObj []*powerObj
-
-func (objs orderedPowerObj) Len() int {
-	return len(objs)
-}
-
-// descending order by TotalPower
-func (objs orderedPowerObj) Less(i, j int) bool {
-	if objs[i].Power != objs[j].Power {
-		return objs[i].Power > objs[j].Power
-	}
-	if bytes.Compare(objs[i].Addr, objs[j].Addr) > 0 {
-		return true
-	}
-	return false
-}
-
-func (objs orderedPowerObj) Swap(i, j int) {
-	objs[i], objs[j] = objs[j], objs[i]
-}
-
-var _ sort.Interface = (orderedPowerObj)(nil)
-
+// StakeLimiter limits the amount of stake changes in one block.
 type StakeLimiter struct {
 	individualLimitRatio int64
 	updatableLimitRatio  int64
@@ -196,3 +169,31 @@ func (sl *StakeLimiter) CheckLimit(delg *Delegatee, changePower int64) xerrors.X
 	}
 	return nil
 }
+
+type powerObj struct {
+	Addr  types.Address
+	Power int64
+}
+
+type orderedPowerObj []*powerObj
+
+func (objs orderedPowerObj) Len() int {
+	return len(objs)
+}
+
+// descending order by TotalPower
+func (objs orderedPowerObj) Less(i, j int) bool {
+	if objs[i].Power != objs[j].Power {
+		return objs[i].Power > objs[j].Power
+	}
+	if bytes.Compare(objs[i].Addr, objs[j].Addr) > 0 {
+		return true
+	}
+	return false
+}
+
+func (objs orderedPowerObj) Swap(i, j int) {
+	objs[i], objs[j] = objs[j], objs[i]
+}
+
+var _ sort.Interface = (orderedPowerObj)(nil)

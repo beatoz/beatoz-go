@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -27,11 +27,13 @@ type Stake struct {
 	mtx sync.RWMutex
 }
 
-func (s *Stake) Key() v0.LedgerKey {
+var _ v1.ILedgerItem = (*Stake)(nil)
+
+func (s *Stake) Key() v1.LedgerKey {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	return v0.ToLedgerKey(s.TxHash)
+	return s.TxHash
 }
 
 func (s *Stake) Encode() ([]byte, xerrors.XError) {
@@ -54,8 +56,6 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 	}
 	return nil
 }
-
-var _ v0.ILedgerItem = (*Stake)(nil)
 
 func NewStakeWithAmount(owner, to types.Address, amt *uint256.Int, startHeight int64, txhash abytes.HexBytes) *Stake {
 	power := ctrlertypes.AmountToPower(amt)

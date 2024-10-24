@@ -3,7 +3,7 @@ package stake
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/beatoz/beatoz-go/ledger/v0"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -21,6 +21,8 @@ type Reward struct {
 
 	mtx sync.RWMutex
 }
+
+var _ v1.ILedgerItem = (*Reward)(nil)
 
 func NewReward(addr types.Address) *Reward {
 	return &Reward{
@@ -86,8 +88,8 @@ func (rwd *Reward) Slash(r *uint256.Int, h int64) xerrors.XError {
 	return nil
 }
 
-func (rwd *Reward) Key() v0.LedgerKey {
-	return v0.ToLedgerKey(rwd.address)
+func (rwd *Reward) Key() v1.LedgerKey {
+	return rwd.address
 }
 
 func (rwd *Reward) Encode() ([]byte, xerrors.XError) {
@@ -225,5 +227,3 @@ func (rwd *Reward) String() string {
 	bz, _ := json.MarshalIndent(rwd, "", "  ")
 	return string(bz)
 }
-
-var _ v0.ILedgerItem = (*Reward)(nil)
