@@ -146,7 +146,7 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
-	// This validation must be performed continuously
+	// This validation must be performed sequentially
 	// after the previous tx was executed.
 	// (after the account balance and nonce have been updated by the previous tx execution.)
 	//
@@ -236,14 +236,17 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if ctx.Exec &&
 		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
 		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
-		// this tx is to deploy contract
+		// the tx is to create(deploy) a new contract
 		// DO NOTHING.
 	}
 
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT &&
 		!(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
 		//
-		// The gas & nonce is already processed in `EVMCtrler` if the tx type is `TRX_CONTRACT`.
+		// 1. If the tx type is `TRX_CONTRACT`,
+		// the gas & nonce have already been processed in `EVMCtrler`.
+		// 2. If the tx is `TRX_TRANSFER` type and to a contract,
+		// it is processed by `EVMCtrler` because of processing the fallback feature.
 
 		// processing fee = gas * gasPrice
 		fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))

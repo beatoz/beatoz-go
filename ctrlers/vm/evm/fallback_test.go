@@ -49,10 +49,12 @@ func Test_Fallback(t *testing.T) {
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
+	// BeginBlock
 	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
 	_, xerr := fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
+	// Execute the tx to deploy contract
 	txctx := &ctrlertypes.TrxContext{
 		Height:      bctx.Height(),
 		BlockTime:   time.Now().Unix(),
@@ -81,13 +83,14 @@ func Test_Fallback(t *testing.T) {
 		}
 	}
 
+	// EndBlock and Commit
 	_, xerr = fallbackEVM.EndBlock(bctx)
 	require.NoError(t, xerr)
 	_, _, xerr = fallbackEVM.Commit()
 	require.NoError(t, xerr)
 
 	//
-	// transfer
+	// transfer to contract
 	bctx.SetHeight(bctx.Height() + 1)
 	_, xerr = fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
