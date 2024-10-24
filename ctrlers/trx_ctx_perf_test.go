@@ -38,7 +38,6 @@ func init() {
 			txbzs = append(txbzs, txbz)
 		}
 	}
-	fmt.Println("Test preparing is finished")
 }
 
 func BenchmarkNewTrxContext_Sync(b *testing.B) {

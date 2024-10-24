@@ -217,11 +217,8 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	ctx.RetData = evmResult.ReturnData
 
-	//
-	// Add events from evm.
-	var attrs []abcitypes.EventAttribute
 	if ctx.Tx.To == nil || types.IsZeroAddress(ctx.Tx.To) {
-		// contract 생성.
+		// When the new contract is created.
 		createdAddr := crypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
 		ctrler.logger.Debug("Create contract", "address", createdAddr)
 
@@ -236,24 +233,22 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// contract 생성 주소를 계산하여 리턴.
 		ctx.RetData = createdAddr[:]
 
-		// Event 로도 컨트랙트 주소 리턴
-		attrs = []abcitypes.EventAttribute{
-			{
-				Key:   []byte("contractAddress"),
-				Value: []byte(bytes.HexBytes(ctx.RetData).String()),
-				Index: false,
+		// Add the address of new contract to events
+		ctx.Events = append(ctx.Events, abcitypes.Event{
+			Type: "evm",
+			Attributes: []abcitypes.EventAttribute{
+				{
+					Key:   []byte("contractAddress"),
+					Value: []byte(bytes.HexBytes(ctx.RetData).String()),
+					Index: false,
+				},
 			},
-		}
-	}
-
-	evmEvts := ctrler.evmLogsToEvent(ctx.TxHash.Array32())
-	if len(attrs) > 0 {
-		evmEvts = append(evmEvts, abcitypes.Event{
-			Type:       "evm",
-			Attributes: attrs,
 		})
 	}
 
+	//
+	// Add events from evm logs.
+	evmEvts := ctrler.evmLogsToEvent(ctx.TxHash.Array32())
 	ctx.Events = append(ctx.Events, evmEvts...)
 
 	return nil
@@ -290,7 +285,7 @@ func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 			// Contract Address
 			strVal := hex.EncodeToString(l.Address[:])
 			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
-				Key:   []byte("address"),
+				Key:   []byte("contractAddress"),
 				Value: []byte(strVal),
 				Index: true,
 			})

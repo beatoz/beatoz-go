@@ -236,40 +236,8 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if ctx.Exec &&
 		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
 		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
-		//// this tx is to deploy contract
-		//var contractAddr rtypes.Address
-		//for _, evt := range ctx.Events {
-		//	if evt.GetType() == "evm" {
-		//		for _, attr := range evt.Attributes {
-		//			if string(attr.Key) == "contractAddress" {
-		//				if caddr, err := rtypes.HexToAddress(string(attr.Value)); err != nil {
-		//					return xerrors.From(err)
-		//				} else {
-		//					contractAddr = caddr
-		//					break
-		//				}
-		//			}
-		//		}
-		//		if contractAddr != nil {
-		//			break
-		//		}
-		//	}
-		//}
-		//if contractAddr == nil {
-		//	return xerrors.NewOrdinary("there is no contract address")
-		//}
-		//
-		//acct := ctx.AcctHandler.FindAccount(contractAddr, ctx.Exec)
-		//if acct == nil {
-		//	return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
-		//}
-		//
-		//// setting deploy txhash in contract account
-		//acct.SetCode(ctx.TxHash)
-		//
-		//if xerr := ctx.AcctHandler.SetAccount(acct, ctx.Exec); xerr != nil {
-		//	return xerr
-		//}
+		// this tx is to deploy contract
+		// DO NOTHING.
 	}
 
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT &&
