@@ -110,7 +110,14 @@ func (hb HexBytes) Format(s fmt.State, verb rune) {
 }
 
 func isHex(s string) bool {
-	for _, b := range []byte(s) {
+	v := s
+	if len(v)%2 != 0 {
+		return false
+	}
+	if strings.HasPrefix(v, "0x") {
+		v = v[2:]
+	}
+	for _, b := range []byte(v) {
 		if !(b >= '0' && b <= '9' || b >= 'a' && b <= 'f' || b >= 'A' && b <= 'F') {
 			return false
 		}
