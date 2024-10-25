@@ -189,7 +189,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//           : At this point, the validators have their power committed at block N(`curr_height` - 4).
 	issuedReward := uint256.NewInt(0)
 	heightOfPower := blockCtx.Height() - 4
-	if heightOfPower < 0 {
+	if heightOfPower <= 0 {
 		heightOfPower = 1
 	}
 
@@ -207,7 +207,11 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 			// Reward
 			item, xerr := immuDelegateeLedger.Get(vote.Validator.Address)
 			if xerr != nil || item == nil {
-				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+				ctrler.logger.Error("Reward - Not found validator",
+					"error", xerr,
+					"address", types.Address(vote.Validator.Address),
+					"power", vote.Validator.Power,
+					"target height", heightOfPower, "current height", blockCtx.Height())
 				continue
 			}
 			delegatee := item.(*Delegatee)
@@ -228,7 +232,11 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 				// it's possible that a `delegatee` is not found.
 				// `vote.Validator.Address` has existed since block[height - 4],
 				// and the validator may be removed from `delegateeLedger` while the last 4 blocks are being processed.
-				ctrler.logger.Error("MinSignedBlocks - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+				ctrler.logger.Error("MinSignedBlocks - Not found validator",
+					"error", xerr,
+					"address", types.Address(vote.Validator.Address),
+					"power", vote.Validator.Power,
+					"target height", heightOfPower, "current height", blockCtx.Height())
 				continue
 			}
 
@@ -317,7 +325,11 @@ func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) (*
 		if vote.SignedLastBlock {
 			item, xerr := immuDelegateeLedger.Get(vote.Validator.Address)
 			if xerr != nil || item == nil {
-				ctrler.logger.Error("Reward - Not found validator", "error", xerr, "address", types.Address(vote.Validator.Address), "power", vote.Validator.Power)
+				ctrler.logger.Error("Reward - Not found validator",
+					"error", xerr,
+					"address", types.Address(vote.Validator.Address),
+					"power", vote.Validator.Power,
+					"target height", heightForReward, "current height", height)
 				continue
 			}
 			delegatee := item.(*Delegatee)
