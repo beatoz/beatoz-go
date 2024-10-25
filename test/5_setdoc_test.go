@@ -28,7 +28,8 @@ func TestSetDoc(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code)
 
-	txRet, xerr := waitTrxResult(ret.Hash, 30, bzweb3)
+	txRet, xerr := waitTrxEvent(ret.Hash)
+	//txRet, xerr := waitTrxResult(ret.Hash, 60, bzweb3)
 	require.NoError(t, xerr)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 

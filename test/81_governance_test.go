@@ -12,11 +12,6 @@ import (
 	"testing"
 )
 
-var (
-	proposalHash         bytes.HexBytes
-	startVoteBlockHeight int64
-)
-
 func TestProposalAndVoting(t *testing.T) {
 	//get validator wallet
 	bzweb3 := randBeatozWeb3()
@@ -39,14 +34,14 @@ func TestProposalAndVoting(t *testing.T) {
 	lastBlockHeight, err := waitBlock(10)
 	require.NoError(t, err)
 
-	startVoteBlockHeight = lastBlockHeight + 5
+	startVoteBlockHeight := lastBlockHeight + 5
 	proposalResult, err := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", startVoteBlockHeight, 259200, 518410+startVoteBlockHeight, proposal.PROPOSAL_GOVPARAMS, bzOpt, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.CheckTx.Code)
 	require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.DeliverTx.Code)
 	require.NotNil(t, proposalResult.Hash)
 
-	proposalHash = bytes.HexBytes(proposalResult.Hash)
+	proposalHash := bytes.HexBytes(proposalResult.Hash)
 
 	prop, err := bzweb3.QueryProposal(proposalHash, 0)
 	require.NoError(t, err)
@@ -92,7 +87,7 @@ func TestIncorrectProposal(t *testing.T) {
 	lastBlockHeight, err := waitBlock(10)
 	require.NoError(t, err)
 
-	startVoteBlockHeight = lastBlockHeight + 5
+	startVoteBlockHeight := lastBlockHeight + 5
 	proposalResult, err := validatorWallet.ProposalCommit(defGas, defGasPrice, "proposal test", startVoteBlockHeight, 259200, 518410+startVoteBlockHeight, proposal.PROPOSAL_GOVPARAMS, bzOpt, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCheckTx.Code(), proposalResult.CheckTx.Code)

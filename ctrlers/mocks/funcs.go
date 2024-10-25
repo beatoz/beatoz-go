@@ -51,3 +51,36 @@ func LastBlockHeight() int64 {
 	}
 	return lastBlockCtx.Height()
 }
+
+func DoBeginBlock(ctrler ctrlertypes.IBlockHandler) error {
+	bctx := LastBlockCtx() //mocks.NextBlockCtx()
+	//fmt.Println("DoBeginBlock for", bctx.Height())
+	_, err := ctrler.BeginBlock(bctx)
+	return err
+}
+func DoEndBlock(ctrler ctrlertypes.IBlockHandler) error {
+	bctx := LastBlockCtx()
+	//fmt.Println("DoEndBlock for", bctx.Height())
+	if _, err := ctrler.EndBlock(bctx); err != nil {
+		return err
+	}
+	return nil
+}
+func DoCommitBlock(ctrler ctrlertypes.ILedgerHandler) error {
+	if _, v, err := ctrler.Commit(); err != nil {
+		return err
+	} else {
+		LastBlockCtx().SetHeight(v)
+	}
+	return nil
+}
+
+func DoEndBlockCommit(ctrler interface{}) error {
+	if err := DoEndBlock(ctrler.(ctrlertypes.IBlockHandler)); err != nil {
+		return err
+	}
+	if err := DoCommitBlock(ctrler.(ctrlertypes.ILedgerHandler)); err != nil {
+		return err
+	}
+	return nil
+}

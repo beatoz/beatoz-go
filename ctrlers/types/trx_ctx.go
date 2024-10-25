@@ -4,7 +4,7 @@ import (
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type TrxContext struct {
@@ -50,7 +50,7 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 
 	txctx := &TrxContext{
 		Tx:        tx,
-		TxHash:    types.Tx(txbz).Hash(),
+		TxHash:    tmtypes.Tx(txbz).Hash(),
 		Height:    height,
 		BlockTime: btime,
 		Exec:      exec,

@@ -671,8 +671,6 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 	return ctrler.frozenLedger.Iterate(func(s0 *Stake) xerrors.XError {
 		if s0.RefundHeight <= height {
 			// un-freezing s0
-			// return s0. not only s0.ReceivedReward but also s0.Amount
-
 			refundAmt := ctrlertypes.PowerToAmount(s0.Power)
 
 			xerr := acctHandler.Reward(s0.From, refundAmt, true)

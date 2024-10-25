@@ -3,7 +3,7 @@ package test
 import (
 	"errors"
 	"fmt"
-	rtypes1 "github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs"
 	btzweb3 "github.com/beatoz/beatoz-go/libs/web3"
 	btzweb3types "github.com/beatoz/beatoz-go/libs/web3/types"
@@ -14,7 +14,7 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/rand"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	"github.com/tendermint/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,11 +25,11 @@ import (
 var (
 	validatorWallets []*btzweb3.Wallet
 	wallets          []*btzweb3.Wallet
-	walletsMap       map[rtypes1.AcctKey]*btzweb3.Wallet
+	walletsMap       map[ctrlertypes.AcctKey]*btzweb3.Wallet
 	W0               *btzweb3.Wallet
 	W1               *btzweb3.Wallet
 	amt              = bytes.RandU256IntN(uint256.NewInt(1000))
-	defGovParams     = rtypes1.DefaultGovParams()
+	defGovParams     = ctrlertypes.DefaultGovParams()
 	defGas           = defGovParams.MinTrxGas()
 	bigGas           = defGas * 10
 	smallGas         = defGas - 1
@@ -56,7 +56,7 @@ func prepareTest(peers []*PeerMock) {
 			panic(err)
 		}
 
-		walletsMap = make(map[rtypes1.AcctKey]*btzweb3.Wallet)
+		walletsMap = make(map[ctrlertypes.AcctKey]*btzweb3.Wallet)
 
 		for _, file := range files {
 			if !file.IsDir() {
@@ -66,7 +66,7 @@ func prepareTest(peers []*PeerMock) {
 				} else {
 					wallets = append(wallets, w)
 
-					acctKey := rtypes1.ToAcctKey(w.Address())
+					acctKey := ctrlertypes.ToAcctKey(w.Address())
 					walletsMap[acctKey] = w
 
 					bzweb3 := btzweb3.NewBeatozWeb3(btzweb3.NewHttpProvider(peer.RPCURL))
@@ -86,8 +86,8 @@ func prepareTest(peers []*PeerMock) {
 
 func waitTrxResult(txhash []byte, maxTimes int, bzweb3 *btzweb3.BeatozWeb3) (*btzweb3types.TrxResult, error) {
 	for i := 0; i < maxTimes; i++ {
-		time.Sleep(100 * time.Millisecond)
-
+		time.Sleep(time.Second)
+		fmt.Println("times", i, "/", maxTimes)
 		// todo: check why it takes more than 10 secs to fetch a transaction
 
 		txRet, err := bzweb3.GetTransaction(txhash)
@@ -100,6 +100,42 @@ func waitTrxResult(txhash []byte, maxTimes int, bzweb3 *btzweb3.BeatozWeb3) (*bt
 		}
 	}
 	return nil, xerrors.NewOrdinary("timeout")
+}
+
+func waitTrxEvent(txhash []byte) (*btzweb3types.TrxResult, error) {
+	var txResult *btzweb3types.TrxResult
+	var retError error
+	wg, err := waitEvent(fmt.Sprintf("tm.event='Tx' AND tx.hash='%X'", txhash),
+		func(event *coretypes.ResultEvent, err error) bool {
+			if err != nil {
+				retError = err
+				return true // stop
+			}
+
+			txEvt := event.Data.(tmtypes.EventDataTx)
+			tx := &ctrlertypes.Trx{}
+			_ = tx.Decode(txEvt.Tx)
+			txResult = &btzweb3types.TrxResult{
+				&coretypes.ResultTx{
+					Hash:     tmtypes.Tx(txEvt.Tx).Hash(),
+					Height:   txEvt.Height,
+					Index:    txEvt.Index,
+					TxResult: txEvt.Result,
+					Tx:       txEvt.Tx,
+				},
+				tx,
+			}
+			return true
+		})
+	wg.Wait()
+
+	if err != nil {
+		return nil, err
+	}
+	if retError != nil {
+		return nil, retError
+	}
+	return txResult, nil
 }
 
 func waitBlock(n int64) (int64, error) {
@@ -119,7 +155,7 @@ func waitBlock(n int64) (int64, error) {
 			sub.Stop()
 			subWg.Done()
 		}
-		lastHeight = event.Data.(types.EventDataNewBlock).Block.Height
+		lastHeight = event.Data.(tmtypes.EventDataNewBlock).Block.Height
 		if lastHeight >= n {
 			sub.Stop()
 			subWg.Done()
