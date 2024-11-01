@@ -352,3 +352,31 @@ func (bzweb3 *BeatozWeb3) VmCall(from, to types.Address, height int64, data []by
 	}
 	return vmRet, nil
 }
+
+func (bzweb3 *BeatozWeb3) VmEstimateGas(from, to types.Address, height int64, data []byte) (*ctrlertypes.VMCallResult, error) {
+	req, err := bzweb3.NewRequest("vm_call", from, to, strconv.FormatInt(height, 10), data)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := bzweb3.provider.Call(req)
+	if err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	}
+
+	qryResp := &rpc.QueryResult{}
+	if err := tmjson.Unmarshal(resp.Result, qryResp); err != nil {
+		return nil, err
+	}
+
+	if qryResp.Code != 0 {
+		return nil, errors.New(qryResp.Log)
+	}
+
+	vmRet := &ctrlertypes.VMCallResult{}
+	if err := tmjson.Unmarshal(qryResp.Value, vmRet); err != nil {
+		return nil, err
+	}
+	return vmRet, nil
+}

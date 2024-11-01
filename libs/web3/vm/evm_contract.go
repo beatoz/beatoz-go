@@ -79,6 +79,21 @@ func (ec *EVMContract) Call(name string, args []interface{}, from types.Address,
 	return ec.unpack(name, ret0.ReturnData)
 }
 
+func (ec *EVMContract) EstimateGas(name string, args []interface{}, from types.Address, height int64, bzweb3 *web3.BeatozWeb3) (uint64, error) {
+	if ec.addr == nil {
+		return 0, errors.New("no contract address")
+	}
+	data, err := ec.pack(name, args...)
+	if err != nil {
+		return 0, err
+	}
+	ret0, xerr := bzweb3.VmEstimateGas(from, ec.addr, height, data)
+	if xerr != nil {
+		return 0, xerr
+	}
+	return ret0.UsedGas, nil
+}
+
 func (ec *EVMContract) ExecAsync(name string, args []interface{}, from *web3.Wallet, nonce, gas uint64, gasPrice, amt *uint256.Int, bzweb3 *web3.BeatozWeb3) (rbytes.HexBytes, error) {
 	to := ec.addr
 

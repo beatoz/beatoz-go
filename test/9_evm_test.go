@@ -28,13 +28,18 @@ func TestERC20_Deploy(t *testing.T) {
 	testQuery(t)
 }
 
+func TestERC20_EstimateGas(t *testing.T) {
+	//testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
+	testEstimateGas(t)
+}
+
 func TestERC20_Payable(t *testing.T) {
-	testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
+	//testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
 	testPayable(t)
 }
 
 func TestERC20_Event(t *testing.T) {
-	testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
+	//testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
 	testEvents(t)
 }
 
@@ -76,7 +81,7 @@ func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 	require.NotNil(t, contract.GetAddress())
 
-	fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
+	//fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
 	contAcct, err := bzweb3.GetAccount(contract.GetAddress())
 	require.NoError(t, err)
 	require.Equal(t, []byte(ret.Hash), contAcct.Code)
@@ -111,6 +116,21 @@ func testQuery(t *testing.T) {
 	ret, err := evmContract.Call("name", nil, sender.Address(), 0, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, "BeatozToken", ret[0])
+}
+
+func testEstimateGas(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	rAddr := types.RandAddress()
+	estimatedGas, err := evmContract.EstimateGas("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator.Address(), 0, bzweb3)
+	require.NoError(t, err)
+	require.True(t, 0 < estimatedGas)
+
+	retTx, err := evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), estimatedGas /*contractGas*/, defGasPrice, uint256.NewInt(0), bzweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)
+	require.Equal(t, estimatedGas, uint64(retTx.DeliverTx.GasUsed))
 }
 
 func testPayable(t *testing.T) {

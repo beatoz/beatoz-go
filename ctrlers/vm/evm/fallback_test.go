@@ -148,4 +148,6 @@ func Test_Fallback(t *testing.T) {
 	_, height, xerr := fallbackEVM.Commit()
 	require.NoError(t, xerr)
 	fmt.Println("TestDeploy", "Commit block", height)
+
+	require.NoError(t, fallbackEVM.Close())
 }

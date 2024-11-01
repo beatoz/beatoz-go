@@ -35,17 +35,21 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		return nil, xerr
 	}
 
-	returnData := &ctrlertypes.VMCallResult{
+	retData := execRet.ReturnData
+	if req.Path == "vm_estimate_gas" {
+		retData = nil
+	}
+	vmCallRet := &ctrlertypes.VMCallResult{
 		UsedGas:    execRet.UsedGas,
-		ReturnData: execRet.ReturnData,
+		ReturnData: retData,
 	}
 	if execRet.Err != nil {
-		returnData.Err = execRet.Err.Error()
+		vmCallRet.Err = execRet.Err.Error()
 	} else {
-		returnData.Err = ""
+		vmCallRet.Err = ""
 	}
 
-	retbz, err := tmjson.Marshal(returnData)
+	retbz, err := tmjson.Marshal(vmCallRet)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
