@@ -51,13 +51,20 @@ BUILDDIR="./build/$(HOSTOS)"
 all: pbm $(TARGETOS) sfeeder
 
 $(TARGETOS):
-	@echo Build beatoz for $(@) on $(HOSTOS)
+	@echo Build beatoz for $(@) on $(UNAME_S)-$(UNAME_M)
 ifeq ($(HOSTOS), windows)
 	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/beatoz.exe $(BUILD_FLAGS)  ./cmd/
 else
 	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/beatoz $(BUILD_FLAGS) ./cmd/
 endif
 
+sfeeder:
+	@echo "Build SecretFeeder ..."
+	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
+
+install:
+	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
+	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 pbm:
 	@echo Compile protocol messages
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ account.proto
@@ -80,10 +87,6 @@ deploy:
 # deploy:
 # 	@echo Deploy...
 # 	@sh -c scripts/deploy/deploy.sh
-
-sfeeder:
-	@echo "Build SecretFeeder ..."
-	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
 
 clean:
 	@echo "Clean build..."
