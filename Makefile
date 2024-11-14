@@ -43,7 +43,7 @@ endif
 GITCOMMIT=$(shell git log -1 --pretty=format:"%h")
 BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCommit=$(GITCOMMIT)'"
 
-
+LOCAL_GOPATH = $(shell go env GOPATH)
 BUILDDIR="./build/$(HOSTOS)"
 
 all: pbm $(TARGETOS) sfeeder
@@ -58,10 +58,10 @@ endif
 
 pbm:
 	@echo Compile protocol messages
-	@protoc --go_out=$(GOPATH)/src -I./protos/ account.proto
-	@protoc --go_out=$(GOPATH)/src -I./protos/ gov_params.proto
-	@protoc --go_out=$(GOPATH)/src -I./protos/ trx.proto
-	@protoc --go_out=$(GOPATH)/src -I./protos/ reward.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ account.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
 
 build-deploy:
 	@echo "Build deploy tar file"
@@ -81,14 +81,14 @@ deploy:
 
 sfeeder: dummy
 	@echo "Generate sfeeder.proto"
-	@protoc --go_out=$(GOPATH)/src --go-grpc_out=$(GOPATH)/src -I./sfeeder/protos secret_feeder.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src --go-grpc_out=$(LOCAL_GOPATH)/src -I./sfeeder/protos secret_feeder.proto
 	@echo "Build SecretFeeder ..."
 	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
 
 dummy:
 
 check:
-	@echo "OSTYPE: `echo ${OSTYPE}`"
+	@echo "GOPATH": $(LOCAL_GOPATH)
 	@echo "HOSTOS: $(HOSTOS)"
 	@echo "HOSTARCH: $(HOSTARCH)"
 	@echo "MAKECMDGOALS $(MAKECMDGOALS)"
