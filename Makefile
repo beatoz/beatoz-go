@@ -46,6 +46,8 @@ BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCo
 LOCAL_GOPATH = $(shell go env GOPATH)
 BUILDDIR="./build/$(HOSTOS)"
 
+.PHONY: all pbm $(TARGETOS) sfeeder deploy
+
 all: pbm $(TARGETOS) sfeeder
 
 $(TARGETOS):
@@ -62,30 +64,30 @@ pbm:
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src --go-grpc_out=$(LOCAL_GOPATH)/src -I./sfeeder/protos secret_feeder.proto
 
-build-deploy:
+deploy:
 	@echo "Build deploy tar file"
-
 	@mkdir -p .deploy
 	@mkdir -p .tmp/deploy
 	@cp ./scripts/deploy/cli/files/* .tmp/deploy/
 	@cp $(BUILDDIR)/beatoz .tmp/deploy/
 
-	@tar -czvf .deploy/deploy.gz.tar -C .tmp/deploy .
+	@tar -czf .deploy/deploy.gz.tar -C .tmp/deploy .
 	@tar -tzvf .deploy/deploy.gz.tar
 	@rm -rf .tmp/deploy
 
-deploy:
-	@echo Deploy...
-	@sh -c scripts/deploy/deploy.sh
+# deploy:
+# 	@echo Deploy...
+# 	@sh -c scripts/deploy/deploy.sh
 
-sfeeder: dummy
-	@echo "Generate sfeeder.proto"
-	@protoc --go_out=$(LOCAL_GOPATH)/src --go-grpc_out=$(LOCAL_GOPATH)/src -I./sfeeder/protos secret_feeder.proto
+sfeeder:
 	@echo "Build SecretFeeder ..."
 	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
 
-dummy:
+clean:
+	@echo "Clean build..."
+	@rm -rf $(BUILDDIR)
 
 check:
 	@echo "GOPATH": $(LOCAL_GOPATH)
