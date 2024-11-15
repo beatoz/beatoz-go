@@ -4,4 +4,3 @@
 any_test/
 build/
 documents/site/
-*.pb.go
