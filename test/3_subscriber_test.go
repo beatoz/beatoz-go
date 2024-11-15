@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/beatoz/beatoz-go/libs/web3"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"

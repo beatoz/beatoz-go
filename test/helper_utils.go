@@ -5,11 +5,11 @@ import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs"
-	btzweb3 "github.com/beatoz/beatoz-go/libs/web3"
-	btzweb3types "github.com/beatoz/beatoz-go/libs/web3/types"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	btzweb3types "github.com/beatoz/beatoz-sdk-go/types"
+	btzweb3 "github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/rand"
@@ -87,8 +87,6 @@ func prepareTest(peers []*PeerMock) {
 func waitTrxResult(txhash []byte, maxTimes int, bzweb3 *btzweb3.BeatozWeb3) (*btzweb3types.TrxResult, error) {
 	for i := 0; i < maxTimes; i++ {
 		time.Sleep(time.Second)
-		fmt.Println("times", i, "/", maxTimes)
-		// todo: check why it takes more than 10 secs to fetch a transaction
 
 		txRet, err := bzweb3.GetTransaction(txhash)
 		if err != nil && strings.Contains(err.Error(), ") not found") {

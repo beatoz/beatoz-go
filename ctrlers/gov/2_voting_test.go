@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/libs/web3"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

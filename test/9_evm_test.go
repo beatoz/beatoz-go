@@ -3,11 +3,11 @@ package test
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/beatoz/beatoz-go/libs/web3"
-	"github.com/beatoz/beatoz-go/libs/web3/vm"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/beatoz/beatoz-sdk-go/vm"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
