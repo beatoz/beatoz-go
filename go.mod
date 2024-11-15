@@ -11,7 +11,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/holiman/uint256 v1.2.2
+	github.com/holiman/uint256 v1.3.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.0
