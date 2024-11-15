@@ -112,6 +112,26 @@ func QueryVM(
 	}
 }
 
+func QueryEstimateGas(
+	ctx *tmrpctypes.Context,
+	addr abytes.HexBytes,
+	to abytes.HexBytes,
+	heightPtr *int64,
+	data []byte,
+) (*QueryResult, error) {
+	params := make([]byte, len(addr)+len(to)+len(data))
+	copy(params, addr)
+	copy(params[len(addr):], to)
+	copy(params[len(addr)+len(to):], data)
+
+	height := adjustHeight(ctx, heightPtr)
+	if resp, err := tmrpccore.ABCIQuery(ctx, "vm_estimate_gas", params, height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {
 	// return error when the event subscription request is received over http session.
 	// related to: #103

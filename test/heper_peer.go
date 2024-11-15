@@ -40,6 +40,7 @@ func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerM
 	config.P2P.AllowDuplicateIP = true
 	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
 	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
+	config.Config.Moniker = fmt.Sprintf("peer-%v@%v", id, chain)
 	config.SetRoot(filepath.Join(os.TempDir(), "beatoz_test_"+id))
 	os.RemoveAll(config.RootDir) // reset root directory
 	tmcfg.EnsureRoot(config.RootDir)

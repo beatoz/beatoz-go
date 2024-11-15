@@ -1,9 +1,9 @@
-package ledger
+package v0
 
 import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
-	tmdb "github.com/tendermint/tm-db"
+	dbm "github.com/cosmos/iavl/db"
 	"sort"
 	"sync"
 )
@@ -16,12 +16,13 @@ type FinalityLedger[T ILedgerItem] struct {
 }
 
 func NewFinalityLedger[T ILedgerItem](name, dbDir string, cacheSize int, cb func() T) (*FinalityLedger[T], xerrors.XError) {
-	if db, err := tmdb.NewDB(name, "goleveldb", dbDir); err != nil {
+	db, err := dbm.NewGoLevelDB(name, dbDir)
+	if err != nil {
 		return nil, xerrors.From(err)
-	} else if tree, err := iavl.NewMutableTreeWithOpts(db, cacheSize, nil /*&iavl.Options{Sync: true}*/); err != nil {
-		_ = db.Close()
-		return nil, xerrors.From(err)
-	} else if _, err := tree.Load(); err != nil {
+	}
+
+	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), iavl.SyncOption(true))
+	if _, err := tree.Load(); err != nil {
 		_ = db.Close()
 		return nil, xerrors.From(err)
 	} else {
@@ -148,6 +149,9 @@ func (ledger *FinalityLedger[T]) IterateFinalityUpdatedItems(cb func(T) xerrors.
 func (ledger *FinalityLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
+
+	ledger.tree.SetCommitting()
+	defer ledger.tree.UnsetCommitting()
 
 	// remove
 	for _, k := range ledger.finalityItems.removedKeys {

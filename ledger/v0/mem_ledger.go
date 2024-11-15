@@ -1,4 +1,4 @@
-package ledger
+package v0
 
 import (
 	"github.com/beatoz/beatoz-go/types/xerrors"

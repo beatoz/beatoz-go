@@ -84,46 +84,13 @@ func Test_callEVM_Deploy(t *testing.T) {
 	// creation code = contract byte code + input parameters
 	deployInput = append(erc20BuildInfo.Bytecode, deployInput...)
 
-	// make transaction
-	fromAcct := acctHandler.walletsArr[0].GetAccount()
-	to := types.ZeroAddress()
-
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
-	_, xerr := erc20EVM.BeginBlock(bctx)
-	require.NoError(t, xerr)
-
-	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.Height(),
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), deployInput),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    nil,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
-	}
-
-	xerr = erc20EVM.ExecuteTrx(txctx)
-	require.NoError(t, xerr)
-
-	for _, evt := range txctx.Events {
-		if evt.Type == "evm" {
-			require.GreaterOrEqual(t, len(evt.Attributes), 1)
-			require.Equal(t, "contractAddress", string(evt.Attributes[0].Key), string(evt.Attributes[0].Key))
-			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
-			erc20ContAddr, err = types.HexToAddress(string(evt.Attributes[0].Value))
-			require.NoError(t, err)
-		}
-	}
+	contAddr, txctx := testDeployContract(t, deployInput)
+	fromAcct := txctx.Sender
+	height := txctx.Height
+	erc20ContAddr = contAddr
 
 	fmt.Println("TestDeploy", "contract address", erc20ContAddr)
 	fmt.Println("TestDeploy", "used gas", txctx.GasUsed)
-
-	_, height, xerr := erc20EVM.Commit()
-	require.NoError(t, xerr)
 	fmt.Println("TestDeploy", "Commit block", height)
 
 	bzCode, xerr := erc20EVM.QueryCode(erc20ContAddr, height)
@@ -147,7 +114,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 }
 
 func Test_callEVM_Transfer(t *testing.T) {
-	state, xerr := erc20EVM.ImmutableStateAt(erc20EVM.lastBlockHeight)
+	state, xerr := erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
@@ -177,7 +144,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("Commit block", height)
 
-	state, xerr = erc20EVM.ImmutableStateAt(erc20EVM.lastBlockHeight)
+	state, xerr = erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
 	ret, xerr = callMethod(abiERC20Contract, queryAcct.Address(), erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
@@ -202,7 +169,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 
 	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
 
-	state, xerr = erc20EVM.ImmutableStateAt(erc20EVM.lastBlockHeight)
+	state, xerr = erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
 	ret, xerr = callMethod(abiERC20Contract, queryAcct.Address(), erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
@@ -224,6 +191,52 @@ func Test_callEVM_Transfer(t *testing.T) {
 	fmt.Println("Commit block", height)
 	xerr = erc20EVM.Close()
 	require.NoError(t, xerr)
+}
+
+func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes.TrxContext) {
+	// make transaction
+	fromAcct := acctHandler.walletsArr[0].GetAccount()
+	to := types.ZeroAddress()
+
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
+	_, xerr := erc20EVM.BeginBlock(bctx)
+	require.NoError(t, xerr)
+
+	txctx := &ctrlertypes.TrxContext{
+		Height:      bctx.Height(),
+		BlockTime:   time.Now().Unix(),
+		TxHash:      bytes2.RandBytes(32),
+		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
+		TxIdx:       1,
+		Exec:        true,
+		Sender:      fromAcct,
+		Receiver:    nil,
+		GasUsed:     0,
+		GovHandler:  govParams,
+		AcctHandler: &acctHandler,
+	}
+
+	xerr = erc20EVM.ExecuteTrx(txctx)
+	require.NoError(t, xerr)
+
+	var contAddr types.Address
+	for _, evt := range txctx.Events {
+		if evt.Type == "evm" {
+			require.GreaterOrEqual(t, len(evt.Attributes), 1)
+			require.Equal(t, "contractAddress", string(evt.Attributes[0].Key), string(evt.Attributes[0].Key))
+			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
+			_addr, err := types.HexToAddress(string(evt.Attributes[0].Value))
+			require.NoError(t, err)
+
+			contAddr = _addr
+		}
+	}
+
+	_, height, xerr := erc20EVM.Commit()
+	require.NoError(t, xerr)
+	require.Equal(t, txctx.Height, height)
+
+	return contAddr, txctx
 }
 
 func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
@@ -342,6 +355,9 @@ func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) 
 }
 
 func (handler *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
+	return nil, nil
+}
+func (handler *acctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	walletsMap := make(map[string]*web3.Wallet)
 	walletsArr := make([]*web3.Wallet, len(handler.walletsArr))
 	for i, w := range handler.walletsArr {
@@ -361,8 +377,7 @@ func (handler *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAcc
 		origin:     false,
 	}, nil
 }
-
-func (handler *acctHandlerMock) SetAccountCommittable(acct *ctrlertypes.Account, exec bool) xerrors.XError {
+func (handler *acctHandlerMock) SetAccount(acct *ctrlertypes.Account, exec bool) xerrors.XError {
 	return nil
 }
 

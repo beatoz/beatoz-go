@@ -51,7 +51,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	sender.AddNonce()
 
 	// not allowed delegating, because `maxAllowedAmt` is already delegated.
-	ret, err = sender.StakingSync(valWal.Address(), defGas, defGasPrice, rtypes0.ToMote(1), bzweb3)
+	ret, err = sender.StakingSync(valWal.Address(), defGas, defGasPrice, rtypes0.ToFons(1), bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
@@ -60,7 +60,7 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	// already stake + new stake >= govParams.MinValidatorStake
 	allowedMinStake := new(uint256.Int).Sub(govParams.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
 	if allowedMinStake.Sign() <= 0 {
-		allowedMinStake = rtypes0.ToMote(10)
+		allowedMinStake = rtypes0.ToFons(10)
 	}
 
 	require.NoError(t, valWal.SyncAccount(bzweb3))
@@ -117,7 +117,7 @@ func TestDelegating(t *testing.T) {
 	valStakes0, err := bzweb3.GetDelegatee(valAddr)
 	require.NoError(t, err)
 
-	stakeAmt := rtypes0.ToMote(1) // 10^18
+	stakeAmt := rtypes0.ToFons(1) // 10^18
 	stakePower := int64(1)
 
 	require.NoError(t, delegatorWallet.Unlock(defaultRpcNode.Pass))

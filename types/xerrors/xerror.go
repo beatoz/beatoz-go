@@ -1,7 +1,6 @@
 package xerrors
 
 import (
-	"errors"
 	"fmt"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -49,17 +48,17 @@ var (
 	ErrNotFoundAccount         = New(ErrCodeNotFoundAccount, "not found account", nil)
 	ErrInvalidAccountType      = New(ErrCodeInvalidAccountType, "invalid account type", nil)
 	ErrInvalidTrx              = New(ErrCodeInvalidTrx, "invalid transaction", nil)
-	ErrNegGas                  = ErrInvalidTrx.Wrap(errors.New("negative gas"))
-	ErrInvalidGas              = ErrInvalidTrx.Wrap(errors.New("invalid gas"))
-	ErrInvalidGasPrice         = ErrInvalidTrx.Wrap(errors.New("invalid gas price"))
-	ErrInvalidAddress          = ErrInvalidTrx.Wrap(errors.New("invalid address"))
-	ErrInvalidNonce            = ErrInvalidTrx.Wrap(errors.New("invalid nonce"))
-	ErrInvalidAmount           = ErrInvalidTrx.Wrap(errors.New("invalid amount"))
-	ErrInsufficientFund        = ErrInvalidTrx.Wrap(errors.New("insufficient fund"))
-	ErrInvalidTrxType          = ErrInvalidTrx.Wrap(errors.New("wrong transaction type"))
-	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(errors.New("wrong transaction payload type"))
-	ErrInvalidTrxPayloadParams = ErrInvalidTrx.Wrap(errors.New("invalid params of transaction payload"))
-	ErrInvalidTrxSig           = ErrInvalidTrx.Wrap(errors.New("invalid signature"))
+	ErrNegGas                  = ErrInvalidTrx.Wrap(NewOrdinary("negative gas"))
+	ErrInvalidGas              = ErrInvalidTrx.Wrap(NewOrdinary("invalid gas"))
+	ErrInvalidGasPrice         = ErrInvalidTrx.Wrap(NewOrdinary("invalid gas price"))
+	ErrInvalidAddress          = ErrInvalidTrx.Wrap(NewOrdinary("invalid address"))
+	ErrInvalidNonce            = ErrInvalidTrx.Wrap(NewOrdinary("invalid nonce"))
+	ErrInvalidAmount           = ErrInvalidTrx.Wrap(NewOrdinary("invalid amount"))
+	ErrInsufficientFund        = ErrInvalidTrx.Wrap(NewOrdinary("insufficient fund"))
+	ErrInvalidTrxType          = ErrInvalidTrx.Wrap(NewOrdinary("wrong transaction type"))
+	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(NewOrdinary("wrong transaction payload type"))
+	ErrInvalidTrxPayloadParams = ErrInvalidTrx.Wrap(NewOrdinary("invalid params of transaction payload"))
+	ErrInvalidTrxSig           = ErrInvalidTrx.Wrap(NewOrdinary("invalid signature"))
 	ErrNotFoundTx              = New(ErrCodeNotFoundTx, "not found tx", nil)
 	ErrNotFoundDelegatee       = New(ErrCodeNotFoundDelegatee, "not found delegatee", nil)
 	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake", nil)
@@ -83,8 +82,8 @@ var (
 
 type XError interface {
 	Code() uint32
-	Error() string
 	Cause() error
+	Error() string
 	Wrap(error) XError
 	Wrapf(string, ...any) XError
 }
@@ -123,17 +122,6 @@ func Wrap(err error, msg string) XError {
 		msg:   msg,
 		cause: err,
 	}
-}
-
-func Cause(err error) error {
-	for err != nil {
-		cause, ok := err.(XError)
-		if !ok {
-			break
-		}
-		err = cause.Cause()
-	}
-	return err
 }
 
 func (e *xerror) Code() uint32 {

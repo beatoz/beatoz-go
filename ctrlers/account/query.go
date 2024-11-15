@@ -1,7 +1,7 @@
 package account
 
 import (
-	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
+	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -10,15 +10,23 @@ import (
 )
 
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	immuLedger, xerr := ctrler.acctLedger.ImmutableLedgerAt(req.Height, 0)
+	immuLedger, xerr := ctrler.acctState.ImitableLedgerAt(req.Height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	acct, xerr := immuLedger.Read(types.Address(req.Data).Array32())
+	var acct *btztypes.Account
+	item, xerr := immuLedger.Get(req.Data)
 	if xerr != nil {
-		acct = types2.NewAccount(req.Data)
+		acct = btztypes.NewAccount(req.Data)
+	} else {
+		acct = item.(*btztypes.Account)
 	}
+
+	//acct, xerr := ctrler.acctState.Get(req.Data, false)
+	//if xerr != nil {
+	//	acct = btztypes.NewAccount(req.Data)
+	//}
 
 	// NOTE
 	// `Account::Balance`, which type is *uint256.Int, is marshaled to hex-string.

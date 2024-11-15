@@ -22,6 +22,8 @@ const (
 	TRX_CONTRACT
 	TRX_SETDOC
 	TRX_WITHDRAW
+	TRX_MIN_TYPE = TRX_TRANSFER
+	TRX_MAX_TYPE = TRX_WITHDRAW
 )
 
 const (
@@ -68,6 +70,21 @@ type Trx struct {
 	Type     int32          `json:"type"`
 	Payload  ITrxPayload    `json:"payload,omitempty"`
 	Sig      bytes.HexBytes `json:"sig"`
+}
+
+func NewTrx(ver uint32, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, payload ITrxPayload) *Trx {
+	return &Trx{
+		Version:  ver,
+		Time:     time.Now().Round(0).UTC().UnixNano(),
+		Nonce:    nonce,
+		From:     from,
+		To:       to,
+		Amount:   amt,
+		Gas:      gas,
+		GasPrice: gasPrice,
+		Type:     payload.Type(),
+		Payload:  payload,
+	}
 }
 
 func (tx *Trx) Equal(_tx *Trx) bool {
@@ -199,21 +216,6 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 var _ rlp.Encoder = (*Trx)(nil)
 var _ rlp.Decoder = (*Trx)(nil)
 
-func NewTrx(ver uint32, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, payload ITrxPayload) *Trx {
-	return &Trx{
-		Version:  ver,
-		Time:     time.Now().Round(0).UTC().UnixNano(),
-		Nonce:    nonce,
-		From:     from,
-		To:       to,
-		Amount:   amt,
-		Gas:      gas,
-		GasPrice: gasPrice,
-		Type:     payload.Type(),
-		Payload:  payload,
-	}
-}
-
 func (tx *Trx) GetType() int32 {
 	return tx.Type
 }
@@ -245,6 +247,8 @@ func (tx *Trx) Decode(bz []byte) xerrors.XError {
 	if err := proto.Unmarshal(bz, &pm); err != nil {
 		return xerrors.From(err)
 	} else if err := tx.fromProto(&pm); err != nil {
+		return err
+	} else if err := tx.validate(); err != nil {
 		return err
 	}
 	return nil
@@ -336,6 +340,27 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 		XPayload:  payload,
 		Sig:       tx.Sig,
 	}, nil
+}
+
+func (tx *Trx) validate() xerrors.XError {
+	if len(tx.From) != types.AddrSize ||
+		len(tx.To) != types.AddrSize {
+		return xerrors.ErrInvalidAddress
+	}
+	if tx.Amount.Sign() < 0 {
+		return xerrors.ErrInvalidAmount
+	}
+	if tx.Type < TRX_MIN_TYPE && tx.Type > TRX_MAX_TYPE {
+		return xerrors.ErrInvalidTrxType
+	}
+	if tx.Payload != nil && tx.Type != tx.Payload.Type() {
+		return xerrors.ErrInvalidTrxPayloadType
+	}
+	// signature is checked in NewTrxContext()
+	//if tx.Sig == nil {
+	//	return xerrors.ErrInvalidTrxSig
+	//}
+	return nil
 }
 
 func PreImageToSignTrxProto(tx *Trx, chainId string) ([]byte, xerrors.XError) {

@@ -217,18 +217,15 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	ctx.RetData = evmResult.ReturnData
 
-	//
-	// Add events from evm.
-	var attrs []abcitypes.EventAttribute
 	if ctx.Tx.To == nil || types.IsZeroAddress(ctx.Tx.To) {
-		// contract 생성.
+		// When the new contract is created.
 		createdAddr := crypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
 		ctrler.logger.Debug("Create contract", "address", createdAddr)
 
 		// Account.Code 에 현재 Tx(Contract 생성) 의 Hash 를 기록.
 		contAcct := ctx.AcctHandler.FindAccount(createdAddr[:], ctx.Exec)
 		contAcct.SetCode(ctx.TxHash)
-		if xerr := ctx.AcctHandler.SetAccountCommittable(contAcct, ctx.Exec); xerr != nil {
+		if xerr := ctx.AcctHandler.SetAccount(contAcct, ctx.Exec); xerr != nil {
 			return xerr
 		}
 
@@ -236,63 +233,23 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// contract 생성 주소를 계산하여 리턴.
 		ctx.RetData = createdAddr[:]
 
-		// Event 로도 컨트랙트 주소 리턴
-		attrs = []abcitypes.EventAttribute{
-			{
-				Key:   []byte("contractAddress"),
-				Value: []byte(bytes.HexBytes(ctx.RetData).String()),
-				Index: false,
-			},
-		}
-	}
-
-	logs := ctrler.stateDBWrapper.GetLogs(ctx.TxHash.Array32(), common.Hash{})
-	if logs != nil && len(logs) > 0 {
-		for _, l := range logs {
-			// Contract Address
-			strVal := hex.EncodeToString(l.Address[:])
-			attrs = append(attrs, abcitypes.EventAttribute{
-				Key:   []byte("contract"),
-				Value: []byte(strVal),
-				Index: true,
-			})
-
-			// Topics (indexed)
-			for i, t := range l.Topics {
-				strVal = hex.EncodeToString(t.Bytes())
-				attrs = append(attrs, abcitypes.EventAttribute{
-					Key:   []byte(fmt.Sprintf("topic.%d", i)),
-					Value: []byte(strings.ToUpper(strVal)),
-					Index: true,
-				})
-			}
-
-			// Data (not indexed)
-			if l.Data != nil && len(l.Data) > 0 {
-				strVal = hex.EncodeToString(l.Data)
-				attrs = append(attrs, abcitypes.EventAttribute{
-					Key:   []byte("data"),
-					Value: []byte(strVal),
+		// Add the address of new contract to events
+		ctx.Events = append(ctx.Events, abcitypes.Event{
+			Type: "evm",
+			Attributes: []abcitypes.EventAttribute{
+				{
+					Key:   []byte("contractAddress"),
+					Value: []byte(bytes.HexBytes(ctx.RetData).String()),
 					Index: false,
-				})
-			}
-
-			// Removed
-			strVal = "false"
-			if l.Removed {
-				strVal = "true"
-			}
-			attrs = append(attrs, abcitypes.EventAttribute{
-				Key:   []byte("removed"),
-				Value: []byte(strVal),
-				Index: false,
-			})
-		}
+				},
+			},
+		})
 	}
-	ctx.Events = append(ctx.Events, abcitypes.Event{
-		Type:       "evm",
-		Attributes: attrs,
-	})
+
+	//
+	// Add events from evm logs.
+	evmEvts := ctrler.evmLogsToEvent(ctx.TxHash.Array32())
+	ctx.Events = append(ctx.Events, evmEvts...)
 
 	return nil
 }
@@ -314,6 +271,61 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPr
 	}
 
 	return result, nil
+}
+
+func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
+	var evts []abcitypes.Event // log : event = 1 : 1
+	logs := ctrler.stateDBWrapper.GetLogs(txHash, common.Hash{})
+	if logs != nil && len(logs) > 0 {
+		for _, l := range logs {
+			evt := abcitypes.Event{
+				Type: "evm", //fmt.Sprintf("evm.%X", l.Address),
+			}
+
+			// Contract Address
+			strVal := hex.EncodeToString(l.Address[:])
+			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+				Key:   []byte("contractAddress"),
+				Value: []byte(strVal),
+				Index: true,
+			})
+
+			// Topics (indexed)
+			for i, t := range l.Topics {
+				strVal = hex.EncodeToString(t.Bytes())
+				evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+					Key:   []byte(fmt.Sprintf("topic.%d", i)),
+					Value: []byte(strings.ToUpper(strVal)),
+					Index: true,
+				})
+			}
+
+			// Data (not indexed)
+			if l.Data != nil && len(l.Data) > 0 {
+				strVal = hex.EncodeToString(l.Data)
+				evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+					Key:   []byte("data"),
+					Value: []byte(strVal),
+					Index: false,
+				})
+			}
+
+			// Removed
+			strVal = "false"
+			if l.Removed {
+				strVal = "true"
+			}
+			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+				Key:   []byte("removed"),
+				Value: []byte(strVal),
+				Index: false,
+			})
+
+			evts = append(evts, evt)
+		}
+	}
+
+	return evts
 }
 
 func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -371,7 +383,16 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 	return nil
 }
 
-func (ctrler *EVMCtrler) ImmutableStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
+// MemStateAt returns the ledger of EVM and AcctCtrler with the state values at the `height`.
+// THIS LEDGER MUST BE NOT COMMITED.
+// MemStateAt is called from `QueryCode` and `callVM`.
+// When it is called from `QueryCode`, this ledger is only read (not updated).
+// In this case, the ledger can be immutable.
+// When it is called from `callVM`, this ledger may be updated.
+// In this case, the ledger should not be immutable.
+// In both cases, the ledger SHOULD NOT BE COMMITTED.
+// To satisfy all conditions, MemStateAt returns the mempool ledger which can be updated but not committed.
+func (ctrler *EVMCtrler) MemStateAt(height int64) (*StateDBWrapper, xerrors.XError) {
 	hash, err := ctrler.metadb.Get(blockKey(height))
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -382,15 +403,15 @@ func (ctrler *EVMCtrler) ImmutableStateAt(height int64) (*StateDBWrapper, xerror
 		return nil, xerrors.From(err)
 	}
 
-	immuAcctHandler, xerr := ctrler.acctHandler.ImmutableAcctCtrlerAt(height)
+	memAcctHandler, xerr := ctrler.acctHandler.SimuAcctCtrlerAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}
 	return &StateDBWrapper{
 		StateDB:          stateDB,
-		acctHandler:      immuAcctHandler,
+		acctHandler:      memAcctHandler,
 		accessedObjAddrs: make(map[common.Address]int),
-		immutable:        true,
+		exec:             false,
 		logger:           ctrler.logger,
 	}, nil
 }

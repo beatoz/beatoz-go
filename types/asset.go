@@ -6,33 +6,33 @@ import (
 
 const (
 	COIN_DECIMAL int16 = 18
-	MOTE               = "1"
-	KMOTE              = "1000"
-	MMOTE              = "1000000"
-	GMOTE              = "1000000000"
+	FONS               = "1"
+	KFONS              = "1000"
+	MFONS              = "1000000"
+	GFONS              = "1000000000"
 	UBEATOZ            = "1000000000000"
 	MiBEATOZ           = "1000000000000000"
-	COIN               = "1000000000000000000"             // 10^18 mote
-	KCOIN              = "1000000000000000000000"          // 10^21 mote
-	MCOIN              = "1000000000000000000000000"       // 10^24 mote
-	GCOIN              = "1000000000000000000000000000"    // 10^27 mote
-	TCOIN              = "1000000000000000000000000000000" // 10^30 mote
+	COIN               = "1000000000000000000"             // 10^18 fons
+	KCOIN              = "1000000000000000000000"          // 10^21 fons
+	MCOIN              = "1000000000000000000000000"       // 10^24 fons
+	GCOIN              = "1000000000000000000000000000"    // 10^27 fons
+	TCOIN              = "1000000000000000000000000000000" // 10^30 fons
 )
 
-// Simplest Asset Unit (MOTE)
+// Simplest Asset Unit (FONS)
 
 var (
-	oneCoinInMote = uint256.MustFromDecimal(COIN)
+	oneCoinInFons = uint256.MustFromDecimal(COIN)
 )
 
-// Coin to mote
-func ToMote(n uint64) *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(n), oneCoinInMote)
+// Coin to fons
+func ToFons(n uint64) *uint256.Int {
+	return new(uint256.Int).Mul(uint256.NewInt(n), oneCoinInFons)
 }
 
-// from mote to COIN and Remain
-func FromMote(sau *uint256.Int) (uint64, uint64) {
+// from fons to COIN and Remain
+func FromFons(sau *uint256.Int) (uint64, uint64) {
 	r := new(uint256.Int)
-	q, r := new(uint256.Int).DivMod(sau, oneCoinInMote, r)
+	q, r := new(uint256.Int).DivMod(sau, oneCoinInFons, r)
 	return q.Uint64(), r.Uint64()
 }

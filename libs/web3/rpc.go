@@ -2,6 +2,7 @@ package web3
 
 import (
 	"errors"
+	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	bzweb3types "github.com/beatoz/beatoz-go/libs/web3/types"
@@ -202,6 +203,29 @@ func (bzweb3 *BeatozWeb3) QueryVotingPower(height int64) (int64, error) {
 	}
 }
 
+type QueryProposalResult struct {
+	Status   string                `json:"status"`
+	Proposal *proposal.GovProposal `json:"proposal"`
+}
+
+func (bzweb3 *BeatozWeb3) QueryProposal(txhash []byte, height int64) (*QueryProposalResult, error) {
+	ret := &QueryProposalResult{}
+	queryResp := &rpc.QueryResult{}
+	if req, err := bzweb3.NewRequest("proposal", txhash, strconv.FormatInt(height, 10)); err != nil {
+		panic(err)
+	} else if resp, err := bzweb3.provider.Call(req); err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	} else if err := tmjson.Unmarshal(resp.Result, queryResp); err != nil {
+		return nil, err
+	} else if err := tmjson.Unmarshal(queryResp.Value, ret); err != nil {
+		return nil, err
+	} else {
+		return ret, nil
+	}
+}
+
 func (bzweb3 *BeatozWeb3) SendTransactionAsync(tx *ctrlertypes.Trx) (*coretypes.ResultBroadcastTx, error) {
 	resp, err := bzweb3.sendTransaction(tx, "broadcast_tx_async")
 	if err != nil {
@@ -302,6 +326,34 @@ func (bzweb3 *BeatozWeb3) GetValidators(height int64, page, perPage int) (*coret
 }
 
 func (bzweb3 *BeatozWeb3) VmCall(from, to types.Address, height int64, data []byte) (*ctrlertypes.VMCallResult, error) {
+	req, err := bzweb3.NewRequest("vm_call", from, to, strconv.FormatInt(height, 10), data)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := bzweb3.provider.Call(req)
+	if err != nil {
+		return nil, err
+	} else if resp.Error != nil {
+		return nil, errors.New("provider error: " + string(resp.Error))
+	}
+
+	qryResp := &rpc.QueryResult{}
+	if err := tmjson.Unmarshal(resp.Result, qryResp); err != nil {
+		return nil, err
+	}
+
+	if qryResp.Code != 0 {
+		return nil, errors.New(qryResp.Log)
+	}
+
+	vmRet := &ctrlertypes.VMCallResult{}
+	if err := tmjson.Unmarshal(qryResp.Value, vmRet); err != nil {
+		return nil, err
+	}
+	return vmRet, nil
+}
+
+func (bzweb3 *BeatozWeb3) VmEstimateGas(from, to types.Address, height int64, data []byte) (*ctrlertypes.VMCallResult, error) {
 	req, err := bzweb3.NewRequest("vm_call", from, to, strconv.FormatInt(height, 10), data)
 	if err != nil {
 		return nil, err

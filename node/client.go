@@ -152,7 +152,7 @@ func (client *beatozLocalClient) onTrxFinished(txidx int, req *abcitypes.Request
 	}
 	rr := client.deliverTxReqReses[txidx]
 	rr.Response = abcitypes.ToResponseDeliverTx(*res)
-	rr.Done()
+	rr.Done() // Wait it in EndBlockSync
 }
 
 func (client *beatozLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *abcicli.ReqRes {

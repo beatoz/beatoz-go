@@ -4,7 +4,7 @@ import (
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type TrxContext struct {
@@ -50,7 +50,7 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 
 	txctx := &TrxContext{
 		Tx:        tx,
-		TxHash:    types.Tx(txbz).Hash(),
+		TxHash:    tmtypes.Tx(txbz).Hash(),
 		Height:    height,
 		BlockTime: btime,
 		Exec:      exec,
@@ -62,14 +62,36 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 		}
 	}
 
+	//
+	// begin of code from commonValidation0
+	// The following can be performed in parallel.
+	{
+		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
+			return nil, xerrors.ErrInvalidGasPrice
+		}
+		if tx.Gas < txctx.GovHandler.MinTrxGas() {
+			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+		} else if tx.Gas > txctx.GovHandler.MaxTrxGas() {
+			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas(fee)")
+		}
+
+		_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
+		if xerr != nil {
+			return nil, xerr
+		}
+		txctx.SenderPubKey = pubKeyBytes
+	}
+	// end of code from commonValidation0
+	//
+
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
 	if txctx.Sender == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.From)
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From)
 	}
 	// RG-91:  Also find the account object with the destination address 0x0.
 	txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(tx.To, txctx.Exec)
 	if txctx.Receiver == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("address: %v", tx.To)
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}
 	return txctx, nil
 }

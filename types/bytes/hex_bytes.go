@@ -2,6 +2,7 @@ package bytes
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
@@ -39,12 +40,23 @@ func (hb *HexBytes) UnmarshalJSON(data []byte) error {
 	}
 
 	// escape double quote
-	str := strings.TrimPrefix(string(data[1:len(data)-1]), "0x")
-	bz2, err := hex.DecodeString(str)
-	if err != nil {
-		return err
+	val := data[1 : len(data)-1]
+	if isHex(string(val)) {
+		// hex string
+		str := strings.TrimPrefix(string(val), "0x")
+		bz, err := hex.DecodeString(str)
+		if err != nil {
+			return err
+		}
+		*hb = bz
+	} else {
+		// base64
+		bz, err := base64.StdEncoding.DecodeString(string(val))
+		if err != nil {
+			return err
+		}
+		*hb = bz
 	}
-	*hb = bz2
 	return nil
 }
 
@@ -95,4 +107,20 @@ func (hb HexBytes) Format(s fmt.State, verb rune) {
 	default:
 		s.Write([]byte(fmt.Sprintf("%X", []byte(hb))))
 	}
+}
+
+func isHex(s string) bool {
+	v := s
+	if len(v)%2 != 0 {
+		return false
+	}
+	if strings.HasPrefix(v, "0x") {
+		v = v[2:]
+	}
+	for _, b := range []byte(v) {
+		if !(b >= '0' && b <= '9' || b >= 'a' && b <= 'f' || b >= 'A' && b <= 'F') {
+			return false
+		}
+	}
+	return true
 }

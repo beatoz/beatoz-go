@@ -17,7 +17,7 @@ var (
 	commitVer uint64 = 0
 
 	// it is changed using ldflags.
-	//  ex) -ldflags "... -X 'github.com/beatoz-go/beatoz-go/cmd/version.GitCommit=$(LVER)'"
+	//  ex) -ldflags "... -X 'github.com/beatoz/beatoz-go/cmd/version.GitCommit=$(LVER)'"
 	GitCommit string
 
 	MASK_MAJOR_VER  = uint64(0xFF00000000000000)

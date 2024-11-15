@@ -3,7 +3,7 @@
 ## Prerequisite
 
 ### golang
-Install golang v1.19+
+Install golang v1.21+
 
 ### protoc (protobuf compiler)
 ```bash
@@ -23,6 +23,11 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go
 
 protoc-gen-go --version
 protoc-gen-go v1.28.1
+```
+
+### protoc-gen-go-grpc
+```bash
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```
  
 ## Sources

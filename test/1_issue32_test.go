@@ -46,9 +46,11 @@ func TestIssue32(t *testing.T) {
 	receiverHelper1 := newAcctObj(randRecvAcct1)
 	allAcctHelpers = append(allAcctHelpers, receiverHelper1)
 
+	fmt.Printf("TestIssue32 - sender count (goroutine count): %v\n", senderCnt)
 	for _, v := range senderAcctObjs {
 		wg.Add(1)
-		go bulkTransferSync(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs
+		//go bulkTransferSync(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs
+		go bulkTransferCommit(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs
 	}
 
 	wg.Wait()
@@ -58,7 +60,7 @@ func TestIssue32(t *testing.T) {
 		require.Equal(t, acctObj.expectedBalance, acctObj.w.GetBalance(), acctObj.w.Address().String())
 		require.Equal(t, acctObj.expectedNonce, acctObj.w.GetNonce(), acctObj.w.Address().String())
 
-		fmt.Println("\tCheck account", acctObj.w.Address(), acctObj.expectedNonce, acctObj.expectedBalance, acctObj.w.GetBalance())
+		//fmt.Println("\tCheck account", acctObj.w.Address(), acctObj.expectedNonce, acctObj.expectedBalance, acctObj.w.GetBalance())
 	}
 
 	clearSenderAcctHelper()

@@ -2,7 +2,7 @@ package gov
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
-	"github.com/beatoz/beatoz-go/ledger"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -13,25 +13,26 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 	txhash := req.Data
 	switch req.Path {
 	case "proposal":
-		atProposalLedger, xerr := ctrler.proposalLedger.ImmutableLedgerAt(req.Height, 0)
+		atProposalLedger, xerr := ctrler.proposalState.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
-		atFrozenLedger, xerr := ctrler.frozenLedger.ImmutableLedgerAt(req.Height, 0)
+		atFrozenLedger, xerr := ctrler.frozenState.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
 
-		type _prop struct {
+		type _response struct {
 			Status   string                `json:"status"`
 			Proposal *proposal.GovProposal `json:"proposal"`
 		}
 
 		if txhash == nil || len(txhash) == 0 {
-			var readProposals []*_prop
-			if xerr := atProposalLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				readProposals = append(readProposals, &_prop{
+			var readProposals []*_response
+			if xerr := atProposalLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+				prop := item.(*proposal.GovProposal)
+				readProposals = append(readProposals, &_response{
 					Status:   "voting",
 					Proposal: prop,
 				})
@@ -40,8 +41,9 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			if xerr = atFrozenLedger.IterateReadAllItems(func(prop *proposal.GovProposal) xerrors.XError {
-				readProposals = append(readProposals, &_prop{
+			if xerr = atFrozenLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+				prop := item.(*proposal.GovProposal)
+				readProposals = append(readProposals, &_response{
 					Status:   "frozen",
 					Proposal: prop,
 				})
@@ -56,24 +58,24 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 			return v, nil
 		} else {
-			prop, xerr := atProposalLedger.Read(ledger.ToLedgerKey(txhash))
-			readProposal := &_prop{}
+			item, xerr := atProposalLedger.Get(txhash)
+			prop := item.(*proposal.GovProposal)
+			resp := &_response{Status: "voting"}
 			if xerr != nil {
 				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
-					prop, xerr = atFrozenLedger.Read(ledger.ToLedgerKey(txhash))
+					item, xerr = atFrozenLedger.Get(txhash)
+					prop = item.(*proposal.GovProposal)
 					if xerr != nil {
 						return nil, xerrors.ErrQuery.Wrap(xerr)
 					}
-					readProposal.Status = "frozen"
+					resp.Status = "frozen"
 				} else {
 					return nil, xerrors.ErrQuery.Wrap(xerr)
 				}
-			} else {
-				readProposal.Status = "voting"
 			}
-			readProposal.Proposal = prop
+			resp.Proposal = prop
 
-			v, err := tmjson.Marshal(readProposal)
+			v, err := tmjson.Marshal(resp)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
@@ -81,11 +83,11 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			return v, nil
 		}
 	case "gov_params":
-		atledger, xerr := ctrler.paramsLedger.ImmutableLedgerAt(req.Height, 0)
+		atledger, xerr := ctrler.paramsState.ImitableLedgerAt(req.Height)
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		govParams, xerr := atledger.Read(ledger.ToLedgerKey(bytes.ZeroBytes(32)))
+		govParams, xerr := atledger.Get(bytes.ZeroBytes(32))
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}

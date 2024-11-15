@@ -35,17 +35,21 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		return nil, xerr
 	}
 
-	returnData := &ctrlertypes.VMCallResult{
+	retData := execRet.ReturnData
+	if req.Path == "vm_estimate_gas" {
+		retData = nil
+	}
+	vmCallRet := &ctrlertypes.VMCallResult{
 		UsedGas:    execRet.UsedGas,
-		ReturnData: execRet.ReturnData,
+		ReturnData: retData,
 	}
 	if execRet.Err != nil {
-		returnData.Err = execRet.Err.Error()
+		vmCallRet.Err = execRet.Err.Error()
 	} else {
-		returnData.Err = ""
+		vmCallRet.Err = ""
 	}
 
-	retbz, err := tmjson.Marshal(returnData)
+	retbz, err := tmjson.Marshal(vmCallRet)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
@@ -54,7 +58,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 }
 
 func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xerrors.XError) {
-	state, xerr := ctrler.ImmutableStateAt(height)
+	state, xerr := ctrler.MemStateAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -65,7 +69,7 @@ func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xe
 func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 
 	// block<height> 시점의 stateDB 와 account ledger(acctCtrler) 를 갖는 `stateDBWrapper` 획득
-	state, xerr := ctrler.ImmutableStateAt(height)
+	state, xerr := ctrler.MemStateAt(height)
 	if xerr != nil {
 		return nil, xerr
 	}

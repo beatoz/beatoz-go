@@ -49,10 +49,12 @@ func Test_Fallback(t *testing.T) {
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
+	// BeginBlock
 	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
 	_, xerr := fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
+	// Execute the tx to deploy contract
 	txctx := &ctrlertypes.TrxContext{
 		Height:      bctx.Height(),
 		BlockTime:   time.Now().Unix(),
@@ -81,13 +83,14 @@ func Test_Fallback(t *testing.T) {
 		}
 	}
 
+	// EndBlock and Commit
 	_, xerr = fallbackEVM.EndBlock(bctx)
 	require.NoError(t, xerr)
 	_, _, xerr = fallbackEVM.Commit()
 	require.NoError(t, xerr)
 
 	//
-	// transfer
+	// transfer to contract
 	bctx.SetHeight(bctx.Height() + 1)
 	_, xerr = fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
@@ -104,7 +107,7 @@ func Test_Fallback(t *testing.T) {
 		Height:      bctx.Height(),
 		BlockTime:   time.Now().Unix(),
 		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToMote(100)),
+		Tx:          web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToFons(100)),
 		TxIdx:       1,
 		Exec:        true,
 		Sender:      fromAcct,
@@ -123,8 +126,8 @@ func Test_Fallback(t *testing.T) {
 
 	gasAmt := new(uint256.Int).Mul(uint256.NewInt(txctx.GasUsed), govParams.GasPrice())
 
-	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToMote(100))
-	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToMote(100))
+	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToFons(100))
+	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToFons(100))
 
 	//fmt.Println("sender", expectedBalance0.Dec(), "contract", expectedBalance1.Dec(), "gas", gasAmt.Dec())
 	require.Equal(t, expectedBalance0.Dec(), fromAcct.Balance.Dec())
@@ -145,4 +148,6 @@ func Test_Fallback(t *testing.T) {
 	_, height, xerr := fallbackEVM.Commit()
 	require.NoError(t, xerr)
 	fmt.Println("TestDeploy", "Commit block", height)
+
+	require.NoError(t, fallbackEVM.Close())
 }

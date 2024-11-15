@@ -8,7 +8,6 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -18,8 +17,6 @@ var (
 	voteTestCases1        []*Case
 	voteTestCases2        []*Case
 	testFlagAlreadyFrozen = false
-	defMinGas             = uint64(100_000)
-	defGasPrice           = uint256.NewInt(10_000_000_000)
 )
 
 func init() {
@@ -30,6 +27,7 @@ func init() {
 	txProposal := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+	_ = signTrx(txProposal, stakeHelper.PickAddress(1), "")
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -41,20 +39,24 @@ func init() {
 	// no error
 	tx0 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-
+	_ = signTrx(tx0, stakeHelper.PickAddress(0), "")
 	// no right
 	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
+	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.valCnt), "")
 
 	// invalid payload params : wrong choice
 	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 1)
+	_ = signTrx(tx2, stakeHelper.PickAddress(0), "")
 	// invalid payload params : wrong choice
 	tx3 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, -1)
+	_ = signTrx(tx3, stakeHelper.PickAddress(0), "")
 	// not found result
 	tx4 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		bytes.RandBytes(32), 0)
+	_ = signTrx(tx4, stakeHelper.PickAddress(0), "")
 
 	// test cases #1
 	voteTestCases1 = []*Case{
@@ -78,6 +80,7 @@ func init() {
 		//}
 		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
 			trxCtxProposal.TxHash, choice)
+		_ = signTrx(tx, addr, "")
 		txs = append(txs, tx)
 	}
 
@@ -207,7 +210,7 @@ func TestFreezingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
-	frozenProp, xerr := govCtrler.frozenLedger.Get(trxCtxProposal.TxHash.Array32())
+	frozenProp, xerr := govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozenProp.MajorOption)
 	// prop.MajorOption is nil, so...
@@ -251,7 +254,7 @@ func TestApplyingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr := govCtrler.frozenLedger.Get(trxCtxProposal.TxHash.Array32())
+	frozenProp, xerr := govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozenProp)
 
@@ -266,7 +269,7 @@ func TestApplyingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr = govCtrler.frozenLedger.Get(trxCtxProposal.TxHash.Array32())
+	frozenProp, xerr = govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, frozenProp)
 

@@ -6,6 +6,7 @@ import (
 	tmcfg "github.com/tendermint/tendermint/config"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -52,26 +53,24 @@ func test_on_internal_node(m *testing.M) {
 
 func test_on_external_node(m *testing.M) {
 	//// node to be executed externally
-	//rpcURL = "http://localhost:26657"
-	//wsEndpoint = "ws://localhost:26657/websocket"
-	//config.RootDir = "/Users/kylekwon/beatoz_localnet_0"
-	//TESTPASS = []byte("1")
 
 	config := cfg.DefaultConfig()
 	config.LogLevel = ""
-	config.SetRoot("/Users/kysee/beatoz_localnet_0")
+	root, _ := filepath.Abs("../.tmp/test-localnet0")
+	config.SetRoot(root) //config.SetRoot("/Users/kysee/beatoz_localnet_0")
 	tmcfg.EnsureRoot(config.RootDir)
 	if err := config.ValidateBasic(); err != nil {
 		panic(fmt.Errorf("error in rootConfig file: %v", err))
 	}
 
 	peer := &PeerMock{
-		ChainID: "beatoz_test_external_chain",
+		ChainID: "test-localnet0",
 		Config:  config,
 		RPCURL:  "http://localhost:26657",
 		WSEnd:   "ws://localhost:26657/websocket",
-		Pass:    []byte("1"),
+		Pass:    []byte("1111"),
 	}
+	peers = append(peers, peer)
 	defaultRpcNode = peer
 
 	prepareTest([]*PeerMock{peer})

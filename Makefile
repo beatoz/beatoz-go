@@ -43,52 +43,57 @@ endif
 GITCOMMIT=$(shell git log -1 --pretty=format:"%h")
 BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCommit=$(GITCOMMIT)'"
 
-
+LOCAL_GOPATH = $(shell go env GOPATH)
 BUILDDIR="./build/$(HOSTOS)"
+
+.PHONY: all pbm $(TARGETOS) sfeeder deploy
 
 all: pbm $(TARGETOS) sfeeder
 
 $(TARGETOS):
-	@echo Build beatoz for $(@) on $(HOSTOS)
+	@echo Build beatoz for $(@) on $(UNAME_S)-$(UNAME_M)
 ifeq ($(HOSTOS), windows)
 	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/beatoz.exe $(BUILD_FLAGS)  ./cmd/
 else
 	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/beatoz $(BUILD_FLAGS) ./cmd/
 endif
 
+sfeeder:
+	@echo "Build SecretFeeder ..."
+	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
+
+install:
+	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
+	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 pbm:
 	@echo Compile protocol messages
-	@protoc --go_out=$(GOPATH)/src -I./protos/ account.proto
-	@protoc --go_out=$(GOPATH)/src -I./protos/ gov_params.proto
-	@protoc --go_out=$(GOPATH)/src -I./protos/ trx.proto
-	@protoc --go_out=$(GOPATH)/src -I./protos/ reward.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ account.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src --go-grpc_out=$(LOCAL_GOPATH)/src -I./sfeeder/protos secret_feeder.proto
 
-build-deploy:
+deploy:
 	@echo "Build deploy tar file"
-
 	@mkdir -p .deploy
 	@mkdir -p .tmp/deploy
 	@cp ./scripts/deploy/cli/files/* .tmp/deploy/
 	@cp $(BUILDDIR)/beatoz .tmp/deploy/
 
-	@tar -czvf .deploy/deploy.gz.tar -C .tmp/deploy .
+	@tar -czf .deploy/deploy.gz.tar -C .tmp/deploy .
 	@tar -tzvf .deploy/deploy.gz.tar
 	@rm -rf .tmp/deploy
 
-deploy:
-	@echo Deploy...
-	@sh -c scripts/deploy/deploy.sh
+# deploy:
+# 	@echo Deploy...
+# 	@sh -c scripts/deploy/deploy.sh
 
-sfeeder: dummy
-	@echo "Generate sfeeder.proto"
-	@protoc --go_out=$(GOPATH)/src --go-grpc_out=$(GOPATH)/src -I./sfeeder/protos secret_feeder.proto
-	@echo "Build SecretFeeder ..."
-	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
-
-dummy:
+clean:
+	@echo "Clean build..."
+	@rm -rf $(BUILDDIR)
 
 check:
-	@echo "OSTYPE: `echo ${OSTYPE}`"
+	@echo "GOPATH": $(LOCAL_GOPATH)
 	@echo "HOSTOS: $(HOSTOS)"
 	@echo "HOSTARCH: $(HOSTARCH)"
 	@echo "MAKECMDGOALS $(MAKECMDGOALS)"

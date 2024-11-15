@@ -3,11 +3,9 @@ package node
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
-	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -102,46 +100,54 @@ func executionRoutine(name string, ch chan *ctrlertypes.TrxContext, logger log.L
 	}
 }
 
-func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
+//func commonValidation0(ctx *ctrlertypes.TrxContext) xerrors.XError {
+//	//
+//	// the following CAN be parellely done
+//	//
+//	//tx := ctx.Tx
+//
+//	// move to `tx.validate()`
+//	//if len(tx.From) != rtypes.AddrSize {
+//	//	return xerrors.ErrInvalidAddress
+//	//}
+//	//if len(tx.To) != rtypes.AddrSize {
+//	//	return xerrors.ErrInvalidAddress
+//	//}
+//	//if tx.Amount.Sign() < 0 {
+//	//	return xerrors.ErrInvalidAmount
+//	//}
+//	//if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
+//	//	return xerrors.ErrInvalidGas
+//	//}
+//
+//	//
+//	// move to NewTrxContext()
+//	//
+//
+//	//if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
+//	//	return xerrors.ErrInvalidGasPrice
+//	//}
+//	//
+//	//feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+//	//if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
+//	//	return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
+//	//}
+//	//
+//	//_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
+//	//if xerr != nil {
+//	//	return xerr
+//	//}
+//	//ctx.SenderPubKey = pubKeyBytes
+//
+//	return nil
+//}
+
+func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
+
 	//
-	// the following CAN be parellely done
-	//
-	tx := ctx.Tx
-
-	if len(tx.From) != rtypes.AddrSize {
-		return xerrors.ErrInvalidAddress
-	}
-	if len(tx.To) != rtypes.AddrSize {
-		return xerrors.ErrInvalidAddress
-	}
-	if tx.Amount.Sign() < 0 {
-		return xerrors.ErrInvalidAmount
-	}
-	if tx.Gas < 0 || tx.Gas > math.MaxInt64 {
-		return xerrors.ErrInvalidGas
-	}
-	if tx.GasPrice.Sign() < 0 || tx.GasPrice.Cmp(ctx.GovHandler.GasPrice()) != 0 {
-		return xerrors.ErrInvalidGasPrice
-	}
-
-	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
-	if feeAmt.Cmp(ctx.GovHandler.MinTrxFee()) < 0 {
-		return xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
-	}
-
-	_, pubKeyBytes, xerr := ctrlertypes.VerifyTrxRLP(tx, ctx.ChainID)
-	if xerr != nil {
-		return xerr
-	}
-	ctx.SenderPubKey = pubKeyBytes
-
-	return nil
-}
-
-func commonValidation1(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
-	//
-	// this validation MUST be serially done
+	// This validation must be performed sequentially
+	// after the previous tx was executed.
+	// (after the account balance and nonce have been updated by the previous tx execution.)
 	//
 	tx := ctx.Tx
 
@@ -151,7 +157,7 @@ func commonValidation1(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
-		return xerr.Wrap(fmt.Errorf("invalid nonce - ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
+		return xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
 	return nil
 }
@@ -160,10 +166,7 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	//
 	// tx validation
-	if xerr := commonValidation0(ctx); xerr != nil {
-		return xerr
-	}
-	if xerr := commonValidation1(ctx); xerr != nil {
+	if xerr := commonValidation(ctx); xerr != nil {
 		return xerr
 	}
 
@@ -228,50 +231,13 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
-	if ctx.Exec &&
-		ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT &&
-		ctx.Tx.To.Compare(rtypes.ZeroAddress()) == 0 {
-		//// this tx is to deploy contract
-		//var contractAddr rtypes.Address
-		//for _, evt := range ctx.Events {
-		//	if evt.GetType() == "evm" {
-		//		for _, attr := range evt.Attributes {
-		//			if string(attr.Key) == "contractAddress" {
-		//				if caddr, err := rtypes.HexToAddress(string(attr.Value)); err != nil {
-		//					return xerrors.From(err)
-		//				} else {
-		//					contractAddr = caddr
-		//					break
-		//				}
-		//			}
-		//		}
-		//		if contractAddr != nil {
-		//			break
-		//		}
-		//	}
-		//}
-		//if contractAddr == nil {
-		//	return xerrors.NewOrdinary("there is no contract address")
-		//}
-		//
-		//acct := ctx.AcctHandler.FindAccount(contractAddr, ctx.Exec)
-		//if acct == nil {
-		//	return xerrors.ErrNotFoundAccount.Wrapf("contract address: %v", contractAddr)
-		//}
-		//
-		//// setting deploy txhash in contract account
-		//acct.SetCode(ctx.TxHash)
-		//
-		//if xerr := ctx.AcctHandler.SetAccountCommittable(acct, ctx.Exec); xerr != nil {
-		//	return xerr
-		//}
-	}
-
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT &&
 		!(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
 		//
-		// The gas & nonce is already processed in `EVMCtrler` if the tx type is `TRX_CONTRACT`.
+		// 1. If the tx type is `TRX_CONTRACT`,
+		// the gas & nonce have already been processed in `EVMCtrler`.
+		// 2. If the tx is `TRX_TRANSFER` type and to a contract,
+		// it is processed by `EVMCtrler` because of processing the fallback feature.
 
 		// processing fee = gas * gasPrice
 		fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
@@ -282,7 +248,7 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		// processing nonce
 		ctx.Sender.AddNonce()
 
-		if xerr := ctx.AcctHandler.SetAccountCommittable(ctx.Sender, ctx.Exec); xerr != nil {
+		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
 			return xerr
 		}
 

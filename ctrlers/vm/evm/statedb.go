@@ -18,7 +18,6 @@ import (
 type StateDBWrapper struct {
 	*state.StateDB
 	acctHandler ctrlertypes.IAccountHandler
-	immutable   bool
 
 	accessedObjAddrs map[common.Address]int
 	snapshot         int
@@ -27,6 +26,8 @@ type StateDBWrapper struct {
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
+
+var _ vm.StateDB = (*StateDBWrapper)(nil)
 
 func NewStateDBWrapper(db ethdb.Database, rootHash bytes.HexBytes, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) (*StateDBWrapper, error) {
 	stateDB, err := state.New(rootHash.Array32(), state.NewDatabase(db), nil)
@@ -62,7 +63,7 @@ func (s *StateDBWrapper) Finish() {
 		acct.SetBalance(amt)
 		acct.SetNonce(nonce)
 
-		_ = s.acctHandler.SetAccountCommittable(acct, s.exec)
+		_ = s.acctHandler.SetAccount(acct, s.exec)
 
 		//s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec(), "snap", v)
 	}
@@ -242,5 +243,3 @@ func (s *StateDBWrapper) AddPreimage(hash common.Hash, preimage []byte) {
 func (s *StateDBWrapper) ForEachStorage(addr common.Address, cb func(common.Hash, common.Hash) bool) error {
 	return s.StateDB.ForEachStorage(addr, cb)
 }
-
-var _ vm.StateDB = (*StateDBWrapper)(nil)

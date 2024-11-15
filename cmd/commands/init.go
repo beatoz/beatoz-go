@@ -120,10 +120,6 @@ func InitFilesWith(chainID string, config *cfg.Config, wkcnt int, secret []byte)
 			if genDoc, err = genesis.TestnetGenesisDoc(chainID); err != nil {
 				return err
 			}
-		} else if chainID == "devnet" {
-			if genDoc, err = genesis.DevnetGenesisDoc(chainID); err != nil {
-				return err
-			}
 		} else { // anything (e.g. loclanet)
 			defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
 			err := tmos.EnsureDir(defaultWalkeyDirPath, acrypto.DefaultWalletKeyDirPerm)
