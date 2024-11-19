@@ -230,20 +230,8 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		}
 
 		// EVM은 ReturnData 에 deployed code 를 리턴한다.
-		// contract 생성 주소를 계산하여 리턴.
+		// 여기서는 contract 생성 주소를 계산하여 리턴.
 		ctx.RetData = createdAddr[:]
-
-		// Add the address of new contract to events
-		ctx.Events = append(ctx.Events, abcitypes.Event{
-			Type: "evm",
-			Attributes: []abcitypes.EventAttribute{
-				{
-					Key:   []byte("contractAddress"),
-					Value: []byte(bytes.HexBytes(ctx.RetData).String()),
-					Index: false,
-				},
-			},
-		})
 	}
 
 	//
@@ -285,7 +273,7 @@ func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 			// Contract Address
 			strVal := hex.EncodeToString(l.Address[:])
 			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
-				Key:   []byte("contractAddress"),
+				Key:   []byte("contract"),
 				Value: []byte(strVal),
 				Index: true,
 			})
