@@ -43,7 +43,7 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		response.Value, xerr = ctrler.stakeCtrler.Query(req)
 	case "proposal", "gov_params":
 		response.Value, xerr = ctrler.govCtrler.Query(req)
-	case "vm_call":
+	case "vm_call", "vm_estimate_gas":
 		response.Value, xerr = ctrler.vmCtrler.Query(req)
 	default:
 		response.Value, xerr = nil, xerrors.ErrInvalidQueryPath

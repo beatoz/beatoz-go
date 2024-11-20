@@ -2,9 +2,9 @@ package test
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/libs/web3/vm"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/beatoz/beatoz-sdk-go/vm"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"math/big"

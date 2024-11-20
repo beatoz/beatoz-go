@@ -1,8 +1,8 @@
 package test
 
 import (
-	"github.com/beatoz/beatoz-go/libs/web3"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/bytes"
 	"sync"

@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	ethvm "github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
@@ -211,15 +211,18 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
 
-	// Gas is already applied to accounts by buyGas and refundGas of EVM.
+	// Gas is already applied to accounts by buyGas and refundGas in EVM.
 	// the `EVM` handles nonce, amount and gas.
 	ctx.GasUsed = evmResult.UsedGas
-
 	ctx.RetData = evmResult.ReturnData
+
+	//
+	// Add events from evm logs.
+	evmEvts := ctrler.evmLogsToEvent(ctx.TxHash.Array32())
 
 	if ctx.Tx.To == nil || types.IsZeroAddress(ctx.Tx.To) {
 		// When the new contract is created.
-		createdAddr := crypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
+		createdAddr := ethcrypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
 		ctrler.logger.Debug("Create contract", "address", createdAddr)
 
 		// Account.Code 에 현재 Tx(Contract 생성) 의 Hash 를 기록.
@@ -229,26 +232,30 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 			return xerr
 		}
 
-		// EVM은 ReturnData 에 deployed code 를 리턴한다.
-		// contract 생성 주소를 계산하여 리턴.
+		// When creating a contract,
+		// the original evm returns deployed code (via evmResult.ReturnData),
+		// and `ctx.RetData` currently points to it.
+		// But should the deployed code really be returned?
+		// Instead, let `ctx.RetData` have the deployed contract address.
 		ctx.RetData = createdAddr[:]
 
-		// Add the address of new contract to events
-		ctx.Events = append(ctx.Events, abcitypes.Event{
-			Type: "evm",
-			Attributes: []abcitypes.EventAttribute{
-				{
-					Key:   []byte("contractAddress"),
-					Value: []byte(bytes.HexBytes(ctx.RetData).String()),
-					Index: false,
+		if len(evmEvts) == 0 {
+			// If there is one or more events in `evmEvts`,
+			// the `contractAddress` attribute already exists.
+			evt := abcitypes.Event{
+				Type: "evm",
+				Attributes: []abcitypes.EventAttribute{
+					{
+						Key:   []byte("contractAddress"),
+						Value: []byte(hex.EncodeToString(ctx.RetData)),
+						Index: false,
+					},
 				},
-			},
-		})
+			}
+			evmEvts = append(evmEvts, evt)
+		}
 	}
 
-	//
-	// Add events from evm logs.
-	evmEvts := ctrler.evmLogsToEvent(ctx.TxHash.Array32())
 	ctx.Events = append(ctx.Events, evmEvts...)
 
 	return nil
@@ -279,7 +286,7 @@ func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 	if logs != nil && len(logs) > 0 {
 		for _, l := range logs {
 			evt := abcitypes.Event{
-				Type: "evm", //fmt.Sprintf("evm.%X", l.Address),
+				Type: "evm",
 			}
 
 			// Contract Address
@@ -287,7 +294,7 @@ func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
 				Key:   []byte("contractAddress"),
 				Value: []byte(strVal),
-				Index: true,
+				Index: false,
 			})
 
 			// Topics (indexed)

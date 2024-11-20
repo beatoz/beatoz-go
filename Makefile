@@ -46,9 +46,9 @@ BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCo
 LOCAL_GOPATH = $(shell go env GOPATH)
 BUILDDIR="./build/$(HOSTOS)"
 
-.PHONY: all pbm $(TARGETOS) sfeeder deploy
+.PHONY: all pbm $(TARGETOS) deploy
 
-all: pbm $(TARGETOS) sfeeder
+all: pbm $(TARGETOS)
 
 $(TARGETOS):
 	@echo Build beatoz for $(@) on $(UNAME_S)-$(UNAME_M)
@@ -57,10 +57,6 @@ ifeq ($(HOSTOS), windows)
 else
 	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/beatoz $(BUILD_FLAGS) ./cmd/
 endif
-
-sfeeder:
-	@echo "Build SecretFeeder ..."
-	@go build -o $(BUILDDIR)/sfeeder -ldflags "-s -w" ./sfeeder/sfeeder.go
 
 install:
 	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
@@ -71,7 +67,6 @@ pbm:
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
-	@protoc --go_out=$(LOCAL_GOPATH)/src --go-grpc_out=$(LOCAL_GOPATH)/src -I./sfeeder/protos secret_feeder.proto
 
 deploy:
 	@echo "Build deploy tar file"

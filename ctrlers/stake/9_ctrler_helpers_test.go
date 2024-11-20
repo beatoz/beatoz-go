@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/libs/web3"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"math/rand"
 )
 

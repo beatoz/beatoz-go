@@ -2,9 +2,9 @@ package types_test
 
 import (
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/libs/web3"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
