@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -227,6 +228,12 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
 			_addr, err := types.HexToAddress(string(evt.Attributes[0].Value))
 			require.NoError(t, err)
+
+			// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
+			// Calculate an expected address with `fromAcct.Nonce-1`.
+			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), fromAcct.Nonce-1)
+			require.EqualValues(t, addr0[:], _addr)
+			require.EqualValues(t, addr0[:], txctx.RetData)
 
 			contAddr = _addr
 		}

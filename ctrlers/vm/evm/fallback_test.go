@@ -10,6 +10,7 @@ import (
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -71,17 +72,14 @@ func Test_Fallback(t *testing.T) {
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))
 	require.NoError(t, fallbackEVM.ExecuteTrx(txctx))
 
-	var contAddr types.Address
-	var err error
-	for _, evt := range txctx.Events {
-		if evt.Type == "evm" {
-			require.GreaterOrEqual(t, len(evt.Attributes), 1)
-			require.Equal(t, "contractAddress", string(evt.Attributes[0].Key), string(evt.Attributes[0].Key))
-			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
-			contAddr, err = types.HexToAddress(string(evt.Attributes[0].Value))
-			require.NoError(t, err)
-		}
-	}
+	// When the contract deploy tx is executed,
+	// `txctx.RetData` has the address of contract.
+	contAddr := txctx.RetData
+
+	// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
+	// Calculate an expected address with `fromAcct.Nonce-1`.
+	addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), fromAcct.Nonce-1)
+	require.Equal(t, addr0[:], contAddr)
 
 	// EndBlock and Commit
 	_, xerr = fallbackEVM.EndBlock(bctx)
@@ -101,7 +99,7 @@ func Test_Fallback(t *testing.T) {
 	originBalance0 := fromAcct.Balance.Clone()
 	originBalance1 := contAcct.Balance.Clone()
 
-	//fmt.Println("sender", originBalance0.Dec(), "contract", originBalance1.Dec())
+	//fmt.Println("sender", originBalance0.Dec(), "address", originBalance1.Dec())
 
 	txctx = &ctrlertypes.TrxContext{
 		Height:      bctx.Height(),

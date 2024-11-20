@@ -8,6 +8,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/vm"
 	"github.com/beatoz/beatoz-sdk-go/web3"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -89,15 +90,20 @@ func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 	txRet, err := waitTrxResult(ret.Hash, 30, bzweb3)
 	require.NoError(t, err, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
-	//require.NotNil(t, txRet.TxResult.Data) // will be deprecated. deployed contract address is not returned via `Data` any more
-	require.Greater(t, len(txRet.TxResult.Events), 0)
-	require.Equal(t, "evm", txRet.TxResult.Events[0].Type, txRet.TxResult.Events[0].Type)
-	require.Greater(t, len(txRet.TxResult.Events[0].Attributes), 0)
-	require.Equal(t, "contractAddress", string(txRet.TxResult.Events[0].Attributes[0].Key), string(txRet.TxResult.Events[0].Attributes[0].Key))
-	require.Equal(t, 40, len(txRet.TxResult.Events[0].Attributes[0].Value), string(txRet.TxResult.Events[0].Attributes[0].Value))
-	_addr, err := types.HexToAddress(string(txRet.TxResult.Events[0].Attributes[0].Value))
-	require.NoError(t, err)
-	contract.SetAddress(_addr)
+
+	addr0 := ethcrypto.CreateAddress(creator.Address().Array20(), creator.GetNonce())
+	require.EqualValues(t, addr0[:], txRet.TxResult.Data)
+	require.EqualValues(t, addr0[:], contract.GetAddress())
+	for _, evt := range txRet.TxResult.Events {
+		if evt.Type == "evm" {
+			require.GreaterOrEqual(t, len(evt.Attributes), 1)
+			require.Equal(t, "contractAddress", string(evt.Attributes[0].Key), string(evt.Attributes[0].Key))
+			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
+			_addr, err := types.HexToAddress(string(evt.Attributes[0].Value))
+			require.NoError(t, err)
+			require.EqualValues(t, addr0[:], _addr)
+		}
+	}
 	evmContract = contract
 
 	require.NoError(t, creator.SyncAccount(bzweb3))
