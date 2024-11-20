@@ -20,6 +20,7 @@ import (
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -353,7 +354,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 				Attributes: []abcitypes.EventAttribute{
 					{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
 					{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-					{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte{byte(xerr.Code())}, Index: false},
+					{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
 				},
 			})
 		}
@@ -375,7 +376,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 			Attributes: []abcitypes.EventAttribute{
 				{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
 				{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte{byte(xerr.Code())}, Index: false},
+				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
 			},
 		})
 
@@ -398,7 +399,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 				{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
 				{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
 				{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
-				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte{0x0}, Index: false},
+				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte("0"), Index: false},
 			},
 		})
 

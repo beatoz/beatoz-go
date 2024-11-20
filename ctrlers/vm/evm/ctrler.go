@@ -317,6 +317,12 @@ func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 				})
 			}
 
+			// block height
+			evt.Attributes = append(evt.Attributes, abcitypes.EventAttribute{
+				Key:   []byte("blockNumber"),
+				Value: []byte(strconv.FormatUint(l.BlockNumber, 10)),
+			})
+
 			// Removed
 			strVal = "false"
 			if l.Removed {
