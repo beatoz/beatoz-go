@@ -25,10 +25,6 @@ protoc-gen-go --version
 protoc-gen-go v1.28.1
 ```
 
-### protoc-gen-go-grpc
-```bash
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-```
  
 ## Sources
 
