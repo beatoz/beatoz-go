@@ -12,6 +12,7 @@ import (
 	"github.com/holiman/uint256"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/big"
+	"sort"
 	"sync"
 )
 
@@ -55,7 +56,19 @@ func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to type
 }
 
 func (s *StateDBWrapper) Finish() {
-	for addr, _ := range s.accessedObjAddrs {
+	// NOTE: Keep the order of addresses.
+	// The acctHandler.SetAccount updates the ledger of account controller.
+	// And the updates must be run in the same key(`common.Address`) order.
+	var sortedKeys []common.Address
+	for k, _ := range s.accessedObjAddrs {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		ret := bytes.Compare(sortedKeys[i][:], sortedKeys[j][:])
+		return ret < 0 // ascending
+	})
+
+	for _, addr := range sortedKeys {
 		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
 		nonce := s.StateDB.GetNonce(addr)
 
@@ -65,7 +78,7 @@ func (s *StateDBWrapper) Finish() {
 
 		_ = s.acctHandler.SetAccount(acct, s.exec)
 
-		//s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec(), "snap", v)
+		s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec())
 	}
 
 	// issue #68
@@ -163,6 +176,15 @@ func (s *StateDBWrapper) PrepareAccessList(addr common.Address, dest *common.Add
 	if dest != nil {
 		s.addAccessedObjAddr(*dest)
 	}
+
+	//
+	// NOTE: Keep the order of addresses.
+	// sort `precompiles`.
+	sort.Slice(precompiles, func(i, j int) bool {
+		ret := bytes.Compare(precompiles[i][:], precompiles[j][:])
+		return ret < 0 // ascending
+	})
+
 	for _, preaddr := range precompiles {
 		s.addAccessedObjAddr(preaddr)
 	}

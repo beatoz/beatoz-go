@@ -151,6 +151,8 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	} else {
 		lastHeight = ctrler.lastBlockCtx.Height()
 		appHash = ctrler.lastBlockCtx.AppHash()
+
+		ctrler.logger.Debug("Info", "height", lastHeight, "appHash", appHash)
 	}
 
 	// get chain_id
@@ -551,25 +553,25 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	if err != nil {
 		panic(err)
 	}
-	//ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
 
 	appHash1, ver1, err := ctrler.acctCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	//ctrler.logger.Debug("BeatozApp::Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
 
 	appHash2, ver2, err := ctrler.stakeCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	//ctrler.logger.Debug("BeatozApp::Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
 
 	appHash3, ver3, err := ctrler.vmCtrler.Commit()
 	if err != nil {
 		panic(err)
 	}
-	//ctrler.logger.Debug("BeatozApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
 
 	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 {
 		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v, vm:%v", ver0, ver1, ver2, ver3))
@@ -577,7 +579,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.nextBlockCtx.SetAppHash(appHash)
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "txs", ctrler.nextBlockCtx.TxsCnt(), "app hash", ctrler.nextBlockCtx.AppHash())
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "txs", ctrler.nextBlockCtx.TxsCnt(), "appHash", ctrler.nextBlockCtx.AppHash())
 
 	ctrler.metaDB.PutLastBlockContext(ctrler.nextBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)
