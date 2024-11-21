@@ -21,12 +21,14 @@ type AcctCtrler struct {
 }
 
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
-	if _state, xerr := v1.NewStateLedger[*btztypes.Account]("accounts", config.DBDir(), 2048, func() *btztypes.Account { return &btztypes.Account{} }, logger); xerr != nil {
+	lg := logger.With("module", "beatoz_AcctCtrler")
+
+	if _state, xerr := v1.NewStateLedger[*btztypes.Account]("accounts", config.DBDir(), 2048, func() *btztypes.Account { return &btztypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
 			acctState: _state,
-			logger:    logger.With("module", "beatoz_AcctCtrler"),
+			logger:    lg,
 		}, nil
 	}
 }

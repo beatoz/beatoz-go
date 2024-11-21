@@ -79,6 +79,7 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovHandler, logg
 		govParams:         govHandler,
 		logger:            lg,
 	}
+	ret.logger.Debug("get last reward hash", "lastRwdHash", bytes.HexBytes(ret.lastRwdHash))
 
 	// set `lastValidators` of StakeCtrler
 	_ = ret.UpdateValidators(int(govHandler.MaxValidatorCnt()))
@@ -781,28 +782,35 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	h0, v0, xerr := ctrler.delegateeLedger.Commit()
+	h0, ver0, xerr := ctrler.delegateeLedger.Commit()
 	if xerr != nil {
 		return nil, -1, xerr
 	}
-	h1, v1, xerr := ctrler.frozenLedger.Commit()
+	ctrler.logger.Debug("delegateeLedger commit", "height", ver0, "hash", bytes.HexBytes(h0))
+
+	h1, ver1, xerr := ctrler.frozenLedger.Commit()
 	if xerr != nil {
 		return nil, -1, xerr
 	}
-	h2, v2, xerr := ctrler.rewardLedger.Commit()
+	ctrler.logger.Debug("fronzenLedger commit", "height", ver1, "hash", bytes.HexBytes(h1))
+
+	h2, ver2, xerr := ctrler.rewardLedger.Commit()
 	if xerr != nil {
 		return nil, -1, xerr
 	}
-	if v0 != v1 || v1 != v2 {
-		return nil, -1, xerrors.ErrCommit.Wrapf("error: StakeCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
+	ctrler.logger.Debug("rewardLedger commit", "height", ver2, "hash", bytes.HexBytes(h2))
+
+	if ver0 != ver1 || ver1 != ver2 {
+		return nil, -1, xerrors.ErrCommit.Wrapf("error: StakeCtrler.Commit() has wrong version number - ver0:%v, ver1:%v, ver2:%v", ver0, ver1, ver2)
 	}
 
-	if v0%ctrler.rwdLedgUpInterval == 0 {
+	if ver0%ctrler.rwdLedgUpInterval == 0 {
 		_ = ctrler.rwdHashDB.PutLastRewardHash(h2)
 		ctrler.lastRwdHash = h2
 	}
+	ctrler.logger.Debug("use rewardLedger's hash", "height", ver2, "hash", bytes.HexBytes(ctrler.lastRwdHash))
 
-	return crypto.DefaultHash(h0, h1, ctrler.lastRwdHash), v0, nil
+	return crypto.DefaultHash(h0, h1, ctrler.lastRwdHash), ver0, nil
 }
 
 func (ctrler *StakeCtrler) Close() xerrors.XError {

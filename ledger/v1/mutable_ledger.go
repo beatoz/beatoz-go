@@ -145,6 +145,8 @@ func (ledger *MutableLedger) set(item ILedgerItem) xerrors.XError {
 		return xerrors.From(err)
 	}
 
+	ledger.logger.Debug("set item to tree", "key", key, "oldVal", oldVal, "newVal", newVal)
+
 	if oldVal == nil || bytes.Compare(oldVal, newVal) != 0 {
 		// if `oldVal` is `nil`, it means that the item is created, and it should be removed in reverting.
 		// if `oldVal` is not equal to `newVal`, it means that the item is updated, and `oldVal` will be restored in reverting.
@@ -157,12 +159,17 @@ func (ledger *MutableLedger) Del(key LedgerKey) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	if oldVal, removed, err := ledger.tree.Remove(key); err != nil {
+	oldVal, removed, err := ledger.tree.Remove(key)
+	if err != nil {
 		return xerrors.From(err)
-	} else if oldVal != nil && removed {
+	}
+	ledger.logger.Debug("delete item from tree", "key", key, "value", oldVal, "removed", removed)
+
+	if oldVal != nil && removed {
 		// In reverting, `oldVal` will be restored.
 		ledger.revisions.set(key, oldVal)
 	}
+
 	delete(ledger.cachedObjs, unsafe.String(&key[0], len(key)))
 	return nil
 }
@@ -210,13 +217,16 @@ func (ledger *MutableLedger) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.tree.SetCommitting()
 	defer ledger.tree.UnsetCommitting()
 
-	if r1, r2, err := ledger.tree.SaveVersion(); err != nil {
+	r1, r2, err := ledger.tree.SaveVersion()
+	if err != nil {
 		return r1, r2, xerrors.From(err)
-	} else {
-		ledger.revisions.reset()
-		ledger.cachedObjs = make(map[string]ILedgerItem)
-		return r1, r2, nil
 	}
+
+	ledger.logger.Debug("tree save version", "hash", r1, "version", r2)
+
+	ledger.revisions.reset()
+	ledger.cachedObjs = make(map[string]ILedgerItem)
+	return r1, r2, nil
 }
 
 func (ledger *MutableLedger) Version() int64 {

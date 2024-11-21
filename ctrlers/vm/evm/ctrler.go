@@ -80,7 +80,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		panic(err)
 	}
 
-	logger = logger.With("module", "beatoz_EVMCtrler")
+	lg := logger.With("module", "beatoz_EVMCtrler")
 
 	return &EVMCtrler{
 		ethChainConfig:  BEATOZMainnetEVMCtrlerChainConfig,
@@ -89,7 +89,7 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		acctHandler:     acctHandler,
 		lastRootHash:    hash,
 		lastBlockHeight: bn,
-		logger:          logger,
+		logger:          lg,
 	}
 }
 
