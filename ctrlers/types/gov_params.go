@@ -75,20 +75,20 @@ func DefaultGovParams() *GovParams {
 		// hotfix: because reward ledger and appHash is continually updated, block time is not controlled to 3s.
 		// so, reward = original reward / 3 = 4756468797
 		rewardPerPower:          uint256.NewInt(4_756_468_797),   // fons
-		lazyUnstakingBlocks:     2592000,                         // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
-		lazyApplyingBlocks:      259200,                          // = 60 * 60 * 24 * 3 => 3 days * 3(block intervals) => 9days
+		lazyUnstakingBlocks:     2592000,                         // 90days blocks = 90 * 24 * 60 * 60s (90days seconds) / 3s(block intervals)
+		lazyApplyingBlocks:      28800,                           // 1days blocks = 24 * 60 * 60s (1days seconds) / 3s(block intervals)
 		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
 		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
 		maxTrxGas:               25_000_000,
 		maxBlockGas:             math.MaxUint64,
-		minVotingPeriodBlocks:   259200,  // = 60 * 60 * 24 * 3 => 3 days* 3(block intervals) => 9days
-		maxVotingPeriodBlocks:   2592000, // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
-		minSelfStakeRatio:       50,      // 50%
-		maxUpdatableStakeRatio:  33,      // 33%
-		maxIndividualStakeRatio: 33,      // 33%
-		slashRatio:              50,      // 50%
-		signedBlocksWindow:      10000,   // 10000 blocks
-		minSignedBlocks:         500,     // 500 blocks
+		minVotingPeriodBlocks:   28800,  // 1day blocks = 24 * 60 * 60s(1day seconds) / 3s(block intervals)
+		maxVotingPeriodBlocks:   864000, // 30days blocks = 30 * 24 * 60 * 60s (30days seconds) / 3s(block intervals)
+		minSelfStakeRatio:       50,     // 50%
+		maxUpdatableStakeRatio:  33,     // 33%
+		maxIndividualStakeRatio: 33,     // 33%
+		slashRatio:              50,     // 50%
+		signedBlocksWindow:      10000,  // 10000 blocks
+		minSignedBlocks:         500,    // 500 blocks
 	}
 }
 
