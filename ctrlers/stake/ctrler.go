@@ -263,7 +263,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 
 				stakes := delegatee.DelAllStakes()
 				for _, _s0 := range stakes {
-					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyRewardBlocks()
+					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyUnstakingBlocks()
 					_ = ctrler.frozenLedger.Set(_s0, true) // add s0 to frozen ledger
 				}
 				_ = ctrler.delegateeLedger.Del(delegatee.Key(), true)
@@ -598,13 +598,13 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 	_ = delegatee.DelStake(txhash)
 
-	s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyRewardBlocks()
+	s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyUnstakingBlocks()
 	_ = ctrler.frozenLedger.Set(s0, ctx.Exec) // add s0 to frozen ledger
 
 	if delegatee.SelfPower == 0 {
 		stakes := delegatee.DelAllStakes()
 		for _, _s0 := range stakes {
-			_s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyRewardBlocks()
+			_s0.RefundHeight = ctx.Height + ctx.GovHandler.LazyUnstakingBlocks()
 			_ = ctrler.frozenLedger.Set(_s0, ctx.Exec) // add s0 to frozen ledger
 		}
 	}

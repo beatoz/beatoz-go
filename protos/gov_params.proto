@@ -7,7 +7,7 @@ message GovParamsProto {
   int64   max_validator_cnt = 2;
   bytes   _gas_price = 3;
   bytes   _reward_per_power = 4;
-  int64   lazy_reward_blocks = 5;
+  int64   lazy_unstaking_blocks = 5;
   int64   lazy_applying_blocks = 6;
   uint64  min_trx_gas = 7;
   uint64  max_trx_gas = 8;
