@@ -12,4 +12,4 @@ func MainnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
 	return genDoc, nil
 }
 
-var jsonBlobMainnetGenesis = []byte(`"message": "not yet"`)
+var jsonBlobMainnetGenesis = []byte(`{"message": "not yet"}`)

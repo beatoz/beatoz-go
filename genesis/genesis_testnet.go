@@ -13,4 +13,4 @@ func TestnetGenesisDoc(chainId string) (*tmtypes.GenesisDoc, error) {
 	return genDoc, nil
 }
 
-var jsonBlobTestnetGenesis = []byte(`"message": "not yet"`)
+var jsonBlobTestnetGenesis = []byte(`{"message": "not yet"}`)

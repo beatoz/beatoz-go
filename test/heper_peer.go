@@ -83,7 +83,7 @@ func (peer *PeerMock) SetPass(pass []byte) {
 }
 
 func (peer *PeerMock) Init() error {
-	return commands.InitFilesWith(peer.ChainID, peer.Config, 500, peer.Pass)
+	return commands.InitFilesWith(peer.ChainID, peer.Config, 1, peer.Pass, 500, peer.Pass)
 }
 
 func (peer *PeerMock) Start() error {

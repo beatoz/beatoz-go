@@ -280,6 +280,7 @@ func (wk *WalletKey) String() string {
 
 const DefaultWalletKeyDirPerm = 0700
 const DefaultWalletKeyDir = "walkeys"
+const DefaultValKeyDir = "walkeys/vals"
 
 func createWalletKeyFile(s []byte, dir string) (*WalletKey, error) {
 	wk := NewWalletKey(s)
