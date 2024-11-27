@@ -30,32 +30,47 @@ func init() {
 	}
 
 	//tx0 := web3.NewTrxProposal(
-	//	stakeHelper.PickAddress(1), types.ZeroAddress(), 1, 99_999, defGasPrice, // insufficient fee
-	//	"test govparams proposal", 10, 259200, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	//if _, _, xerr := wallets[stakeHelper.valCnt+1].SignTrxRLP(tx0); xerr != nil {
-	//	panic(xerr)
-	//}
-	tx1 := web3.NewTrxProposal( // no right == not validator
+	//	stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice, // insufficient fee
+	//	"test govparams proposal",
+	//	10,
+	//	govCtrler.MinVotingPeriodBlocks(),
+	//	10-1+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), // too small applying height
+	//	proposal.PROPOSAL_GOVPARAMS, bzOpt)
+	//_ = signTrx(tx0, stakeHelper.PickAddress(stakeHelper.valCnt-1), "")
+
+	tx1 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt+1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.valCnt+1), "")
+		"test govparams proposal",
+		10,
+		govCtrler.MinVotingPeriodBlocks(),
+		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+		proposal.PROPOSAL_GOVPARAMS, bzOpt)
+	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.valCnt+1), "") // not validator
 
 	tx3 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 159200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt) // wrong period
+		"test govparams proposal",
+		10,
+		govCtrler.MinVotingPeriodBlocks()-1, // too small period
+		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+		proposal.PROPOSAL_GOVPARAMS, bzOpt) // too small period
 	_ = signTrx(tx3, stakeHelper.PickAddress(stakeHelper.valCnt-1), "")
 
 	tx4 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt) // it will be used to test wrong start height
+		"test govparams proposal",
+		10,
+		govCtrler.MinVotingPeriodBlocks(),
+		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+		proposal.PROPOSAL_GOVPARAMS, bzOpt) // it will be used to test wrong start height
 	_ = signTrx(tx4, stakeHelper.PickAddress(stakeHelper.valCnt-1), "")
 	tx5 := web3.NewTrxProposal(
 		stakeHelper.PickAddress(stakeHelper.valCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt) // all right
+		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt) // all right
 	_ = signTrx(tx5, stakeHelper.PickAddress(stakeHelper.valCnt-1), "")
 
 	cases1 = []*Case{
-		//{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInvalidGas}, // wrong min fee
+		//{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInvalidTrxPayloadParams}, // too small applying height
 		{txctx: makeTrxCtx(tx1, 1, true), err: xerrors.ErrNoRight},
 		{txctx: makeTrxCtx(tx3, 1, true), err: xerrors.ErrInvalidTrxPayloadParams},  // wrong period
 		{txctx: makeTrxCtx(tx4, 20, true), err: xerrors.ErrInvalidTrxPayloadParams}, // wrong start height
