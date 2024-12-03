@@ -12,6 +12,7 @@ import (
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -120,12 +121,9 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 	for i := 0; i < vcnt; i++ {
 		var pv *acrypto.SFilePV
 
-		_keyFilePath := privValKeyFile
-		_keyStateFilePath := privValStateFile
-		if i > 0 {
-			_keyFilePath = fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(_keyFilePath), filepath.Ext(_keyFilePath)), i, filepath.Ext(_keyFilePath))
-			_keyStateFilePath = fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(_keyStateFilePath), filepath.Ext(_keyStateFilePath)), i, filepath.Ext(_keyFilePath))
-		}
+		_keyFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValKeyFile), filepath.Ext(privValKeyFile)), i, filepath.Ext(privValKeyFile))
+		_keyStateFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValStateFile), filepath.Ext(privValStateFile)), i, filepath.Ext(_keyFilePath))
+
 		if tmos.FileExists(_keyFilePath) {
 			pv = acrypto.LoadSFilePV(_keyFilePath, _keyStateFilePath, vsecret)
 			logger.Info("Found private validator", "keyFile", _keyFilePath,
@@ -136,6 +134,19 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			pv.SaveWith(vsecret)
 			logger.Info("Generated private validator", "keyFile", _keyFilePath,
 				"stateFile", _keyStateFilePath)
+		}
+		if i == 0 {
+			// copy to `privValKeyFile` and `privValStateFile`
+			if data, err := os.ReadFile(_keyFilePath); err != nil {
+				return err
+			} else if err = os.WriteFile(privValKeyFile, data, libs.DefaultSFilePerm); err != nil {
+				return err
+			}
+			if data, err := os.ReadFile(_keyStateFilePath); err != nil {
+				return err
+			} else if err = os.WriteFile(privValStateFile, data, libs.DefaultSFilePerm); err != nil {
+				return err
+			}
 		}
 		pvs = append(pvs, pv)
 	}
