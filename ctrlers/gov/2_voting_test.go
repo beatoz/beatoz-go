@@ -26,7 +26,7 @@ func init() {
 	}
 	txProposal := web3.NewTrxProposal(
 		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
-		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt)
 	_ = signTrx(txProposal, stakeHelper.PickAddress(1), "")
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
@@ -60,13 +60,13 @@ func init() {
 
 	// test cases #1
 	voteTestCases1 = []*Case{
-		{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrNotVotingPeriod},           // not voting period
-		{txctx: makeTrxCtx(tx0, 10+259200+1, true), err: xerrors.ErrNotVotingPeriod}, // not voting period
-		{txctx: makeTrxCtx(tx1, 10, true), err: xerrors.ErrNoRight},                  // no right
-		{txctx: makeTrxCtx(tx2, 10, true), err: xerrors.ErrInvalidTrxPayloadParams},  // not found result
-		{txctx: makeTrxCtx(tx3, 10, true), err: xerrors.ErrInvalidTrxPayloadParams},  // not found result
-		{txctx: makeTrxCtx(tx4, 10, true), err: xerrors.ErrNotFoundResult},           // not found result
-		{txctx: makeTrxCtx(tx0, 10, true), err: nil},                                 // success
+		{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrNotVotingPeriod},                                      // not voting period
+		{txctx: makeTrxCtx(tx0, 10+govCtrler.MinVotingPeriodBlocks()+1, true), err: xerrors.ErrNotVotingPeriod}, // not voting period
+		{txctx: makeTrxCtx(tx1, 10, true), err: xerrors.ErrNoRight},                                             // no right
+		{txctx: makeTrxCtx(tx2, 10, true), err: xerrors.ErrInvalidTrxPayloadParams},                             // not found result
+		{txctx: makeTrxCtx(tx3, 10, true), err: xerrors.ErrInvalidTrxPayloadParams},                             // not found result
+		{txctx: makeTrxCtx(tx4, 10, true), err: xerrors.ErrNotFoundResult},                                      // not found result
+		{txctx: makeTrxCtx(tx0, 10, true), err: nil},                                                            // success
 	}
 
 	// txs of validators except stakeHelper.delegatees[0]

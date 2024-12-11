@@ -20,7 +20,7 @@ type IGovHandler interface {
 	MinValidatorStake() *uint256.Int
 	MinDelegatorStake() *uint256.Int
 	RewardPerPower() *uint256.Int
-	LazyRewardBlocks() int64 // todo: rename LazyrewardBlocks to UnbondingPeriodBlockcs(?)
+	LazyUnstakingBlocks() int64
 	LazyApplyingBlocks() int64
 	GasPrice() *uint256.Int
 	MinTrxGas() uint64

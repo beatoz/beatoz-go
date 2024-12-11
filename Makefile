@@ -44,23 +44,37 @@ GITCOMMIT=$(shell git log -1 --pretty=format:"%h")
 BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCommit=$(GITCOMMIT)'"
 
 LOCAL_GOPATH = $(shell go env GOPATH)
-BUILDDIR="./build/$(HOSTOS)"
+BUILDDIR=./build/$(HOSTOS)
+
+OUTPUT=$(BUILDDIR)/beatoz
+ifeq ($(HOSTOS), windows)
+	OUTPUT=$(BUILDDIR)/beatoz.exe
+endif
+
+BUILD_YN="Y"
+ifneq ($(wildcard $(OUTPUT)),)
+	commit0=$(word 2, $(subst -, ,$(subst @, ,$(shell $(OUTPUT) version))))
+	ifeq ($(commit0),$(GITCOMMIT))
+		BUILD_YN="N"
+	endif
+endif
 
 .PHONY: all pbm $(TARGETOS) deploy
 
 all: pbm $(TARGETOS)
 
 $(TARGETOS):
+ifeq ($(BUILD_YN),"Y")
 	@echo Build beatoz for $(@) on $(UNAME_S)-$(UNAME_M)
-ifeq ($(HOSTOS), windows)
-	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(BUILDDIR)/beatoz.exe $(BUILD_FLAGS)  ./cmd/
+ifeq ($(HOSTOS),windows)
+	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(OUTPUT) $(BUILD_FLAGS)  ./cmd/
 else
-	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(BUILDDIR)/beatoz $(BUILD_FLAGS) ./cmd/
+	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(OUTPUT) $(BUILD_FLAGS) ./cmd/
+endif
+else
+	@echo "The last version ($(shell $(OUTPUT) version)) has already been built."
 endif
 
-install:
-	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
-	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 pbm:
 	@echo Compile protocol messages
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ account.proto
@@ -68,20 +82,9 @@ pbm:
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
 
-deploy:
-	@echo "Build deploy tar file"
-	@mkdir -p .deploy
-	@mkdir -p .tmp/deploy
-	@cp ./scripts/deploy/cli/files/* .tmp/deploy/
-	@cp $(BUILDDIR)/beatoz .tmp/deploy/
-
-	@tar -czf .deploy/deploy.gz.tar -C .tmp/deploy .
-	@tar -tzvf .deploy/deploy.gz.tar
-	@rm -rf .tmp/deploy
-
-# deploy:
-# 	@echo Deploy...
-# 	@sh -c scripts/deploy/deploy.sh
+install:
+	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
+	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 
 clean:
 	@echo "Clean build..."

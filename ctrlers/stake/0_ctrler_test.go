@@ -395,7 +395,7 @@ func TestUnfreezing(t *testing.T) {
 		//new(uint256.Int).Add(s0.Amount, s0.ReceivedReward))
 	}
 
-	toBlockHeight := mocks.LastBlockHeight() + govParams00.LazyRewardBlocks()
+	toBlockHeight := mocks.LastBlockHeight() + govParams00.LazyUnstakingBlocks()
 
 	for mocks.LastBlockHeight() <= toBlockHeight {
 		require.NoError(t, mocks.DoBeginBlock(stakeCtrler))

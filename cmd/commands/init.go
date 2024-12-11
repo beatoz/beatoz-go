@@ -12,7 +12,9 @@ import (
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"os"
 	"path/filepath"
+	"strings"
 )
 
 //// InitFilesCmd initialises a fresh Tendermint Core instance.
@@ -24,7 +26,9 @@ import (
 
 var (
 	beatozChainID           = "mainnet"
-	walkeyCnt               = 9
+	holderCnt               = 10
+	holderSecret            string
+	privValCnt              = 1
 	privValSecret           string
 	privValSecretFeederAddr string
 )
@@ -49,60 +53,112 @@ func AddInitFlags(cmd *cobra.Command) {
 		beatozChainID, // default name
 		"the id of chain to generate (e.g. mainnet, testnet, devnet and others)")
 	cmd.Flags().IntVar(
-		&walkeyCnt,
+		&holderCnt,
 		"holders",
-		walkeyCnt, // default value is 9
-		"the number of holder's accounts to generate. "+
+		holderCnt, // default value is 9
+		"the number of holder's account files to be generated.\n"+
 			"if you create a new genesis of your own blockchain, "+
 			"you need to generate accounts of genesis holders and "+
-			"these accounts will be saved at $BEATOZHOME/walkeys",
+			"these accounts will be saved at $BEATOZHOME/walkeys directory.\n"+
+			"if `--chain_id` is `mainnet`, the holder's accounts is not generated.",
+	)
+	cmd.Flags().StringVar(
+		&holderSecret,
+		"holder_secret",
+		"",
+		"passphrase to encrypt and decrypt a private key in account files of initial holders.\n"+
+			"these files are created in $BEATOZHOME/walkeys and have file names starting with 'wk'.",
+	)
+	cmd.Flags().IntVar(
+		&privValCnt,
+		"priv_validator_cnt",
+		privValCnt, // default value is 1
+		"the number of validators on BEATOZ network created.\n"+
+			"if you create a new genesis of your own blockchain, "+
+			"you need to generate validator's accounts and\n"+
+			"the first validator's account file (wallet key file) is created as $BEATOZHOME/config/priv_validator_key.json.\n"+
+			"if there is more than one validator, the rest will be created in the $BEATOZHOME/walkeys/vals directory.",
 	)
 	cmd.Flags().StringVar(
 		&privValSecret,
 		"priv_validator_secret",
 		"",
-		"passphrase to encrypt and decrypt a private key in priv_validator_key.json",
+		"passphrase to encrypt and decrypt $BEATOZHOME/config/priv_validator_key.json.",
 	)
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
-	var s []byte
+	var s0, s1 []byte
 	if privValSecret != "" {
-		s = []byte(privValSecret)
+		s0 = []byte(privValSecret)
 		privValSecret = ""
 	} else {
-		s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
+		s0 = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
 	}
-	defer libs.ClearCredential(s)
+	if holderSecret != "" {
+		s1 = []byte(holderSecret)
+		holderSecret = ""
+	} else {
+		s1 = libs.ReadCredential("Passphrase for initial holder's accounts: ")
+	}
+	defer libs.ClearCredential(s0)
 
-	return InitFilesWith(beatozChainID, rootConfig, walkeyCnt, s)
+	return InitFilesWith(beatozChainID, rootConfig, privValCnt, s0, holderCnt, s1)
 }
 
-func InitFilesWith(chainID string, config *cfg.Config, wkcnt int, secret []byte) error {
+func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte, hcnt int, hsecret []byte) error {
 	// private validator
 	privValKeyFile := config.PrivValidatorKeyFile()
 	privValStateFile := config.PrivValidatorStateFile()
-	var pv *acrypto.SFilePV
-	if tmos.FileExists(privValKeyFile) {
-		pv = acrypto.LoadSFilePV(privValKeyFile, privValStateFile, secret)
-		logger.Info("Found private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
-		//pv.SaveWith(secret) // encrypt with new driven key.
-	} else {
-		pv = acrypto.GenSFilePV(privValKeyFile, privValStateFile)
-		pv.SaveWith(secret)
-		logger.Info("Generated private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
+
+	defaultValDirPath := filepath.Join(config.RootDir, acrypto.DefaultValKeyDir)
+	err := tmos.EnsureDir(defaultValDirPath, acrypto.DefaultWalletKeyDirPerm)
+	if err != nil {
+		return err
+	}
+
+	var pvs []*acrypto.SFilePV
+	for i := 0; i < vcnt; i++ {
+		var pv *acrypto.SFilePV
+
+		_keyFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValKeyFile), filepath.Ext(privValKeyFile)), i, filepath.Ext(privValKeyFile))
+		_keyStateFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValStateFile), filepath.Ext(privValStateFile)), i, filepath.Ext(_keyFilePath))
+
+		if tmos.FileExists(_keyFilePath) {
+			pv = acrypto.LoadSFilePV(_keyFilePath, _keyStateFilePath, vsecret)
+			logger.Info("Found private validator", "keyFile", _keyFilePath,
+				"stateFile", _keyStateFilePath)
+			//pv.SaveWith(secret) // encrypt with new driven key.
+		} else {
+			pv = acrypto.GenSFilePV(_keyFilePath, _keyStateFilePath)
+			pv.SaveWith(vsecret)
+			logger.Info("Generated private validator", "keyFile", _keyFilePath,
+				"stateFile", _keyStateFilePath)
+		}
+		if i == 0 {
+			// copy to `privValKeyFile` and `privValStateFile`
+			if data, err := os.ReadFile(_keyFilePath); err != nil {
+				return err
+			} else if err = os.WriteFile(privValKeyFile, data, libs.DefaultSFilePerm); err != nil {
+				return err
+			}
+			if data, err := os.ReadFile(_keyStateFilePath); err != nil {
+				return err
+			} else if err = os.WriteFile(privValStateFile, data, libs.DefaultSFilePerm); err != nil {
+				return err
+			}
+		}
+		pvs = append(pvs, pv)
 	}
 
 	nodeKeyFile := config.NodeKeyFile()
 	if tmos.FileExists(nodeKeyFile) {
-		logger.Info("Found beatoz key", "path", nodeKeyFile)
+		logger.Info("Found beatoz node key", "path", nodeKeyFile)
 	} else {
 		if _, err := p2p.LoadOrGenNodeKey(nodeKeyFile); err != nil {
 			return err
 		}
-		logger.Info("Generated beatoz key", "path", nodeKeyFile)
+		logger.Info("Generated beatoz node key", "path", nodeKeyFile)
 	}
 
 	// genesis file
@@ -127,50 +183,45 @@ func InitFilesWith(chainID string, config *cfg.Config, wkcnt int, secret []byte)
 				return err
 			}
 
-			walkeys, err := acrypto.CreateWalletKeyFiles(secret, wkcnt, defaultWalkeyDirPath)
+			walkeys, err := acrypto.CreateWalletKeyFiles(hsecret, hcnt, defaultWalkeyDirPath)
 			if err != nil {
 				return err
 			}
+			logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
 
-			pvWalKey, err := acrypto.OpenWalletKey(libs.NewFileReader(privValKeyFile))
-			if err != nil {
-				return err
-			}
-			_, err = pvWalKey.Save(
-				libs.NewFileWriter(
-					filepath.Join(defaultWalkeyDirPath, fmt.Sprintf("wk%X.json", pvWalKey.Address))))
-			if err != nil {
-				return err
-			}
+			//pvWalKey, err := acrypto.OpenWalletKey(libs.NewFileReader(privValKeyFile))
+			//if err != nil {
+			//	return err
+			//}
+			//_, err = pvWalKey.Save(
+			//	libs.NewFileWriter(
+			//		filepath.Join(defaultWalkeyDirPath, fmt.Sprintf("wk%X.json", pvWalKey.Address))))
+			//if err != nil {
+			//	return err
+			//}
 
-			pubKey, err := pv.GetPubKey()
-			if err != nil {
-				return fmt.Errorf("can't get pubkey: %w", err)
+			var valset []tmtypes.GenesisValidator
+			for _, pv := range pvs {
+				pubKey, err := pv.GetPubKey()
+				if err != nil {
+					return fmt.Errorf("can't get pubkey: %w", err)
+				}
+				valset = append(valset, tmtypes.GenesisValidator{
+					Address: pubKey.Address(),
+					PubKey:  pubKey,
+					Power:   types.AmountToPower(types.DefaultGovParams().MinValidatorStake()),
+				})
 			}
-			valset := []tmtypes.GenesisValidator{{
-				Address: pubKey.Address(),
-				PubKey:  pubKey,
-				Power:   types.AmountToPower(types.DefaultGovParams().MinValidatorStake()),
-			}}
-
-			// validator is not included to initial holders
-			//walkeys = append(walkeys, pvWalKey)
 
 			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
 			for i, wk := range walkeys {
-				if err := wk.Unlock(secret); err != nil {
-					return err
-				}
 				holders[i] = &genesis.GenesisAssetHolder{
 					Address: wk.Address,
 					Balance: uint256.MustFromDecimal("100000000000000000000000000"), // 100_000_000 * 1_000_000_000_000_000_000
 				}
 			}
-			defer func() {
-				for _, wk := range walkeys {
-					wk.Lock()
-				}
-			}()
+
+			logger.Info("Generate GenesisAssetHolder")
 
 			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
 			if err != nil {

@@ -7,7 +7,7 @@ type GovParams struct {
 	minValidatorStake     *uint256.Int
 	minDelegatorStake     *uint256.Int
 	rewardPerPower        *uint256.Int
-	lazyRewardBlocks      int64
+	lazyUnstakingBlocks      int64
 	lazyApplyingBlocks    int64
 	gasPrice              *uint256.Int
 	minTrxGas             uint64

@@ -24,7 +24,7 @@ type GovParams struct {
 	minValidatorStake     *uint256.Int
 	minDelegatorStake     *uint256.Int
 	rewardPerPower        *uint256.Int
-	lazyRewardBlocks      int64
+	lazyUnstakingBlocks   int64
 	lazyApplyingBlocks    int64
 	gasPrice              *uint256.Int
 	minTrxGas             uint64
@@ -75,20 +75,20 @@ func DefaultGovParams() *GovParams {
 		// hotfix: because reward ledger and appHash is continually updated, block time is not controlled to 3s.
 		// so, reward = original reward / 3 = 4756468797
 		rewardPerPower:          uint256.NewInt(4_756_468_797),   // fons
-		lazyRewardBlocks:        2592000,                         // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
-		lazyApplyingBlocks:      259200,                          // = 60 * 60 * 24 * 3 => 3 days * 3(block intervals) => 9days
+		lazyUnstakingBlocks:     2592000,                         // 90days blocks = 90 * 24 * 60 * 60s (90days seconds) / 3s(block intervals)
+		lazyApplyingBlocks:      28800,                           // 1days blocks = 24 * 60 * 60s (1days seconds) / 3s(block intervals)
 		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
 		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
 		maxTrxGas:               25_000_000,
 		maxBlockGas:             math.MaxUint64,
-		minVotingPeriodBlocks:   259200,  // = 60 * 60 * 24 * 3 => 3 days* 3(block intervals) => 9days
-		maxVotingPeriodBlocks:   2592000, // = 60 * 60 * 24 * 30 => 30 days * 3(block intervals) => 90days
-		minSelfStakeRatio:       50,      // 50%
-		maxUpdatableStakeRatio:  33,      // 33%
-		maxIndividualStakeRatio: 33,      // 33%
-		slashRatio:              50,      // 50%
-		signedBlocksWindow:      10000,   // 10000 blocks
-		minSignedBlocks:         500,     // 500 blocks
+		minVotingPeriodBlocks:   28800,  // 1day blocks = 24 * 60 * 60s(1day seconds) / 3s(block intervals)
+		maxVotingPeriodBlocks:   864000, // 30days blocks = 30 * 24 * 60 * 60s (30days seconds) / 3s(block intervals)
+		minSelfStakeRatio:       50,     // 50%
+		maxUpdatableStakeRatio:  33,     // 33%
+		maxIndividualStakeRatio: 33,     // 33%
+		slashRatio:              50,     // 50%
+		signedBlocksWindow:      10000,  // 10000 blocks
+		minSignedBlocks:         500,    // 500 blocks
 	}
 }
 
@@ -99,7 +99,7 @@ func Test1GovParams() *GovParams {
 		minValidatorStake:       uint256.MustFromDecimal("1000000000000000000"), // 1 BEATOZ
 		minDelegatorStake:       uint256.NewInt(0),                              // issue(hotfix) RG78
 		rewardPerPower:          uint256.NewInt(2_000_000_000),
-		lazyRewardBlocks:        10,
+		lazyUnstakingBlocks:     10,
 		lazyApplyingBlocks:      10,
 		gasPrice:                uint256.NewInt(10),
 		minTrxGas:               uint64(10),
@@ -123,7 +123,7 @@ func Test2GovParams() *GovParams {
 		minValidatorStake:       uint256.MustFromDecimal("5000000000000000000"), // 5 BEATOZ
 		minDelegatorStake:       uint256.NewInt(0),                              // issue(hotfix) RG78
 		rewardPerPower:          uint256.NewInt(2_000_000_000),
-		lazyRewardBlocks:        30,
+		lazyUnstakingBlocks:     30,
 		lazyApplyingBlocks:      40,
 		gasPrice:                uint256.NewInt(20),
 		minTrxGas:               uint64(20),
@@ -147,7 +147,7 @@ func Test3GovParams() *GovParams {
 		minValidatorStake:       uint256.MustFromDecimal("0"),
 		minDelegatorStake:       uint256.NewInt(0), // issue(hotfix) RG78
 		rewardPerPower:          uint256.NewInt(0),
-		lazyRewardBlocks:        20,
+		lazyUnstakingBlocks:     20,
 		lazyApplyingBlocks:      0,
 		gasPrice:                nil,
 		minTrxGas:               0,
@@ -171,7 +171,7 @@ func Test4GovParams() *GovParams {
 		minValidatorStake:       uint256.MustFromDecimal("7000000000000000000000000"),
 		minDelegatorStake:       uint256.NewInt(0), // issue(hotfix) RG78
 		rewardPerPower:          uint256.NewInt(4_756_468_797),
-		lazyRewardBlocks:        20,
+		lazyUnstakingBlocks:     20,
 		lazyApplyingBlocks:      259200,
 		gasPrice:                uint256.NewInt(10_000_000_000),
 		minTrxGas:               uint64(100_000),
@@ -206,7 +206,7 @@ func Test6GovParams_NoStakeLimiter() *GovParams {
 		minValidatorStake:       uint256.MustFromDecimal("5000000000000000000"), // 5 BEATOZ
 		minDelegatorStake:       uint256.NewInt(0),                              // issue(hotfix) RG78
 		rewardPerPower:          uint256.NewInt(2_000_000_000),
-		lazyRewardBlocks:        30,
+		lazyUnstakingBlocks:     30,
 		lazyApplyingBlocks:      40,
 		gasPrice:                uint256.NewInt(20),
 		minTrxGas:               uint64(20),
@@ -261,7 +261,7 @@ func (r *GovParams) fromProto(pm *GovParamsProto) {
 	r.minValidatorStake = new(uint256.Int).SetBytes(pm.XMinValidatorStake)
 	r.minDelegatorStake = new(uint256.Int).SetBytes(pm.XMinDelegatorStake)
 	r.rewardPerPower = new(uint256.Int).SetBytes(pm.XRewardPerPower)
-	r.lazyRewardBlocks = pm.LazyRewardBlocks
+	r.lazyUnstakingBlocks = pm.LazyUnstakingBlocks
 	r.lazyApplyingBlocks = pm.LazyApplyingBlocks
 	r.gasPrice = new(uint256.Int).SetBytes(pm.XGasPrice)
 	r.minTrxGas = pm.MinTrxGas
@@ -287,7 +287,7 @@ func (r *GovParams) toProto() *GovParamsProto {
 		XMinValidatorStake:      r.minValidatorStake.Bytes(),
 		XMinDelegatorStake:      r.minDelegatorStake.Bytes(),
 		XRewardPerPower:         r.rewardPerPower.Bytes(),
-		LazyRewardBlocks:        r.lazyRewardBlocks,
+		LazyUnstakingBlocks:     r.lazyUnstakingBlocks,
 		LazyApplyingBlocks:      r.lazyApplyingBlocks,
 		XGasPrice:               r.gasPrice.Bytes(),
 		MinTrxGas:               r.minTrxGas,
@@ -315,7 +315,7 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		MinValidatorStake       string `json:"minValidatorStake"`
 		MinDelegatorStake       string `json:"minDelegatorStake"`
 		RewardPerPower          string `json:"rewardPerPower"`
-		LazyRewardBlocks        int64  `json:"lazyRewardBlocks"`
+		LazyUnstakingBlocks     int64  `json:"lazyUnstakingBlocks"`
 		LazyApplyingBlocks      int64  `json:"lazyApplyingBlocks"`
 		GasPrice                string `json:"gasPrice"`
 		MinTrxGas               uint64 `json:"minTrxGas"`
@@ -335,7 +335,7 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		MinValidatorStake:       uint256ToString(r.minValidatorStake), // hex-string
 		MinDelegatorStake:       uint256ToString(r.minDelegatorStake), // hex-string
 		RewardPerPower:          uint256ToString(r.rewardPerPower),    // hex-string
-		LazyRewardBlocks:        r.lazyRewardBlocks,
+		LazyUnstakingBlocks:     r.lazyUnstakingBlocks,
 		LazyApplyingBlocks:      r.lazyApplyingBlocks,
 		GasPrice:                uint256ToString(r.gasPrice),
 		MinTrxGas:               r.minTrxGas,
@@ -367,7 +367,7 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 		MinValidatorStake       string `json:"minValidatorStake"`
 		MinDelegatorStake       string `json:"minDelegatorStake"`
 		RewardPerPower          string `json:"rewardPerPower"`
-		LazyRewardBlocks        int64  `json:"lazyRewardBlocks"`
+		LazyUnstakingBlocks     int64  `json:"lazyUnstakingBlocks"`
 		LazyApplyingBlocks      int64  `json:"lazyApplyingBlocks"`
 		GasPrice                string `json:"gasPrice"`
 		MinTrxGas               uint64 `json:"minTrxGas"`
@@ -409,7 +409,7 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 	if err != nil {
 		return err
 	}
-	r.lazyRewardBlocks = tm.LazyRewardBlocks
+	r.lazyUnstakingBlocks = tm.LazyUnstakingBlocks
 	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
 	r.gasPrice, err = stringToUint256(tm.GasPrice)
 	if err != nil {
@@ -479,11 +479,11 @@ func (r *GovParams) RewardPerPower() *uint256.Int {
 	return new(uint256.Int).Set(r.rewardPerPower)
 }
 
-func (r *GovParams) LazyRewardBlocks() int64 {
+func (r *GovParams) LazyUnstakingBlocks() int64 {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return r.lazyRewardBlocks
+	return r.lazyUnstakingBlocks
 }
 
 func (r *GovParams) LazyApplyingBlocks() int64 {
@@ -653,8 +653,8 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 		newParams.rewardPerPower = oldParams.rewardPerPower
 	}
 
-	if newParams.lazyRewardBlocks == 0 {
-		newParams.lazyRewardBlocks = oldParams.lazyRewardBlocks
+	if newParams.lazyUnstakingBlocks == 0 {
+		newParams.lazyUnstakingBlocks = oldParams.lazyUnstakingBlocks
 	}
 
 	if newParams.lazyApplyingBlocks == 0 {
