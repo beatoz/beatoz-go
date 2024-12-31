@@ -47,6 +47,9 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 	if xerr := tx.Decode(txbz); xerr != nil {
 		return nil, xerr
 	}
+	if xerr := tx.Validate(); xerr != nil {
+		return nil, xerr
+	}
 
 	txctx := &TrxContext{
 		Tx:        tx,

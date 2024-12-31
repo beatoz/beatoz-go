@@ -128,8 +128,13 @@ func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverT
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
-	// parallel tx processing
+	//
+	// Parallel tx processing.
+	// Just collect `RequestDeliverTx` at here.
+	// The executions for these `RequestDeliverTx` will be done in `EncBlockSync`
 	client.deliverTxReqs = append(client.deliverTxReqs, &params)
+
+	// this return value has no meaning.
 	return nil
 }
 
@@ -321,7 +326,10 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
-	// todo: Implement parallel tx processing
+	//
+	// Parallel tx processing.
+	// Build `TrxContext` in parallel
+	// and run transactions on each `TrxContext`
 	wg := sync.WaitGroup{}
 	txctxs := make([]*types.TrxContext, len(client.deliverTxReqs))
 	deliverTxResps := make([]*abcitypes.ResponseDeliverTx, len(client.deliverTxReqs))
@@ -344,13 +352,14 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 		panic(fmt.Sprintf("error: len(client.deliverTxReqs) != txs count in block"))
 	}
 
-	// now, building TrxContext is completed!!!
-	// do execute txs
+	// Execute every transaction in its own `TrxContext`
 	for idx, txctx := range txctxs {
+		// `txctx` may be `nil`, which means ans error occurred in generating `TrxContext`.
+		// The `ResponseDeliverTx` for this tx already exists in `deliverTxResps` and
+		// it is written to blockchain as invalid tx.
 		if txctx != nil {
 			deliverTxResps[idx] = client.Application.(*BeatozApp).asyncExecTrxContext(txctx)
 		}
-
 		client.callback(
 			abcitypes.ToRequestDeliverTx(*client.deliverTxReqs[idx]),
 			abcitypes.ToResponseDeliverTx(*deliverTxResps[idx]),

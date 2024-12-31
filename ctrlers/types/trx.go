@@ -248,8 +248,6 @@ func (tx *Trx) Decode(bz []byte) xerrors.XError {
 		return xerrors.From(err)
 	} else if err := tx.fromProto(&pm); err != nil {
 		return err
-	} else if err := tx.validate(); err != nil {
-		return err
 	}
 	return nil
 }
@@ -342,12 +340,15 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 	}, nil
 }
 
-func (tx *Trx) validate() xerrors.XError {
+func (tx *Trx) Validate() xerrors.XError {
 	if len(tx.From) != types.AddrSize ||
 		len(tx.To) != types.AddrSize {
 		return xerrors.ErrInvalidAddress
 	}
 	if tx.Amount.Sign() < 0 {
+		return xerrors.ErrInvalidAmount
+	}
+	if tx.GasPrice.Sign() < 0 {
 		return xerrors.ErrInvalidAmount
 	}
 	if tx.Type < TRX_MIN_TYPE && tx.Type > TRX_MAX_TYPE {
@@ -356,10 +357,9 @@ func (tx *Trx) validate() xerrors.XError {
 	if tx.Payload != nil && tx.Type != tx.Payload.Type() {
 		return xerrors.ErrInvalidTrxPayloadType
 	}
-	// signature is checked in NewTrxContext()
-	//if tx.Sig == nil {
-	//	return xerrors.ErrInvalidTrxSig
-	//}
+	if tx.Sig == nil {
+		return xerrors.ErrInvalidTrxSig
+	}
 	return nil
 }
 
