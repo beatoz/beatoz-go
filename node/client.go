@@ -46,13 +46,7 @@ type beatozLocalClient struct {
 	abcicli.Callback
 
 	// for parallel tx processing
-	reqIdx     int
 	txPreparer *TrxPreparer
-	retParams  []*RetParam
-	//deliverTxReqs  []*abcitypes.RequestDeliverTx
-	//deliverTxResps []*abcitypes.ResponseDeliverTx
-	//txCtxs         []*types.TrxContext
-	//chReqs         []chan *abcitypes.RequestDeliverTx
 }
 
 var _ abcicli.Client = (*beatozLocalClient)(nil)
@@ -75,7 +69,7 @@ func NewBeatozLocalClient(mtx *tmsync.Mutex, app abcitypes.Application) abcicli.
 }
 
 func (client *beatozLocalClient) OnStart() error {
-	client.txPreparer.start(client.Application)
+	client.txPreparer.start()
 	return client.Application.(*BeatozApp).Start()
 }
 
@@ -140,18 +134,25 @@ func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverT
 	// Parallel tx processing.
 	// Just collect `RequestDeliverTx` at here.
 	// The executions for these `RequestDeliverTx` will be done in `EncBlockSync`
-	client.txPreparer.Add(&ReqParam{
-		idx: client.reqIdx,
-		req: &params,
-		Callback: func(ret *RetParam) {
-			client.retParams = append(client.retParams, ret)
-			client.txPreparer.Done()
-		},
-	})
+	client.txPreparer.Add(&params, client.Application)
 
 	// this return value has no meaning.
 	return nil
 }
+
+/*
+Original DeliverTxAsync
+func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverTx) *abcicli.ReqRes {
+	client.mtx.Lock()
+	defer client.mtx.Unlock()
+
+	res := client.Application.DeliverTx(params)
+	return client.callback(
+		abcitypes.ToRequestDeliverTx(params),
+		abcitypes.ToResponseDeliverTx(res),
+	)
+}
+*/
 
 func (client *beatozLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *abcicli.ReqRes {
 	client.mtx.Lock()
@@ -341,35 +342,15 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
-	////
-	//// Parallel tx processing.
-	//// Build `TrxContext` in parallel
-	//// and run transactions on each `TrxContext`
-	//wg := sync.WaitGroup{}
-	//txctxs := make([]*types.TrxContext, len(client.deliverTxReqs))
-	//deliverTxResps := make([]*abcitypes.ResponseDeliverTx, len(client.deliverTxReqs))
-	//for idx, txReq := range client.deliverTxReqs {
-	//	wg.Add(1)
-	//	go func(_idx int, _req *abcitypes.RequestDeliverTx) {
-	//		_txctx, _resp := client.Application.(*BeatozApp).asyncPrepareTrxContext(_req, _idx)
-	//		txctxs[_idx] = _txctx
-	//		deliverTxResps[_idx] = _resp
-	//		if _txctx.TxIdx != _idx {
-	//			panic(fmt.Sprintf("error: DeliverTx index(%v) != TrxContext.TxIdx(%v)", _idx, _txctx.TxIdx))
-	//		}
-	//		wg.Done()
-	//	}(idx, txReq)
-	//}
-	//wg.Wait()
 	client.txPreparer.Wait()
 
 	// for debugging
-	if len(client.retParams) != client.Application.(*BeatozApp).nextBlockCtx.TxsCnt() {
+	if client.txPreparer.resultCount() != client.Application.(*BeatozApp).nextBlockCtx.TxsCnt() {
 		panic(fmt.Sprintf("error: len(client.deliverTxReqs) != txs count in block"))
 	}
 
-	// Sequentially execute every transaction in its own `TrxContext`
-	for idx, param := range client.retParams {
+	// Execute every transaction in its own `TrxContext` sequentially
+	for idx, param := range client.txPreparer.resultList() {
 		if idx != param.idx || idx != param.txctx.TxIdx {
 			panic(fmt.Sprintf("error: wrong transaction index. idx:%v, param.idx:%v, txctx.TxIdx:%v", idx, param.idx, param.txctx.TxIdx))
 		}
@@ -384,12 +365,23 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 			abcitypes.ToResponseDeliverTx(*param.resDeliverTx),
 		)
 	}
-	client.retParams = nil
+	client.txPreparer.reset()
 
 	res := client.Application.EndBlock(req)
 	return &res, nil
 }
 
+/*
+Original EndBlockSync
+
+	func (client *beatozLocalClient) EndBlockSync(req types.RequestEndBlock) (*types.ResponseEndBlock, error) {
+		client.mtx.Lock()
+		defer client.mtx.Unlock()
+
+		res := client.Application.EndBlock(req)
+		return &res, nil
+	}
+*/
 func (client *beatozLocalClient) ListSnapshotsSync(req abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()

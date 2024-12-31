@@ -449,23 +449,9 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
 
-		var events []abcitypes.Event
-		if txctx != nil && txctx.Tx != nil {
-			// add event
-			events = append(events, abcitypes.Event{
-				Type: "tx",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
-				},
-			})
-		}
-
 		return nil, &abcitypes.ResponseDeliverTx{
-			Code:   xerr.Code(),
-			Log:    xerr.Error(),
-			Events: events,
+			Code: xerr.Code(),
+			Log:  xerr.Error(),
 		}
 	}
 

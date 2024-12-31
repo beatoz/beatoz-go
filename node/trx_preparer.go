@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"runtime"
@@ -11,7 +10,8 @@ import (
 type ReqParam struct {
 	idx      int
 	req      *abcitypes.RequestDeliverTx
-	Callback func(ret *RetParam)
+	onResult func(ret *RetParam)
+	app      abcitypes.Application
 }
 
 type RetParam struct {
@@ -23,8 +23,12 @@ type RetParam struct {
 
 type TrxPreparer struct {
 	*sync.WaitGroup
+
 	chDone      chan struct{}
 	chReqParams []chan *ReqParam
+
+	reqIdx    int
+	retParams []*RetParam
 }
 
 func newTrxPreparer() *TrxPreparer {
@@ -35,10 +39,10 @@ func newTrxPreparer() *TrxPreparer {
 	}
 }
 
-func (tp *TrxPreparer) start(app abcitypes.Application) {
+func (tp *TrxPreparer) start() {
 	for i := 0; i < len(tp.chReqParams); i++ {
 		tp.chReqParams[i] = make(chan *ReqParam, 5000)
-		go trxPreparerRoutine(tp.chReqParams[i], tp.chDone, app)
+		go trxPreparerRoutine(tp.chReqParams[i], tp.chDone, i)
 	}
 }
 
@@ -46,25 +50,54 @@ func (tp *TrxPreparer) stop() {
 	close(tp.chDone)
 }
 
-func (tp *TrxPreparer) Add(param *ReqParam) {
+func (tp *TrxPreparer) reset() {
+	tp.reqIdx = 0
+	tp.retParams = nil
+}
+
+func (tp *TrxPreparer) Add(req *abcitypes.RequestDeliverTx, app abcitypes.Application) {
+	tp.retParams = append(tp.retParams, nil)
+	param := &ReqParam{
+		idx: tp.reqIdx,
+		req: req,
+		app: app,
+		onResult: func(ret *RetParam) {
+			tp.retParams[ret.idx] = ret
+			tp.WaitGroup.Done()
+		},
+	}
+	tp.reqIdx++
+
 	tp.WaitGroup.Add(1)
 	n := param.idx % len(tp.chReqParams)
 	tp.chReqParams[n] <- param
 }
 
-func trxPreparerRoutine(chReqParams chan *ReqParam, done chan struct{}, app abcitypes.Application) {
-	fmt.Println("*************************** START trxPreparerRoutine")
+func (tp *TrxPreparer) resultAt(idx int) *RetParam {
+	return tp.retParams[idx]
+}
+
+func (tp *TrxPreparer) resultCount() int {
+	return len(tp.retParams)
+}
+
+func (tp *TrxPreparer) resultList() []*RetParam {
+	return tp.retParams
+}
+
+func trxPreparerRoutine(chReqParams chan *ReqParam, done chan struct{}, no int) {
+	//fmt.Println("*************************** START trxPreparerRoutine:", no)
 
 STOP:
 	for {
 		select {
 		case param := <-chReqParams:
-			_txctx, _resp := app.(*BeatozApp).asyncPrepareTrxContext(param.req, param.idx)
-			param.Callback(&RetParam{param.idx, param.req, _resp, _txctx})
+			_txctx, _resp := param.app.(*BeatozApp).asyncPrepareTrxContext(param.req, param.idx)
+			param.onResult(&RetParam{param.idx, param.req, _resp, _txctx})
 		case <-done:
 			break STOP
 		}
 	}
 
-	fmt.Println("*************************** EXIT trxPreparerRoutine")
+	//fmt.Println("*************************** EXIT trxPreparerRoutine:", no)
 }
