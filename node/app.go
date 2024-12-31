@@ -7,7 +7,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/account"
 	"github.com/beatoz/beatoz-go/ctrlers/gov"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
-	rctypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vm/evm"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -31,10 +31,10 @@ var _ abcitypes.Application = (*BeatozApp)(nil)
 type BeatozApp struct {
 	abcitypes.BaseApplication
 
-	lastBlockCtx *rctypes.BlockContext
-	nextBlockCtx *rctypes.BlockContext
+	lastBlockCtx *ctrlertypes.BlockContext
+	nextBlockCtx *ctrlertypes.BlockContext
 
-	metaDB      *rctypes.MetaDB
+	metaDB      *ctrlertypes.MetaDB
 	acctCtrler  *account.AcctCtrler
 	stakeCtrler *stake.StakeCtrler
 	govCtrler   *gov.GovCtrler
@@ -50,7 +50,7 @@ type BeatozApp struct {
 }
 
 func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
-	stateDB, err := rctypes.OpenMetaDB("beatoz_app", config.DBDir())
+	stateDB, err := ctrlertypes.OpenMetaDB("beatoz_app", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 
 func (ctrler *BeatozApp) Start() error {
 	if atomic.CompareAndSwapInt32(&ctrler.started, 0, 1) {
-		ctrler.txExecutor.Start()
+		// ctrler.txExecutor.Start()
 	}
 	return nil
 }
@@ -99,7 +99,8 @@ func (ctrler *BeatozApp) Stop() error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.txExecutor.Stop()
+	//ctrler.txExecutor.Stop()
+
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
 	}
@@ -139,7 +140,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		lastHeight = ctrler.metaDB.LastBlockHeight()
 		appHash = ctrler.metaDB.LastBlockAppHash()
 
-		ctrler.lastBlockCtx = rctypes.NewBlockContext(
+		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
 					Height: lastHeight,
@@ -242,11 +243,11 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		txctx, xerr := rctypes.NewTrxContext(req.Tx,
+		txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
 			ctrler.lastBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
 			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
-			func(_txctx *rctypes.TrxContext) xerrors.XError {
+			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -302,7 +303,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.nextBlockCtx = rctypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.nextBlockCtx = ctrlertypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
 	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
@@ -327,11 +328,11 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 
 func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
-	txctx, xerr := rctypes.NewTrxContext(req.Tx,
+	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
 		ctrler.nextBlockCtx.Height(),
 		ctrler.nextBlockCtx.TimeSeconds(),
 		true,
-		func(_txctx *rctypes.TrxContext) xerrors.XError {
+		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 			_txctx.TxIdx = ctrler.nextBlockCtx.TxsCnt()
 			ctrler.nextBlockCtx.AddTxsCnt(1)
 
@@ -349,14 +350,15 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
 
-		if txctx.Tx != nil {
+		var events []abcitypes.Event
+		if txctx != nil && txctx.Tx != nil {
 			// add event
-			txctx.Events = append(txctx.Events, abcitypes.Event{
+			events = append(events, abcitypes.Event{
 				Type: "tx",
 				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-					{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-					{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
+					{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
 				},
 			})
 		}
@@ -364,8 +366,9 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		return abcitypes.ResponseDeliverTx{
 			Code:   xerr.Code(),
 			Log:    xerr.Error(),
-			Events: txctx.Events,
+			Events: events,
 		}
+
 	}
 	xerr = ctrler.txExecutor.ExecuteSync(txctx)
 	if xerr != nil {
@@ -376,9 +379,9 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		txctx.Events = append(txctx.Events, abcitypes.Event{
 			Type: "tx",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
 			},
 		})
 
@@ -390,18 +393,18 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 	} else {
 
-		ctrler.nextBlockCtx.AddFee(rctypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.nextBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
 			Type: "tx",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-				{Key: []byte(rctypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
-				{Key: []byte(rctypes.EVENT_ATTR_TXSTATUS), Value: []byte("0"), Index: false},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte("0"), Index: false},
 			},
 		})
 
@@ -415,18 +418,23 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 	}
 }
 
-// deliverTxAsync is not fully implemented yet
-// todo: Fully implement deliverTxAsync which processes txs in parallel.
-func (ctrler *BeatozApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	txIdx := ctrler.nextBlockCtx.TxsCnt()
-	ctrler.nextBlockCtx.AddTxsCnt(1)
+func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 
-	txctx, xerr := rctypes.NewTrxContext(req.Tx,
+	return ctrler.deliverTxSync(req)
+}
+
+// asyncPrepareTrxContext is called in parallel tx processing
+func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
+	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
 		ctrler.nextBlockCtx.Height(),
 		ctrler.nextBlockCtx.TimeSeconds(),
 		true,
-		func(_txctx *rctypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = txIdx
+		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+			_txctx.TxIdx = idx //ctrler.nextBlockCtx.TxsCnt()
+			ctrler.nextBlockCtx.AddTxsCnt(1)
+
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -435,68 +443,83 @@ func (ctrler *BeatozApp) deliverTxAsync(req abcitypes.RequestDeliverTx) abcitype
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
 			_txctx.ChainID = ctrler.rootConfig.ChainID
-
-			// when the 'tx' is finished, it's called
-			_txctx.Callback = func(ctx *rctypes.TrxContext, xerr xerrors.XError) {
-				// it is called from executionRoutine goroutine
-				// when execution is finished or error is generated
-				response := abcitypes.ResponseDeliverTx{}
-				if xerr != nil {
-					xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-					response.Code = xerr.Code()
-					response.Log = xerr.Error()
-
-				} else {
-					response.GasWanted = int64(ctx.Tx.Gas)
-					response.GasUsed = int64(ctx.GasUsed)
-					response.Data = ctx.RetData
-					response.Events = []abcitypes.Event{
-						{
-							Type: "tx",
-							Attributes: []abcitypes.EventAttribute{
-								{Key: []byte(rctypes.EVENT_ATTR_TXTYPE), Value: []byte(ctx.Tx.TypeString()), Index: true},
-								{Key: []byte(rctypes.EVENT_ATTR_TXSENDER), Value: []byte(ctx.Tx.From.String()), Index: true},
-								{Key: []byte(rctypes.EVENT_ATTR_TXRECVER), Value: []byte(ctx.Tx.To.String()), Index: true},
-								{Key: []byte(rctypes.EVENT_ATTR_ADDRPAIR), Value: []byte(ctx.Tx.From.String() + ctx.Tx.To.String()), Index: true},
-							},
-						},
-					}
-
-					ctrler.nextBlockCtx.AddFee(rctypes.GasToFee(ctx.GasUsed, ctrler.govCtrler.GasPrice()))
-				}
-				ctrler.localClient.(*beatozLocalClient).OnTrxExecFinished(ctrler.localClient, ctx.TxIdx, &req, &response)
-			}
-
 			return nil
 		})
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		response := abcitypes.ResponseDeliverTx{
-			Code: xerr.Code(),
-			Log:  xerr.Error(),
+		ctrler.logger.Error("deliverTxSync", "error", xerr)
+
+		var events []abcitypes.Event
+		if txctx != nil && txctx.Tx != nil {
+			// add event
+			events = append(events, abcitypes.Event{
+				Type: "tx",
+				Attributes: []abcitypes.EventAttribute{
+					{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
+				},
+			})
 		}
-		ctrler.localClient.(*beatozLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
+
+		return nil, &abcitypes.ResponseDeliverTx{
+			Code:   xerr.Code(),
+			Log:    xerr.Error(),
+			Events: events,
+		}
 	}
 
-	xerr = ctrler.txExecutor.ExecuteAsync(txctx)
-	if xerr != nil {
-		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		response := abcitypes.ResponseDeliverTx{
-			Code: xerr.Code(),
-			Log:  xerr.Error(),
-		}
-		ctrler.localClient.(*beatozLocalClient).OnTrxExecFinished(ctrler.localClient, txIdx, &req, &response)
-	}
-
-	// this return value has no meaning
-	return abcitypes.ResponseDeliverTx{}
+	return txctx, nil
 }
 
-func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
+// asyncExecTrxContext is called in parallel tx processing
+func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abcitypes.ResponseDeliverTx {
+	xerr := ctrler.txExecutor.ExecuteSync(txctx)
+	if xerr != nil {
+		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
+		ctrler.logger.Error("asyncExecTrxContext", "error", xerr)
 
-	return ctrler.deliverTxSync(req)
+		// add event
+		txctx.Events = append(txctx.Events, abcitypes.Event{
+			Type: "tx",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
+			},
+		})
+
+		return &abcitypes.ResponseDeliverTx{
+			Code:   xerr.Code(),
+			Log:    xerr.Error(),
+			Data:   txctx.RetData, // in case of evm, there may be return data when tx is failed.
+			Events: txctx.Events,
+		}
+	} else {
+
+		ctrler.nextBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+
+		// add event
+		txctx.Events = append(txctx.Events, abcitypes.Event{
+			Type: "tx",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte("0"), Index: false},
+			},
+		})
+
+		return &abcitypes.ResponseDeliverTx{
+			Code:      abcitypes.CodeTypeOK,
+			GasWanted: int64(txctx.Tx.Gas),
+			GasUsed:   int64(txctx.GasUsed),
+			Data:      txctx.RetData,
+			Events:    txctx.Events,
+		}
+	}
 }
 
 func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {

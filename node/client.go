@@ -1,11 +1,14 @@
 package node
 
 import (
+	"fmt"
+	"github.com/beatoz/beatoz-go/ctrlers/types"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/service"
 	tmsync "github.com/tendermint/tendermint/libs/sync"
 	tmproxy "github.com/tendermint/tendermint/proxy"
+	"sync"
 )
 
 //----------------------------------------------------
@@ -44,8 +47,7 @@ type beatozLocalClient struct {
 	abcitypes.Application
 	abcicli.Callback
 
-	deliverTxReqReses []*abcicli.ReqRes
-	OnTrxExecFinished func(abcicli.Client, int, *abcitypes.RequestDeliverTx, *abcitypes.ResponseDeliverTx)
+	deliverTxReqs []*abcitypes.RequestDeliverTx
 }
 
 var _ abcicli.Client = (*beatozLocalClient)(nil)
@@ -59,9 +61,8 @@ func NewBeatozLocalClient(mtx *tmsync.Mutex, app abcitypes.Application) abcicli.
 		mtx = new(tmsync.Mutex)
 	}
 	cli := &beatozLocalClient{
-		mtx:               mtx,
-		Application:       app,
-		OnTrxExecFinished: defualtOnTrxExecFinished,
+		mtx:         mtx,
+		Application: app,
 	}
 	cli.BaseService = *service.NewBaseService(nil, "beatozLocalClient", cli)
 	return cli
@@ -127,32 +128,9 @@ func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverT
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
 
-	// todo: Implement parallel tx processing
-	//rr := newLocalReqRes(abcitypes.ToRequestDeliverTx(params), abcitypes.ToResponseDeliverTx(abcitypes.ResponseDeliverTx{}))
-	//client.deliverTxReqReses = append(client.deliverTxReqReses, rr)
-	//
-	//_ = client.Application.DeliverTx(params)
-	//return nil
-
-	res := client.Application.DeliverTx(params)
-	return client.callback(
-		abcitypes.ToRequestDeliverTx(params),
-		abcitypes.ToResponseDeliverTx(res),
-	)
-}
-
-func defualtOnTrxExecFinished(client abcicli.Client, txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
-	client.(*beatozLocalClient).onTrxFinished(txidx, req, res)
-}
-
-func (client *beatozLocalClient) onTrxFinished(txidx int, req *abcitypes.RequestDeliverTx, res *abcitypes.ResponseDeliverTx) {
-	client.Logger.Info("beatozLocalClient receives finished tx", "index", txidx)
-	if txidx >= len(client.deliverTxReqReses) {
-		panic("web3.deliverTxReqReses's length is wrong")
-	}
-	rr := client.deliverTxReqReses[txidx]
-	rr.Response = abcitypes.ToResponseDeliverTx(*res)
-	rr.Done() // Wait it in EndBlockSync
+	// parallel tx processing
+	client.deliverTxReqs = append(client.deliverTxReqs, &params)
+	return nil
 }
 
 func (client *beatozLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *abcicli.ReqRes {
@@ -344,13 +322,41 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 	defer client.mtx.Unlock()
 
 	// todo: Implement parallel tx processing
-	//// wait that all txs are finished
-	//for _, rr := range client.deliverTxReqReses {
-	//	rr.Wait()
-	//	client.Callback(rr.Request, rr.Response)
-	//	rr.InvokeCallback()
-	//}
-	//client.deliverTxReqReses = nil
+	wg := sync.WaitGroup{}
+	txctxs := make([]*types.TrxContext, len(client.deliverTxReqs))
+	deliverTxResps := make([]*abcitypes.ResponseDeliverTx, len(client.deliverTxReqs))
+	for idx, txReq := range client.deliverTxReqs {
+		wg.Add(1)
+		go func(_idx int, _req *abcitypes.RequestDeliverTx) {
+			_txctx, _resp := client.Application.(*BeatozApp).asyncPrepareTrxContext(_req, _idx)
+			txctxs[_idx] = _txctx
+			deliverTxResps[_idx] = _resp
+			if _txctx.TxIdx != _idx {
+				panic(fmt.Sprintf("error: DeliverTx index(%v) != TrxContext.TxIdx(%v)", _idx, _txctx.TxIdx))
+			}
+			wg.Done()
+		}(idx, txReq)
+	}
+	wg.Wait()
+
+	// for debugging
+	if len(client.deliverTxReqs) != client.Application.(*BeatozApp).nextBlockCtx.TxsCnt() {
+		panic(fmt.Sprintf("error: len(client.deliverTxReqs) != txs count in block"))
+	}
+
+	// now, building TrxContext is completed!!!
+	// do execute txs
+	for idx, txctx := range txctxs {
+		if txctx != nil {
+			deliverTxResps[idx] = client.Application.(*BeatozApp).asyncExecTrxContext(txctx)
+		}
+
+		client.callback(
+			abcitypes.ToRequestDeliverTx(*client.deliverTxReqs[idx]),
+			abcitypes.ToResponseDeliverTx(*deliverTxResps[idx]),
+		)
+	}
+	client.deliverTxReqs = nil
 
 	res := client.Application.EndBlock(req)
 	return &res, nil
