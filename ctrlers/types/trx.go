@@ -349,7 +349,7 @@ func (tx *Trx) Validate() xerrors.XError {
 		return xerrors.ErrInvalidAmount
 	}
 	if tx.GasPrice.Sign() < 0 {
-		return xerrors.ErrInvalidAmount
+		return xerrors.ErrInvalidGasPrice
 	}
 	if tx.Type < TRX_MIN_TYPE && tx.Type > TRX_MAX_TYPE {
 		return xerrors.ErrInvalidTrxType
