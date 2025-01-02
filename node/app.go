@@ -425,14 +425,16 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 	return ctrler.deliverTxSync(req)
 }
 
-// asyncPrepareTrxContext is called in parallel tx processing
+// asyncPrepareTrxContext is called in TrxPreparer
 func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
 		ctrler.nextBlockCtx.Height(),
 		ctrler.nextBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = idx //ctrler.nextBlockCtx.TxsCnt()
+			// `idx` may be not equal to `ctrler.nextBlockCtx.TxsCnt()`
+			// because the order of calling `asyncPrepareTrxContext` is not sequential.
+			_txctx.TxIdx = idx
 			ctrler.nextBlockCtx.AddTxsCnt(1)
 
 			_txctx.TrxGovHandler = ctrler.govCtrler

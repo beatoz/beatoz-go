@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/service"
@@ -132,9 +133,11 @@ func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverT
 
 	//
 	// Parallel tx processing.
-	// Just collect `RequestDeliverTx` at here.
-	// The executions for these `RequestDeliverTx` will be done in `EncBlockSync`
-	client.txPreparer.Add(&params, client.Application)
+	// Just request to create `TrxContext` with `params RequestDeliverTx`.
+	// The executions for this `params RequestDeliverTx` will be done in `EncBlockSync`
+	client.txPreparer.Add(&params, func(txreq *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
+		return client.Application.(*BeatozApp).asyncPrepareTrxContext(txreq, idx)
+	})
 
 	// this return value has no meaning.
 	return nil
@@ -351,15 +354,21 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 
 	// Execute every transaction in its own `TrxContext` sequentially
 	for idx, param := range client.txPreparer.resultList() {
+		// for debugging
 		if idx != param.idx || idx != param.txctx.TxIdx {
 			panic(fmt.Sprintf("error: wrong transaction index. idx:%v, param.idx:%v, txctx.TxIdx:%v", idx, param.idx, param.txctx.TxIdx))
 		}
-		// `txctx` may be `nil`, which means ans error occurred in generating `TrxContext`.
-		// The `ResponseDeliverTx` for this tx already exists in `deliverTxResps` and
-		// it is written to blockchain as invalid tx.
+
+		// `param.txctx` may be `nil`, which means an error occurred in generating `TrxContext`.
+		// The `ResponseDeliverTx` with the error for this tx (`param.reqDeliverTx`)
+		// already exists in `param.resDeliverTx` and it is written to blockchain as invalid tx.
 		if param.txctx != nil {
 			param.resDeliverTx = client.Application.(*BeatozApp).asyncExecTrxContext(param.txctx)
 		}
+
+		// the `client.Callback` will be called.
+		// this callback function is set before calling `DeliverTxAsync`
+		// in `execBlockOnProxyApp`(`github.com/tendermint/tendermint/state/execution.go`).
 		client.callback(
 			abcitypes.ToRequestDeliverTx(*param.reqDeliverTx),
 			abcitypes.ToResponseDeliverTx(*param.resDeliverTx),

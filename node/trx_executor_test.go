@@ -24,7 +24,8 @@ func Test_commonValidation(t *testing.T) {
 	// Invalid nonce
 	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 1, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr := newTrxCtx(tx, 1)
+	bztx, _ := tx.Encode()
+	txctx, xerr := newTrxCtx(bztx, 1)
 	require.NoError(t, xerr)
 	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInvalidNonce.Error())
 
@@ -32,14 +33,14 @@ func Test_commonValidation(t *testing.T) {
 	// Insufficient fund
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1001))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	bztx, _ = tx.Encode()
+	txctx, xerr = newTrxCtx(bztx, 1)
 	require.NoError(t, xerr)
 	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInsufficientFund.Error())
 }
 
-func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
-	bz, _ := tx.Encode()
-	return ctrlertypes.NewTrxContext(bz, height, time.Now().UnixMilli(), true, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+func newTrxCtx(bztx []byte, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
+	return ctrlertypes.NewTrxContext(bztx, height, time.Now().UnixMilli(), true, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 		_txctx.GovHandler = govParams
 		_txctx.AcctHandler = &acctHandlerMock{}
 		_txctx.ChainID = chainId
