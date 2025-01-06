@@ -82,7 +82,7 @@ pbm:
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
 
-install:
+install: $(TARGETOS)
 	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
 	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 
