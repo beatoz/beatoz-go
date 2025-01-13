@@ -13,18 +13,10 @@ import (
 )
 
 var (
-	wkPass     string
 	changePass bool
 )
 
 func AddWalletKeyCmdFlag(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(
-		&wkPass,
-		"passphrase",
-		"p",
-		"",
-		"passphrase to encrypt and decrypt a private key in a wallet key files",
-	)
 	cmd.Flags().BoolVarP(
 		&changePass,
 		"change-passphrase",
@@ -102,12 +94,8 @@ func showWalletKeyFile(path string) error {
 	if wk, err := crypto.OpenWalletKey(libs.NewFileReader(path)); err != nil {
 		return err
 	} else {
-		var s []byte
-		if wkPass != "" {
-			s = []byte(wkPass)
-		} else {
-			s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
-		}
+		s := libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
+		defer libs.ClearCredential(s)
 
 		if err := wk.Unlock(s); err != nil {
 			return err

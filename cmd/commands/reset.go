@@ -23,24 +23,6 @@ var ResetAllCmd = &cobra.Command{
 	PreRun:  deprecateSnakeCase,
 }
 
-var keepAddrBook bool
-
-func init() {
-	ResetAllCmd.Flags().BoolVar(&keepAddrBook, "keep-addr-book", false, "keep the address book intact")
-	ResetAllCmd.Flags().StringVar(
-		&privValSecret,
-		"priv_validator_secret",
-		"",
-		"passphrase to encrypt and decrypt a private key in priv_validator_key.json",
-	)
-	ResetPrivValidatorCmd.Flags().StringVar(
-		&privValSecret,
-		"priv_validator_secret",
-		"",
-		"passphrase to encrypt and decrypt a private key in priv_validator_key.json",
-	)
-}
-
 // ResetPrivValidatorCmd resets the private validator files.
 var ResetPrivValidatorCmd = &cobra.Command{
 	Use:     "unsafe-reset-priv-validator",
@@ -48,6 +30,12 @@ var ResetPrivValidatorCmd = &cobra.Command{
 	Short:   "(unsafe) Reset this beatoz's validator to genesis state",
 	Run:     resetPrivValidator,
 	PreRun:  deprecateSnakeCase,
+}
+
+var keepAddrBook bool
+
+func init() {
+	ResetAllCmd.Flags().BoolVar(&keepAddrBook, "keep-addr-book", false, "keep the address book intact")
 }
 
 // XXX: this is totally unsafe.
@@ -85,11 +73,11 @@ func ResetAll(dbDir, addrBookFile, privValKeyFile, privValStateFile string, logg
 
 func resetFilePV(privValKeyFile, privValStateFile string, logger log.Logger) {
 	var s []byte
-	if privValSecret != "" {
-		s = []byte(privValSecret)
-		privValSecret = ""
+	_secret := os.Getenv("BEATOZ_VALIDATOR_SECRET")
+	if _secret == "" {
+		s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
 	} else {
-		s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(privValKeyFile)))
+		s = []byte(_secret)
 	}
 	defer libs.ClearCredential(s)
 

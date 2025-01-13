@@ -25,11 +25,10 @@ import (
 //}
 
 var (
-	beatozChainID           = "mainnet"
-	holderCnt               = 10
-	holderSecret            string
-	privValCnt              = 1
-	privValSecret           string
+	beatozChainID = "mainnet"
+	holderCnt     = 10
+	privValCnt    = 1
+
 	privValSecretFeederAddr string
 )
 
@@ -62,13 +61,6 @@ func AddInitFlags(cmd *cobra.Command) {
 			"these accounts will be saved at $BEATOZHOME/walkeys directory.\n"+
 			"if `--chain_id` is `mainnet`, the holder's accounts is not generated.",
 	)
-	cmd.Flags().StringVar(
-		&holderSecret,
-		"holder_secret",
-		"",
-		"passphrase to encrypt and decrypt a private key in account files of initial holders.\n"+
-			"these files are created in $BEATOZHOME/walkeys and have file names starting with 'wk'.",
-	)
 	cmd.Flags().IntVar(
 		&privValCnt,
 		"priv_validator_cnt",
@@ -79,29 +71,29 @@ func AddInitFlags(cmd *cobra.Command) {
 			"the first validator's account file (wallet key file) is created as $BEATOZHOME/config/priv_validator_key.json.\n"+
 			"if there is more than one validator, the rest will be created in the $BEATOZHOME/walkeys/vals directory.",
 	)
-	cmd.Flags().StringVar(
-		&privValSecret,
-		"priv_validator_secret",
-		"",
-		"passphrase to encrypt and decrypt $BEATOZHOME/config/priv_validator_key.json.",
-	)
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
 	var s0, s1 []byte
-	if privValSecret != "" {
-		s0 = []byte(privValSecret)
-		privValSecret = ""
-	} else {
+
+	_secret := os.Getenv("BEATOZ_VALIDATOR_SECRET")
+	if _secret == "" {
 		s0 = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
-	}
-	if holderSecret != "" {
-		s1 = []byte(holderSecret)
-		holderSecret = ""
 	} else {
-		s1 = libs.ReadCredential("Passphrase for initial holder's accounts: ")
+		s0 = []byte(_secret)
 	}
-	defer libs.ClearCredential(s0)
+
+	_secret = os.Getenv("BEATOZ_HOLDER_SECRET")
+	if _secret == "" {
+		s1 = libs.ReadCredential("Passphrase for initial holder's accounts: ")
+	} else {
+		s1 = []byte(_secret)
+	}
+
+	defer func() {
+		libs.ClearCredential(s0)
+		libs.ClearCredential(s1)
+	}()
 
 	return InitFilesWith(beatozChainID, rootConfig, privValCnt, s0, holderCnt, s1)
 }
@@ -188,17 +180,6 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 				return err
 			}
 			logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
-
-			//pvWalKey, err := acrypto.OpenWalletKey(libs.NewFileReader(privValKeyFile))
-			//if err != nil {
-			//	return err
-			//}
-			//_, err = pvWalKey.Save(
-			//	libs.NewFileWriter(
-			//		filepath.Join(defaultWalkeyDirPath, fmt.Sprintf("wk%X.json", pvWalKey.Address))))
-			//if err != nil {
-			//	return err
-			//}
 
 			var valset []tmtypes.GenesisValidator
 			for _, pv := range pvs {
