@@ -17,13 +17,6 @@ import (
 	"strings"
 )
 
-//// InitFilesCmd initialises a fresh Tendermint Core instance.
-//var InitFilesCmd = &cobra.Command{
-//	Use:   "init",
-//	Short: "Initialize a node",
-//	RunE:  initFiles,
-//}
-
 var (
 	beatozChainID = "mainnet"
 	holderCnt     = 10
