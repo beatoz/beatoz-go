@@ -55,7 +55,7 @@ func AddInitFlags(cmd *cobra.Command) {
 	cmd.Flags().IntVar(
 		&holderCnt,
 		"holders",
-		holderCnt, // default value is 9
+		holderCnt, // default value is 10
 		"the number of holder's account files to be generated.\n"+
 			"if you create a new genesis of your own blockchain, "+
 			"you need to generate accounts of genesis holders and "+
