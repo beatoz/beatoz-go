@@ -22,7 +22,6 @@ import (
 	tmver "github.com/tendermint/tendermint/version"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -72,9 +71,7 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 
 	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
 
-	// the first parameter of NewTrxExecutor `n` is 0,
-	// because the parallel tx-processing is not used
-	txExecutor := NewTrxExecutor(0 /*runtime.GOMAXPROCS(0)*/, logger)
+	txExecutor := NewTrxExecutor(logger)
 
 	return &BeatozApp{
 		metaDB:      stateDB,
@@ -89,17 +86,12 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 }
 
 func (ctrler *BeatozApp) Start() error {
-	if atomic.CompareAndSwapInt32(&ctrler.started, 0, 1) {
-		// ctrler.txExecutor.Start()
-	}
 	return nil
 }
 
 func (ctrler *BeatozApp) Stop() error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
-
-	//ctrler.txExecutor.Stop()
 
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
