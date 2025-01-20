@@ -74,7 +74,6 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		panic(err)
 	}
 
-	//rawDB, err := rawdb.NewLevelDBDatabaseWithFreezer(path, 0, 0, path, "", false)
 	db, err := rawdb.NewLevelDBDatabase(path, 128, 128, "", false)
 	if err != nil {
 		panic(err)
@@ -384,6 +383,13 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 			return xerrors.From(err)
 		}
 		ctrler.metadb = nil
+	}
+
+	if ctrler.ethDB != nil {
+		if err := ctrler.ethDB.Close(); err != nil {
+			return xerrors.From(err)
+		}
+		ctrler.ethDB = nil
 	}
 
 	if ctrler.stateDBWrapper != nil {

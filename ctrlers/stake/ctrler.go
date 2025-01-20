@@ -826,6 +826,12 @@ func (ctrler *StakeCtrler) Close() xerrors.XError {
 		}
 		ctrler.frozenLedger = nil
 	}
+	if ctrler.rewardLedger != nil {
+		if xerr := ctrler.rewardLedger.Close(); xerr != nil {
+			ctrler.logger.Error("rewardLedger.Close()", "error", xerr.Error())
+		}
+		ctrler.rewardLedger = nil
+	}
 	return nil
 }
 
