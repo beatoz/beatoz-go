@@ -18,16 +18,18 @@ func ReadCredential(prompt string) []byte {
 	if terminal.IsTerminal(int(os.Stdin.Fd())) {
 		ret = readFromTERM(prompt, int(os.Stdin.Fd()))
 	} else {
-		panic("It must be executed in terminal session")
+		fmt.Println("error: run it in terminal environment")
+		os.Exit(1)
 	}
 	return ret
 }
 
 func readFromTERM(prompt string, fd int) []byte {
 	// Get the initial state of the terminal.
-	initialTermState, e1 := terminal.GetState(fd)
-	if e1 != nil {
-		panic(e1)
+	initialTermState, err := terminal.GetState(fd)
+	if err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
 	}
 
 	// Restore it in the event of an interrupt.
@@ -45,7 +47,8 @@ func readFromTERM(prompt string, fd int) []byte {
 	p, err := terminal.ReadPassword(fd)
 	fmt.Println("")
 	if err != nil {
-		panic(err)
+		fmt.Println("error:", err)
+		os.Exit(1)
 	}
 
 	// Stop looking for ^C on the channel.
