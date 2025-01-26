@@ -13,11 +13,13 @@ import (
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/holiman/uint256"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
 	"strconv"
@@ -278,7 +280,69 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			GasUsed:   int64(txctx.GasUsed),
 		}
 	case abcitypes.CheckTxType_Recheck:
-		// do nothing
+		// do Tx validation minimally
+		// validate amount and nonce of sender, which may have been changed.
+		tx := &ctrlertypes.Trx{}
+		if xerr := tx.Decode(req.Tx); xerr != nil {
+			xerr := xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		sender := ctrler.acctCtrler.FindAccount(tx.From, false)
+		if sender == nil {
+			xerr := xerrors.ErrCheckTx.Wrap(xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From))
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		// check balance
+		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+		if xerr := sender.CheckBalance(needAmt); xerr != nil {
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		// check nonce
+		if xerr := sender.CheckNonce(tx.Nonce); xerr != nil {
+			xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		// update sender account
+		if xerr := sender.SubBalance(feeAmt); xerr != nil {
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+		sender.AddNonce()
+
+		if xerr := ctrler.acctCtrler.SetAccount(sender, false); xerr != nil {
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
 	}
 	return abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
 }

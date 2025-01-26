@@ -353,25 +353,27 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 	}
 
 	// Execute every transaction in its own `TrxContext` sequentially
-	for idx, param := range client.txPreparer.resultList() {
+	for idx, ret := range client.txPreparer.resultList() {
 		// for debugging
-		if idx != param.idx || idx != param.txctx.TxIdx {
-			panic(fmt.Sprintf("error: wrong transaction index. idx:%v, param.idx:%v, txctx.TxIdx:%v", idx, param.idx, param.txctx.TxIdx))
+		if ret == nil {
+			panic(fmt.Sprintf("error: ret[%v] is nil. total result count: %v", idx, client.txPreparer.resultCount()))
+		} else if idx != ret.idx {
+			panic(fmt.Sprintf("error: wrong transaction index. idx:%v, param.idx:%v", idx, ret.idx))
 		}
 
 		// `param.txctx` may be `nil`, which means an error occurred in generating `TrxContext`.
 		// The `ResponseDeliverTx` with the error for this tx (`param.reqDeliverTx`)
 		// already exists in `param.resDeliverTx` and it is written to blockchain as invalid tx.
-		if param.txctx != nil {
-			param.resDeliverTx = client.Application.(*BeatozApp).asyncExecTrxContext(param.txctx)
+		if ret.txctx != nil {
+			ret.resDeliverTx = client.Application.(*BeatozApp).asyncExecTrxContext(ret.txctx)
 		}
 
 		// the `client.Callback` will be called.
 		// this callback function is set before calling `DeliverTxAsync`
 		// in `execBlockOnProxyApp`(`github.com/tendermint/tendermint/state/execution.go`).
 		client.callback(
-			abcitypes.ToRequestDeliverTx(*param.reqDeliverTx),
-			abcitypes.ToResponseDeliverTx(*param.resDeliverTx),
+			abcitypes.ToRequestDeliverTx(*ret.reqDeliverTx),
+			abcitypes.ToResponseDeliverTx(*ret.resDeliverTx),
 		)
 	}
 	client.txPreparer.reset()

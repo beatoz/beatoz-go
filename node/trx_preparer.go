@@ -8,11 +8,10 @@ import (
 )
 
 type requestParam struct {
-	idx       int
-	req       *abcitypes.RequestDeliverTx
-	onPrepare func(*abcitypes.RequestDeliverTx, int) (*types.TrxContext, *abcitypes.ResponseDeliverTx)
-	onResult  func(*resultValue)
-	//app      abcitypes.Application
+	idx         int
+	req         *abcitypes.RequestDeliverTx
+	onPrepare   func(*abcitypes.RequestDeliverTx, int) (*types.TrxContext, *abcitypes.ResponseDeliverTx)
+	onCompleted func(*resultValue)
 }
 
 type resultValue struct {
@@ -30,6 +29,8 @@ type TrxPreparer struct {
 
 	reqCount     int
 	resultValues []*resultValue
+
+	mtx sync.RWMutex
 }
 
 func newTrxPreparer() *TrxPreparer {
@@ -48,26 +49,38 @@ func (tp *TrxPreparer) start() {
 }
 
 func (tp *TrxPreparer) stop() {
+	tp.mtx.Lock()
+	defer tp.mtx.Unlock()
+
 	close(tp.chDone)
 }
 
 func (tp *TrxPreparer) reset() {
+	tp.mtx.Lock()
+	defer tp.mtx.Unlock()
+
 	tp.reqCount = 0
 	tp.resultValues = nil
 }
 
 func (tp *TrxPreparer) Add(req *abcitypes.RequestDeliverTx, prepareCallback func(*abcitypes.RequestDeliverTx, int) (*types.TrxContext, *abcitypes.ResponseDeliverTx)) {
-	tp.resultValues = append(tp.resultValues, nil)
 	param := &requestParam{
 		idx:       tp.reqCount,
 		req:       req,
 		onPrepare: prepareCallback,
-		onResult: func(ret *resultValue) {
+		onCompleted: func(ret *resultValue) {
+			tp.mtx.Lock()
 			tp.resultValues[ret.idx] = ret
+			tp.mtx.Unlock()
+
 			tp.WaitGroup.Done()
 		},
 	}
+
+	tp.mtx.Lock()
+	tp.resultValues = append(tp.resultValues, nil)
 	tp.reqCount++
+	tp.mtx.Unlock()
 
 	tp.WaitGroup.Add(1)
 	n := param.idx % len(tp.chReqParams)
@@ -75,30 +88,35 @@ func (tp *TrxPreparer) Add(req *abcitypes.RequestDeliverTx, prepareCallback func
 }
 
 func (tp *TrxPreparer) resultAt(idx int) *resultValue {
+	tp.mtx.RLock()
+	defer tp.mtx.RUnlock()
+
 	return tp.resultValues[idx]
 }
 
 func (tp *TrxPreparer) resultCount() int {
+	tp.mtx.RLock()
+	defer tp.mtx.RUnlock()
+
 	return len(tp.resultValues)
 }
 
 func (tp *TrxPreparer) resultList() []*resultValue {
+	tp.mtx.RLock()
+	defer tp.mtx.RUnlock()
+
 	return tp.resultValues
 }
 
 func trxPreparerRoutine(chReqParams chan *requestParam, done chan struct{}, no int) {
-	//fmt.Println("*************************** START trxPreparerRoutine:", no)
-
 STOP:
 	for {
 		select {
 		case param := <-chReqParams:
 			_txctx, _resp := param.onPrepare(param.req, param.idx) //param.app.(*BeatozApp).asyncPrepareTrxContext(param.req, param.idx)
-			param.onResult(&resultValue{param.idx, param.req, _resp, _txctx})
+			param.onCompleted(&resultValue{param.idx, param.req, _resp, _txctx})
 		case <-done:
 			break STOP
 		}
 	}
-
-	//fmt.Println("*************************** EXIT trxPreparerRoutine:", no)
 }

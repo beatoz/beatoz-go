@@ -119,29 +119,31 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT &&
-		!(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
-		//
+	if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT ||
+		(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
 		// 1. If the tx type is `TRX_CONTRACT`,
-		// the gas & nonce have already been processed in `EVMCtrler`.
-		// 2. If the tx is `TRX_TRANSFER` type and to a contract,
-		// it is processed by `EVMCtrler` because of processing the fallback feature.
-
-		// processing fee = gas * gasPrice
-		fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
-		if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
-			return xerr
-		}
-
-		// processing nonce
-		ctx.Sender.AddNonce()
-
-		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
-			return xerr
-		}
-
-		// set used gas
-		ctx.GasUsed = ctx.Tx.Gas
+		//    the gas & nonce have already been processed in `EVMCtrler`.
+		// 2. If the tx is `TRX_TRANSFER` type and the receiver is a contract,
+		//    it is executed by `EVMCtrler` to process the fallback feature.
+		//    In this case too, tha gas & nonce have already been also processed in `EVMCtrler`.
+		return nil
 	}
+
+	// processing fee = gas * gasPrice
+	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
+	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
+		return xerr
+	}
+
+	// processing nonce
+	ctx.Sender.AddNonce()
+
+	// update sender account
+	if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
+		return xerr
+	}
+
+	// set used gas
+	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }

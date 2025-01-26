@@ -34,6 +34,11 @@ func TestERC20_EstimateGas(t *testing.T) {
 	testEstimateGas(t)
 }
 
+func TestERC20_NonceDup(t *testing.T) {
+	testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
+	testNonceDup(t)
+}
+
 func TestERC20_Payable(t *testing.T) {
 	//testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
 	testPayable(t)
@@ -137,6 +142,28 @@ func testEstimateGas(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)
 	require.Equal(t, estimatedGas, uint64(retTx.DeliverTx.GasUsed))
+}
+
+func testNonceDup(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	rAddr := types.RandAddress()
+	estimatedGas, err := evmContract.EstimateGas("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator.Address(), 0, bzweb3)
+	require.NoError(t, err)
+	require.True(t, 0 < estimatedGas)
+
+	nonce := creator.GetNonce()
+
+	retTx, err := evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, nonce, estimatedGas /*contractGas*/, defGasPrice, uint256.NewInt(0), bzweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, retTx.Code, retTx.Log)
+
+	// Expected error for same nonce
+	// The txs that are handled by `EVMCtrler`, the nonce validation has been not performed in `CheckTx` phase.
+	// After that bug is fixed, the error should be occurred.
+	retTx, err = evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, nonce, estimatedGas /*contractGas*/, defGasPrice, uint256.NewInt(0), bzweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.Code, retTx.Log)
 }
 
 func testPayable(t *testing.T) {
