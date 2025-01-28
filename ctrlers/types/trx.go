@@ -341,9 +341,13 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 }
 
 func (tx *Trx) Validate() xerrors.XError {
-	if len(tx.From) != types.AddrSize ||
-		len(tx.To) != types.AddrSize {
+	if len(tx.From) != types.AddrSize {
 		return xerrors.ErrInvalidAddress
+	}
+	if len(tx.To) != types.AddrSize {
+		if tx.Type != TRX_CONTRACT || tx.To != nil {
+			return xerrors.ErrInvalidAddress
+		}
 	}
 	if tx.Amount.Sign() < 0 {
 		return xerrors.ErrInvalidAmount

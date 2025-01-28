@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -92,7 +93,12 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From)
 	}
 	// RG-91:  Also find the account object with the destination address 0x0.
-	txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(tx.To, txctx.Exec)
+	toAddr := tx.To
+	if toAddr == nil {
+		// `toAddr` may be `nil` when the tx type is `TRX_CONTRACT`.
+		toAddr = types.ZeroAddress()
+	}
+	txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(toAddr, txctx.Exec)
 	if txctx.Receiver == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}

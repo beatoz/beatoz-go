@@ -1,18 +1,23 @@
 package test
 
 import (
+	bytes2 "bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/vm"
 	"github.com/beatoz/beatoz-sdk-go/web3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	"io/ioutil"
 	"strings"
 	"sync"
 	"testing"
@@ -22,6 +27,10 @@ var (
 	evmContract *vm.EVMContract
 	creator     *web3.Wallet
 )
+
+func TestERC20_DeployWithNilAddress(t *testing.T) {
+	testDeployWithNilAddress(t, "./abi_erc20.json", []interface{}{"BeatozToken0", "BZT0"})
+}
 
 func TestERC20_Deploy(t *testing.T) {
 	// deploy
@@ -53,6 +62,45 @@ func TestERC20_Fallback(t *testing.T) {
 	testDeploy(t, "./abi_fallback_contract.json", nil)
 	testReceive(t)
 	testFallback(t)
+}
+
+func testDeployWithNilAddress(t *testing.T, abiFile string, args []interface{}) {
+	bzweb3 := randBeatozWeb3()
+
+	creator = randCommonWallet()
+	require.NoError(t, creator.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, creator.SyncAccount(bzweb3))
+
+	// `NewEVMContract()` in beatoz-sdk-go cannot be used to test a deployment tx with `to` as `nil`.
+	// (beatoz-sdk-go always setㄴ `to` to zero address when deploying.)
+	// load an abi file of erc20 contract
+	bz, err := ioutil.ReadFile(abiFile)
+	require.NoError(t, err)
+
+	var erc20BuildInfo struct {
+		ABI              json.RawMessage `json:"abi"`
+		Bytecode         hexutil.Bytes   `json:"bytecode"`
+		DeployedBytecode hexutil.Bytes   `json:"deployedBytecode"`
+	}
+	err = json.Unmarshal(bz, &erc20BuildInfo)
+	require.NoError(t, err)
+	abiERC20Contract, err := abi.JSON(bytes2.NewReader(erc20BuildInfo.ABI))
+	require.NoError(t, err)
+
+	deployInput, err := abiERC20Contract.Pack("", args...)
+	require.NoError(t, err)
+
+	// creation code = contract byte code + input parameters
+	deployInput = append(erc20BuildInfo.Bytecode, deployInput...)
+	tx := web3.NewTrxContract(creator.Address(), nil, creator.GetNonce(), contractGas, defGasPrice, uint256.NewInt(0), deployInput)
+	_, _, err = creator.SignTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+
+	ret, err := bzweb3.SendTransactionCommit(tx)
+
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 }
 
 func testDeploy(t *testing.T, abiFile string, args []interface{}) {
