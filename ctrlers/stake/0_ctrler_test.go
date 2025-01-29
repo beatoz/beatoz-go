@@ -127,7 +127,9 @@ func TestTrxStakingToSelf(t *testing.T) {
 		require.NoError(t, err)
 
 		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += ctrlertypes.AmountToPower(txctx.Tx.Amount)
+		pow, err := ctrlertypes.AmountToPower(txctx.Tx.Amount)
+		require.NoError(t, err)
+		sumPower += pow
 	}
 
 	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
@@ -173,7 +175,9 @@ func TestTrxStakingByTx(t *testing.T) {
 		err = stakeCtrler.ExecuteTrx(txctx)
 		require.NoError(t, err)
 		_ = sumAmt.Add(sumAmt, txctx.Tx.Amount)
-		sumPower += ctrlertypes.AmountToPower(txctx.Tx.Amount)
+		pow, err := ctrlertypes.AmountToPower(txctx.Tx.Amount)
+		require.NoError(t, err)
+		sumPower += pow
 	}
 
 	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))

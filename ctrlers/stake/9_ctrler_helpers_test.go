@@ -14,7 +14,11 @@ func randMakeStakingToSelfTrxContext(txHeight int64) (*ctrlertypes.TrxContext, e
 	from := acctMock00.RandWallet()
 	to := from
 
-	power := ctrlertypes.AmountToPower(govParams00.MinValidatorStake()) + rand.Int63n(10000)
+	power, err := ctrlertypes.AmountToPower(govParams00.MinValidatorStake())
+	if err != nil {
+		return nil, err
+	}
+	power += rand.Int63n(10000)
 
 	if txCtx, err := makeStakingTrxContext(from, to, power, txHeight); err != nil {
 		return nil, err

@@ -57,9 +57,12 @@ func (s *Stake) Decode(d []byte) xerrors.XError {
 	return nil
 }
 
-func NewStakeWithAmount(owner, to types.Address, amt *uint256.Int, startHeight int64, txhash abytes.HexBytes) *Stake {
-	power := ctrlertypes.AmountToPower(amt)
-	return NewStakeWithPower(owner, to, power, startHeight, txhash)
+func NewStakeWithAmount(owner, to types.Address, amt *uint256.Int, startHeight int64, txhash abytes.HexBytes) (*Stake, xerrors.XError) {
+	power, xerr := ctrlertypes.AmountToPower(amt)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return NewStakeWithPower(owner, to, power, startHeight, txhash), nil
 }
 
 func NewStakeWithPower(owner, to types.Address, power int64, startHeight int64, txhash abytes.HexBytes) *Stake {

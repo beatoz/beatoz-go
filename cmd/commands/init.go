@@ -174,6 +174,10 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			}
 			logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
 
+			pow, err := types.AmountToPower(types.DefaultGovParams().MinValidatorStake())
+			if err != nil {
+				return err
+			}
 			var valset []tmtypes.GenesisValidator
 			for _, pv := range pvs {
 				pubKey, err := pv.GetPubKey()
@@ -183,7 +187,7 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 				valset = append(valset, tmtypes.GenesisValidator{
 					Address: pubKey.Address(),
 					PubKey:  pubKey,
-					Power:   types.AmountToPower(types.DefaultGovParams().MinValidatorStake()),
+					Power:   pow,
 				})
 			}
 

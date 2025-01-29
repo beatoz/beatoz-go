@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -604,14 +603,14 @@ func MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
 }
 
-func AmountToPower(amt *uint256.Int) int64 {
+func AmountToPower(amt *uint256.Int) (int64, xerrors.XError) {
 	// 1 VotingPower == 1 BEATOZ
 	_vp := new(uint256.Int).Div(amt, amountPerPower)
 	vp := int64(_vp.Uint64())
 	if vp < 0 {
-		panic(fmt.Sprintf("voting power is negative: %v", vp))
+		return -1, xerrors.ErrOverFlow.Wrapf("voting power is converted as negative(%v) from amount(%v)", vp, amt.Dec())
 	}
-	return vp
+	return vp, nil
 }
 
 func PowerToAmount(power int64) *uint256.Int {
