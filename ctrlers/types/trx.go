@@ -118,9 +118,6 @@ func (tx *Trx) Equal(_tx *Trx) bool {
 	if tx.Version != _tx.Version {
 		return false
 	}
-	if tx.Version != _tx.Version {
-		return false
-	}
 	if bytes.Compare(tx.Sig, _tx.Sig) != 0 {
 		return false
 	}
@@ -221,25 +218,7 @@ func (tx *Trx) GetType() int32 {
 }
 
 func (tx *Trx) TypeString() string {
-	switch tx.GetType() {
-	case TRX_TRANSFER:
-		return "transfer"
-	case TRX_STAKING:
-		return "staking"
-	case TRX_UNSTAKING:
-		return "unstaking"
-	case TRX_WITHDRAW:
-		return "withdraw"
-	case TRX_PROPOSAL:
-		return "proposal"
-	case TRX_VOTING:
-		return "voting"
-	case TRX_CONTRACT:
-		return "contract"
-	case TRX_SETDOC:
-		return "setdoc"
-	}
-	return ""
+	return TrxTypeString(tx.GetType())
 }
 
 func (tx *Trx) Decode(bz []byte) xerrors.XError {
@@ -266,7 +245,9 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 	var payload ITrxPayload
 	switch txProto.Type {
 	case TRX_TRANSFER, TRX_STAKING:
-		// there is no payload!!!
+		if txProto.XPayload != nil {
+			return xerrors.ErrInvalidTrxPayloadType.Wrapf("the payload of tx type(%v) should be nil", txProto.Type)
+		}
 	case TRX_UNSTAKING:
 		payload = &TrxPayloadUnstaking{}
 		if err := payload.Decode(txProto.XPayload); err != nil {
@@ -365,6 +346,29 @@ func (tx *Trx) Validate() xerrors.XError {
 		return xerrors.ErrInvalidTrxSig
 	}
 	return nil
+}
+
+func TrxTypeString(t int32) string {
+	switch t {
+	case TRX_TRANSFER:
+		return "transfer"
+	case TRX_STAKING:
+		return "staking"
+	case TRX_UNSTAKING:
+		return "unstaking"
+	case TRX_WITHDRAW:
+		return "withdraw"
+	case TRX_PROPOSAL:
+		return "proposal"
+	case TRX_VOTING:
+		return "voting"
+	case TRX_CONTRACT:
+		return "contract"
+	case TRX_SETDOC:
+		return "setdoc"
+	default:
+		return "unknown"
+	}
 }
 
 func PreImageToSignTrxProto(tx *Trx, chainId string) ([]byte, xerrors.XError) {
