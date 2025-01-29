@@ -13,6 +13,7 @@ import (
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	"math"
 	"sort"
 	"strconv"
 	"sync"
@@ -451,7 +452,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 
 		// check overflow
-		if (totalPower + txPower) <= 0 {
+		if totalPower > math.MaxInt64-txPower {
 			// Not reachable code.
 			// The sender's balance is checked at `commonValidation()` at `trx_executor.go`
 			// and `txPower` is converted from `ctx.Tx.Amount`.
