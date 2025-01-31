@@ -242,6 +242,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+				_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -392,6 +393,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 			_txctx.TxIdx = ctrler.nextBlockCtx.TxsCnt()
 			ctrler.nextBlockCtx.AddTxsCnt(1)
 
+			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -493,6 +495,7 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 			_txctx.TxIdx = idx
 			ctrler.nextBlockCtx.AddTxsCnt(1)
 
+			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -646,7 +649,14 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.nextBlockCtx.SetAppHash(appHash)
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "txs", ctrler.nextBlockCtx.TxsCnt(), "appHash", ctrler.nextBlockCtx.AppHash())
+	ctrler.nextBlockCtx.AdjustMaxGasPerTrx(
+		ctrler.govCtrler.MinTrxGas(),
+		ctrler.govCtrler.MaxTrxGas())
+	ctrler.logger.Debug("BeatozApp::Commit",
+		"height", ver0,
+		"txs", ctrler.nextBlockCtx.TxsCnt(),
+		"appHash", ctrler.nextBlockCtx.AppHash(),
+		"adjustedMaxGasPerTrx", ctrler.nextBlockCtx.MaxGasPerTrx())
 
 	ctrler.metaDB.PutLastBlockContext(ctrler.nextBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)

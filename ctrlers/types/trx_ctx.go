@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -14,6 +15,8 @@ type TrxContext struct {
 	TxHash    bytes2.HexBytes
 	Tx        *Trx
 	TxIdx     int
+	MinGas    uint64
+	MaxGas    uint64
 	Exec      bool
 
 	SenderPubKey []byte
@@ -67,16 +70,21 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 	}
 
 	//
-	// begin of code from commonValidation0
 	// The following can be performed in parallel.
 	{
+		if txctx.MinGas == 0 {
+			txctx.MinGas = txctx.GovHandler.MinTrxGas()
+		}
+		if txctx.MaxGas == 0 {
+			txctx.MaxGas = txctx.GovHandler.MaxTrxGas()
+		}
+		if tx.Gas < txctx.MinGas {
+			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas")
+		} else if tx.Gas > txctx.MaxGas {
+			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas")
+		}
 		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
 			return nil, xerrors.ErrInvalidGasPrice
-		}
-		if tx.Gas < txctx.GovHandler.MinTrxGas() {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas(fee)")
-		} else if tx.Gas > txctx.GovHandler.MaxTrxGas() {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas(fee)")
 		}
 
 		_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
@@ -85,7 +93,6 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 		}
 		txctx.SenderPubKey = pubKeyBytes
 	}
-	// end of code from commonValidation0
 	//
 
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
@@ -103,4 +110,9 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}
 	return txctx, nil
+}
+
+func AdjustMaxGasPerTrx(txcnt int, cap uint64) uint64 {
+	txcnt = libs.MaxInt(txcnt, 1)
+	return cap / uint64(txcnt)
 }

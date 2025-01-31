@@ -793,7 +793,7 @@ func selectValidators(delegatees PowerOrderDelegatees, maxVals int) DelegateeArr
 	//}
 	//
 	//return validators
-	return DelegateeArray(delegatees[:libs.MIN(len(delegatees), maxVals)])
+	return DelegateeArray(delegatees[:libs.MinInt(len(delegatees), maxVals)])
 }
 
 func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {

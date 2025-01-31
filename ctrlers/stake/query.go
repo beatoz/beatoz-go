@@ -111,7 +111,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 
 		sort.Sort(delegatees)
 
-		n := libs.MIN(len(delegatees), int(ctrler.govParams.MaxValidatorCnt()))
+		n := libs.MinInt(len(delegatees), int(ctrler.govParams.MaxValidatorCnt()))
 		validators := delegatees[:n]
 
 		retPower := int64(0)

@@ -111,7 +111,7 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	}
 
 	ctrler.stateDBWrapper = stdb
-	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
+	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(blockGasLimit)
 
 	beneficiary := bytes.HexBytes(ctx.BlockInfo().Header.ProposerAddress).Array20()
 	blockContext := evmBlockContext(beneficiary, ctx.Height(), ctx.TimeSeconds())

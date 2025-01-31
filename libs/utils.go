@@ -1,27 +1,41 @@
 package libs
 
-func MAX(a, b int) int {
+func MaxInt(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func MIN(a, b int) int {
+func MinInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func MAX64(a, b int64) int64 {
+func MaxInt64(a, b int64) int64 {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func MIN64(a, b int64) int64 {
+func MinInt64(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func MaxUint64(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func MinUint64(a, b uint64) uint64 {
 	if a < b {
 		return a
 	}

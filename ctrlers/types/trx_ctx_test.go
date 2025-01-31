@@ -3,6 +3,7 @@ package types_test
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
@@ -24,14 +25,14 @@ func Test_NewTrxContext(t *testing.T) {
 	// Small Gas
 	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas()-1, govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr := newTrxCtx(tx, 1)
+	txctx, xerr := newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
 
 	//
 	// 0 GasPrice
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), uint256.NewInt(0), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
 	//
@@ -42,55 +43,55 @@ func Test_NewTrxContext(t *testing.T) {
 	require.Negative(t, neg.Sign())
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), neg, uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
 	//
 	// too much GasPrice
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), uint256.NewInt(10_000_000_001), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
 	//
 	// Wrong Signature - sign with proto encoding
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxProto(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
 
 	//
 	// Wrong Signature - no signature
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
 
 	//
 	// Wrong Signature - other's signature
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w1.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
 
 	//
 	// Wrong Signature - wrong chainId
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, "tx_executor_test_chain_wrong")
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
 
 	//
-	// To nil address
+	// To nil address (not contract transaction)
 	tx = web3.NewTrxTransfer(w0.Address(), nil, 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidAddress.Error())
 
 	//
-	// To Zero Address
-	tx = web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
+	// To nil address (contract transaction)
+	tx = web3.NewTrxContract(w0.Address(), nil, 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(0), bytes.RandBytes(32))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Sender)
 	require.Equal(t, txctx.Sender.Address, w0.Address())
@@ -98,16 +99,56 @@ func Test_NewTrxContext(t *testing.T) {
 	require.Equal(t, txctx.Receiver.Address, types.ZeroAddress())
 
 	//
+	// To Zero Address
+	tx = web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
+	require.NoError(t, xerr)
+	require.NotNil(t, txctx.Sender)
+	require.Equal(t, txctx.Sender.Address, w0.Address())
+	require.NotNil(t, txctx.Receiver)
+	require.Equal(t, txctx.Receiver.Address, types.ZeroAddress())
+
+	//
+	// too small gas
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas()-1, govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
+
+	//
+	// too much gas
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MaxTrxGas()+1, govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
+
+	//
+	// too much gas - adjustMaxGas
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, 10001, govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	txctx, xerr = newTrxCtx(tx, 1, 10000)
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
+
+	//
+	// proper gas - adjustMaxGas
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, 10000, govParams.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	txctx, xerr = newTrxCtx(tx, 1, 10000)
+	require.NoError(t, xerr)
+
+	//
 	// Success
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas(), govParams.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
+	txctx, xerr = newTrxCtx(tx, 1, govParams.MaxTrxGas())
 	require.NoError(t, xerr)
 }
 
-func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
+func newTrxCtx(tx *ctrlertypes.Trx, height int64, adjustMaxGas uint64) (*ctrlertypes.TrxContext, xerrors.XError) {
 	bz, _ := tx.Encode()
 	return ctrlertypes.NewTrxContext(bz, height, time.Now().UnixMilli(), true, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+		_txctx.MaxGas = adjustMaxGas
 		_txctx.GovHandler = govParams
 		_txctx.AcctHandler = &acctHandlerMock{}
 		_txctx.ChainID = chainId
