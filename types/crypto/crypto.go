@@ -38,11 +38,6 @@ func VerifySig(pubkey, msg, sig []byte) bool {
 }
 
 func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
-	// todo: generate address like as ethereum style
-
-	//a := ethcrypto.PubkeyToAddress(*pub)
-	//return a[:]
-
 	pubKeyBytes := CompressPubkey(pub)
 	ret, _ := PubBytes2Addr(pubKeyBytes)
 	return ret

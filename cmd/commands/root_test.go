@@ -144,7 +144,6 @@ func TestRootConfig(t *testing.T) {
 		require.Nil(t, err)
 
 		// write the non-defaults to a different path
-		// TODO: support writing sub configs so we can test that too
 		err = WriteConfigVals(configFilePath, cvals)
 		require.Nil(t, err)
 

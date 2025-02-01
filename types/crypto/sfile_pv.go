@@ -277,7 +277,7 @@ func LoadOrGenSFilePV(keyFilePath, stateFilePath string, s []byte) *SFilePV {
 		pv = LoadSFilePV(keyFilePath, stateFilePath, s)
 		// retry to save.
 		// each time the file is saved, the salt value will be changed,
-		// so the file contnets will be changed also.
+		// so the file content will be changed also.
 		pv.SaveWith(s)
 	} else {
 		pv = GenSFilePV(keyFilePath, stateFilePath)

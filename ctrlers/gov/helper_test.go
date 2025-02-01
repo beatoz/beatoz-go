@@ -94,27 +94,22 @@ func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes
 }
 
 func (a *acctHelperMock) Transfer(address types.Address, address2 types.Address, u *uint256.Int, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) Reward(address types.Address, u *uint256.Int, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 

@@ -117,9 +117,6 @@ func (ctrler *BeatozApp) SetLocalClient(client abcicli.Client) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// todo: Find out how to solve the following problem.
-	// Problem: The 'web3' MUST BE a web3 of CONSENSUS.
-	// However, there is no way to know if the 'web3' is for CONSENSUS or not.
 	ctrler.localClient = client
 }
 
@@ -176,8 +173,6 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(err)
 	}
 
-	// todo: check whether 'appHash' is equal to the original hash of the current blockchain network.
-	// but how to get the original hash? official web site????
 	appHash, err := appState.Hash()
 	if err != nil {
 		panic(err)
@@ -350,7 +345,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	if req.Header.Height != ctrler.lastBlockCtx.Height()+1 {
-		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.lastBlockCtx.Height()+1, req.Header.Height))
+		panic(fmt.Errorf("error block height: expected(%v), actual(%v)", ctrler.lastBlockCtx.Height()+1, req.Header.Height))
 	}
 	ctrler.logger.Debug("BeatozApp::BeginBlock",
 		"height", req.Header.Height,

@@ -197,7 +197,6 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 		return xerr
 	}
 	if xerr := ctrler.setAccount(acct1, exec); xerr != nil {
-		// todo: cancel ctrler.setAccount(acct0,exec)
 		return xerr
 	}
 	return nil

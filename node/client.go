@@ -85,7 +85,6 @@ func (client *beatozLocalClient) SetResponseCallback(cb abcicli.Callback) {
 	client.mtx.Unlock()
 }
 
-// TODO: change abcitypes.Application to include Error()?
 func (client *beatozLocalClient) Error() error {
 	return nil
 }

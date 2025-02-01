@@ -178,24 +178,19 @@ func (a *acctHandlerMock) FindAccount(address types.Address, b bool) *ctrlertype
 }
 
 func (a *acctHandlerMock) Transfer(address types.Address, address2 types.Address, u *uint256.Int, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHandlerMock) Reward(address types.Address, u *uint256.Int, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHandlerMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 func (a *acctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 func (a *acctHandlerMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
