@@ -94,27 +94,22 @@ func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes
 }
 
 func (a *acctHelperMock) Transfer(address types.Address, address2 types.Address, u *uint256.Int, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) Reward(address types.Address, u *uint256.Int, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (a *acctHelperMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
-	//TODO implement me
 	panic("implement me")
 }
 
@@ -123,13 +118,6 @@ var _ ctrlertypes.IAccountHandler = (*acctHelperMock)(nil)
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 	txbz, _ := tx.Encode()
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, height, time.Now().Unix(), exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-		_tx := _txctx.Tx
-		// find sender account
-		acct := acctHelper.FindAccount(_tx.From, _txctx.Exec)
-		if acct == nil {
-			return xerrors.ErrNotFoundAccount
-		}
-		_txctx.Sender = acct
 		_txctx.GovHandler = govCtrler
 		_txctx.AcctHandler = acctHelper
 		_txctx.StakeHandler = stakeHelper

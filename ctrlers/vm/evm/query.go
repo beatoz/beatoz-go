@@ -86,13 +86,13 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, 0, gasLimit, uint256.NewInt(0), uint256.NewInt(0), data, true)
+	vmmsg := evmMessage(sender, toAddr, 0, blockGasLimit, uint256.NewInt(0), uint256.NewInt(0), data, true)
 	blockContext := evmBlockContext(sender, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(gasLimit)
+	gp := new(core.GasPool).AddGas(blockGasLimit)
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
 	if err != nil {
 		return nil, xerrors.From(err)

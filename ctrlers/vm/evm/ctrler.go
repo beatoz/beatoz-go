@@ -74,7 +74,6 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		panic(err)
 	}
 
-	//rawDB, err := rawdb.NewLevelDBDatabaseWithFreezer(path, 0, 0, path, "", false)
 	db, err := rawdb.NewLevelDBDatabase(path, 128, 128, "", false)
 	if err != nil {
 		panic(err)
@@ -112,7 +111,7 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	}
 
 	ctrler.stateDBWrapper = stdb
-	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
+	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(blockGasLimit)
 
 	beneficiary := bytes.HexBytes(ctx.BlockInfo().Header.ProposerAddress).Array20()
 	blockContext := evmBlockContext(beneficiary, ctx.Height(), ctx.TimeSeconds())
@@ -132,14 +131,6 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		inputData = payload.Data
 	}
 
-	//payload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract)
-	//if !ok {
-	//	return xerrors.ErrInvalidTrxPayloadType
-	//}
-	//if payload.Data == nil || len(payload.Data) == 0 {
-	//	return xerrors.ErrInvalidTrxPayloadParams
-	//}
-
 	// Check intrinsic gas if everything is correct
 	bn := big.NewInt(ctx.Height)
 	gas, err := ethcore.IntrinsicGas(inputData, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
@@ -151,13 +142,33 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		return xerrors.ErrInvalidGas
 	}
 
+	if ctx.Exec == false {
+		// `GasUsed` will be used to simulate in `ExecuteTrx`.
+		ctx.GasUsed = gas
+	}
+
 	return nil
 }
 
 func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if ctx.Exec == false {
-		// issue #71
-		// Execute a contract transaction only on `deliveryTx`
+		// Only in the 'DeliveryTx' phase, the contract transaction is fully executed,
+		// and in the 'CheckTx' phase it is minimally executed.
+
+		// update balance
+		feeAmt := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(ctx.GasUsed))
+		needAmt := new(uint256.Int).Add(feeAmt, ctx.Tx.Amount)
+		if xerr := ctx.Sender.SubBalance(needAmt); xerr != nil {
+			return xerr
+		}
+
+		// update nonce
+		ctx.Sender.AddNonce()
+
+		// update account ledger
+		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
+			return xerr
+		}
 		return nil
 	}
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
@@ -384,6 +395,13 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 			return xerrors.From(err)
 		}
 		ctrler.metadb = nil
+	}
+
+	if ctrler.ethDB != nil {
+		if err := ctrler.ethDB.Close(); err != nil {
+			return xerrors.From(err)
+		}
+		ctrler.ethDB = nil
 	}
 
 	if ctrler.stateDBWrapper != nil {

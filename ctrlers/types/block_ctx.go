@@ -11,10 +11,11 @@ import (
 )
 
 type BlockContext struct {
-	blockInfo abcitypes.RequestBeginBlock
-	feeSum    *uint256.Int
-	txsCnt    int
-	appHash   bytes.HexBytes
+	blockInfo    abcitypes.RequestBeginBlock
+	feeSum       *uint256.Int
+	txsCnt       int
+	maxGasPerTrx uint64
+	appHash      bytes.HexBytes
 
 	GovHandler   IGovHandler
 	AcctHandler  IAccountHandler
@@ -147,20 +148,38 @@ func (bctx *BlockContext) SetValUpdates(valUps abcitypes.ValidatorUpdates) {
 	bctx.ValUpdates = valUps
 }
 
+func (bctx *BlockContext) AdjustMaxGasPerTrx(minCap, maxCap uint64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	// Hyperbolic Function is applied.
+	// `newMaxGas = (maxCap - minCap) / (1 + TxCount) + minCap`
+	bctx.maxGasPerTrx = (maxCap-minCap)/uint64(1+bctx.txsCnt) + minCap
+}
+
+func (bctx *BlockContext) MaxGasPerTrx() uint64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return bctx.maxGasPerTrx
+}
+
 func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
 	_bctx := &struct {
-		BlockInfo abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum    *uint256.Int                `json:"feeSum"`
-		TxsCnt    int                         `json:"txsCnt"`
-		AppHash   []byte                      `json:"appHash"`
+		BlockInfo    abcitypes.RequestBeginBlock `json:"blockInfo"`
+		GasSum       *uint256.Int                `json:"feeSum"`
+		TxsCnt       int                         `json:"txsCnt"`
+		MaxGasPerTrx uint64                      `json:"maxGasPerTrx"`
+		AppHash      []byte                      `json:"appHash"`
 	}{
-		BlockInfo: bctx.blockInfo,
-		GasSum:    bctx.feeSum,
-		TxsCnt:    bctx.txsCnt,
-		AppHash:   bctx.appHash,
+		BlockInfo:    bctx.blockInfo,
+		GasSum:       bctx.feeSum,
+		TxsCnt:       bctx.txsCnt,
+		MaxGasPerTrx: bctx.maxGasPerTrx,
+		AppHash:      bctx.appHash,
 	}
 
 	return json.Marshal(_bctx)
@@ -171,10 +190,11 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	defer bctx.mtx.Unlock()
 
 	_bctx := &struct {
-		BlockInfo abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum    *uint256.Int                `json:"feeSum"`
-		TxsCnt    int                         `json:"txsCnt"`
-		AppHash   []byte                      `json:"appHash"`
+		BlockInfo    abcitypes.RequestBeginBlock `json:"blockInfo"`
+		GasSum       *uint256.Int                `json:"feeSum"`
+		TxsCnt       int                         `json:"txsCnt"`
+		MaxGasPerTrx uint64                      `json:"maxGasPerTrx"`
+		AppHash      []byte                      `json:"appHash"`
 	}{}
 
 	if err := json.Unmarshal(bz, _bctx); err != nil {
@@ -183,6 +203,7 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	bctx.blockInfo = _bctx.BlockInfo
 	bctx.feeSum = _bctx.GasSum
 	bctx.txsCnt = _bctx.TxsCnt
+	bctx.maxGasPerTrx = _bctx.MaxGasPerTrx
 	bctx.appHash = _bctx.AppHash
 	return nil
 }

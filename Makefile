@@ -16,7 +16,7 @@ else
 	else ifeq ($(UNAME_S),Darwin)
 		HOSTOS=darwin
 	else
-		@echo "Unknown OS: $(UNAME_S)"
+$(info Unknown OS: $(UNAME_S))
 		exit
 	endif
 
@@ -51,11 +51,24 @@ ifeq ($(HOSTOS), windows)
 	OUTPUT=$(BUILDDIR)/beatoz.exe
 endif
 
-BUILD_YN="Y"
-ifneq ($(wildcard $(OUTPUT)),)
-	commit0=$(word 2, $(subst -, ,$(subst @, ,$(shell $(OUTPUT) version))))
-	ifeq ($(commit0),$(GITCOMMIT))
-		BUILD_YN="N"
+BUILD_YN="N"
+# if there is no `beatoz` binary.
+ifeq ($(wildcard $(OUTPUT)),)
+	BUILD_YN="Y"
+$(info [info] not found $(OUTPUT))
+else
+	# if source files are updated.
+	status=$(shell git status -s | grep ".go")
+	ifneq ($(status), )
+		BUILD_YN="Y"
+$(info [info] modified files: $(status))
+	else
+		# if commit hashes are different
+		ver_commit=$(word 2, $(subst -, ,$(subst @, ,$(shell $(OUTPUT) version))))
+		ifneq ($(ver_commit),$(GITCOMMIT))
+			BUILD_YN="Y"
+$(info [info] commit hash is different: $(GITCOMMIT) <> $(ver_commit))
+		endif
 	endif
 endif
 
@@ -65,29 +78,29 @@ all: pbm $(TARGETOS)
 
 $(TARGETOS):
 ifeq ($(BUILD_YN),"Y")
-	@echo Build beatoz for $(@) on $(UNAME_S)-$(UNAME_M)
+	@echo "[$(@)] Build beatoz($(GITCOMMIT)) for $(@) on $(UNAME_S)-$(UNAME_M)"
 ifeq ($(HOSTOS),windows)
 	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(OUTPUT) $(BUILD_FLAGS)  ./cmd/
 else
 	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(OUTPUT) $(BUILD_FLAGS) ./cmd/
 endif
 else
-	@echo "The last version ($(shell $(OUTPUT) version)) has already been built."
+	@echo "[$(@)] The last version ($(shell $(OUTPUT) version)) has already been built."
 endif
 
 pbm:
-	@echo Compile protocol messages
+	@echo "[$(@)] Compile protocol messages"
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ account.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
 
 install: $(TARGETOS)
-	@echo "Install binaries to $(LOCAL_GOPATH)/bin"
+	@echo "[$(@)] Install binaries to $(LOCAL_GOPATH)/bin"
 	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 
 clean:
-	@echo "Clean build..."
+	@echo "[$(@)] Clean build..."
 	@rm -rf $(BUILDDIR)
 
 check:

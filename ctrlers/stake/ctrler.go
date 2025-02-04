@@ -13,6 +13,7 @@ import (
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	"math"
 	"sort"
 	"strconv"
 	"sync"
@@ -130,13 +131,14 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	if xerr := ctrler.delegateeLedger.Iterate(func(d *Delegatee) xerrors.XError {
 		// issue #59
 		// Only `Delegatee` who has deposited more than `MinValidatorStake` can become validator.
-		minPower := ctrlertypes.AmountToPower(ctrler.govParams.MinValidatorStake())
-		if d.SelfPower >= minPower {
+		if minPower, xerr := ctrlertypes.AmountToPower(ctrler.govParams.MinValidatorStake()); xerr != nil {
+			return xerr
+		} else if d.SelfPower >= minPower {
 			ctrler.allDelegatees = append(ctrler.allDelegatees, d)
 		}
 		return nil
 	}, true); xerr != nil {
-		//
+		return nil, xerr
 	}
 
 	sort.Sort(PowerOrderDelegatees(ctrler.allDelegatees)) // sort by power
@@ -194,10 +196,9 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		heightOfPower = 1
 	}
 
-	// todo: remove ImitableLedgerAt. How? => Rewarding is started after 4 blocks, but is immediately stopped in un-staking
 	// ImitableLedgerAt is used to get the delegator's stakes at the block[height-4] and to give rewards based on it.
 	// Solution: When a stake is deposited, the rewards start after 4 blocks from the block containing TrxPayloadStaking, (check by using Stake.StartHeight)
-	// and when staking is un-staking(executing TrxPayloadUnstaking), immediately stop to reward. (don't reward for stakes existed 4 blocks ago and un-staked at now.)
+	// and when stake is un-staking(executing TrxPayloadUnstaking), immediately stop to reward. (don't reward for stakes existed 4 blocks ago and un-staked at now.)
 	immuDelegateeLedger, xerr := ctrler.delegateeLedger.ImitableLedgerAt(heightOfPower)
 	if xerr != nil {
 		return nil, xerr
@@ -217,8 +218,6 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 			}
 			delegatee := item.(*Delegatee)
 			if delegatee.TotalPower != vote.Validator.Power {
-				//panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo",
-				//	delegatee.Addr, delegatee.TotalPower, vote.Validator.Power))
 				ctrler.logger.Error("Wrong power", "delegatee", delegatee.Addr, "power of ledger", delegatee.TotalPower, "power of VoteInfo", vote.Validator.Power)
 				continue
 			}
@@ -394,7 +393,10 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be multiple of %v", ctrlertypes.AmountPerPower())
 		}
 
-		txPower := ctrlertypes.AmountToPower(ctx.Tx.Amount)
+		txPower, xerr := ctrlertypes.AmountToPower(ctx.Tx.Amount)
+		if xerr != nil {
+			return xerr
+		}
 		totalPower := int64(0)
 
 		delegatee, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
@@ -405,7 +407,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		if bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 			// self staking
 
-			// isseu #59
+			// issue #59
 			// check MinValidatorStake
 
 			selfPower := txPower
@@ -414,7 +416,10 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 				totalPower = delegatee.GetTotalPower()
 			}
 
-			minPower := ctrlertypes.AmountToPower(ctrler.govParams.MinValidatorStake())
+			minPower, xerr := ctrlertypes.AmountToPower(ctrler.govParams.MinValidatorStake())
+			if xerr != nil {
+				return xerr
+			}
 			if selfPower < minPower {
 				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: a minimum is %v", ctrler.govParams.MinValidatorStake())
 			}
@@ -426,7 +431,10 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			}
 
 			// RG-78: check minDelegatorStake
-			minDelegatorPower := ctrlertypes.AmountToPower(ctx.GovHandler.MinDelegatorStake())
+			minDelegatorPower, xerr := ctrlertypes.AmountToPower(ctx.GovHandler.MinDelegatorStake())
+			if xerr != nil {
+				return xerr
+			}
 			if minDelegatorPower > 0 && minDelegatorPower > txPower {
 				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", ctrler.govParams.MinDelegatorStake())
 			}
@@ -441,8 +449,12 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 
 		// check overflow
-		if (totalPower + txPower) <= 0 {
-			panic(fmt.Errorf("delegatee power overflow occurs.\ndelegatee: %v\ntx:%v", delegatee, ctx.Tx))
+		if totalPower > math.MaxInt64-txPower {
+			// Not reachable code.
+			// The sender's balance is checked at `commonValidation()` at `trx_executor.go`
+			// and `txPower` is converted from `ctx.Tx.Amount`.
+			// Because of that, overflow can not be occurred.
+			return xerrors.ErrOverFlow.Wrapf("delegatee power overflow occurs.\ndelegatee: %v\ntx:%v", delegatee, ctx.Tx)
 		}
 
 		//
@@ -483,7 +495,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 
 		if ctx.Tx.From.Compare(s0.From) != 0 {
-			return xerrors.ErrNotFoundStake.Wrapf("you not stake owner")
+			return xerrors.ErrNotFoundStake.Wrapf("you are not the stake owner")
 		}
 
 		if len(ctrler.lastValidators) >= 3 {
@@ -559,7 +571,10 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 
 	// create stake and delegate it to `delegatee`
 	// the reward for this stake will be started at ctx.Height + 1. (issue #29)
-	power := ctrlertypes.AmountToPower(ctx.Tx.Amount)
+	power, xerr := ctrlertypes.AmountToPower(ctx.Tx.Amount)
+	if xerr != nil {
+		return xerr
+	}
 	s0 := NewStakeWithPower(ctx.Tx.From, ctx.Tx.To, power, ctx.Height+1, ctx.TxHash)
 
 	if xerr := delegatee.AddStake(s0); xerr != nil {
@@ -593,7 +608,7 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	// issue #43
 	// check that tx's sender is stake's owner
 	if ctx.Tx.From.Compare(s0.From) != 0 {
-		return xerrors.ErrNotFoundStake.Wrapf("you not stake owner")
+		return xerrors.ErrNotFoundStake.Wrapf("you are not the stake owner")
 	}
 
 	_ = delegatee.DelStake(txhash)
@@ -660,7 +675,7 @@ func (ctrler *StakeCtrler) exeWithdraw(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	xerr = ctx.AcctHandler.Reward(ctx.Sender.Address, txpayload.ReqAmt, ctx.Exec)
 	if xerr != nil {
 		if xerr = ctrler.rewardLedger.RevertToSnapshot(snap, ctx.Exec); xerr != nil {
-			ctrler.logger.Error("rewardLedger is fail to be reverted to", "rev", snap, "err", xerr)
+			ctrler.logger.Error("rewardLedger is failed to be reverted to", "rev", snap, "err", xerr)
 		}
 		return xerr
 	}
@@ -760,22 +775,7 @@ func validatorUpdates(existing, newers DelegateeArray) []abcitypes.ValidatorUpda
 }
 
 func selectValidators(delegatees PowerOrderDelegatees, maxVals int) DelegateeArray {
-	//
-	// the item of delegatees has TotaPower greater than power for govParams.MinValidatorStake()
-	//
-
-	//var validators DelegateeArray
-	//for i, val := range delegatees {
-	//	if val.TotalPower <= 0 {
-	//		break
-	//	} else if i >= maxVals {
-	//		break
-	//	}
-	//	validators = append(validators, val)
-	//}
-	//
-	//return validators
-	return DelegateeArray(delegatees[:libs.MIN(len(delegatees), maxVals)])
+	return DelegateeArray(delegatees[:libs.MinInt(len(delegatees), maxVals)])
 }
 
 func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
@@ -825,6 +825,12 @@ func (ctrler *StakeCtrler) Close() xerrors.XError {
 			ctrler.logger.Error("frozenLedger.Close()", "error", xerr.Error())
 		}
 		ctrler.frozenLedger = nil
+	}
+	if ctrler.rewardLedger != nil {
+		if xerr := ctrler.rewardLedger.Close(); xerr != nil {
+			ctrler.logger.Error("rewardLedger.Close()", "error", xerr.Error())
+		}
+		ctrler.rewardLedger = nil
 	}
 	return nil
 }

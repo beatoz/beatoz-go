@@ -86,9 +86,11 @@ func (s *StateDBWrapper) Finish() {
 }
 
 func (s *StateDBWrapper) Close() error {
-	err := s.StateDB.Database().TrieDB().DiskDB().Close()
+	// Since `ethDB` of `EVMCtrler` is closed in `Close()` of `EVMCtrler`,
+	// `s.StateDB` which uses `ethDB` as the actual DB object does not need to be closed here,
+	// and setting it to `nil` is sufficient.
 	s.StateDB = nil
-	return err
+	return nil
 }
 
 func (s *StateDBWrapper) CreateAccount(addr common.Address) {

@@ -166,6 +166,9 @@ func (acct *Account) GetBalance() *uint256.Int {
 }
 
 func (acct *Account) CheckBalance(amt *uint256.Int) xerrors.XError {
+	acct.mtx.RLock()
+	defer acct.mtx.RUnlock()
+
 	if amt.Cmp(acct.Balance) > 0 {
 		return xerrors.ErrInsufficientFund
 	}

@@ -96,7 +96,10 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		var delegatees PowerOrderDelegatees
 		xerr = atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
 			d := item.(*Delegatee)
-			minPower := types2.AmountToPower(ctrler.govParams.MinValidatorStake())
+			minPower, xerr := types2.AmountToPower(ctrler.govParams.MinValidatorStake())
+			if xerr != nil {
+				return xerr
+			}
 			if d.SelfPower >= minPower {
 				delegatees = append(delegatees, d)
 			}
@@ -108,7 +111,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 
 		sort.Sort(delegatees)
 
-		n := libs.MIN(len(delegatees), int(ctrler.govParams.MaxValidatorCnt()))
+		n := libs.MinInt(len(delegatees), int(ctrler.govParams.MaxValidatorCnt()))
 		validators := delegatees[:n]
 
 		retPower := int64(0)

@@ -41,7 +41,6 @@ func (ledger *SimpleLedger[T]) ImmutableLedgerAt(n int64, cacheSize int) (*Simpl
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	// todo: Use GetImmutable()
 	tree := iavl.NewMutableTree(ledger.db, cacheSize, false, iavl.NewNopLogger())
 	_, err := tree.LoadVersion(n)
 	if err != nil {

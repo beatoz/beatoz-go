@@ -35,13 +35,6 @@ func AddNodeFlags(cmd *cobra.Command) {
 		"socket address to listen on for connections from external priv_validator process")
 
 	cmd.Flags().StringVar(
-		&privValSecret,
-		"priv_validator_secret",
-		"",
-		"passphrase to encrypt and decrypt a private key in priv_validator_key.json",
-	)
-
-	cmd.Flags().StringVar(
 		&privValSecretFeederAddr,
 		"priv_validator_secret_feeder",
 		"",
@@ -140,11 +133,14 @@ func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 				if err != nil {
 					return err
 				}
-			} else if privValSecret != "" {
-				s = []byte(privValSecret)
-				privValSecret = ""
 			} else {
-				s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
+				_secret := os.Getenv("BEATOZ_VALIDATOR_SECRET")
+				if _secret == "" {
+					s = libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(rootConfig.PrivValidatorKeyFile())))
+				} else {
+					s = []byte(_secret)
+				}
+				defer libs.ClearCredential(s)
 			}
 
 			n, err := nodeProvider(rootConfig, s, logger)

@@ -13,16 +13,17 @@ import (
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/holiman/uint256"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -72,9 +73,7 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 
 	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
 
-	// the first parameter of NewTrxExecutor `n` is 0,
-	// because the parallel tx-processing is not used
-	txExecutor := NewTrxExecutor(0 /*runtime.GOMAXPROCS(0)*/, logger)
+	txExecutor := NewTrxExecutor(logger)
 
 	return &BeatozApp{
 		metaDB:      stateDB,
@@ -89,17 +88,12 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 }
 
 func (ctrler *BeatozApp) Start() error {
-	if atomic.CompareAndSwapInt32(&ctrler.started, 0, 1) {
-		// ctrler.txExecutor.Start()
-	}
 	return nil
 }
 
 func (ctrler *BeatozApp) Stop() error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
-
-	//ctrler.txExecutor.Stop()
 
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
@@ -123,9 +117,6 @@ func (ctrler *BeatozApp) SetLocalClient(client abcicli.Client) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// todo: Find out how to solve the following problem.
-	// Problem: The 'web3' MUST BE a web3 of CONSENSUS.
-	// However, there is no way to know if the 'web3' is for CONSENSUS or not.
 	ctrler.localClient = client
 }
 
@@ -182,8 +173,6 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(err)
 	}
 
-	// todo: check whether 'appHash' is equal to the original hash of the current blockchain network.
-	// but how to get the original hash? official web site????
 	appHash, err := appState.Hash()
 	if err != nil {
 		panic(err)
@@ -248,6 +237,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+				_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -286,14 +276,76 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			GasUsed:   int64(txctx.GasUsed),
 		}
 	case abcitypes.CheckTxType_Recheck:
-		// do nothing
+		// do Tx validation minimally
+		// validate amount and nonce of sender, which may have been changed.
+		tx := &ctrlertypes.Trx{}
+		if xerr := tx.Decode(req.Tx); xerr != nil {
+			xerr := xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		sender := ctrler.acctCtrler.FindAccount(tx.From, false)
+		if sender == nil {
+			xerr := xerrors.ErrCheckTx.Wrap(xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From))
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		// check balance
+		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+		if xerr := sender.CheckBalance(needAmt); xerr != nil {
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		// check nonce
+		if xerr := sender.CheckNonce(tx.Nonce); xerr != nil {
+			xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+
+		// update sender account
+		if xerr := sender.SubBalance(feeAmt); xerr != nil {
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
+		sender.AddNonce()
+
+		if xerr := ctrler.acctCtrler.SetAccount(sender, false); xerr != nil {
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
+			ctrler.logger.Error("ReCheckTx", "error", xerr)
+			return abcitypes.ResponseCheckTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+		}
 	}
 	return abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
 }
 
 func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	if req.Header.Height != ctrler.lastBlockCtx.Height()+1 {
-		panic(fmt.Errorf("error block height: expected(%v), actural(%v)", ctrler.lastBlockCtx.Height()+1, req.Header.Height))
+		panic(fmt.Errorf("error block height: expected(%v), actual(%v)", ctrler.lastBlockCtx.Height()+1, req.Header.Height))
 	}
 	ctrler.logger.Debug("BeatozApp::BeginBlock",
 		"height", req.Header.Height,
@@ -336,6 +388,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 			_txctx.TxIdx = ctrler.nextBlockCtx.TxsCnt()
 			ctrler.nextBlockCtx.AddTxsCnt(1)
 
+			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -437,6 +490,7 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 			_txctx.TxIdx = idx
 			ctrler.nextBlockCtx.AddTxsCnt(1)
 
+			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -590,7 +644,14 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.nextBlockCtx.SetAppHash(appHash)
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "txs", ctrler.nextBlockCtx.TxsCnt(), "appHash", ctrler.nextBlockCtx.AppHash())
+	ctrler.nextBlockCtx.AdjustMaxGasPerTrx(
+		ctrler.govCtrler.MinTrxGas(),
+		ctrler.govCtrler.MaxTrxGas())
+	ctrler.logger.Debug("BeatozApp::Commit",
+		"height", ver0,
+		"txs", ctrler.nextBlockCtx.TxsCnt(),
+		"appHash", ctrler.nextBlockCtx.AppHash(),
+		"adjustedMaxGasPerTrx", ctrler.nextBlockCtx.MaxGasPerTrx())
 
 	ctrler.metaDB.PutLastBlockContext(ctrler.nextBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)

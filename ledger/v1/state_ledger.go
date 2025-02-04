@@ -33,7 +33,6 @@ func NewStateLedger[T ILedgerItem](name, dbDir string, cacheSize int, newItem fu
 		imitableLedger: _imitableLedger,
 		logger:         lg.With("ledger", "StateLedger"),
 	}, nil
-	return nil, nil
 }
 
 func (ledger *StateLedger[T]) getLedger(exec bool) IImitable {
@@ -41,7 +40,6 @@ func (ledger *StateLedger[T]) getLedger(exec bool) IImitable {
 		return ledger.commitLedger
 	}
 	return ledger.imitableLedger
-	return nil
 }
 
 func (ledger *StateLedger[T]) Version() int64 {

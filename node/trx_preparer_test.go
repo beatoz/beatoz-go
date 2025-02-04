@@ -55,3 +55,21 @@ func Benchmark_sequentialTrxContext(b *testing.B) {
 		}
 	}
 }
+
+func TestNilResult(t *testing.T) {
+	for n := 0; n < 100; n++ {
+		for _, req := range txReqs {
+			txPreparer.Add(req, func(*abcitypes.RequestDeliverTx, int) (*types.TrxContext, *abcitypes.ResponseDeliverTx) {
+				return &types.TrxContext{}, nil
+			})
+		}
+		txPreparer.Wait()
+
+		require.Equal(t, len(txReqs), txPreparer.resultCount())
+		for idx, ret := range txPreparer.resultList() {
+			require.NotNil(t, ret, "result is nil", "n", n, "idx", idx)
+		}
+
+		txPreparer.reset()
+	}
+}

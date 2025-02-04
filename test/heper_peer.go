@@ -148,7 +148,7 @@ func runPeers(n int) {
 		//  // print debug logs only on the first peer.
 		//	ll = "beatoz_AcctCtrler:debug,beatoz_EVMCtrler:debug,*:error"
 		//}
-		_peer := NewPeerMock("beatoz_test_chain", strconv.FormatInt(int64(i), 10), 26656+i, 36657+i, ll)
+		_peer := NewPeerMock("beatoz_test_chain", strconv.FormatInt(int64(i), 10), 46656+i, 36657+i, ll)
 		if err := _peer.Init(); err != nil {
 			panic(err)
 		}
@@ -166,7 +166,7 @@ func runPeers(n int) {
 			panic(err)
 		}
 
-		fmt.Printf("peer_%d: %s\n", i, _peer.Config.RootDir)
+		fmt.Printf("peer_%d: p2p(%s) root(%s)\n", i, _peer.Config.P2P.ListenAddress, _peer.Config.RootDir)
 		peers = append(peers, _peer)
 
 		time.Sleep(time.Second)

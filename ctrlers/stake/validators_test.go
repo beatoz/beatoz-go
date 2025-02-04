@@ -45,7 +45,7 @@ func testValidatorUpdates(t *testing.T, delegateeCnt, maxValCnt int) {
 
 	//
 	// select validator set when previous validator set is nil
-	n := libs.MIN(maxValCnt, len(allDelegatees))
+	n := libs.MinInt(maxValCnt, len(allDelegatees))
 	newVals1 := selectValidators(PowerOrderDelegatees(allDelegatees), n)
 	require.NotNil(t, newVals1)
 
@@ -112,7 +112,7 @@ func testValidatorUpdates(t *testing.T, delegateeCnt, maxValCnt int) {
 	}
 
 	// select validator set
-	n = libs.MIN(maxValCnt, len(allDelegatees))
+	n = libs.MinInt(maxValCnt, len(allDelegatees))
 	newVals2 := selectValidators(PowerOrderDelegatees(allDelegatees), n)
 	require.NotNil(t, newVals2, "validator count", n, "allDelegatees", allDelegatees)
 

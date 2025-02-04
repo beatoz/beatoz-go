@@ -79,6 +79,11 @@ func (prop *GovProposal) DoVote(addr types.Address, choice int32) xerrors.XError
 		return xerrors.NewOrdinary("not found voter")
 	}
 
+	if voter.Choice == choice {
+		// same option is already selected.
+		return nil
+	}
+
 	prop.cancelVote(voter)
 	prop.doVote(voter, choice)
 
