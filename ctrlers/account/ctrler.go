@@ -104,7 +104,7 @@ func (ctrler *AcctCtrler) EndBlock(ctx *btztypes.BlockContext) ([]abcitypes.Even
 	defer ctrler.mtx.Unlock()
 
 	header := ctx.BlockInfo().Header
-	if header.GetProposerAddress() != nil && ctx.SumFee().Sign() > 0 {
+	if header.GetProposerAddress() != nil && ctx.GasUsed() <= ctx.BlockGasLimit() {
 		//
 		// give fee to block proposer
 		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,
@@ -113,7 +113,7 @@ func (ctrler *AcctCtrler) EndBlock(ctx *btztypes.BlockContext) ([]abcitypes.Even
 		if acct == nil {
 			acct = btztypes.NewAccount(header.GetProposerAddress())
 		}
-		xerr := acct.AddBalance(ctx.SumFee())
+		xerr := acct.AddBalance(btztypes.GasToFee(ctx.GasUsed(), ctx.GovHandler.GasPrice()))
 		if xerr != nil {
 			return nil, xerr
 		}

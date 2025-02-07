@@ -4,18 +4,21 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"github.com/holiman/uint256"
+	ethcore "github.com/ethereum/go-ethereum/core"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"sync"
 	"time"
 )
 
 type BlockContext struct {
-	blockInfo    abcitypes.RequestBeginBlock
-	feeSum       *uint256.Int
-	txsCnt       int
-	maxGasPerTrx uint64
-	appHash      bytes.HexBytes
+	blockInfo abcitypes.RequestBeginBlock
+	appHash   bytes.HexBytes
+
+	txsCnt        int
+	txGasLimit    uint64
+	blockGasLimit uint64
+	blockGasUsed  uint64
+	blockGasPool  *ethcore.GasPool
 
 	GovHandler   IGovHandler
 	AcctHandler  IAccountHandler
@@ -28,14 +31,17 @@ type BlockContext struct {
 
 func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
 	return &BlockContext{
-		blockInfo:    bi,
-		feeSum:       uint256.NewInt(0),
-		txsCnt:       0,
-		appHash:      nil,
-		GovHandler:   g,
-		AcctHandler:  a,
-		StakeHandler: s,
-		ValUpdates:   nil,
+		blockInfo:     bi,
+		appHash:       nil,
+		txsCnt:        0,
+		txGasLimit:    0,
+		blockGasLimit: g.MaxBlockGas(),
+		blockGasUsed:  0,
+		blockGasPool:  new(ethcore.GasPool).AddGas(g.MaxBlockGas()),
+		GovHandler:    g,
+		AcctHandler:   a,
+		StakeHandler:  s,
+		ValUpdates:    nil,
 	}
 }
 
@@ -106,20 +112,6 @@ func (bctx *BlockContext) ExpectedNextBlockTimeSeconds(interval time.Duration) i
 	return bctx.blockInfo.Header.GetTime().Unix() + secs
 }
 
-func (bctx *BlockContext) SumFee() *uint256.Int {
-	bctx.mtx.RLock()
-	defer bctx.mtx.RUnlock()
-
-	return bctx.feeSum.Clone()
-}
-
-func (bctx *BlockContext) AddFee(fee *uint256.Int) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	_ = bctx.feeSum.Add(bctx.feeSum, fee)
-}
-
 func (bctx *BlockContext) TxsCnt() int {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
@@ -132,6 +124,27 @@ func (bctx *BlockContext) AddTxsCnt(d int) {
 	defer bctx.mtx.Unlock()
 
 	bctx.txsCnt += d
+}
+
+func (bctx *BlockContext) AddGasUsed(gas uint64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockGasUsed += gas
+}
+
+func (bctx *BlockContext) GasUsed() uint64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return bctx.blockGasUsed
+}
+
+func (bctx *BlockContext) BlockGasLimit() uint64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return bctx.blockGasLimit
 }
 
 func (bctx *BlockContext) GetValUpdates() abcitypes.ValidatorUpdates {
@@ -148,20 +161,20 @@ func (bctx *BlockContext) SetValUpdates(valUps abcitypes.ValidatorUpdates) {
 	bctx.ValUpdates = valUps
 }
 
-func (bctx *BlockContext) AdjustMaxGasPerTrx(minCap, maxCap uint64) {
+func (bctx *BlockContext) AdujstTrxGasLimit(minCap, maxCap uint64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
 	// Hyperbolic Function is applied.
 	// `newMaxGas = (maxCap - minCap) / (1 + TxCount) + minCap`
-	bctx.maxGasPerTrx = (maxCap-minCap)/uint64(1+bctx.txsCnt) + minCap
+	bctx.txGasLimit = (maxCap-minCap)/uint64(1+bctx.txsCnt) + minCap
 }
 
-func (bctx *BlockContext) MaxGasPerTrx() uint64 {
+func (bctx *BlockContext) ExpectedTrxGasLimit() uint64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
-	return bctx.maxGasPerTrx
+	return bctx.txGasLimit
 }
 
 func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
@@ -169,17 +182,19 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 	defer bctx.mtx.RUnlock()
 
 	_bctx := &struct {
-		BlockInfo    abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum       *uint256.Int                `json:"feeSum"`
-		TxsCnt       int                         `json:"txsCnt"`
-		MaxGasPerTrx uint64                      `json:"maxGasPerTrx"`
-		AppHash      []byte                      `json:"appHash"`
+		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
+		AppHash       []byte                      `json:"appHash"`
+		TxsCnt        int                         `json:"txsCnt"`
+		TxGasLimit    uint64                      `json:"txGasLimit"`
+		BlockGasLimit uint64                      `json:"blockGasLimit"`
+		BlockGasUsed  uint64                      `json:"blockGasUsed"`
 	}{
-		BlockInfo:    bctx.blockInfo,
-		GasSum:       bctx.feeSum,
-		TxsCnt:       bctx.txsCnt,
-		MaxGasPerTrx: bctx.maxGasPerTrx,
-		AppHash:      bctx.appHash,
+		BlockInfo:     bctx.blockInfo,
+		AppHash:       bctx.appHash,
+		TxsCnt:        bctx.txsCnt,
+		TxGasLimit:    bctx.txGasLimit,
+		BlockGasLimit: bctx.blockGasLimit,
+		BlockGasUsed:  bctx.blockGasUsed,
 	}
 
 	return json.Marshal(_bctx)
@@ -190,21 +205,23 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	defer bctx.mtx.Unlock()
 
 	_bctx := &struct {
-		BlockInfo    abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum       *uint256.Int                `json:"feeSum"`
-		TxsCnt       int                         `json:"txsCnt"`
-		MaxGasPerTrx uint64                      `json:"maxGasPerTrx"`
-		AppHash      []byte                      `json:"appHash"`
+		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
+		AppHash       []byte                      `json:"appHash"`
+		TxsCnt        int                         `json:"txsCnt"`
+		TxGasLimit    uint64                      `json:"txGasLimit"`
+		BlockGasLimit uint64                      `json:"blockGasLimit"`
+		BlockGasUsed  uint64                      `json:"blockGasUsed"`
 	}{}
 
 	if err := json.Unmarshal(bz, _bctx); err != nil {
 		return err
 	}
 	bctx.blockInfo = _bctx.BlockInfo
-	bctx.feeSum = _bctx.GasSum
-	bctx.txsCnt = _bctx.TxsCnt
-	bctx.maxGasPerTrx = _bctx.MaxGasPerTrx
 	bctx.appHash = _bctx.AppHash
+	bctx.txsCnt = _bctx.TxsCnt
+	bctx.txGasLimit = _bctx.TxGasLimit
+	bctx.blockGasLimit = _bctx.BlockGasLimit
+	bctx.blockGasUsed = _bctx.BlockGasUsed
 	return nil
 }
 

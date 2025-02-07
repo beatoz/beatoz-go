@@ -33,7 +33,7 @@ type BeatozApp struct {
 	abcitypes.BaseApplication
 
 	lastBlockCtx *ctrlertypes.BlockContext
-	nextBlockCtx *ctrlertypes.BlockContext
+	currBlockCtx *ctrlertypes.BlockContext
 
 	metaDB      *ctrlertypes.MetaDB
 	acctCtrler  *account.AcctCtrler
@@ -237,7 +237,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-				_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
+				_txctx.MaxGas = ctrler.lastBlockCtx.ExpectedTrxGasLimit()
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -355,19 +355,19 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.nextBlockCtx = ctrlertypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.currBlockCtx = ctrlertypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
 
-	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.nextBlockCtx)
+	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
-	ev1, xerr := ctrler.stakeCtrler.BeginBlock(ctrler.nextBlockCtx)
+	ev1, xerr := ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
-	ev2, xerr := ctrler.vmCtrler.BeginBlock(ctrler.nextBlockCtx)
+	ev2, xerr := ctrler.vmCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
@@ -381,14 +381,14 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.nextBlockCtx.Height(),
-		ctrler.nextBlockCtx.TimeSeconds(),
+		ctrler.currBlockCtx.Height(),
+		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = ctrler.nextBlockCtx.TxsCnt()
-			ctrler.nextBlockCtx.AddTxsCnt(1)
+			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
+			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
+			_txctx.MaxGas = ctrler.lastBlockCtx.ExpectedTrxGasLimit()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -446,7 +446,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 	} else {
 
-		ctrler.nextBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddGasUsed(txctx.GasUsed)
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -481,16 +481,16 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 // asyncPrepareTrxContext is called in TrxPreparer
 func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.nextBlockCtx.Height(),
-		ctrler.nextBlockCtx.TimeSeconds(),
+		ctrler.currBlockCtx.Height(),
+		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			// `idx` may be not equal to `ctrler.nextBlockCtx.TxsCnt()`
+			// `idx` may be not equal to `ctrler.currBlockCtx.TxsCnt()`
 			// because the order of calling `asyncPrepareTrxContext` is not sequential.
 			_txctx.TxIdx = idx
-			ctrler.nextBlockCtx.AddTxsCnt(1)
+			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
+			_txctx.MaxGas = ctrler.lastBlockCtx.ExpectedTrxGasLimit()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -539,7 +539,7 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 		}
 	} else {
 
-		ctrler.nextBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddGasUsed(txctx.GasUsed)
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -575,22 +575,22 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 			"height", req.Height)
 	}()
 
-	ev0, xerr := ctrler.govCtrler.EndBlock(ctrler.nextBlockCtx)
+	ev0, xerr := ctrler.govCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
-	ev1, xerr := ctrler.acctCtrler.EndBlock(ctrler.nextBlockCtx)
+	ev1, xerr := ctrler.acctCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
-	ev2, xerr := ctrler.stakeCtrler.EndBlock(ctrler.nextBlockCtx)
+	ev2, xerr := ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
-	ev3, xerr := ctrler.vmCtrler.EndBlock(ctrler.nextBlockCtx)
+	ev3, xerr := ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
@@ -603,7 +603,7 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	ev = append(ev, ev3...)
 
 	return abcitypes.ResponseEndBlock{
-		ValidatorUpdates: ctrler.nextBlockCtx.ValUpdates,
+		ValidatorUpdates: ctrler.currBlockCtx.ValUpdates,
 		Events:           ev,
 	}
 }
@@ -612,7 +612,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.nextBlockCtx.Height())
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.Height())
 
 	appHash0, ver0, err := ctrler.govCtrler.Commit()
 	if err != nil {
@@ -643,21 +643,21 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	}
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
-	ctrler.nextBlockCtx.SetAppHash(appHash)
-	ctrler.nextBlockCtx.AdjustMaxGasPerTrx(
+	ctrler.currBlockCtx.SetAppHash(appHash)
+	ctrler.currBlockCtx.AdujstTrxGasLimit(
 		ctrler.govCtrler.MinTrxGas(),
 		ctrler.govCtrler.MaxTrxGas())
 	ctrler.logger.Debug("BeatozApp::Commit",
 		"height", ver0,
-		"txs", ctrler.nextBlockCtx.TxsCnt(),
-		"appHash", ctrler.nextBlockCtx.AppHash(),
-		"adjustedMaxGasPerTrx", ctrler.nextBlockCtx.MaxGasPerTrx())
+		"txs", ctrler.currBlockCtx.TxsCnt(),
+		"appHash", ctrler.currBlockCtx.AppHash(),
+		"adjustedMaxGasPerTrx", ctrler.currBlockCtx.ExpectedTrxGasLimit())
 
-	ctrler.metaDB.PutLastBlockContext(ctrler.nextBlockCtx)
+	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)
 
-	ctrler.lastBlockCtx = ctrler.nextBlockCtx
-	ctrler.nextBlockCtx = nil
+	ctrler.lastBlockCtx = ctrler.currBlockCtx
+	ctrler.currBlockCtx = nil
 
 	return abcitypes.ResponseCommit{
 		Data: appHash[:],

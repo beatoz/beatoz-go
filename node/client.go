@@ -347,7 +347,7 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 	client.txPreparer.Wait()
 
 	// for debugging
-	if client.txPreparer.resultCount() != client.Application.(*BeatozApp).nextBlockCtx.TxsCnt() {
+	if client.txPreparer.resultCount() != client.Application.(*BeatozApp).currBlockCtx.TxsCnt() {
 		panic(fmt.Sprintf("error: len(client.deliverTxReqs) != txs count in block"))
 	}
 
