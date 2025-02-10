@@ -84,10 +84,10 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
-func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *GovCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	var evts []abcitypes.Event
 
-	byzantines := blockCtx.BlockInfo().ByzantineValidators
+	byzantines := bctx.ByzantineValidators
 	if byzantines != nil && len(byzantines) > 0 {
 		ctrler.logger.Info("GovCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
@@ -304,18 +304,18 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *GovCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	var evts []abcitypes.Event
 
-	frozen, removed, xerr := ctrler.freezeProposals(ctx.Height())
+	frozen, removed, xerr := ctrler.freezeProposals(bctx.GetHeight())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	applied, xerr := ctrler.applyProposals(ctx.Height())
+	applied, xerr := ctrler.applyProposals(bctx.GetHeight())
 	if xerr != nil {
 		return nil, xerr
 	}

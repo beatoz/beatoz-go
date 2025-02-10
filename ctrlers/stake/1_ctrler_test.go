@@ -441,7 +441,7 @@ func genesisStaking(t *testing.T, cnt int) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.GetHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"
@@ -457,7 +457,7 @@ func genesisStaking(t *testing.T, cnt int) {
 	//_, xerr = stakeCtrler01.EndBlock(bctx)
 	//require.NoError(t, xerr)
 	//_, h, xerr := stakeCtrler01.Commit()
-	//require.Equal(t, bctx.Height(), h)
+	//require.Equal(t, bctx.GetHeight(), h)
 	//require.NoError(t, xerr)
 	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
 
@@ -475,7 +475,7 @@ func genesisStaking(t *testing.T, cnt int) {
 
 	//_, _ = stakeCtrler01.EndBlock(bctx) // at here, stakeCtrler01.lastValidators is set.
 	//_, h, _ = stakeCtrler01.Commit()
-	//require.Equal(t, bctx.Height(), h)
+	//require.Equal(t, bctx.GetHeight(), h)
 	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
 
 	vals, tp := stakeCtrler01.Validators()

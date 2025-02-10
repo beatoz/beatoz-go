@@ -97,15 +97,15 @@ func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
-func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.lastBlockHeight+1 != ctx.Height() {
-		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, ctx.Height())
+	if ctrler.lastBlockHeight+1 != bctx.GetHeight() {
+		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, bctx.GetHeight())
 	}
 
-	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, ctx.AcctHandler, ctrler.logger)
+	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, bctx.AcctHandler, ctrler.logger)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
@@ -113,8 +113,8 @@ func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 	ctrler.stateDBWrapper = stdb
 	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(blockGasLimit)
 
-	beneficiary := bytes.HexBytes(ctx.BlockInfo().Header.ProposerAddress).Array20()
-	blockContext := evmBlockContext(beneficiary, ctx.Height(), ctx.TimeSeconds())
+	beneficiary := bctx.ProposerAddress.Array20()
+	blockContext := evmBlockContext(beneficiary, bctx.GetHeight(), bctx.TimeSeconds())
 	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{}, ctrler.stateDBWrapper, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
 
 	return nil, nil
@@ -352,7 +352,7 @@ func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 	return evts
 }
 
-func (ctrler *EVMCtrler) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *EVMCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	return nil, nil
 }
 

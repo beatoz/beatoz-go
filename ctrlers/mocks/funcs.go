@@ -29,7 +29,7 @@ func NextBlockCtx() *ctrlertypes.BlockContext {
 	if lastBlockCtx == nil {
 		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
 	}
-	lastBlockCtx = InitBlockCtxWith(lastBlockCtx.Height()+1, lastBlockCtx.AcctHandler, lastBlockCtx.GovHandler, lastBlockCtx.StakeHandler)
+	lastBlockCtx = InitBlockCtxWith(lastBlockCtx.GetHeight()+1, lastBlockCtx.AcctHandler, lastBlockCtx.GovHandler, lastBlockCtx.StakeHandler)
 	return lastBlockCtx
 }
 
@@ -37,7 +37,7 @@ func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
 	if lastBlockCtx == nil {
 		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
 	}
-	lastBlockCtx = InitBlockCtxWith(bctx.Height()+1, bctx.AcctHandler, bctx.GovHandler, bctx.StakeHandler)
+	lastBlockCtx = InitBlockCtxWith(bctx.GetHeight()+1, bctx.AcctHandler, bctx.GovHandler, bctx.StakeHandler)
 	return lastBlockCtx
 }
 
@@ -49,18 +49,18 @@ func LastBlockHeight() int64 {
 	if lastBlockCtx == nil {
 		return 0
 	}
-	return lastBlockCtx.Height()
+	return lastBlockCtx.GetHeight()
 }
 
 func DoBeginBlock(ctrler ctrlertypes.IBlockHandler) error {
 	bctx := LastBlockCtx() //mocks.NextBlockCtx()
-	//fmt.Println("DoBeginBlock for", bctx.Height())
+	//fmt.Println("DoBeginBlock for", bctx.GetHeight())
 	_, err := ctrler.BeginBlock(bctx)
 	return err
 }
 func DoEndBlock(ctrler ctrlertypes.IBlockHandler) error {
 	bctx := LastBlockCtx()
-	//fmt.Println("DoEndBlock for", bctx.Height())
+	//fmt.Println("DoEndBlock for", bctx.GetHeight())
 	if _, err := ctrler.EndBlock(bctx); err != nil {
 		return err
 	}

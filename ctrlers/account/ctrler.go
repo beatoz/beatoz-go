@@ -94,26 +94,25 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *btztypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) BeginBlock(ctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *AcctCtrler) BeginBlock(bctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	// do nothing
 	return nil, nil
 }
 
-func (ctrler *AcctCtrler) EndBlock(ctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	header := ctx.BlockInfo().Header
-	if header.GetProposerAddress() != nil && ctx.GasUsed() <= ctx.BlockGasLimit() {
+	if bctx.ProposerAddress != nil && bctx.GasUsed() <= bctx.BlockGasLimit() {
 		//
 		// give fee to block proposer
 		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,
 		// the validator's account may not exist yet not in ledger.
-		acct := ctrler.findAccount(header.GetProposerAddress(), true)
+		acct := ctrler.findAccount(bctx.ProposerAddress, true)
 		if acct == nil {
-			acct = btztypes.NewAccount(header.GetProposerAddress())
+			acct = btztypes.NewAccount(bctx.ProposerAddress)
 		}
-		xerr := acct.AddBalance(btztypes.GasToFee(ctx.GasUsed(), ctx.GovHandler.GasPrice()))
+		xerr := acct.AddBalance(btztypes.GasToFee(bctx.GasUsed(), bctx.GovHandler.GasPrice()))
 		if xerr != nil {
 			return nil, xerr
 		}

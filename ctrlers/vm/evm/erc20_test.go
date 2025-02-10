@@ -136,7 +136,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
-	ret, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
+	ret, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx.GetHeight(), time.Now().Unix(),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -204,7 +204,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 	require.NoError(t, xerr)
 
 	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.Height(),
+		Height:      bctx.GetHeight(),
 		BlockTime:   time.Now().Unix(),
 		TxHash:      bytes2.RandBytes(32),
 		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),

@@ -114,13 +114,13 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 // BeginBlock are called in BeatozApp::BeginBlock
-func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *StakeCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	//
 	// Begin of code from EndBlock
 	//
 	ctrler.allDelegatees = nil
 	// NOTE:
-	// Iterate() returns delegatees, which are committed at previous block(which height is `blockCtx.Height() - 1`).
+	// Iterate() returns delegatees, which are committed at previous block(which height is `bctx.GetHeight() - 1`).
 	// (At `BeginBlock()`, the transactions in the current block is not applied to ledger yet.)
 	// So, if the staking tx(including TrxPayloadStaking) is executed and the stake is saved(committed) at block height `N`,
 	//     the updated validators is notified to the consensus engine via EndBlock() at block height `N+1`,
@@ -153,12 +153,12 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	var evts []abcitypes.Event
 
 	// Slashing
-	byzantines := blockCtx.BlockInfo().ByzantineValidators
+	byzantines := bctx.ByzantineValidators
 	if byzantines != nil && len(byzantines) > 0 {
 		ctrler.logger.Info("StakeCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(
-				&evi, blockCtx.GovHandler.SlashRatio()); xerr != nil {
+				&evi, bctx.GovHandler.SlashRatio()); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
@@ -179,7 +179,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//
 	// Reward and Check MinSignedBlocks
 	//
-	if len(blockCtx.BlockInfo().LastCommitInfo.Votes) <= 0 {
+	if len(bctx.LastCommitInfo.Votes) <= 0 {
 		return nil, nil
 	}
 
@@ -191,7 +191,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//   (N+1)+3 : the updated validators are included into `lastVotes`.
 	//           : At this point, the validators have their power committed at block N(`curr_height` - 4).
 	issuedReward := uint256.NewInt(0)
-	heightOfPower := blockCtx.Height() - 4
+	heightOfPower := bctx.GetHeight() - 4
 	if heightOfPower <= 0 {
 		heightOfPower = 1
 	}
@@ -204,7 +204,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		return nil, xerr
 	}
 
-	for _, vote := range blockCtx.BlockInfo().LastCommitInfo.Votes {
+	for _, vote := range bctx.LastCommitInfo.Votes {
 		if vote.SignedLastBlock {
 			// Reward
 			item, xerr := immuDelegateeLedger.Get(vote.Validator.Address)
@@ -213,7 +213,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 					"error", xerr,
 					"address", types.Address(vote.Validator.Address),
 					"power", vote.Validator.Power,
-					"target height", heightOfPower, "current height", blockCtx.Height())
+					"target height", heightOfPower, "current height", bctx.GetHeight())
 				continue
 			}
 			delegatee := item.(*Delegatee)
@@ -222,11 +222,11 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 				continue
 			}
 
-			issued, _ := ctrler.doRewardTo(delegatee, blockCtx.Height())
+			issued, _ := ctrler.doRewardTo(delegatee, bctx.GetHeight())
 			_ = issuedReward.Add(issuedReward, issued)
 		} else {
 			// check MinSignedBlocks
-			signedHeight := blockCtx.Height() - 1
+			signedHeight := bctx.GetHeight() - 1
 			delegatee, xerr := ctrler.delegateeLedger.Get(vote.Validator.Address, true)
 			if xerr != nil {
 				// it's possible that a `delegatee` is not found.
@@ -236,7 +236,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 					"error", xerr,
 					"address", types.Address(vote.Validator.Address),
 					"power", vote.Validator.Power,
-					"target height", heightOfPower, "current height", blockCtx.Height())
+					"target height", heightOfPower, "current height", bctx.GetHeight())
 				continue
 			}
 
@@ -262,7 +262,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 
 				stakes := delegatee.DelAllStakes()
 				for _, _s0 := range stakes {
-					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyUnstakingBlocks()
+					_s0.RefundHeight = bctx.GetHeight() + ctrler.govParams.LazyUnstakingBlocks()
 					_ = ctrler.frozenLedger.Set(_s0, true) // add s0 to frozen ledger
 				}
 				_ = ctrler.delegateeLedger.Del(delegatee.Key(), true)
@@ -682,15 +682,15 @@ func (ctrler *StakeCtrler) exeWithdraw(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	return nil
 }
 
-func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *StakeCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if xerr := ctrler.unfreezingStakes(ctx.Height(), ctx.AcctHandler); xerr != nil {
+	if xerr := ctrler.unfreezingStakes(bctx.GetHeight(), bctx.AcctHandler); xerr != nil {
 		return nil, xerr
 	}
 
-	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHandler.MaxValidatorCnt())))
+	bctx.SetValUpdates(ctrler.updateValidators(int(bctx.GovHandler.MaxValidatorCnt())))
 
 	return nil, nil
 }

@@ -124,7 +124,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	var lastHeight int64
 	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
 	if ctrler.lastBlockCtx != nil {
-		lastHeight = ctrler.lastBlockCtx.Height()
+		lastHeight = ctrler.lastBlockCtx.GetHeight()
 		appHash = ctrler.lastBlockCtx.AppHash()
 	}
 
@@ -216,7 +216,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
 		txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-			ctrler.lastBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
+			ctrler.lastBlockCtx.GetHeight()+int64(1),                                                                // issue #39: set block number expected to include current tx.
 			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -329,7 +329,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	lastHeight := int64(0)
 	if ctrler.lastBlockCtx != nil {
-		lastHeight = ctrler.lastBlockCtx.Height()
+		lastHeight = ctrler.lastBlockCtx.GetHeight()
 	}
 	if req.Header.Height != lastHeight+1 {
 		panic(fmt.Errorf("error block height: expected(%v), actual(%v)", lastHeight+1, req.Header.Height))
@@ -368,7 +368,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.Height(),
+		ctrler.currBlockCtx.GetHeight(),
 		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -468,7 +468,7 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 // asyncPrepareTrxContext is called in TrxPreparer
 func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.Height(),
+		ctrler.currBlockCtx.GetHeight(),
 		ctrler.currBlockCtx.TimeSeconds(),
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -599,7 +599,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.Height())
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.GetHeight())
 
 	appHash0, ver0, err := ctrler.govCtrler.Commit()
 	if err != nil {
@@ -625,7 +625,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	}
 	ctrler.logger.Debug("BeatozApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
 
-	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 || ver3 != ctrler.currBlockCtx.Height() {
+	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 || ver3 != ctrler.currBlockCtx.GetHeight() {
 		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v, vm:%v", ver0, ver1, ver2, ver3))
 	}
 

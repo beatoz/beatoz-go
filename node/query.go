@@ -11,7 +11,7 @@ import (
 func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
 	if req.Height == 0 {
 		// last block height
-		req.Height = ctrler.lastBlockCtx.Height()
+		req.Height = ctrler.lastBlockCtx.GetHeight()
 	}
 
 	response := abcitypes.ResponseQuery{

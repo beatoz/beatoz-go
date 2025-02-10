@@ -51,13 +51,13 @@ func Test_Fallback(t *testing.T) {
 	to := types.ZeroAddress()
 
 	// BeginBlock
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, nil, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
 	_, xerr := fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
 	// Execute the tx to deploy contract
 	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.Height(),
+		Height:      bctx.GetHeight(),
 		BlockTime:   time.Now().Unix(),
 		TxHash:      bytes2.RandBytes(32),
 		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bytes2.HexBytes(buildInfoFallbackContract.Bytecode)),
@@ -89,7 +89,7 @@ func Test_Fallback(t *testing.T) {
 
 	//
 	// transfer to contract
-	bctx.SetHeight(bctx.Height() + 1)
+	bctx.SetHeight(bctx.GetHeight() + 1)
 	_, xerr = fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -102,7 +102,7 @@ func Test_Fallback(t *testing.T) {
 	//fmt.Println("sender", originBalance0.Dec(), "address", originBalance1.Dec())
 
 	txctx = &ctrlertypes.TrxContext{
-		Height:      bctx.Height(),
+		Height:      bctx.GetHeight(),
 		BlockTime:   time.Now().Unix(),
 		TxHash:      bytes2.RandBytes(32),
 		Tx:          web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToFons(100)),
