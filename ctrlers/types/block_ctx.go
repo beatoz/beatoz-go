@@ -126,11 +126,15 @@ func (bctx *BlockContext) AddTxsCnt(d int) {
 	bctx.txsCnt += d
 }
 
-func (bctx *BlockContext) AddGasUsed(gas uint64) {
+func (bctx *BlockContext) UseGas(gas uint64) xerrors.XError {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
+	if err := bctx.blockGasPool.SubGas(gas); err != nil {
+		return xerrors.ErrOverFlow.Wrap(err)
+	}
 	bctx.blockGasUsed += gas
+	return nil
 }
 
 func (bctx *BlockContext) GasUsed() uint64 {
