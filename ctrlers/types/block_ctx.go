@@ -161,7 +161,7 @@ func (bctx *BlockContext) SetValUpdates(valUps abcitypes.ValidatorUpdates) {
 	bctx.ValUpdates = valUps
 }
 
-func (bctx *BlockContext) AdujstTrxGasLimit(minCap, maxCap uint64) {
+func (bctx *BlockContext) AdjustTrxGasLimit(minCap, maxCap uint64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 

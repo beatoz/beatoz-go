@@ -631,7 +631,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.currBlockCtx.SetAppHash(appHash)
-	ctrler.currBlockCtx.AdujstTrxGasLimit(
+	ctrler.currBlockCtx.AdjustTrxGasLimit(
 		ctrler.govCtrler.MinTrxGas(),
 		ctrler.govCtrler.MaxTrxGas())
 	ctrler.logger.Debug("BeatozApp::Commit",
