@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/binary"
 	"github.com/tendermint/tendermint/libs/json"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"
@@ -53,28 +52,6 @@ func (stdb *MetaDB) ChainID() string {
 
 func (stdb *MetaDB) PutChainID(chainId string) error {
 	return stdb.put(keyChainID, []byte(chainId))
-}
-
-func (stdb *MetaDB) LastBlockHeight() int64 {
-	v := stdb.get(keyBlockHeight)
-	if v == nil {
-		return 0
-	}
-	return int64(binary.BigEndian.Uint64(v))
-}
-
-func (stdb *MetaDB) PutLastBlockHeight(bh int64) error {
-	v := make([]byte, 8)
-	binary.BigEndian.PutUint64(v, uint64(bh))
-	return stdb.put(keyBlockHeight, v)
-}
-
-func (stdb *MetaDB) LastBlockAppHash() []byte {
-	return stdb.get(keyBlockAppHash)
-}
-
-func (stdb *MetaDB) PutLastBlockAppHash(v []byte) error {
-	return stdb.put(keyBlockAppHash, v)
 }
 
 func (stdb *MetaDB) LastRewardHash() []byte {

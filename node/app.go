@@ -18,13 +18,10 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
 	"strconv"
 	"sync"
-	"time"
 )
 
 var _ abcitypes.Application = (*BeatozApp)(nil)
@@ -126,26 +123,12 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	var appHash bytes.HexBytes
 	var lastHeight int64
 	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
-	if ctrler.lastBlockCtx == nil {
-		// to ensure backward compatibility
-		lastHeight = ctrler.metaDB.LastBlockHeight()
-		appHash = ctrler.metaDB.LastBlockAppHash()
-
-		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
-			abcitypes.RequestBeginBlock{
-				Header: tmproto.Header{
-					Height: lastHeight,
-					Time:   tmtime.Canonical(time.Now()),
-				},
-			},
-			nil, nil, nil)
-		ctrler.lastBlockCtx.SetAppHash(appHash)
-	} else {
+	if ctrler.lastBlockCtx != nil {
 		lastHeight = ctrler.lastBlockCtx.Height()
 		appHash = ctrler.lastBlockCtx.AppHash()
-
-		ctrler.logger.Debug("Info", "height", lastHeight, "appHash", appHash)
 	}
+
+	ctrler.logger.Debug("Info", "height", lastHeight, "appHash", appHash)
 
 	// get chain_id
 	ctrler.rootConfig.ChainID = ctrler.metaDB.ChainID()
@@ -344,8 +327,12 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 }
 
 func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	if req.Header.Height != ctrler.lastBlockCtx.Height()+1 {
-		panic(fmt.Errorf("error block height: expected(%v), actual(%v)", ctrler.lastBlockCtx.Height()+1, req.Header.Height))
+	lastHeight := int64(0)
+	if ctrler.lastBlockCtx != nil {
+		lastHeight = ctrler.lastBlockCtx.Height()
+	}
+	if req.Header.Height != lastHeight+1 {
+		panic(fmt.Errorf("error block height: expected(%v), actual(%v)", lastHeight+1, req.Header.Height))
 	}
 	ctrler.logger.Debug("BeatozApp::BeginBlock",
 		"height", req.Header.Height,
@@ -638,7 +625,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	}
 	ctrler.logger.Debug("BeatozApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
 
-	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 {
+	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 || ver3 != ctrler.currBlockCtx.Height() {
 		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v, vm:%v", ver0, ver1, ver2, ver3))
 	}
 
@@ -654,7 +641,6 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 		"adjustedMaxGasPerTrx", ctrler.currBlockCtx.ExpectedTrxGasLimit())
 
 	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
-	ctrler.metaDB.PutLastBlockHeight(ver0)
 
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
