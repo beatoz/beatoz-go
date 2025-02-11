@@ -42,17 +42,8 @@ func Test_commonValidation(t *testing.T) {
 func newTrxCtx(bztx []byte, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
 	return ctrlertypes.NewTrxContext(
 		bztx,
-		&ctrlertypes.BlockContext{
-			Height: height,
-			Time:   time.Now(),
-		},
-		true,
-		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.GovHandler = govParams
-			_txctx.AcctHandler = &acctHandlerMock{}
-			_txctx.ChainID = chainId
-			return nil
-		})
+		ctrlertypes.NewBlockContextAs(height, time.Now(), chainId, govParams, &acctHandlerMock{}, nil),
+		true)
 }
 
 type acctHandlerMock struct{}

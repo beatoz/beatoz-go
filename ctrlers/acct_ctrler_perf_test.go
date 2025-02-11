@@ -68,76 +68,6 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 	return _ctrler, bcfg, _txs
 }
 
-//func Test_AcctCtrler_ASync_ByChannel(t *testing.T) {
-//	acctCtrler, bcfg, txs := prepare()
-//
-//	var txctxs []*types.TrxContext
-//
-//	for i, txbz := range txs {
-//		if i >= 20000 {
-//			break
-//		}
-//		txctx := _makeTrxCtx(txbz, func(_txctx *types.TrxContext) xerrors.XError {
-//			_txctx.ChainID = bcfg.ChainID
-//			_txctx.GovHandler = govParams
-//			_txctx.AcctHandler = acctCtrler
-//			return nil
-//		})
-//		txctxs = append(txctxs, txctx)
-//	}
-//
-//	for i := 0; i < 4; i++ {
-//		for j := 0; j < len(txctxs); j++ {
-//			require.NoError(t, acctCtrler.ValidateTrx(txctxs[j]))
-//			require.NoError(t, acctCtrler.ExecuteTrx(txctxs[j]))
-//		}
-//		_, _, xerr := acctCtrler.Commit()
-//		require.NoError(t, xerr)
-//	}
-//	require.NoError(t, acctCtrler.Close())
-//}
-
-//func Test_AcctCtrler_ASync(t *testing.T) {
-//	acctCtrler, bcfg, txs := prepare()
-//
-//	for i := 0; i < 4; i++ {
-//		var txctxs []*types.TrxContext
-//		wg := &sync.WaitGroup{}
-//		mtx := &sync.Mutex{}
-//
-//		s0 := time.Now()
-//		for j := 0; j < mempoolSize; j++ {
-//			wg.Add(1)
-//			go func(idx int) {
-//				defer wg.Done()
-//
-//				txbz := txs[idx%len(txs)]
-//				txctx := _makeTrxCtx(txbz, func(_txctx *types.TrxContext) xerrors.XError {
-//					_txctx.ChainID = bcfg.ChainID
-//					_txctx.GovHandler = govParams
-//					_txctx.AcctHandler = acctCtrler
-//					return nil
-//				})
-//
-//				mtx.Lock()
-//				txctxs = append(txctxs, txctx)
-//				mtx.Unlock()
-//			}(j)
-//		}
-//		wg.Wait()
-//		s1 := time.Now()
-//
-//		for j := 0; j < len(txctxs); j++ {
-//			require.NoError(t, acctCtrler.ValidateTrx(txctxs[j]))
-//			require.NoError(t, acctCtrler.ExecuteTrx(txctxs[j]))
-//		}
-//		_, _, xerr := acctCtrler.Commit()
-//		require.NoError(t, xerr)
-//	}
-//
-//	require.NoError(t, acctCtrler.Close())
-//}
-
 func Benchmark_AcctCtrler_ASync_ByChannel(b *testing.B) {
 	acctCtrler, bcfg, txs := prepare()
 
@@ -251,17 +181,12 @@ func Benchmark_AcctCtrler_Sync(b *testing.B) {
 		for j := 0; j < mempoolSize; j++ {
 			txbz := txs[rand.Intn(len(txs))]
 			txctx, xerr := types.NewTrxContext(txbz,
-				&types.BlockContext{
-					Height: rand.Int63(),
-					Time:   time.Now(),
-				}, // issue #39: set block time expected to be executed.
-				true,
-				func(_txctx *types.TrxContext) xerrors.XError {
-					_txctx.ChainID = bcfg.ChainID
-					_txctx.GovHandler = govParams
-					_txctx.AcctHandler = acctCtrler
-					return nil
-				})
+				types.NewBlockContextAs(
+					rand.Int63(),
+					time.Now(),
+					bcfg.ChainID,
+					govParams, acctCtrler, nil),
+				true)
 			require.NoError(b, xerr)
 			require.NoError(b, acctCtrler.ValidateTrx(txctx))
 			require.NoError(b, acctCtrler.ExecuteTrx(txctx))
@@ -303,10 +228,7 @@ func makeTrxCtxRoutineEx(chIn chan int, txs [][]byte, cb0, cb1 func(ctx *types.T
 
 func _makeTrxCtx(txbz []byte, cb func(ctx *types.TrxContext) xerrors.XError) *types.TrxContext {
 	txctx, xerr := types.NewTrxContext(txbz,
-		&types.BlockContext{
-			Height: rand.Int63(),
-			Time:   time.Now(),
-		}, // issue #39: set block time expected to be executed.
+		types.NewBlockContextAs(rand.Int63(), time.Now(), "", nil, nil, nil),
 		true,
 		cb)
 	if xerr != nil {

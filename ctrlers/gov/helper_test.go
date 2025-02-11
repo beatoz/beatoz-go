@@ -118,13 +118,7 @@ var _ ctrlertypes.IAccountHandler = (*acctHelperMock)(nil)
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 	txbz, _ := tx.Encode()
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz,
-		&ctrlertypes.BlockContext{
-			Height:       height,
-			Time:         time.Now(),
-			GovHandler:   govCtrler,
-			AcctHandler:  acctHelper,
-			StakeHandler: stakeHelper,
-		},
+		ctrlertypes.NewBlockContextAs(height, time.Now(), "", govCtrler, acctHelper, stakeHelper),
 		exec,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 			return nil

@@ -103,7 +103,7 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if bctx.ProposerAddress != nil && bctx.GasUsed() <= bctx.BlockGasLimit() {
+	if bctx.ProposerAddress != nil && bctx.GasUsed() <= bctx.GetBlockGasLimit() {
 		//
 		// give fee to block proposer
 		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,

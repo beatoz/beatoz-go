@@ -149,16 +149,10 @@ func newTrxCtx(tx *ctrlertypes.Trx, height int64, adjustMaxGas uint64) (*ctrlert
 	bz, _ := tx.Encode()
 	return ctrlertypes.NewTrxContext(
 		bz,
-		&ctrlertypes.BlockContext{
-			Height:      height,
-			Time:        time.Now(),
-			GovHandler:  govParams,
-			AcctHandler: &acctHandlerMock{},
-			ChainID:     chainId,
-		},
+		ctrlertypes.NewBlockContextAs(height, time.Now(), chainId, govParams, &acctHandlerMock{}, nil),
 		true,
-		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.BlockContext.SetTrxGasLimit(adjustMaxGas)
+		func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+			ctx.BlockContext.TxGasLimit = adjustMaxGas
 			return nil
 		})
 }

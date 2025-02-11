@@ -125,7 +125,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
 	if ctrler.lastBlockCtx != nil {
 		lastHeight = ctrler.lastBlockCtx.GetHeight()
-		appHash = ctrler.lastBlockCtx.AppHash()
+		appHash = ctrler.lastBlockCtx.GetAppHash()
 	}
 
 	ctrler.logger.Debug("Info", "height", lastHeight, "appHash", appHash)
@@ -620,7 +620,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.logger.Debug("BeatozApp::Commit",
 		"height", ver0,
 		"txs", ctrler.currBlockCtx.GetTxsCnt(),
-		"appHash", ctrler.currBlockCtx.AppHash(),
+		"appHash", ctrler.currBlockCtx.GetAppHash(),
 		"adjustedMaxGasPerTrx", ctrler.currBlockCtx.GetTrxGasLimit())
 	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
 

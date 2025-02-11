@@ -62,10 +62,7 @@ func BenchmarkNewTrxContext_ASync(b *testing.B) {
 
 func newTrxCtx(txbz []byte) xerrors.XError {
 	_, xerr := types2.NewTrxContext(txbz,
-		&types2.BlockContext{
-			Height: rand.Int63(),
-			Time:   time.Now(),
-		}, // issue #39: set block time expected to be executed.
+		types2.NewBlockContextAs(rand.Int63(), time.Now(), "test_chain_id", govParams, acctHandler, nil),
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
 			_txctx.ChainID = "test_chain_id"

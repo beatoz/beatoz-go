@@ -423,7 +423,7 @@ func genesisStaking(t *testing.T, cnt int) {
 	totalPower := int64(0)
 	// gensis staking
 
-	bctx := mocks.InitBlockCtxWith(1, acctMock01, govParams01, nil)
+	bctx := mocks.InitBlockCtxWith(1, govParams01, acctMock01, nil)
 
 	//_, xerr := stakeCtrler01.BeginBlock(bctx)
 	//require.NoError(t, xerr)

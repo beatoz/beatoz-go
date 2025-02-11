@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
+	"time"
 )
 
 var (
@@ -67,18 +68,17 @@ func TestApplyMergeProposal(t *testing.T) {
 	}
 	govCtrler.Commit()
 
-	blockContext := &ctrlertypes.BlockContext{}
 	txProposalPayload := newTrxContext.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
-	blockContext.SetHeight(txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + 1)
+	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + 1
+	blockContext := ctrlertypes.NewBlockContextAs(runHeight, time.Now(), "", nil, nil, nil)
 	govCtrler.EndBlock(blockContext)
 	govCtrler.Commit()
 
 	txProposalPayload, ok := newTrxContext.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 	require.True(t, ok)
 
-	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
-	blockContext = &ctrlertypes.BlockContext{}
-	blockContext.SetHeight(runHeight)
+	runHeight = txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
+	blockContext = ctrlertypes.NewBlockContextAs(runHeight, time.Now(), "", nil, nil, nil)
 	_, xerr := govCtrler.EndBlock(blockContext)
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()

@@ -5,20 +5,10 @@ import (
 	"time"
 )
 
-//func BlockCtx(h int64) *ctrlertypes.BlockContext {
-//	bctx := &ctrlertypes.BlockContext{}
-//	bctx.SetHeight(h)
-//	return bctx
-//}
-
 var lastBlockCtx *ctrlertypes.BlockContext
 
-func InitBlockCtxWith(h int64, a ctrlertypes.IAccountHandler, g ctrlertypes.IGovHandler, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
-	bctx := &ctrlertypes.BlockContext{Height: h, Time: time.Now()}
-	bctx.AcctHandler = a
-	bctx.GovHandler = g
-	bctx.StakeHandler = s
-
+func InitBlockCtxWith(h int64, g ctrlertypes.IGovHandler, a ctrlertypes.IAccountHandler, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
+	bctx := ctrlertypes.NewBlockContextAs(h, time.Now(), "", g, a, s)
 	lastBlockCtx = bctx
 	return bctx
 }
@@ -31,7 +21,7 @@ func NextBlockCtx() *ctrlertypes.BlockContext {
 	if lastBlockCtx == nil {
 		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
 	}
-	lastBlockCtx = InitBlockCtxWith(lastBlockCtx.GetHeight()+1, lastBlockCtx.AcctHandler, lastBlockCtx.GovHandler, lastBlockCtx.StakeHandler)
+	lastBlockCtx = InitBlockCtxWith(lastBlockCtx.GetHeight()+1, lastBlockCtx.GovHandler, lastBlockCtx.AcctHandler, lastBlockCtx.StakeHandler)
 	return lastBlockCtx
 }
 
@@ -39,7 +29,7 @@ func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
 	if lastBlockCtx == nil {
 		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
 	}
-	lastBlockCtx = InitBlockCtxWith(bctx.GetHeight()+1, bctx.AcctHandler, bctx.GovHandler, bctx.StakeHandler)
+	lastBlockCtx = InitBlockCtxWith(bctx.GetHeight()+1, bctx.GovHandler, bctx.AcctHandler, bctx.StakeHandler)
 	return lastBlockCtx
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 var (
@@ -189,8 +190,7 @@ func TestFreezingProposal(t *testing.T) {
 
 	//
 	// not changed
-	bctx := &ctrlertypes.BlockContext{}
-	bctx.SetHeight(prop.EndVotingHeight)
+	bctx := ctrlertypes.NewBlockContextAs(prop.EndVotingHeight, time.Now(), "", nil, nil, nil)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -201,8 +201,7 @@ func TestFreezingProposal(t *testing.T) {
 
 	//
 	// freezing the proposal
-	bctx = &ctrlertypes.BlockContext{}
-	bctx.SetHeight(prop.EndVotingHeight + 1)
+	bctx = ctrlertypes.NewBlockContextAs(prop.EndVotingHeight+1, time.Now(), "", nil, nil, nil)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -237,8 +236,11 @@ func TestApplyingProposal(t *testing.T) {
 		require.NoError(t, xerr)
 
 		// freezing the proposal
-		bctx := &ctrlertypes.BlockContext{}
-		bctx.SetHeight(txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + 1)
+		bctx := ctrlertypes.NewBlockContextAs(
+			txProposalPayload.StartVotingHeight+txProposalPayload.VotingPeriodBlocks+1,
+			time.Now(),
+			"",
+			nil, nil, nil)
 		_, xerr = govCtrler.EndBlock(bctx)
 		require.NoError(t, xerr)
 		_, _, xerr = govCtrler.Commit()
@@ -248,8 +250,7 @@ func TestApplyingProposal(t *testing.T) {
 	//
 	// not changed
 	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks() - 1
-	bctx := &ctrlertypes.BlockContext{}
-	bctx.SetHeight(runHeight)
+	bctx := ctrlertypes.NewBlockContextAs(runHeight, time.Now(), "", nil, nil, nil)
 	_, xerr := govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
@@ -261,8 +262,7 @@ func TestApplyingProposal(t *testing.T) {
 	//
 	// apply new gov rule
 	runHeight = txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
-	bctx = &ctrlertypes.BlockContext{}
-	bctx.SetHeight(runHeight)
+	bctx = ctrlertypes.NewBlockContextAs(runHeight, time.Now(), "", nil, nil, nil)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 	require.NotNil(t, govCtrler.newGovParams)
