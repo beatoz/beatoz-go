@@ -219,15 +219,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			ctrlertypes.ExpectedNextBlockContextOf(ctrler.lastBlockCtx, ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval),
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-				_txctx.MaxGas = ctrler.lastBlockCtx.GetTrxGasLimit()
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
 				_txctx.TrxEVMHandler = ctrler.vmCtrler
-				_txctx.GovHandler = ctrler.govCtrler
-				_txctx.AcctHandler = ctrler.acctCtrler
-				_txctx.StakeHandler = ctrler.stakeCtrler
-				_txctx.ChainID = ctrler.rootConfig.ChainID
 				return nil
 			})
 		if xerr != nil {
@@ -377,18 +372,10 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		ctrler.currBlockCtx,
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = ctrler.currBlockCtx.GetTxsCnt()
-			ctrler.currBlockCtx.AddTxsCnt(1)
-
-			_txctx.MaxGas = ctrler.lastBlockCtx.GetTrxGasLimit()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
 			_txctx.TrxEVMHandler = ctrler.vmCtrler
-			_txctx.GovHandler = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
-			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.ChainID = ctrler.rootConfig.ChainID
 			return nil
 		})
 	if xerr != nil {
@@ -470,7 +457,7 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 	return ctrler.deliverTxSync(req)
 }
 
-// asyncPrepareTrxContext is called in TrxPreparer
+// asyncPrepareTrxContext is called in `trxPreparerRoutine()`
 func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
 		ctrler.currBlockCtx,
@@ -478,18 +465,13 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 			// `idx` may be not equal to `ctrler.currBlockCtx.GetTxsCnt()`
 			// because the order of calling `asyncPrepareTrxContext` is not sequential.
+			// So, the `TxIdx` specified by `ctrler.currBlockCtx.GetTxsCnt()` may be not correct.
 			_txctx.TxIdx = idx
-			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.MaxGas = ctrler.lastBlockCtx.GetTrxGasLimit()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
 			_txctx.TrxEVMHandler = ctrler.vmCtrler
-			_txctx.GovHandler = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
-			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.ChainID = ctrler.rootConfig.ChainID
 			return nil
 		})
 	if xerr != nil {

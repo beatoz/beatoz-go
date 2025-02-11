@@ -119,14 +119,14 @@ func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxCo
 	txbz, _ := tx.Encode()
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz,
 		&ctrlertypes.BlockContext{
-			Height: height,
-			Time:   time.Now(),
+			Height:       height,
+			Time:         time.Now(),
+			GovHandler:   govCtrler,
+			AcctHandler:  acctHelper,
+			StakeHandler: stakeHelper,
 		},
 		exec,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.GovHandler = govCtrler
-			_txctx.AcctHandler = acctHelper
-			_txctx.StakeHandler = stakeHelper
 			return nil
 		})
 	if xerr != nil {

@@ -52,8 +52,10 @@ func makeStakingTrxContext(from, to *web3.Wallet, power, txHeight int64) (*ctrle
 
 	return &ctrlertypes.TrxContext{
 		BlockContext: &ctrlertypes.BlockContext{
-			Height: txHeight,
-			Time:   time.Now(),
+			Height:      txHeight,
+			Time:        time.Now(),
+			GovHandler:  govParams00,
+			AcctHandler: acctMock00,
 		},
 		Exec:         true,
 		Tx:           tx,
@@ -62,8 +64,6 @@ func makeStakingTrxContext(from, to *web3.Wallet, power, txHeight int64) (*ctrle
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
 		GasUsed:      0,
-		GovHandler:   govParams00,
-		AcctHandler:  acctMock00,
 	}, nil
 }
 
@@ -102,8 +102,9 @@ func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes, txHe
 
 	return &ctrlertypes.TrxContext{
 		BlockContext: &ctrlertypes.BlockContext{
-			Height: txHeight,
-			Time:   time.Now(),
+			Height:     txHeight,
+			Time:       time.Now(),
+			GovHandler: govParams00,
 		},
 		Exec:         true,
 		Tx:           tx,
@@ -111,6 +112,5 @@ func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes, txHe
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
-		GovHandler:   govParams00,
 	}, nil
 }

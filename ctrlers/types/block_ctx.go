@@ -48,7 +48,7 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 
 		appHash:       nil,
 		txsCnt:        0,
-		txGasLimit:    0,
+		txGasLimit:    g.MaxTrxGas(),
 		blockGasLimit: g.MaxBlockGas(),
 		blockGasUsed:  0,
 		blockGasPool:  new(ethcore.GasPool).AddGas(g.MaxBlockGas()),
@@ -185,6 +185,14 @@ func (bctx *BlockContext) AdjustTrxGasLimit(txCnt int, minCap, maxCap uint64) {
 	defer bctx.mtx.Unlock()
 
 	bctx.txGasLimit = adjustTrxGasLimit(txCnt, minCap, maxCap)
+}
+
+// `SetTrxGasLimit` is used only to test.
+func (bctx *BlockContext) SetTrxGasLimit(gasLimit uint64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.txGasLimit = gasLimit
 }
 
 func (bctx *BlockContext) GetTrxGasLimit() uint64 {

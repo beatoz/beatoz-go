@@ -14,8 +14,6 @@ type TrxContext struct {
 	TxHash bytes2.HexBytes
 	Tx     *Trx
 	TxIdx  int
-	MinGas uint64
-	MaxGas uint64
 	Exec   bool
 
 	SenderPubKey []byte
@@ -29,11 +27,6 @@ type TrxContext struct {
 	TrxAcctHandler  ITrxHandler
 	TrxStakeHandler ITrxHandler
 	TrxEVMHandler   ITrxHandler
-
-	GovHandler   IGovHandler
-	AcctHandler  IAccountHandler
-	StakeHandler IStakeHandler
-	ChainID      string
 
 	Callback func(*TrxContext, xerrors.XError)
 }
@@ -56,6 +49,7 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 
 	txctx := &TrxContext{
 		BlockContext: bctx,
+		TxIdx:        bctx.GetTxsCnt(),
 		Tx:           tx,
 		TxHash:       tmtypes.Tx(txbz).Hash(),
 		Exec:         exec,
@@ -70,15 +64,9 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 	//
 	// The following can be performed in parallel.
 	{
-		if txctx.MinGas == 0 {
-			txctx.MinGas = txctx.GovHandler.MinTrxGas()
-		}
-		if txctx.MaxGas == 0 {
-			txctx.MaxGas = txctx.GovHandler.MaxTrxGas()
-		}
-		if tx.Gas < txctx.MinGas {
+		if tx.Gas < bctx.GovHandler.MinTrxGas() {
 			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas")
-		} else if tx.Gas > txctx.MaxGas {
+		} else if tx.Gas > bctx.GetTrxGasLimit() {
 			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas")
 		}
 		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
@@ -107,5 +95,7 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 	if txctx.Receiver == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}
+
+	bctx.AddTxsCnt(1)
 	return txctx, nil
 }
