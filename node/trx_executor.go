@@ -129,6 +129,11 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		return nil
 	}
 
+	// set used gas
+	if xerr := ctx.UseGas(ctx.Tx.Gas); xerr != nil {
+		return xerr
+	}
+
 	// processing fee = gas * gasPrice
 	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
 	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
@@ -143,7 +148,5 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		return xerr
 	}
 
-	// set used gas
-	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }

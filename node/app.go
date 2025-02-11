@@ -424,9 +424,6 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 			Events: txctx.Events,
 		}
 	} else {
-		// todo: `UseGas()` should be called in `ExecuteSync()` and the error should be handled
-		_ = ctrler.currBlockCtx.UseGas(txctx.GasUsed)
-
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
 			Type: "tx",
@@ -511,9 +508,6 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 			Events: txctx.Events,
 		}
 	} else {
-		// todo: `UseGas()` should be called in `ExecuteSync()` and the error should be handled
-		_ = ctrler.currBlockCtx.UseGas(txctx.GasUsed)
-
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
 			Type: "tx",

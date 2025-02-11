@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	govParams = ctrlertypes.DefaultGovParams()
-	chainId   = "test_trx_ctx_chain"
+	govParams   = ctrlertypes.DefaultGovParams()
+	acctHandler = &acctHandlerMock{}
+	chainId     = "test_trx_ctx_chain"
 )
 
 func Test_NewTrxContext(t *testing.T) {
@@ -26,6 +27,14 @@ func Test_NewTrxContext(t *testing.T) {
 	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govParams.MinTrxGas()-1, govParams.GasPrice(), uint256.NewInt(0))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
 	txctx, xerr := newTrxCtx(tx, 1, govParams.MaxTrxGas())
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
+
+	//
+	// Too much Gas
+	txGasLimit := uint64(10000)
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, txGasLimit+1, govParams.GasPrice(), uint256.NewInt(0))
+	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	txctx, xerr = newTrxCtx(tx, 1, txGasLimit)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
 
 	//
@@ -149,7 +158,7 @@ func newTrxCtx(tx *ctrlertypes.Trx, height int64, adjustMaxGas uint64) (*ctrlert
 	bz, _ := tx.Encode()
 	return ctrlertypes.NewTrxContext(
 		bz,
-		ctrlertypes.NewBlockContextAs(height, time.Now(), chainId, govParams, &acctHandlerMock{}, nil),
+		ctrlertypes.NewBlockContextAs(height, time.Now(), chainId, govParams, acctHandler, nil),
 		true,
 		func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.BlockContext.TxGasLimit = adjustMaxGas

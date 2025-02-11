@@ -65,9 +65,9 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 	// The following can be performed in parallel.
 	{
 		if tx.Gas < bctx.GovHandler.MinTrxGas() {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas")
+			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas. the minimum gas of tx is %v", bctx.GovHandler.MinTrxGas())
 		} else if tx.Gas > bctx.GetTrxGasLimit() {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas")
+			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas. the gas limit of tx is %v", bctx.TxGasLimit)
 		}
 		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
 			return nil, xerrors.ErrInvalidGasPrice
@@ -98,4 +98,13 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 
 	bctx.AddTxsCnt(1)
 	return txctx, nil
+}
+
+// `UseGas` should not be used in `EVMCtrler`
+func (ctx *TrxContext) UseGas(gas uint64) xerrors.XError {
+	if xerr := ctx.BlockContext.UseGas(gas); xerr != nil {
+		return xerr
+	}
+	ctx.GasUsed = gas
+	return nil
 }
