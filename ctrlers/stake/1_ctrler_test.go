@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 var (
@@ -55,7 +54,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txbz, err := tx.Encode()
 	require.NoError(t, err)
 
-	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
 		ctx.ChainID = "test-chain"
@@ -81,7 +80,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txbz, err = tx.Encode()
 	require.NoError(t, err)
 
-	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
 		ctx.ChainID = "test-chain"
@@ -103,7 +102,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txbz, err = tx.Encode()
 	require.NoError(t, err)
 
-	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
 		ctx.ChainID = "test-chain"
@@ -125,7 +124,7 @@ func wrongIndividualLimit(t *testing.T) {
 	txbz, err = tx.Encode()
 	require.NoError(t, err)
 
-	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
 		ctx.ChainID = "test-chain"
@@ -171,7 +170,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"
@@ -193,7 +192,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 	txbz, err := tx.Encode()
 	require.NoError(t, err)
 
-	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
 		ctx.ChainID = "test-chain"
@@ -238,7 +237,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"
@@ -268,7 +267,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"
@@ -293,7 +292,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 	txbz, err := tx.Encode()
 	require.NoError(t, err)
 
-	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
 		ctx.GovHandler = govParams01
 		ctx.ChainID = "test-chain"
@@ -332,7 +331,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"
@@ -368,7 +367,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockCtx(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"
@@ -441,7 +440,7 @@ func genesisStaking(t *testing.T, cnt int) {
 		txbz, err := tx.Encode()
 		require.NoError(t, err)
 
-		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.GetHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
+		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx, true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
 			ctx.GovHandler = govParams01
 			ctx.ChainID = "test-chain"

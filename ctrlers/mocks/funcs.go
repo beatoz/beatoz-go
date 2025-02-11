@@ -1,6 +1,9 @@
 package mocks
 
-import ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+import (
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"time"
+)
 
 //func BlockCtx(h int64) *ctrlertypes.BlockContext {
 //	bctx := &ctrlertypes.BlockContext{}
@@ -11,8 +14,7 @@ import ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 var lastBlockCtx *ctrlertypes.BlockContext
 
 func InitBlockCtxWith(h int64, a ctrlertypes.IAccountHandler, g ctrlertypes.IGovHandler, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
-	bctx := &ctrlertypes.BlockContext{}
-	bctx.SetHeight(h)
+	bctx := &ctrlertypes.BlockContext{Height: h, Time: time.Now()}
 	bctx.AcctHandler = a
 	bctx.GovHandler = g
 	bctx.StakeHandler = s

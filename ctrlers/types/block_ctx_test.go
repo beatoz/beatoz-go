@@ -12,8 +12,8 @@ func TestAdjustMaxGasPerTrx(t *testing.T) {
 
 	blockCtx := &types.BlockContext{}
 	for n := 0; n < 100000; n++ {
-		blockCtx.AdjustTrxGasLimit(_min, _max)
-		adjusted := blockCtx.ExpectedTrxGasLimit()
+		blockCtx.AdjustTrxGasLimit(blockCtx.GetTxsCnt(), _min, _max)
+		adjusted := blockCtx.GetTrxGasLimit()
 		require.True(t, _min <= adjusted)
 		require.True(t, _max >= adjusted)
 		blockCtx.AddTxsCnt(1)

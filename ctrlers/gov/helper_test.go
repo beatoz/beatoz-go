@@ -117,12 +117,18 @@ var _ ctrlertypes.IAccountHandler = (*acctHelperMock)(nil)
 
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 	txbz, _ := tx.Encode()
-	txctx, xerr := ctrlertypes.NewTrxContext(txbz, height, time.Now().Unix(), exec, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-		_txctx.GovHandler = govCtrler
-		_txctx.AcctHandler = acctHelper
-		_txctx.StakeHandler = stakeHelper
-		return nil
-	})
+	txctx, xerr := ctrlertypes.NewTrxContext(txbz,
+		&ctrlertypes.BlockContext{
+			Height: height,
+			Time:   time.Now(),
+		},
+		exec,
+		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
+			_txctx.GovHandler = govCtrler
+			_txctx.AcctHandler = acctHelper
+			_txctx.StakeHandler = stakeHelper
+			return nil
+		})
 	if xerr != nil {
 		panic(xerr)
 	}

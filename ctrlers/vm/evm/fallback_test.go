@@ -51,23 +51,22 @@ func Test_Fallback(t *testing.T) {
 	to := types.ZeroAddress()
 
 	// BeginBlock
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1, Time: time.Now()}}, govParams, &acctHandler, nil)
 	_, xerr := fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
 	// Execute the tx to deploy contract
 	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.GetHeight(),
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bytes2.HexBytes(buildInfoFallbackContract.Bytecode)),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    nil,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		TxHash:       bytes2.RandBytes(32),
+		Tx:           web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bytes2.HexBytes(buildInfoFallbackContract.Bytecode)),
+		TxIdx:        1,
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     nil,
+		GasUsed:      0,
+		GovHandler:   govParams,
+		AcctHandler:  &acctHandler,
 	}
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))
 	require.NoError(t, fallbackEVM.ExecuteTrx(txctx))
@@ -89,7 +88,7 @@ func Test_Fallback(t *testing.T) {
 
 	//
 	// transfer to contract
-	bctx.SetHeight(bctx.GetHeight() + 1)
+	bctx = ctrlertypes.ExpectedNextBlockContextOf(bctx, time.Second)
 	_, xerr = fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -102,17 +101,16 @@ func Test_Fallback(t *testing.T) {
 	//fmt.Println("sender", originBalance0.Dec(), "address", originBalance1.Dec())
 
 	txctx = &ctrlertypes.TrxContext{
-		Height:      bctx.GetHeight(),
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToFons(100)),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    contAcct,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		TxHash:       bytes2.RandBytes(32),
+		Tx:           web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govParams.MinTrxGas()*10, govParams.GasPrice(), types.ToFons(100)),
+		TxIdx:        1,
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     contAcct,
+		GasUsed:      0,
+		GovHandler:   govParams,
+		AcctHandler:  &acctHandler,
 	}
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))
 	require.NoError(t, fallbackEVM.ExecuteTrx(txctx))

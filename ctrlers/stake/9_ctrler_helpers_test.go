@@ -8,6 +8,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"math/rand"
+	"time"
 )
 
 func randMakeStakingToSelfTrxContext(txHeight int64) (*ctrlertypes.TrxContext, error) {
@@ -50,10 +51,13 @@ func makeStakingTrxContext(from, to *web3.Wallet, power, txHeight int64) (*ctrle
 	}
 
 	return &ctrlertypes.TrxContext{
+		BlockContext: &ctrlertypes.BlockContext{
+			Height: txHeight,
+			Time:   time.Now(),
+		},
 		Exec:         true,
 		Tx:           tx,
 		TxHash:       crypto.DefaultHash(bz),
-		Height:       txHeight,
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
@@ -97,10 +101,13 @@ func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes, txHe
 	}
 
 	return &ctrlertypes.TrxContext{
+		BlockContext: &ctrlertypes.BlockContext{
+			Height: txHeight,
+			Time:   time.Now(),
+		},
 		Exec:         true,
 		Tx:           tx,
 		TxHash:       crypto.DefaultHash(tzbz),
-		Height:       txHeight,
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),

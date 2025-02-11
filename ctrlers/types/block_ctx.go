@@ -59,6 +59,21 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 	}
 }
 
+func ExpectedNextBlockContextOf(bctx *BlockContext, interval time.Duration) *BlockContext {
+	return &BlockContext{
+		Height: bctx.Height + 1,
+		Time:   bctx.Time.Add(interval),
+
+		txGasLimit:    bctx.txGasLimit,
+		blockGasLimit: bctx.GovHandler.MaxBlockGas(),
+		blockGasPool:  new(ethcore.GasPool).AddGas(bctx.GovHandler.MaxBlockGas()),
+
+		GovHandler:   bctx.GovHandler,
+		AcctHandler:  bctx.AcctHandler,
+		StakeHandler: bctx.StakeHandler,
+	}
+}
+
 func (bctx *BlockContext) SetHeight(h int64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
@@ -112,7 +127,7 @@ func (bctx *BlockContext) ExpectedNextBlockTimeSeconds(interval time.Duration) i
 	return bctx.Time.Unix() + secs
 }
 
-func (bctx *BlockContext) TxsCnt() int {
+func (bctx *BlockContext) GetTxsCnt() int {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
@@ -165,16 +180,14 @@ func (bctx *BlockContext) SetValUpdates(valUps abcitypes.ValidatorUpdates) {
 	bctx.ValUpdates = valUps
 }
 
-func (bctx *BlockContext) AdjustTrxGasLimit(minCap, maxCap uint64) {
+func (bctx *BlockContext) AdjustTrxGasLimit(txCnt int, minCap, maxCap uint64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
-	// Hyperbolic Function is applied.
-	// `newMaxGas = (maxCap - minCap) / (1 + TxCount) + minCap`
-	bctx.txGasLimit = (maxCap-minCap)/uint64(1+bctx.txsCnt) + minCap
+	bctx.txGasLimit = adjustTrxGasLimit(txCnt, minCap, maxCap)
 }
 
-func (bctx *BlockContext) ExpectedTrxGasLimit() uint64 {
+func (bctx *BlockContext) GetTrxGasLimit() uint64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
@@ -259,4 +272,10 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 type IBlockHandler interface {
 	BeginBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
 	EndBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
+}
+
+func adjustTrxGasLimit(txCnt int, minCap, maxCap uint64) uint64 {
+	// Hyperbolic Function is applied.
+	// `newMaxGas = (maxCap - minCap) / (1 + TxCount) + minCap`
+	return (maxCap-minCap)/uint64(1+txCnt) + minCap
 }

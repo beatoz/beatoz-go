@@ -132,11 +132,11 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1, Time: time.Now()}}, govParams, &acctHandler, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
-	ret, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx.GetHeight(), time.Now().Unix(),
+	ret, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx,
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -199,22 +199,28 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{
+			Header: tmproto.Header{
+				Height: erc20EVM.lastBlockHeight + 1,
+				Time:   time.Now(),
+			},
+		},
+		govParams, &acctHandler, nil)
 	_, xerr := erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
 	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.GetHeight(),
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    nil,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		TxHash:       bytes2.RandBytes(32),
+		Tx:           web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
+		TxIdx:        1,
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     nil,
+		GasUsed:      0,
+		GovHandler:   govParams,
+		AcctHandler:  &acctHandler,
 	}
 
 	xerr = erc20EVM.ExecuteTrx(txctx)
@@ -246,7 +252,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 	return contAddr, txctx
 }
 
-func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, bctx *ctrlertypes.BlockContext, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiObj.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -255,17 +261,16 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPr
 	fromAcct := acctHandler.FindAccount(from, true)
 	toAcct := acctHandler.FindAccount(to, true)
 	txctx := &ctrlertypes.TrxContext{
-		Height:      1,
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    toAcct,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		TxHash:       bytes2.RandBytes(32),
+		Tx:           web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
+		TxIdx:        1,
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     toAcct,
+		GasUsed:      0,
+		GovHandler:   govParams,
+		AcctHandler:  &acctHandler,
 	}
 	xerr := erc20EVM.ExecuteTrx(txctx)
 	if xerr != nil {

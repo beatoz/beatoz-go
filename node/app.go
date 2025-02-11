@@ -216,11 +216,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
 		txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-			ctrler.lastBlockCtx.GetHeight()+int64(1),                                                                // issue #39: set block number expected to include current tx.
-			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
+			ctrlertypes.ExpectedNextBlockContextOf(ctrler.lastBlockCtx, ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval),
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-				_txctx.MaxGas = ctrler.lastBlockCtx.ExpectedTrxGasLimit()
+				_txctx.MaxGas = ctrler.lastBlockCtx.GetTrxGasLimit()
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -328,8 +327,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	lastHeight := int64(0)
+	lastTxsCnt := 0
 	if ctrler.lastBlockCtx != nil {
 		lastHeight = ctrler.lastBlockCtx.GetHeight()
+		lastTxsCnt = ctrler.lastBlockCtx.GetTxsCnt()
 	}
 	if req.Header.Height != lastHeight+1 {
 		panic(fmt.Errorf("error block height: expected(%v), actual(%v)", lastHeight+1, req.Header.Height))
@@ -343,6 +344,11 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	defer ctrler.mtx.Unlock()
 
 	ctrler.currBlockCtx = ctrlertypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.currBlockCtx.AdjustTrxGasLimit(
+		lastTxsCnt,
+		ctrler.govCtrler.MinTrxGas(),
+		ctrler.govCtrler.MaxTrxGas(),
+	)
 
 	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
@@ -368,14 +374,13 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.GetHeight(),
-		ctrler.currBlockCtx.TimeSeconds(),
+		ctrler.currBlockCtx,
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
+			_txctx.TxIdx = ctrler.currBlockCtx.GetTxsCnt()
 			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.MaxGas = ctrler.lastBlockCtx.ExpectedTrxGasLimit()
+			_txctx.MaxGas = ctrler.lastBlockCtx.GetTrxGasLimit()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -468,16 +473,15 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 // asyncPrepareTrxContext is called in TrxPreparer
 func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.GetHeight(),
-		ctrler.currBlockCtx.TimeSeconds(),
+		ctrler.currBlockCtx,
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			// `idx` may be not equal to `ctrler.currBlockCtx.TxsCnt()`
+			// `idx` may be not equal to `ctrler.currBlockCtx.GetTxsCnt()`
 			// because the order of calling `asyncPrepareTrxContext` is not sequential.
 			_txctx.TxIdx = idx
 			ctrler.currBlockCtx.AddTxsCnt(1)
 
-			_txctx.MaxGas = ctrler.lastBlockCtx.ExpectedTrxGasLimit()
+			_txctx.MaxGas = ctrler.lastBlockCtx.GetTrxGasLimit()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -631,16 +635,12 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.currBlockCtx.SetAppHash(appHash)
-	ctrler.currBlockCtx.AdjustTrxGasLimit(
-		ctrler.govCtrler.MinTrxGas(),
-		ctrler.govCtrler.MaxTrxGas())
 	ctrler.logger.Debug("BeatozApp::Commit",
 		"height", ver0,
-		"txs", ctrler.currBlockCtx.TxsCnt(),
+		"txs", ctrler.currBlockCtx.GetTxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash(),
-		"adjustedMaxGasPerTrx", ctrler.currBlockCtx.ExpectedTrxGasLimit())
-
-	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
+		"adjustedMaxGasPerTrx", ctrler.currBlockCtx.GetTrxGasLimit())
+	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
 
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
