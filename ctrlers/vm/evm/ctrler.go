@@ -110,12 +110,11 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 		return nil, xerrors.From(err)
 	}
 
-	ctrler.stateDBWrapper = stdb
-	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(blockGasLimit)
-
 	beneficiary := bctx.ProposerAddress.Array20()
-	blockContext := evmBlockContext(beneficiary, bctx.GetHeight(), bctx.TimeSeconds())
-	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{}, ctrler.stateDBWrapper, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
+	evmBlockContext := newEVMBlockContext(beneficiary, bctx.GetHeight(), bctx.TimeSeconds(), bctx.GetBlockGasLimit())
+	ctrler.stateDBWrapper = stdb
+	ctrler.blockGasPool = bctx.GetBlockGasPool()
+	ctrler.vmevm = ethvm.NewEVM(evmBlockContext, ethvm.TxContext{}, ctrler.stateDBWrapper, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
 
 	return nil, nil
 }
@@ -155,8 +154,12 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// Only in the 'DeliveryTx' phase, the contract transaction is fully executed,
 		// and in the 'CheckTx' phase it is minimally executed.
 
+		if xerr := ctx.BlockContext.UseGas(ctx.GasUsed); xerr != nil {
+			return xerr
+		}
+
 		// update balance
-		feeAmt := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(ctx.GasUsed))
+		feeAmt := ctrlertypes.GasToFee(ctx.GasUsed, ctx.Tx.GasPrice)
 		needAmt := new(uint256.Int).Add(feeAmt, ctx.Tx.Amount)
 		if xerr := ctx.Sender.SubBalance(needAmt); xerr != nil {
 			return xerr
@@ -169,6 +172,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
 			return xerr
 		}
+
 		return nil
 	}
 	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
@@ -222,8 +226,13 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
 
-	// Gas is already applied to accounts by buyGas and refundGas in EVM.
-	// the `EVM` handles nonce, amount and gas.
+	// The gas is already applied to accounts by buyGas and refundGas in EVM.
+	// (the `EVM` handles nonce, balance and gas(+gas pool).)
+	// The `ctx.BlockContext.blockGasPool` is also decreased by EVM.
+	// But the `ctx.BlockContext.BlockGasUsed` is not increased by EVM.
+	// Don't call ``ctx.UseGas()` or `ctx.BlockContext.UseGas()`.
+	// Update `ctx.GasUsed` and `ctx.BlockContext.BlockGasUsed` directly.
+	ctx.BlockContext.BlockGasUsed += evmResult.UsedGas
 	ctx.GasUsed = evmResult.UsedGas
 	ctx.RetData = evmResult.ReturnData
 

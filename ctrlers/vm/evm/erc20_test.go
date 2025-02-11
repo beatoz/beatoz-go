@@ -15,9 +15,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -73,11 +71,11 @@ func init() {
 		//}
 	}
 
-}
-
-func Test_callEVM_Deploy(t *testing.T) {
 	os.RemoveAll(dbPath)
 	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)))
+}
+
+func Test_EVMCtrler_Deploy(t *testing.T) {
 
 	deployInput, err := abiERC20Contract.Pack("", "TokenOnBeatoz", "TOR")
 	require.NoError(t, err)
@@ -114,7 +112,9 @@ func Test_callEVM_Deploy(t *testing.T) {
 	fmt.Println("TestDeploy", "Commit block", height)
 }
 
-func Test_callEVM_Transfer(t *testing.T) {
+func Test_EVMCtrler_Transfer(t *testing.T) {
+	require.NotNil(t, erc20ContAddr, "`erc20ContAddr` is nil. Do `Test_EVMCtrler_Deploy` first.")
+
 	state, xerr := erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 
@@ -132,7 +132,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1, Time: time.Now()}}, govParams, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContextAs(erc20EVM.lastBlockHeight+1, time.Now(), "no_chain_id", govParams, &acctHandler, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -158,7 +158,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println(" (AFTER) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx = ctrlertypes.NewBlockContextAs(erc20EVM.lastBlockHeight+1, time.Now(), "no_chain_id", govParams, &acctHandler, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -183,7 +183,7 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(REOPEN) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx = ctrlertypes.NewBlockContextAs(erc20EVM.lastBlockHeight+1, time.Now(), "no_chain_id", govParams, &acctHandler, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -194,18 +194,36 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 }
 
+func Test_EVMCtrler_Gas(t *testing.T) {
+	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
+
+	fromAcct := acctHandler.walletsArr[0].GetAccount()
+	toAcct := acctHandler.walletsArr[1].GetAccount()
+
+	bctx := ctrlertypes.NewBlockContextAs(erc20EVM.lastBlockHeight+1, time.Now(), "no_chain_id", govParams, &acctHandler, nil)
+	_, xerr := erc20EVM.BeginBlock(bctx)
+	require.NoError(t, xerr)
+
+	_, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx,
+		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
+	require.NoError(t, xerr)
+	require.Equal(t, bctx.BlockGasRemained(), bctx.GetBlockGasLimit()-bctx.GasUsed())
+
+	fmt.Println("blockGasLimit", bctx.GetBlockGasLimit(), "usedGas", bctx.GasUsed(), "gasPool(remained)", bctx.BlockGasRemained())
+
+	xerr = erc20EVM.Close()
+	require.NoError(t, xerr)
+}
+
 func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes.TrxContext) {
 	// make transaction
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
-	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{
-			Header: tmproto.Header{
-				Height: erc20EVM.lastBlockHeight + 1,
-				Time:   time.Now(),
-			},
-		},
+	bctx := ctrlertypes.NewBlockContextAs(
+		erc20EVM.lastBlockHeight+1,
+		time.Now(),
+		"no_chain_id",
 		govParams, &acctHandler, nil)
 	_, xerr := erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
