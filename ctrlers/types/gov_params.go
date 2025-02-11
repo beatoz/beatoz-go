@@ -79,7 +79,7 @@ func DefaultGovParams() *GovParams {
 		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
 		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
 		maxTrxGas:               25_000_000,
-		maxBlockGas:             math.MaxUint64,
+		maxBlockGas:             300_000_000,
 		minVotingPeriodBlocks:   28800,  // 1day blocks = 24 * 60 * 60s(1day seconds) / 3s(block intervals)
 		maxVotingPeriodBlocks:   864000, // 30days blocks = 30 * 24 * 60 * 60s (30days seconds) / 3s(block intervals)
 		minSelfStakeRatio:       50,     // 50%

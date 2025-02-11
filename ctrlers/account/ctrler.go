@@ -112,7 +112,7 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 		if acct == nil {
 			acct = btztypes.NewAccount(bctx.ProposerAddress)
 		}
-		xerr := acct.AddBalance(btztypes.GasToFee(bctx.GasUsed(), bctx.GovHandler.GasPrice()))
+		xerr := acct.AddBalance(bctx.FeeUsed())
 		if xerr != nil {
 			return nil, xerr
 		}
