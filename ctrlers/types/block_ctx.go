@@ -1,31 +1,31 @@
 package types
 
 import (
-	"encoding/json"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethcore "github.com/ethereum/go-ethereum/core"
+	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"sync"
 	"time"
 )
 
 type BlockContext struct {
-	Hash                bytes.HexBytes
-	Height              int64
-	Time                time.Time
-	ProposerAddress     types.Address
-	LastCommitInfo      abcitypes.LastCommitInfo
-	ByzantineValidators []abcitypes.Evidence
-	ChainID             string
+	Hash                bytes.HexBytes           `json:"hash"`
+	Height              int64                    `json:"height"`
+	Time                time.Time                `json:"time"`
+	ProposerAddress     types.Address            `json:"proposerAddress"`
+	LastCommitInfo      abcitypes.LastCommitInfo `json:"lastCommitInfo"`
+	ByzantineValidators []abcitypes.Evidence     `json:"byzantineValidators"`
+	ChainID             string                   `json:"chainId"`
 
-	AppHash bytes.HexBytes
+	AppHash bytes.HexBytes `json:"appHash"`
 
-	TxsCnt        int
-	TxGasLimit    uint64
-	BlockGasLimit uint64
-	BlockGasUsed  uint64
+	TxsCnt        int    `json:"txsCnt"`
+	TxGasLimit    uint64 `json:"txGasLimit"`
+	BlockGasLimit uint64 `json:"blockGasLimit"`
+	BlockGasUsed  uint64 `json:"blockGasUsed"`
 	blockGasPool  *ethcore.GasPool
 
 	GovHandler   IGovHandler
@@ -60,7 +60,7 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 	}
 }
 
-// `NewBlockContextAs` should be used only to test.
+// 'NewBlockContextAs' should be used for testing purposes only.
 func NewBlockContextAs(h int64, t time.Time, c string, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
 	_txGasLimit := uint64(0)
 	_blockGasLimit := uint64(0)
@@ -100,13 +100,6 @@ func ExpectedNextBlockContextOf(bctx *BlockContext, interval time.Duration) *Blo
 		AcctHandler:  bctx.AcctHandler,
 		StakeHandler: bctx.StakeHandler,
 	}
-}
-
-func (bctx *BlockContext) SetHeight(h int64) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	bctx.Height = h
 }
 
 func (bctx *BlockContext) GetHeight() int64 {
@@ -169,6 +162,7 @@ func (bctx *BlockContext) AddTxsCnt(d int) {
 	bctx.TxsCnt += d
 }
 
+// `UseGas` should not be used in `EVMCtrler`
 func (bctx *BlockContext) UseGas(gas uint64) xerrors.XError {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
@@ -185,6 +179,27 @@ func (bctx *BlockContext) GasUsed() uint64 {
 	defer bctx.mtx.RUnlock()
 
 	return bctx.BlockGasUsed
+}
+
+func (bctx *BlockContext) FeeUsed() *uint256.Int {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return GasToFee(bctx.GasUsed(), bctx.GovHandler.GasPrice())
+}
+
+func (bctx *BlockContext) BlockGasRemained() uint64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return bctx.blockGasPool.Gas()
+}
+
+func (bctx *BlockContext) GetBlockGasPool() *ethcore.GasPool {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return bctx.blockGasPool
 }
 
 func (bctx *BlockContext) GetBlockGasLimit() uint64 {
@@ -215,94 +230,11 @@ func (bctx *BlockContext) AdjustTrxGasLimit(txCnt int, minCap, maxCap uint64) {
 	bctx.TxGasLimit = adjustTrxGasLimit(txCnt, minCap, maxCap)
 }
 
-// `SetTrxGasLimit` is used only to test.
-func (bctx *BlockContext) SetTrxGasLimit(gasLimit uint64) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	bctx.TxGasLimit = gasLimit
-}
-
 func (bctx *BlockContext) GetTrxGasLimit() uint64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
 	return bctx.TxGasLimit
-}
-
-func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
-	bctx.mtx.RLock()
-	defer bctx.mtx.RUnlock()
-
-	_bctx := &struct {
-		Hash                bytes.HexBytes           `json:"hash"`
-		Height              int64                    `json:"height"`
-		Time                time.Time                `json:"time"`
-		ProposerAddress     types.Address            `json:"proposerAddress"`
-		LastCommitInfo      abcitypes.LastCommitInfo `json:"lastCommitInfo"`
-		ByzantineValidators []abcitypes.Evidence     `json:"byzantineValidators"`
-		ChainID             string                   `json:"chainId"`
-
-		AppHash       []byte `json:"appHash"`
-		TxsCnt        int    `json:"txsCnt"`
-		TxGasLimit    uint64 `json:"txGasLimit"`
-		BlockGasLimit uint64 `json:"blockGasLimit"`
-		BlockGasUsed  uint64 `json:"blockGasUsed"`
-	}{
-		Hash:                bctx.Hash,
-		Height:              bctx.Height,
-		Time:                bctx.Time,
-		ProposerAddress:     bctx.ProposerAddress,
-		LastCommitInfo:      bctx.LastCommitInfo,
-		ByzantineValidators: bctx.ByzantineValidators,
-		ChainID:             bctx.ChainID,
-
-		AppHash:       bctx.AppHash,
-		TxsCnt:        bctx.TxsCnt,
-		TxGasLimit:    bctx.TxGasLimit,
-		BlockGasLimit: bctx.BlockGasLimit,
-		BlockGasUsed:  bctx.BlockGasUsed,
-	}
-
-	return json.Marshal(_bctx)
-}
-
-func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	_bctx := &struct {
-		Hash                bytes.HexBytes           `json:"hash"`
-		Height              int64                    `json:"height"`
-		Time                time.Time                `json:"time"`
-		ProposerAddress     types.Address            `json:"proposerAddress"`
-		LastCommitInfo      abcitypes.LastCommitInfo `json:"lastCommitInfo"`
-		ByzantineValidators []abcitypes.Evidence     `json:"byzantineValidators"`
-		ChainID             string                   `json:"chainId"`
-
-		AppHash       []byte `json:"appHash"`
-		TxsCnt        int    `json:"txsCnt"`
-		TxGasLimit    uint64 `json:"txGasLimit"`
-		BlockGasLimit uint64 `json:"blockGasLimit"`
-		BlockGasUsed  uint64 `json:"blockGasUsed"`
-	}{}
-
-	if err := json.Unmarshal(bz, _bctx); err != nil {
-		return err
-	}
-	bctx.Hash = _bctx.Hash
-	bctx.Height = _bctx.Height
-	bctx.Time = _bctx.Time
-	bctx.ProposerAddress = _bctx.ProposerAddress
-	bctx.LastCommitInfo = _bctx.LastCommitInfo
-	bctx.ByzantineValidators = _bctx.ByzantineValidators
-	bctx.ChainID = _bctx.ChainID
-	bctx.AppHash = _bctx.AppHash
-	bctx.TxsCnt = _bctx.TxsCnt
-	bctx.TxGasLimit = _bctx.TxGasLimit
-	bctx.BlockGasLimit = _bctx.BlockGasLimit
-	bctx.BlockGasUsed = _bctx.BlockGasUsed
-	return nil
 }
 
 type IBlockHandler interface {

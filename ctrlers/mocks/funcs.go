@@ -21,7 +21,7 @@ func NextBlockCtx() *ctrlertypes.BlockContext {
 	if lastBlockCtx == nil {
 		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
 	}
-	lastBlockCtx = InitBlockCtxWith(lastBlockCtx.GetHeight()+1, lastBlockCtx.GovHandler, lastBlockCtx.AcctHandler, lastBlockCtx.StakeHandler)
+	lastBlockCtx = NextBlockCtxOf(lastBlockCtx)
 	return lastBlockCtx
 }
 
@@ -62,7 +62,7 @@ func DoCommitBlock(ctrler ctrlertypes.ILedgerHandler) error {
 	if _, v, err := ctrler.Commit(); err != nil {
 		return err
 	} else {
-		LastBlockCtx().SetHeight(v)
+		LastBlockCtx().Height = v
 	}
 	return nil
 }
