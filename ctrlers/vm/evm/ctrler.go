@@ -225,11 +225,10 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	// The gas value is already applied to the sender account and the gas pool
 	// by buyGas() and refundGas() in EVM.
 	// (the `EVM` handles nonce, balance(including gas) and gas pool.)
-	// In other word, the `ctx.BlockContext.blockGasPool` is updated by EVM,
-	// but the `ctx.BlockContext.BlockGasUsed` and `ctx.GasUsed` is not updated by EVM.
-	// Don't call ``ctx.UseGas()` or `ctx.BlockContext.UseGas()` which updates `ctx.BlockContext.blockGasPool`.
-	// Update only `ctx.GasUsed` and `ctx.BlockContext.BlockGasUsed` directly.
-	ctx.BlockContext.BlockGasUsed += evmResult.UsedGas
+	// In other word, the `ctx.BlockContext.blockGasPool` is updated by EVM.
+	// But the`ctx.GasUsed` is not updated by EVM.
+	// Don't call ``ctx.UseGas()` or `ctx.BlockContext.UseGas()` that causes `ctx.BlockContext.blockGasPool` update.
+	// Update only `ctx.GasUsed` directly.
 	ctx.GasUsed = evmResult.UsedGas
 	ctx.RetData = evmResult.ReturnData
 

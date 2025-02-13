@@ -25,7 +25,6 @@ type BlockContext struct {
 	TxsCnt        int    `json:"txsCnt"`
 	TxGasLimit    uint64 `json:"txGasLimit"`
 	BlockGasLimit uint64 `json:"blockGasLimit"`
-	BlockGasUsed  uint64 `json:"blockGasUsed"`
 	blockGasPool  *ethcore.GasPool
 
 	GovHandler   IGovHandler
@@ -51,7 +50,6 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 		TxsCnt:        0,
 		TxGasLimit:    g.MaxTrxGas(),
 		BlockGasLimit: g.MaxBlockGas(),
-		BlockGasUsed:  0,
 		blockGasPool:  new(ethcore.GasPool).AddGas(g.MaxBlockGas()),
 		GovHandler:    g,
 		AcctHandler:   a,
@@ -77,7 +75,6 @@ func NewBlockContextAs(h int64, t time.Time, c string, g IGovHandler, a IAccount
 		TxsCnt:        0,
 		TxGasLimit:    _txGasLimit,
 		BlockGasLimit: _blockGasLimit,
-		BlockGasUsed:  0,
 		blockGasPool:  new(ethcore.GasPool).AddGas(_blockGasLimit),
 		GovHandler:    g,
 		AcctHandler:   a,
@@ -162,7 +159,6 @@ func (bctx *BlockContext) AddTxsCnt(d int) {
 	bctx.TxsCnt += d
 }
 
-// `UseGas` should not be used in `EVMCtrler`
 func (bctx *BlockContext) UseGas(gas uint64) xerrors.XError {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
@@ -170,7 +166,18 @@ func (bctx *BlockContext) UseGas(gas uint64) xerrors.XError {
 	if err := bctx.blockGasPool.SubGas(gas); err != nil {
 		return xerrors.ErrOverFlow.Wrap(err)
 	}
-	bctx.BlockGasUsed += gas
+	return nil
+}
+
+func (bctx *BlockContext) RefundGas(gas uint64) xerrors.XError {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	if bctx.blockGasPool.Gas()+gas > bctx.BlockGasLimit {
+		xerrors.ErrOverFlow.Wrapf("gas refund causes overflow: gas limit: %d, gas pool: %d+%d",
+			bctx.BlockGasLimit, bctx.blockGasPool, gas)
+	}
+	_ = bctx.blockGasPool.AddGas(gas)
 	return nil
 }
 
@@ -178,7 +185,7 @@ func (bctx *BlockContext) GasUsed() uint64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
-	return bctx.BlockGasUsed
+	return bctx.BlockGasLimit - bctx.blockGasPool.Gas()
 }
 
 func (bctx *BlockContext) FeeUsed() *uint256.Int {

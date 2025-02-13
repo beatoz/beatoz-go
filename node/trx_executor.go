@@ -84,42 +84,49 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
+	var xerr xerrors.XError
+
 	if !ctx.IsHandledByEVM() {
 		// When the tx is handled by `EVMCtrler`,
 		// tha gas & nonce have already been also processed in `EVMCtrler`.
-		if xerr := ctx.UseGas(ctx.Tx.Gas); xerr != nil {
+		if xerr = ctx.UseGas(ctx.Tx.Gas); xerr != nil {
 			return xerr
 		}
 	}
+	defer func() {
+		if xerr != nil {
+			_ = ctx.RefundGas(ctx.Tx.Gas)
+		}
+	}()
 
 	//
 	// tx execution
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
-		if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		if xerr = ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 			return xerr
 		}
 	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
-		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr = ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
 		if ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil {
-			if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+			if xerr = ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
 				return xerr
 			}
-		} else if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
+		} else if xerr = ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
-		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr = ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
 
-	if xerr := postRunTrx(ctx); xerr != nil {
+	if xerr = postRunTrx(ctx); xerr != nil {
 		return xerr
 	}
 

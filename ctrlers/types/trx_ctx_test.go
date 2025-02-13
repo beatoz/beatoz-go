@@ -156,14 +156,9 @@ func Test_NewTrxContext(t *testing.T) {
 
 func newTrxCtx(tx *ctrlertypes.Trx, height int64, adjustMaxGas uint64) (*ctrlertypes.TrxContext, xerrors.XError) {
 	bz, _ := tx.Encode()
-	return ctrlertypes.NewTrxContext(
-		bz,
-		ctrlertypes.NewBlockContextAs(height, time.Now(), chainId, govParams, acctHandler, nil),
-		true,
-		func(ctx *ctrlertypes.TrxContext) xerrors.XError {
-			ctx.BlockContext.TxGasLimit = adjustMaxGas
-			return nil
-		})
+	bctx := ctrlertypes.NewBlockContextAs(height, time.Now(), chainId, govParams, acctHandler, nil)
+	bctx.TxGasLimit = adjustMaxGas
+	return ctrlertypes.NewTrxContext(bz, bctx, true)
 }
 
 type acctHandlerMock struct{}

@@ -48,6 +48,22 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 		return nil, xerr
 	}
 
+	//
+	// The following can be performed in parallel.
+	if tx.Gas < bctx.GovHandler.MinTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("too small gas. the minimum gas of tx is %v", bctx.GovHandler.MinTrxGas())
+	} else if tx.Gas > bctx.GetTrxGasLimit() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("too much gas. the gas limit of tx is %v", bctx.TxGasLimit)
+	}
+	if tx.GasPrice.Cmp(bctx.GovHandler.GasPrice()) != 0 {
+		return nil, xerrors.ErrInvalidGasPrice
+	}
+
+	_, pubKeyBytes, xerr := VerifyTrxRLP(tx, bctx.ChainID)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	txctx := &TrxContext{
 		BlockContext: bctx,
 		TxIdx:        bctx.GetTxsCnt(),
@@ -55,6 +71,7 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 		TxHash:       tmtypes.Tx(txbz).Hash(),
 		Exec:         exec,
 		GasUsed:      0,
+		SenderPubKey: pubKeyBytes,
 	}
 	for _, fn := range cbfns {
 		if err := fn(txctx); err != nil {
@@ -62,24 +79,6 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool, cbfns ...NewTrxCo
 		}
 	}
 
-	//
-	// The following can be performed in parallel.
-	{
-		if tx.Gas < bctx.GovHandler.MinTrxGas() {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas. the minimum gas of tx is %v", bctx.GovHandler.MinTrxGas())
-		} else if tx.Gas > bctx.GetTrxGasLimit() {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas. the gas limit of tx is %v", bctx.TxGasLimit)
-		}
-		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
-			return nil, xerrors.ErrInvalidGasPrice
-		}
-
-		_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
-		if xerr != nil {
-			return nil, xerr
-		}
-		txctx.SenderPubKey = pubKeyBytes
-	}
 	//
 
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
@@ -106,7 +105,15 @@ func (ctx *TrxContext) UseGas(gas uint64) xerrors.XError {
 	if xerr := ctx.BlockContext.UseGas(gas); xerr != nil {
 		return xerr
 	}
-	ctx.GasUsed = gas
+	ctx.GasUsed += gas
+	return nil
+}
+
+func (ctx *TrxContext) RefundGas(gas uint64) xerrors.XError {
+	if xerr := ctx.BlockContext.RefundGas(gas); xerr != nil {
+		return xerr
+	}
+	ctx.GasUsed -= gas
 	return nil
 }
 

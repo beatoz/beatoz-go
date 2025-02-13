@@ -7,8 +7,8 @@ import (
 
 var lastBlockCtx *ctrlertypes.BlockContext
 
-func InitBlockCtxWith(h int64, g ctrlertypes.IGovHandler, a ctrlertypes.IAccountHandler, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
-	bctx := ctrlertypes.NewBlockContextAs(h, time.Now(), "", g, a, s)
+func InitBlockCtxWith(h int64, chainId string, g ctrlertypes.IGovHandler, a ctrlertypes.IAccountHandler, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
+	bctx := ctrlertypes.NewBlockContextAs(h, time.Now(), chainId, g, a, s)
 	lastBlockCtx = bctx
 	return bctx
 }
@@ -29,7 +29,7 @@ func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
 	if lastBlockCtx == nil {
 		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
 	}
-	lastBlockCtx = InitBlockCtxWith(bctx.GetHeight()+1, bctx.GovHandler, bctx.AcctHandler, bctx.StakeHandler)
+	lastBlockCtx = InitBlockCtxWith(bctx.GetHeight()+1, bctx.ChainID, bctx.GovHandler, bctx.AcctHandler, bctx.StakeHandler)
 	return lastBlockCtx
 }
 
