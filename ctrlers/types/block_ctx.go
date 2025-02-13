@@ -137,14 +137,6 @@ func (bctx *BlockContext) TimeSeconds() int64 {
 	return bctx.Time.Unix()
 }
 
-func (bctx *BlockContext) ExpectedNextBlockTimeSeconds(interval time.Duration) int64 {
-	bctx.mtx.RLock()
-	defer bctx.mtx.RUnlock()
-
-	secs := int64(interval.Seconds())
-	return bctx.Time.Unix() + secs
-}
-
 func (bctx *BlockContext) GetTxsCnt() int {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
