@@ -2,11 +2,13 @@ package node
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"testing"
+	"time"
 )
 
 var (
@@ -36,7 +38,7 @@ func Benchmark_prepareTrxContext(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for _, req := range txReqs {
 			txPreparer.Add(req, func(*abcitypes.RequestDeliverTx, int) (*types.TrxContext, *abcitypes.ResponseDeliverTx) {
-				txctx, xerr := newTrxCtx(req.Tx, 1)
+				txctx, xerr := newTrxCtx(req.Tx, ctrlertypes.NewBlockContextAs(1, time.Now(), chainId, govParams, acctHandler, nil))
 				require.NoError(b, xerr)
 				return txctx, nil
 			})
@@ -50,7 +52,7 @@ func Benchmark_prepareTrxContext(b *testing.B) {
 func Benchmark_sequentialTrxContext(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for _, req := range txReqs {
-			_, xerr := newTrxCtx(req.Tx, 1)
+			_, xerr := newTrxCtx(req.Tx, ctrlertypes.NewBlockContextAs(1, time.Now(), chainId, govParams, acctHandler, nil))
 			require.NoError(b, xerr)
 		}
 	}

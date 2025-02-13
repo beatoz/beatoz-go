@@ -142,8 +142,11 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	}
 
 	if ctx.Exec == false {
-		// `GasUsed` will be used to simulate in `ExecuteTrx`.
-		ctx.GasUsed = gas
+		// Since the tx is not fully executed in the `CheckTx` phase,
+		// the gas values are not updated by `EVM`.
+		if xerr := ctx.UseGas(gas); xerr != nil {
+			return xerr
+		}
 	}
 
 	return nil
@@ -151,15 +154,11 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 
 func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if ctx.Exec == false {
-		// Only in the 'DeliveryTx' phase, the contract transaction is fully executed,
-		// and in the 'CheckTx' phase it is minimally executed.
-
-		if xerr := ctx.BlockContext.UseGas(ctx.GasUsed); xerr != nil {
-			return xerr
-		}
+		// In the `CheckTx` phase, the tx is not fully executed.
+		// Only in the 'DeliveryTx' phase, the contract transaction is fully executed.
 
 		// update balance
-		feeAmt := ctrlertypes.GasToFee(ctx.GasUsed, ctx.Tx.GasPrice)
+		feeAmt := ctx.FeeUsed()
 		needAmt := new(uint256.Int).Add(feeAmt, ctx.Tx.Amount)
 		if xerr := ctx.Sender.SubBalance(needAmt); xerr != nil {
 			return xerr
@@ -174,9 +173,6 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		}
 
 		return nil
-	}
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
-		return xerrors.ErrUnknownTrxType
 	}
 
 	ctrler.mtx.Lock()
@@ -226,12 +222,13 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
 
-	// The gas is already applied to accounts by buyGas and refundGas in EVM.
-	// (the `EVM` handles nonce, balance and gas(+gas pool).)
-	// The `ctx.BlockContext.blockGasPool` is also decreased by EVM.
-	// But the `ctx.BlockContext.BlockGasUsed` is not increased by EVM.
-	// Don't call ``ctx.UseGas()` or `ctx.BlockContext.UseGas()`.
-	// Update `ctx.GasUsed` and `ctx.BlockContext.BlockGasUsed` directly.
+	// The gas value is already applied to the sender account and the gas pool
+	// by buyGas() and refundGas() in EVM.
+	// (the `EVM` handles nonce, balance(including gas) and gas pool.)
+	// In other word, the `ctx.BlockContext.blockGasPool` is updated by EVM,
+	// but the `ctx.BlockContext.BlockGasUsed` and `ctx.GasUsed` is not updated by EVM.
+	// Don't call ``ctx.UseGas()` or `ctx.BlockContext.UseGas()` which updates `ctx.BlockContext.blockGasPool`.
+	// Update only `ctx.GasUsed` and `ctx.BlockContext.BlockGasUsed` directly.
 	ctx.BlockContext.BlockGasUsed += evmResult.UsedGas
 	ctx.GasUsed = evmResult.UsedGas
 	ctx.RetData = evmResult.ReturnData

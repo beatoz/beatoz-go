@@ -276,7 +276,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 		}
 
 		// check balance
-		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+		feeAmt := ctrlertypes.GasToFee(tx.Gas, tx.GasPrice)
 		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
 		if xerr := sender.CheckBalance(needAmt); xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)

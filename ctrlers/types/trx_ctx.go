@@ -4,6 +4,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
@@ -107,4 +108,18 @@ func (ctx *TrxContext) UseGas(gas uint64) xerrors.XError {
 	}
 	ctx.GasUsed = gas
 	return nil
+}
+
+func (ctx *TrxContext) FeeUsed() *uint256.Int {
+	return GasToFee(ctx.GasUsed, ctx.Tx.GasPrice)
+}
+
+func (ctx *TrxContext) FeeWanted() *uint256.Int {
+	return GasToFee(ctx.Tx.Gas, ctx.Tx.GasPrice)
+}
+
+func (ctx *TrxContext) IsHandledByEVM() bool {
+	// the tx whose type is `TRX_CONTRACT`.
+	// the tx whose type is `TRX_TRANSFER` and `Receiver` is contract. (for processing fallback)
+	return ctx.Tx.GetType() == TRX_CONTRACT || (ctx.Tx.GetType() == TRX_TRANSFER && ctx.Receiver.Code != nil)
 }

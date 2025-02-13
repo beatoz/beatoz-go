@@ -39,7 +39,7 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	//
 	tx := ctx.Tx
 
-	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	feeAmt := ctx.FeeWanted()
 	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
 	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
 		return xerr
@@ -84,6 +84,14 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
+	if !ctx.IsHandledByEVM() {
+		// When the tx is handled by `EVMCtrler`,
+		// tha gas & nonce have already been also processed in `EVMCtrler`.
+		if xerr := ctx.UseGas(ctx.Tx.Gas); xerr != nil {
+			return xerr
+		}
+	}
+
 	//
 	// tx execution
 	switch ctx.Tx.GetType() {
@@ -119,23 +127,14 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT ||
-		(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
-		// 1. If the tx type is `TRX_CONTRACT`,
-		//    the gas & nonce have already been processed in `EVMCtrler`.
-		// 2. If the tx is `TRX_TRANSFER` type and the receiver is a contract,
-		//    it is executed by `EVMCtrler` to process the fallback feature.
-		//    In this case too, tha gas & nonce have already been also processed in `EVMCtrler`.
+	if ctx.IsHandledByEVM() {
+		// When the tx is handled by `EVMCtrler`,
+		// tha gas & nonce have already been also processed in `EVMCtrler`.
 		return nil
 	}
 
-	// set used gas
-	if xerr := ctx.UseGas(ctx.Tx.Gas); xerr != nil {
-		return xerr
-	}
-
 	// processing fee = gas * gasPrice
-	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
+	fee := ctx.FeeUsed()
 	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
 		return xerr
 	}
