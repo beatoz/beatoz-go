@@ -13,17 +13,17 @@ func TestBlockGasLimit(t *testing.T) {
 	_max := types.DefaultGovParams().MaxBlockGas()
 	_min := types.DefaultGovParams().MinTrxGas() * 10000
 
-	for n := 0; n < 100000; n++ {
+	for n := 0; n < 1000000; n++ {
 
 		blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil)
 		randBlockGasLimit := rand.Uint64N(_max)
 		blockCtx.SetBlockGasLimit(randBlockGasLimit)
 
-		randGasUsed := rand.Uint64N(randBlockGasLimit) + 4000
+		randGasUsed := uint64(0) //rand.Uint64N(randBlockGasLimit)
 		threshold0 := randBlockGasLimit - randBlockGasLimit/10
-		threshold1 := randBlockGasLimit / 10
+		threshold1 := randBlockGasLimit / 100
 
-		adjusted := types.AdjustBlockGasLimit(blockCtx.GetBlockGasLimit(), randGasUsed, _min, _max)
+		adjusted := types.AdjustBlockGasLimit(randBlockGasLimit, randGasUsed, _min, _max)
 
 		expected := uint64(0)
 		if randGasUsed > threshold0 {
@@ -33,12 +33,12 @@ func TestBlockGasLimit(t *testing.T) {
 				expected = _max
 			}
 
-		} else if randGasUsed <= threshold0 && randGasUsed >= threshold1 {
+		} else if randGasUsed == 0 || randGasUsed <= threshold0 && randGasUsed >= threshold1 {
 			// expect gas limit equal
 			expected = randBlockGasLimit
 		} else if randGasUsed < threshold1 {
 			// expect gas limit decreasing.
-			expected = randBlockGasLimit - randBlockGasLimit/10
+			expected = randBlockGasLimit - randBlockGasLimit/100
 			if expected < _min {
 				expected = _min
 			}
