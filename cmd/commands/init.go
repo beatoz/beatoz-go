@@ -21,6 +21,7 @@ var (
 	beatozChainID = "mainnet"
 	holderCnt     = 10
 	privValCnt    = 1
+	blockGasLimit = int64(50_000_000)
 
 	privValSecretFeederAddr string
 )
@@ -64,6 +65,15 @@ func AddInitFlags(cmd *cobra.Command) {
 			"the first validator's account file (wallet key file) is created as $BEATOZHOME/config/priv_validator_key.json.\n"+
 			"if there is more than one validator, the rest will be created in the $BEATOZHOME/walkeys/vals directory.",
 	)
+	cmd.Flags().Int64Var(
+		&blockGasLimit,
+		"block_gas_limit",
+		blockGasLimit,
+		"the maximum gas that can be used in one block.\n"+
+			"this value is deterministically adjusted based on the gas usage in the blockchain network.\n"+
+			"however, it cannot exceed the `maxBlockGas` of Governance Parameters.",
+	)
+
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
@@ -202,6 +212,7 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			logger.Info("Generate GenesisAssetHolder")
 
 			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
+			genDoc.ConsensusParams.Block.MaxGas = blockGasLimit
 			if err != nil {
 				return err
 			}
