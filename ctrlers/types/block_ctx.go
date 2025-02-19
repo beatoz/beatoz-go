@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"sync"
@@ -11,11 +12,13 @@ import (
 )
 
 type BlockContext struct {
-	blockInfo    abcitypes.RequestBeginBlock
-	feeSum       *uint256.Int
-	txsCnt       int
-	maxGasPerTrx uint64
-	appHash      bytes.HexBytes
+	blockInfo     abcitypes.RequestBeginBlock
+	blockGasLimit uint64
+	blockGasPool  *ethcore.GasPool
+	feeSum        *uint256.Int
+	txsCnt        int
+	evmTxsCnt     int
+	appHash       bytes.HexBytes
 
 	GovHandler   IGovHandler
 	AcctHandler  IAccountHandler
@@ -31,6 +34,7 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 		blockInfo:    bi,
 		feeSum:       uint256.NewInt(0),
 		txsCnt:       0,
+		evmTxsCnt:    0,
 		appHash:      nil,
 		GovHandler:   g,
 		AcctHandler:  a,
@@ -127,11 +131,21 @@ func (bctx *BlockContext) TxsCnt() int {
 	return bctx.txsCnt
 }
 
-func (bctx *BlockContext) AddTxsCnt(d int) {
+func (bctx *BlockContext) EVMTxsCnt() int {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	return bctx.evmTxsCnt
+}
+
+func (bctx *BlockContext) AddTxsCnt(d int, isEVMTx bool) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
 	bctx.txsCnt += d
+	if isEVMTx {
+		bctx.evmTxsCnt += d
+	}
 }
 
 func (bctx *BlockContext) GetValUpdates() abcitypes.ValidatorUpdates {
@@ -148,20 +162,56 @@ func (bctx *BlockContext) SetValUpdates(valUps abcitypes.ValidatorUpdates) {
 	bctx.ValUpdates = valUps
 }
 
-func (bctx *BlockContext) AdjustMaxGasPerTrx(minCap, maxCap uint64) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	// Hyperbolic Function is applied.
-	// `newMaxGas = (maxCap - minCap) / (1 + TxCount) + minCap`
-	bctx.maxGasPerTrx = (maxCap-minCap)/uint64(1+bctx.txsCnt) + minCap
-}
-
-func (bctx *BlockContext) MaxGasPerTrx() uint64 {
+func (bctx *BlockContext) GetBlockGasLimit() uint64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
-	return bctx.maxGasPerTrx
+	return bctx.blockGasLimit
+}
+
+func (bctx *BlockContext) SetBlockGasLimit(gasLimit uint64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.setBlockGasLimit(gasLimit)
+}
+
+func (bctx *BlockContext) setBlockGasLimit(gasLimit uint64) {
+	bctx.blockGasLimit = gasLimit
+	bctx.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
+}
+
+func (bctx *BlockContext) GetBlockGasUsed() uint64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+	return bctx.getBlockGasUsed()
+}
+
+func (bctx *BlockContext) getBlockGasUsed() uint64 {
+	return bctx.blockGasLimit - bctx.blockGasPool.Gas()
+}
+
+func (bctx *BlockContext) UseBlockGas(gas uint64) xerrors.XError {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	if err := bctx.blockGasPool.SubGas(gas); err != nil {
+		return xerrors.ErrInvalidGas.Wrap(err)
+	}
+	return nil
+}
+
+func (bctx *BlockContext) RefundBlockGas(gas uint64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	_ = bctx.blockGasPool.AddGas(gas)
+}
+
+func (bctx *BlockContext) GetBlockGasPool() *ethcore.GasPool {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+	return bctx.blockGasPool
 }
 
 func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
@@ -169,17 +219,21 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 	defer bctx.mtx.RUnlock()
 
 	_bctx := &struct {
-		BlockInfo    abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum       *uint256.Int                `json:"feeSum"`
-		TxsCnt       int                         `json:"txsCnt"`
-		MaxGasPerTrx uint64                      `json:"maxGasPerTrx"`
-		AppHash      []byte                      `json:"appHash"`
+		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
+		BlockGasLimit uint64                      `json:"blockGasLimit"`
+		BlockGasUsed  uint64                      `json:"blockGasUsed"`
+		FeeSum        *uint256.Int                `json:"feeSum"`
+		TxsCnt        int                         `json:"txsCnt"`
+		EVMTxsCnt     int                         `json:"evmTxsCnt"`
+		AppHash       []byte                      `json:"appHash"`
 	}{
-		BlockInfo:    bctx.blockInfo,
-		GasSum:       bctx.feeSum,
-		TxsCnt:       bctx.txsCnt,
-		MaxGasPerTrx: bctx.maxGasPerTrx,
-		AppHash:      bctx.appHash,
+		BlockInfo:     bctx.blockInfo,
+		BlockGasLimit: bctx.blockGasLimit,
+		BlockGasUsed:  bctx.GetBlockGasUsed(),
+		FeeSum:        bctx.feeSum,
+		TxsCnt:        bctx.txsCnt,
+		EVMTxsCnt:     bctx.evmTxsCnt,
+		AppHash:       bctx.appHash,
 	}
 
 	return json.Marshal(_bctx)
@@ -190,22 +244,45 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	defer bctx.mtx.Unlock()
 
 	_bctx := &struct {
-		BlockInfo    abcitypes.RequestBeginBlock `json:"blockInfo"`
-		GasSum       *uint256.Int                `json:"feeSum"`
-		TxsCnt       int                         `json:"txsCnt"`
-		MaxGasPerTrx uint64                      `json:"maxGasPerTrx"`
-		AppHash      []byte                      `json:"appHash"`
+		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
+		BlockGasLimit uint64                      `json:"blockGasLimit"`
+		BlockGasUsed  uint64                      `json:"blockGasUsed"`
+		FeeSum        *uint256.Int                `json:"feeSum"`
+		TxsCnt        int                         `json:"txsCnt"`
+		EVMTxsCnt     int                         `json:"evmTxsCnt"`
+		AppHash       []byte                      `json:"appHash"`
 	}{}
 
 	if err := json.Unmarshal(bz, _bctx); err != nil {
 		return err
 	}
 	bctx.blockInfo = _bctx.BlockInfo
-	bctx.feeSum = _bctx.GasSum
+	bctx.blockGasLimit = _bctx.BlockGasLimit
+	bctx.blockGasPool = new(ethcore.GasPool).AddGas(bctx.blockGasLimit - _bctx.BlockGasUsed)
+	bctx.feeSum = _bctx.FeeSum
 	bctx.txsCnt = _bctx.TxsCnt
-	bctx.maxGasPerTrx = _bctx.MaxGasPerTrx
+	bctx.evmTxsCnt = _bctx.EVMTxsCnt
 	bctx.appHash = _bctx.AppHash
 	return nil
+}
+
+func AdjustBlockGasLimit(blockGasLimit, blockGasUsed, min, max uint64) uint64 {
+	upperThreshold := blockGasLimit - (blockGasLimit / 10)
+	bottomThreshold := blockGasLimit / 10
+	if blockGasUsed > upperThreshold {
+		// increase gas limit
+		blockGasLimit = blockGasLimit + (blockGasLimit / 10)
+		if blockGasLimit > max {
+			blockGasLimit = max
+		}
+	} else if blockGasUsed < bottomThreshold {
+		// decrease gas limit
+		blockGasLimit = blockGasLimit - (blockGasLimit / 10)
+		if blockGasLimit < min {
+			blockGasLimit = min
+		}
+	}
+	return blockGasLimit
 }
 
 type IBlockHandler interface {
