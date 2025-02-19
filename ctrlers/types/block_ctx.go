@@ -12,13 +12,14 @@ import (
 )
 
 type BlockContext struct {
-	blockInfo     abcitypes.RequestBeginBlock
-	blockGasLimit uint64
-	blockGasPool  *ethcore.GasPool
-	feeSum        *uint256.Int
-	txsCnt        int
-	evmTxsCnt     int
-	appHash       bytes.HexBytes
+	blockInfo      abcitypes.RequestBeginBlock
+	blockSizeLimit int64
+	blockGasLimit  uint64
+	blockGasPool   *ethcore.GasPool
+	feeSum         *uint256.Int
+	txsCnt         int
+	evmTxsCnt      int
+	appHash        bytes.HexBytes
 
 	GovHandler   IGovHandler
 	AcctHandler  IAccountHandler
@@ -30,7 +31,7 @@ type BlockContext struct {
 }
 
 func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
-	return &BlockContext{
+	ret := &BlockContext{
 		blockInfo:    bi,
 		feeSum:       uint256.NewInt(0),
 		txsCnt:       0,
@@ -41,6 +42,10 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 		StakeHandler: s,
 		ValUpdates:   nil,
 	}
+	if g != nil {
+		ret.setBlockGasLimit(g.MaxBlockGas())
+	}
+	return ret
 }
 
 func (bctx *BlockContext) BlockInfo() abcitypes.RequestBeginBlock {
@@ -162,6 +167,18 @@ func (bctx *BlockContext) SetValUpdates(valUps abcitypes.ValidatorUpdates) {
 	bctx.ValUpdates = valUps
 }
 
+func (bctx *BlockContext) GetBlockSizeLimit() int64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+	return bctx.blockSizeLimit
+}
+
+func (bctx *BlockContext) SetBlockSizeLimit(limit int64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+	bctx.blockSizeLimit = limit
+}
+
 func (bctx *BlockContext) GetBlockGasLimit() uint64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
@@ -266,18 +283,23 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	return nil
 }
 
-func AdjustBlockGasLimit(blockGasLimit, blockGasUsed, min, max uint64) uint64 {
-	upperThreshold := blockGasLimit - (blockGasLimit / 10)
-	bottomThreshold := blockGasLimit / 10
-	if blockGasUsed > upperThreshold {
+func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max uint64) uint64 {
+	if preBlockGasUsed == 0 {
+		return preBlockGasLimit
+	}
+
+	blockGasLimit := preBlockGasLimit
+	upperThreshold := blockGasLimit - (blockGasLimit / 10) // 90%
+	bottomThreshold := blockGasLimit / 100                 // 1%
+	if preBlockGasUsed > upperThreshold {
 		// increase gas limit
-		blockGasLimit = blockGasLimit + (blockGasLimit / 10)
+		blockGasLimit = blockGasLimit + (blockGasLimit / 10) // increase 10%
 		if blockGasLimit > max {
 			blockGasLimit = max
 		}
-	} else if blockGasUsed < bottomThreshold {
+	} else if preBlockGasUsed < bottomThreshold {
 		// decrease gas limit
-		blockGasLimit = blockGasLimit - (blockGasLimit / 10)
+		blockGasLimit = blockGasLimit - (blockGasLimit / 100) // decrease 1%
 		if blockGasLimit < min {
 			blockGasLimit = min
 		}

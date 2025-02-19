@@ -18,12 +18,12 @@ func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 	}
 }
 
-func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
+func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors.XError {
 	xerr := validateTrx(ctx)
 	if xerr != nil {
 		return xerr
 	}
-	xerr = runTrx(ctx)
+	xerr = runTrx(ctx, bctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -82,36 +82,48 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
+func runTrx(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors.XError {
+	var xerr xerrors.XError
 	//
 	// tx execution
+	if bctx != nil && !ctx.IsHandledByEVM() {
+		if xerr = bctx.UseBlockGas(ctx.Tx.Gas); xerr != nil {
+			return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)", bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), ctx.Tx.Gas)
+		}
+	}
+
+	defer func() {
+		if xerr != nil {
+			bctx.RefundBlockGas(ctx.Tx.Gas)
+		}
+	}()
+
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
-		if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		if xerr = ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
-		if xerr := ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr = ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
-		if ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil {
-			if xerr := ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil && xerr != xerrors.ErrUnknownTrxType {
+		if ctx.IsHandledByEVM() {
+			if xerr = ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil {
 				return xerr
 			}
-		} else if xerr := ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
+		} else if xerr = ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
-		if xerr := ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr = ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
 
-	if xerr := postRunTrx(ctx); xerr != nil {
+	if xerr = postRunTrx(ctx); xerr != nil {
 		return xerr
 	}
 

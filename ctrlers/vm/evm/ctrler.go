@@ -97,25 +97,24 @@ func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
-func (ctrler *EVMCtrler) BeginBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.lastBlockHeight+1 != ctx.Height() {
-		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, ctx.Height())
+	if ctrler.lastBlockHeight+1 != bctx.Height() {
+		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, bctx.Height())
 	}
 
-	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, ctx.AcctHandler, ctrler.logger)
+	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, bctx.AcctHandler, ctrler.logger)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
 
+	beneficiary := bytes.HexBytes(bctx.BlockInfo().Header.ProposerAddress).Array20()
+	blockContext := evmBlockContext(beneficiary, bctx.Height(), bctx.TimeSeconds(), bctx.GetBlockGasLimit())
+	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{}, stdb, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
 	ctrler.stateDBWrapper = stdb
-	ctrler.blockGasPool = new(ethcore.GasPool).AddGas(blockGasLimit)
-
-	beneficiary := bytes.HexBytes(ctx.BlockInfo().Header.ProposerAddress).Array20()
-	blockContext := evmBlockContext(beneficiary, ctx.Height(), ctx.TimeSeconds())
-	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{}, ctrler.stateDBWrapper, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
+	ctrler.blockGasPool = bctx.GetBlockGasPool()
 
 	return nil, nil
 }
@@ -222,7 +221,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
 
-	// Gas is already applied to accounts by buyGas and refundGas in EVM.
+	// Gas is already applied to accounts and gas pool by buyGas and refundGas in EVM
 	// the `EVM` handles nonce, amount and gas.
 	ctx.GasUsed = evmResult.UsedGas
 	ctx.RetData = evmResult.ReturnData

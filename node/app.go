@@ -220,6 +220,10 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(xerr)
 	}
 
+	// set initial block gas limit
+	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
+	ctrler.lastBlockCtx.SetBlockGasLimit(uint64(req.ConsensusParams.Block.MaxGas))
+
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{
 		AppHash: appHash,
@@ -237,7 +241,6 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
 			false,
 			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-				_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 				_txctx.TrxGovHandler = ctrler.govCtrler
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -257,7 +260,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			}
 		}
 
-		xerr = ctrler.txExecutor.ExecuteSync(txctx)
+		xerr = ctrler.txExecutor.ExecuteSync(txctx, nil)
 		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("CheckTx", "error", xerr)
@@ -339,6 +342,11 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 				Log:  xerr.Error(),
 			}
 		}
+		return abcitypes.ResponseCheckTx{
+			Code:      abcitypes.CodeTypeOK,
+			GasWanted: int64(tx.Gas),
+			GasUsed:   int64(tx.Gas),
+		}
 	}
 	return abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
 }
@@ -355,7 +363,15 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	blockGasLimit := ctrlertypes.AdjustBlockGasLimit(
+		ctrler.lastBlockCtx.GetBlockGasLimit(),
+		ctrler.lastBlockCtx.GetBlockGasUsed(),
+		ctrler.govCtrler.MaxTrxGas(), // minimum block gas limit
+		ctrler.govCtrler.MaxBlockGas(),
+	)
 	ctrler.nextBlockCtx = ctrlertypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler)
+	ctrler.nextBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
+	ctrler.nextBlockCtx.SetBlockGasLimit(blockGasLimit)
 
 	ev0, xerr := ctrler.govCtrler.BeginBlock(ctrler.nextBlockCtx)
 	if xerr != nil {
@@ -386,9 +402,6 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		true,
 		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
 			_txctx.TxIdx = ctrler.nextBlockCtx.TxsCnt()
-			ctrler.nextBlockCtx.AddTxsCnt(1)
-
-			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -423,7 +436,9 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 
 	}
-	xerr = ctrler.txExecutor.ExecuteSync(txctx)
+	ctrler.nextBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
+
+	xerr = ctrler.txExecutor.ExecuteSync(txctx, ctrler.nextBlockCtx)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
@@ -488,9 +503,6 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 			// `idx` may be not equal to `ctrler.nextBlockCtx.TxsCnt()`
 			// because the order of calling `asyncPrepareTrxContext` is not sequential.
 			_txctx.TxIdx = idx
-			ctrler.nextBlockCtx.AddTxsCnt(1)
-
-			_txctx.MaxGas = ctrler.lastBlockCtx.MaxGasPerTrx()
 			_txctx.TrxGovHandler = ctrler.govCtrler
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
@@ -511,12 +523,14 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 		}
 	}
 
+	ctrler.nextBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
+
 	return txctx, nil
 }
 
 // asyncExecTrxContext is called in parallel tx processing
 func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abcitypes.ResponseDeliverTx {
-	xerr := ctrler.txExecutor.ExecuteSync(txctx)
+	xerr := ctrler.txExecutor.ExecuteSync(txctx, ctrler.nextBlockCtx)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("asyncExecTrxContext", "error", xerr)
@@ -602,9 +616,22 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	ev = append(ev, ev2...)
 	ev = append(ev, ev3...)
 
+	nextBlockGasLimit := ctrlertypes.AdjustBlockGasLimit(
+		ctrler.nextBlockCtx.GetBlockGasLimit(),
+		ctrler.nextBlockCtx.GetBlockGasUsed(),
+		ctrler.govCtrler.MaxTrxGas(), // minimum block gas limit
+		ctrler.govCtrler.MaxBlockGas(),
+	)
+	blockParams := &abcitypes.BlockParams{
+		MaxBytes: ctrler.nextBlockCtx.GetBlockSizeLimit(),
+		MaxGas:   int64(nextBlockGasLimit),
+	}
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates: ctrler.nextBlockCtx.ValUpdates,
-		Events:           ev,
+		ConsensusParamUpdates: &abcitypes.ConsensusParams{
+			Block: blockParams,
+		},
+		Events: ev,
 	}
 }
 
@@ -644,14 +671,10 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
 	ctrler.nextBlockCtx.SetAppHash(appHash)
-	ctrler.nextBlockCtx.AdjustMaxGasPerTrx(
-		ctrler.govCtrler.MinTrxGas(),
-		ctrler.govCtrler.MaxTrxGas())
 	ctrler.logger.Debug("BeatozApp::Commit",
 		"height", ver0,
 		"txs", ctrler.nextBlockCtx.TxsCnt(),
-		"appHash", ctrler.nextBlockCtx.AppHash(),
-		"adjustedMaxGasPerTrx", ctrler.nextBlockCtx.MaxGasPerTrx())
+		"appHash", ctrler.nextBlockCtx.AppHash())
 
 	ctrler.metaDB.PutLastBlockContext(ctrler.nextBlockCtx)
 	ctrler.metaDB.PutLastBlockHeight(ver0)
