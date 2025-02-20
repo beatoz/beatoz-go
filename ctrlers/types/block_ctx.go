@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethcore "github.com/ethereum/go-ethereum/core"
@@ -222,7 +223,19 @@ func (bctx *BlockContext) RefundBlockGas(gas uint64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
+	// for debug
+	_gasPool0 := bctx.blockGasPool.Gas()
+
 	_ = bctx.blockGasPool.AddGas(gas)
+
+	//
+	// for debug
+	_gasPool1 := bctx.blockGasPool.Gas()
+	if _gasPool1 > bctx.blockGasLimit {
+		panic(fmt.Sprintf("before gas pool(%v), gas(%v), after gas pool(%v), gas limit(%v)", _gasPool0, gas, _gasPool1, bctx.blockGasLimit))
+	}
+	//
+	//
 }
 
 func (bctx *BlockContext) GetBlockGasPool() *ethcore.GasPool {
@@ -290,14 +303,14 @@ func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max uint64) uin
 
 	blockGasLimit := preBlockGasLimit
 	upperThreshold := blockGasLimit - (blockGasLimit / 10) // 90%
-	bottomThreshold := blockGasLimit / 100                 // 1%
+	lowerThreshold := blockGasLimit / 100                  // 1%
 	if preBlockGasUsed > upperThreshold {
 		// increase gas limit
 		blockGasLimit = blockGasLimit + (blockGasLimit / 10) // increase 10%
 		if blockGasLimit > max {
 			blockGasLimit = max
 		}
-	} else if preBlockGasUsed < bottomThreshold {
+	} else if preBlockGasUsed < lowerThreshold {
 		// decrease gas limit
 		blockGasLimit = blockGasLimit - (blockGasLimit / 100) // decrease 1%
 		if blockGasLimit < min {
