@@ -12,6 +12,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
+	"math"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
@@ -86,13 +87,13 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, 0, blockGasLimit, uint256.NewInt(0), uint256.NewInt(0), data, true)
-	blockContext := evmBlockContext(sender, height, blockTime)
+	vmmsg := evmMessage(sender, toAddr, 0, math.MaxUint64/2, uint256.NewInt(0), uint256.NewInt(0), data, true)
+	blockContext := evmBlockContext(sender, height, blockTime, math.MaxUint64/2)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
-	gp := new(core.GasPool).AddGas(blockGasLimit)
+	gp := new(core.GasPool).AddGas(blockContext.GasLimit)
 	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
 	if err != nil {
 		return nil, xerrors.From(err)

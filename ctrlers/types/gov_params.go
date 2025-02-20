@@ -78,8 +78,8 @@ func DefaultGovParams() *GovParams {
 		lazyApplyingBlocks:      28800,                           // 1days blocks = 24 * 60 * 60s (1days seconds) / 3s(block intervals)
 		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
 		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
-		maxTrxGas:               25_000_000,
-		maxBlockGas:             math.MaxUint64,
+		maxTrxGas:               40_000_000,
+		maxBlockGas:             math.MaxUint64 / 2,
 		minVotingPeriodBlocks:   28800,  // 1day blocks = 24 * 60 * 60s(1day seconds) / 3s(block intervals)
 		maxVotingPeriodBlocks:   864000, // 30days blocks = 30 * 24 * 60 * 60s (30days seconds) / 3s(block intervals)
 		minSelfStakeRatio:       50,     // 50%
@@ -102,8 +102,8 @@ func Test1GovParams() *GovParams {
 		lazyApplyingBlocks:      10,
 		gasPrice:                uint256.NewInt(10),
 		minTrxGas:               uint64(10),
-		maxTrxGas:               math.MaxUint64,
-		maxBlockGas:             math.MaxUint64,
+		maxTrxGas:               math.MaxUint64 / 2,
+		maxBlockGas:             math.MaxUint64 / 2,
 		minVotingPeriodBlocks:   10,
 		maxVotingPeriodBlocks:   10,
 		minSelfStakeRatio:       50, // 50%
@@ -126,8 +126,8 @@ func Test2GovParams() *GovParams {
 		lazyApplyingBlocks:      40,
 		gasPrice:                uint256.NewInt(20),
 		minTrxGas:               uint64(20),
-		maxTrxGas:               math.MaxUint64,
-		maxBlockGas:             math.MaxUint64,
+		maxTrxGas:               math.MaxUint64 / 2,
+		maxBlockGas:             math.MaxUint64 / 2,
 		minVotingPeriodBlocks:   50,
 		maxVotingPeriodBlocks:   60,
 		minSelfStakeRatio:       50,    // 50%
@@ -150,8 +150,8 @@ func Test3GovParams() *GovParams {
 		lazyApplyingBlocks:      0,
 		gasPrice:                nil,
 		minTrxGas:               0,
-		maxTrxGas:               math.MaxUint64,
-		maxBlockGas:             math.MaxUint64,
+		maxTrxGas:               math.MaxUint64 / 2,
+		maxBlockGas:             math.MaxUint64 / 2,
 		minVotingPeriodBlocks:   0,
 		maxVotingPeriodBlocks:   0,
 		minSelfStakeRatio:       0,
@@ -174,8 +174,8 @@ func Test4GovParams() *GovParams {
 		lazyApplyingBlocks:      259200,
 		gasPrice:                uint256.NewInt(10_000_000_000),
 		minTrxGas:               uint64(100_000),
-		maxTrxGas:               math.MaxUint64,
-		maxBlockGas:             math.MaxUint64,
+		maxTrxGas:               math.MaxUint64 / 2,
+		maxBlockGas:             math.MaxUint64 / 2,
 		minVotingPeriodBlocks:   259200,
 		maxVotingPeriodBlocks:   2592000,
 		minSelfStakeRatio:       50,
@@ -209,8 +209,8 @@ func Test6GovParams_NoStakeLimiter() *GovParams {
 		lazyApplyingBlocks:      40,
 		gasPrice:                uint256.NewInt(20),
 		minTrxGas:               uint64(20),
-		maxTrxGas:               math.MaxUint64,
-		maxBlockGas:             math.MaxUint64,
+		maxTrxGas:               math.MaxUint64 / 2,
+		maxBlockGas:             math.MaxUint64 / 2,
 		minVotingPeriodBlocks:   50,
 		maxVotingPeriodBlocks:   60,
 		minSelfStakeRatio:       50,       // 50%

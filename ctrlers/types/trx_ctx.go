@@ -1,7 +1,6 @@
 package types
 
 import (
-	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -15,8 +14,6 @@ type TrxContext struct {
 	TxHash    bytes2.HexBytes
 	Tx        *Trx
 	TxIdx     int
-	MinGas    uint64
-	MaxGas    uint64
 	Exec      bool
 
 	SenderPubKey []byte
@@ -70,29 +67,23 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 	}
 
 	//
-	// The following can be performed in parallel.
-	{
-		if txctx.MinGas == 0 {
-			txctx.MinGas = txctx.GovHandler.MinTrxGas()
-		}
-		if txctx.MaxGas == 0 {
-			txctx.MaxGas = txctx.GovHandler.MaxTrxGas()
-		}
-		if tx.Gas < txctx.MinGas {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too small gas")
-		} else if tx.Gas > txctx.MaxGas {
-			return nil, xerrors.ErrInvalidGas.Wrapf("too much gas")
-		}
-		if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
-			return nil, xerrors.ErrInvalidGasPrice
-		}
-
-		_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
-		if xerr != nil {
-			return nil, xerr
-		}
-		txctx.SenderPubKey = pubKeyBytes
+	// validation gas and signature.
+	if tx.Gas < txctx.GovHandler.MinTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too small gas (min: %v)", txctx.GovHandler.MinTrxGas())
+	} else if tx.Gas > txctx.GovHandler.MaxTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too much gas (max: %d)", txctx.GovHandler.MaxTrxGas())
 	}
+
+	if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
+		return nil, xerrors.ErrInvalidGasPrice
+	}
+
+	_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
+	if xerr != nil {
+		return nil, xerr
+	}
+	txctx.SenderPubKey = pubKeyBytes
+	//
 	//
 
 	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
@@ -109,10 +100,11 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 	if txctx.Receiver == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}
+
 	return txctx, nil
 }
 
-func AdjustMaxGasPerTrx(txcnt int, cap uint64) uint64 {
-	txcnt = libs.MaxInt(txcnt, 1)
-	return cap / uint64(txcnt)
+func (ctx *TrxContext) IsHandledByEVM() bool {
+	b := ctx.Tx.GetType() == TRX_CONTRACT || (ctx.Tx.GetType() == TRX_TRANSFER && ctx.Receiver.Code != nil)
+	return b
 }

@@ -347,8 +347,9 @@ func (client *beatozLocalClient) EndBlockSync(req abcitypes.RequestEndBlock) (*a
 	client.txPreparer.Wait()
 
 	// for debugging
-	if client.txPreparer.resultCount() != client.Application.(*BeatozApp).nextBlockCtx.TxsCnt() {
-		panic(fmt.Sprintf("error: len(client.deliverTxReqs) != txs count in block"))
+	if client.txPreparer.resultCount() != client.Application.(*BeatozApp).currBlockCtx.TxsCnt() {
+		panic(fmt.Sprintf("error: len(client.deliverTxReqs)(%v) != txs count in block(%v)",
+			client.txPreparer.resultCount(), client.Application.(*BeatozApp).currBlockCtx.TxsCnt()))
 	}
 
 	// Execute every transaction in its own `TrxContext` sequentially

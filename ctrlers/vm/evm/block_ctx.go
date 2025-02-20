@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	blockGasLimit = uint64(25_000_000) // issue #44
-	gasFeeCap     = uint256.NewInt(0)
-	gasTipCap     = uint256.NewInt(0)
+	gasFeeCap = uint256.NewInt(0)
+	gasTipCap = uint256.NewInt(0)
 )
 
 // CanTransfer checks whether there are enough funds in the address' account to make a transfer.
@@ -30,7 +29,7 @@ func GetHash(h uint64) common.Hash {
 	return common.Hash{}
 }
 
-func evmBlockContext(coinbase common.Address, bn int64, tm int64) vm.BlockContext {
+func evmBlockContext(coinbase common.Address, bn int64, tm int64, gasLimit uint64) vm.BlockContext {
 	return vm.BlockContext{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -40,7 +39,7 @@ func evmBlockContext(coinbase common.Address, bn int64, tm int64) vm.BlockContex
 		Time:        big.NewInt(tm),
 		Difficulty:  big.NewInt(1),
 		BaseFee:     big.NewInt(0),
-		GasLimit:    blockGasLimit, // issue #44
+		GasLimit:    gasLimit, // issue #44
 	}
 }
 
