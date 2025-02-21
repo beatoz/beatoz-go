@@ -21,7 +21,7 @@ var (
 	beatozChainID = "mainnet"
 	holderCnt     = 10
 	privValCnt    = 1
-	blockGasLimit = int64(50_000_000)
+	blockGasLimit = int64(36_000_000)
 
 	privValSecretFeederAddr string
 )
