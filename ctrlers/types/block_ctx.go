@@ -307,15 +307,16 @@ func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max uint64) uin
 	if preBlockGasUsed > upperThreshold {
 		// increase gas limit
 		blockGasLimit = blockGasLimit + (blockGasLimit / 10) // increase 10%
-		if blockGasLimit > max {
-			blockGasLimit = max
-		}
+
 	} else if preBlockGasUsed < lowerThreshold {
 		// decrease gas limit
 		blockGasLimit = blockGasLimit - (blockGasLimit / 100) // decrease 1%
-		if blockGasLimit < min {
-			blockGasLimit = min
-		}
+	}
+
+	if blockGasLimit > max {
+		blockGasLimit = max
+	} else if blockGasLimit < min {
+		blockGasLimit = min
 	}
 	return blockGasLimit
 }
