@@ -213,7 +213,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 		Sender:      fromAcct,
 		Receiver:    nil,
 		GasUsed:     0,
-		GovHandler:  govParams,
+		GovParams:   govParams,
 		AcctHandler: &acctHandler,
 	}
 
@@ -264,7 +264,7 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPr
 		Sender:      fromAcct,
 		Receiver:    toAcct,
 		GasUsed:     0,
-		GovHandler:  govParams,
+		GovParams:   govParams,
 		AcctHandler: &acctHandler,
 	}
 	xerr := erc20EVM.ExecuteTrx(txctx)

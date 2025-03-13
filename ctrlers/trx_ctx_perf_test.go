@@ -19,7 +19,7 @@ import (
 var (
 	txbzs       [][]byte
 	acctHandler *mocks.AcctHandlerMock
-	govParams   *types2.GovParams
+	govParams   types2.IGovParams
 )
 
 func init() {
@@ -67,7 +67,7 @@ func newTrxCtx(txbz []byte) xerrors.XError {
 		true,
 		func(_txctx *types2.TrxContext) xerrors.XError {
 			_txctx.ChainID = "test_chain_id"
-			_txctx.GovHandler = govParams
+			_txctx.GovParams = govParams
 			_txctx.AcctHandler = acctHandler
 			return nil
 		})

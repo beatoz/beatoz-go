@@ -19,7 +19,7 @@ import (
 
 var (
 	acctMock01    *mocks.AcctHandlerMock
-	govParams01   *ctrlertypes.GovParams
+	govParams01   ctrlertypes.IGovParams
 	stakeCtrler01 *stake.StakeCtrler
 	validatorCnt  = 0
 )
@@ -57,7 +57,7 @@ func wrongIndividualLimit(t *testing.T) {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
-		ctx.GovHandler = govParams01
+		ctx.GovParams = govParams01
 		ctx.ChainID = "test-chain"
 		return nil
 	})
@@ -83,7 +83,7 @@ func wrongIndividualLimit(t *testing.T) {
 
 	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
-		ctx.GovHandler = govParams01
+		ctx.GovParams = govParams01
 		ctx.ChainID = "test-chain"
 		return nil
 	})
@@ -105,7 +105,7 @@ func wrongIndividualLimit(t *testing.T) {
 
 	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
-		ctx.GovHandler = govParams01
+		ctx.GovParams = govParams01
 		ctx.ChainID = "test-chain"
 		return nil
 	})
@@ -127,7 +127,7 @@ func wrongIndividualLimit(t *testing.T) {
 
 	txctx, xerr = ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
-		ctx.GovHandler = govParams01
+		ctx.GovParams = govParams01
 		ctx.ChainID = "test-chain"
 		return nil
 	})
@@ -173,7 +173,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
-			ctx.GovHandler = govParams01
+			ctx.GovParams = govParams01
 			ctx.ChainID = "test-chain"
 			return nil
 		})
@@ -195,7 +195,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
-		ctx.GovHandler = govParams01
+		ctx.GovParams = govParams01
 		ctx.ChainID = "test-chain"
 		return nil
 	})
@@ -240,7 +240,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
-			ctx.GovHandler = govParams01
+			ctx.GovParams = govParams01
 			ctx.ChainID = "test-chain"
 			return nil
 		})
@@ -270,7 +270,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
-			ctx.GovHandler = govParams01
+			ctx.GovParams = govParams01
 			ctx.ChainID = "test-chain"
 			return nil
 		})
@@ -295,7 +295,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.AcctHandler = acctMock01
-		ctx.GovHandler = govParams01
+		ctx.GovParams = govParams01
 		ctx.ChainID = "test-chain"
 		return nil
 	})
@@ -334,7 +334,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
-			ctx.GovHandler = govParams01
+			ctx.GovParams = govParams01
 			ctx.ChainID = "test-chain"
 			return nil
 		})
@@ -370,7 +370,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, mocks.LastBlockHeight(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
-			ctx.GovHandler = govParams01
+			ctx.GovParams = govParams01
 			ctx.ChainID = "test-chain"
 			return nil
 		})
@@ -443,7 +443,7 @@ func genesisStaking(t *testing.T, cnt int) {
 
 		txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx.Height(), time.Now().UnixNano(), true, func(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			ctx.AcctHandler = acctMock01
-			ctx.GovHandler = govParams01
+			ctx.GovParams = govParams01
 			ctx.ChainID = "test-chain"
 			return nil
 		})

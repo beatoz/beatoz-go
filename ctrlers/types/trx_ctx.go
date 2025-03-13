@@ -28,17 +28,12 @@ type TrxContext struct {
 	TrxStakeHandler ITrxHandler
 	TrxEVMHandler   ITrxHandler
 
-	GovHandler   IGovHandler
+	GovParams    IGovParams
 	AcctHandler  IAccountHandler
 	StakeHandler IStakeHandler
 	ChainID      string
 
 	Callback func(*TrxContext, xerrors.XError)
-}
-
-type ITrxHandler interface {
-	ValidateTrx(*TrxContext) xerrors.XError
-	ExecuteTrx(*TrxContext) xerrors.XError
 }
 
 type NewTrxContextCb func(*TrxContext) xerrors.XError
@@ -68,13 +63,13 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 
 	//
 	// validation gas and signature.
-	if tx.Gas < txctx.GovHandler.MinTrxGas() {
-		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too small gas (min: %v)", txctx.GovHandler.MinTrxGas())
-	} else if tx.Gas > txctx.GovHandler.MaxTrxGas() {
-		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too much gas (max: %d)", txctx.GovHandler.MaxTrxGas())
+	if tx.Gas < txctx.GovParams.MinTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too small gas (min: %v)", txctx.GovParams.MinTrxGas())
+	} else if tx.Gas > txctx.GovParams.MaxTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too much gas (max: %d)", txctx.GovParams.MaxTrxGas())
 	}
 
-	if tx.GasPrice.Cmp(txctx.GovHandler.GasPrice()) != 0 {
+	if tx.GasPrice.Cmp(txctx.GovParams.GasPrice()) != 0 {
 		return nil, xerrors.ErrInvalidGasPrice
 	}
 

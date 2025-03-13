@@ -525,4 +525,4 @@ func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes) (*proposal.GovProp
 var _ ctrlertypes.ILedgerHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*GovCtrler)(nil)
-var _ ctrlertypes.IGovHandler = (*GovCtrler)(nil)
+var _ ctrlertypes.IGovParams = (*GovCtrler)(nil)

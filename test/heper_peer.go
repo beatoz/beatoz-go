@@ -146,8 +146,8 @@ func runPeers(n int) {
 		ll := "*:error"
 		if i == 0 {
 			// change log level only on the first peer.
-			//	ll = "beatoz_AcctCtrler:debug,beatoz_EVMCtrler:debug,*:error"
-			ll = "*:info"
+			//ll = "beatoz_AcctCtrler:debug,beatoz_EVMCtrler:debug,*:error"
+			//ll = "*:info"
 		}
 		_peer := NewPeerMock("beatoz_test_chain", strconv.FormatInt(int64(i), 10), 46656+i, 36657+i, ll)
 		if err := _peer.Init(); err != nil {

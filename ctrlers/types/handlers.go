@@ -14,11 +14,22 @@ type ILedgerHandler interface {
 	Close() xerrors.XError
 }
 
-type IGovHandler interface {
+type IBlockHandler interface {
+	BeginBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
+	EndBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
+}
+
+type ITrxHandler interface {
+	ValidateTrx(*TrxContext) xerrors.XError
+	ExecuteTrx(*TrxContext) xerrors.XError
+}
+
+type IGovParams interface {
 	Version() int64
 	MaxValidatorCnt() int64
 	MinValidatorStake() *uint256.Int
 	MinDelegatorStake() *uint256.Int
+	// DEPRECATED
 	RewardPerPower() *uint256.Int
 	LazyUnstakingBlocks() int64
 	LazyApplyingBlocks() int64

@@ -245,7 +245,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 				_txctx.TrxAcctHandler = ctrler.acctCtrler
 				_txctx.TrxStakeHandler = ctrler.stakeCtrler
 				_txctx.TrxEVMHandler = ctrler.vmCtrler
-				_txctx.GovHandler = ctrler.govCtrler
+				_txctx.GovParams = ctrler.govCtrler
 				_txctx.AcctHandler = ctrler.acctCtrler
 				_txctx.StakeHandler = ctrler.stakeCtrler
 				_txctx.ChainID = ctrler.rootConfig.ChainID
@@ -406,7 +406,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
 			_txctx.TrxEVMHandler = ctrler.vmCtrler
-			_txctx.GovHandler = ctrler.govCtrler
+			_txctx.GovParams = ctrler.govCtrler
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
 			_txctx.ChainID = ctrler.rootConfig.ChainID
@@ -507,7 +507,7 @@ func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx,
 			_txctx.TrxAcctHandler = ctrler.acctCtrler
 			_txctx.TrxStakeHandler = ctrler.stakeCtrler
 			_txctx.TrxEVMHandler = ctrler.vmCtrler
-			_txctx.GovHandler = ctrler.govCtrler
+			_txctx.GovParams = ctrler.govCtrler
 			_txctx.AcctHandler = ctrler.acctCtrler
 			_txctx.StakeHandler = ctrler.stakeCtrler
 			_txctx.ChainID = ctrler.rootConfig.ChainID

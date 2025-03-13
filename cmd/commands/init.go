@@ -212,11 +212,10 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			logger.Info("Generate GenesisAssetHolder")
 
 			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
-			genDoc.ConsensusParams.Block.MaxGas = blockGasLimit
 			if err != nil {
 				return err
 			}
-
+			genDoc.ConsensusParams.Block.MaxGas = blockGasLimit
 		}
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err

@@ -22,7 +22,7 @@ type BlockContext struct {
 	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
-	GovHandler   IGovHandler
+	GovParams    IGovParams
 	AcctHandler  IAccountHandler
 	StakeHandler IStakeHandler
 
@@ -31,14 +31,14 @@ type BlockContext struct {
 	mtx sync.RWMutex
 }
 
-func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
+func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovParams, a IAccountHandler, s IStakeHandler) *BlockContext {
 	ret := &BlockContext{
 		blockInfo:    bi,
 		feeSum:       uint256.NewInt(0),
 		txsCnt:       0,
 		evmTxsCnt:    0,
 		appHash:      nil,
-		GovHandler:   g,
+		GovParams:    g,
 		AcctHandler:  a,
 		StakeHandler: s,
 		ValUpdates:   nil,
@@ -319,9 +319,4 @@ func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max uint64) uin
 		blockGasLimit = min
 	}
 	return blockGasLimit
-}
-
-type IBlockHandler interface {
-	BeginBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
-	EndBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
 }

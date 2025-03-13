@@ -66,7 +66,7 @@ func Test_Fallback(t *testing.T) {
 		Sender:      fromAcct,
 		Receiver:    nil,
 		GasUsed:     0,
-		GovHandler:  govParams,
+		GovParams:   govParams,
 		AcctHandler: &acctHandler,
 	}
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))
@@ -111,7 +111,7 @@ func Test_Fallback(t *testing.T) {
 		Sender:      fromAcct,
 		Receiver:    contAcct,
 		GasUsed:     0,
-		GovHandler:  govParams,
+		GovParams:   govParams,
 		AcctHandler: &acctHandler,
 	}
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))

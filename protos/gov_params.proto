@@ -22,4 +22,13 @@ message GovParamsProto {
   bytes   _min_delegator_stake = 19;
   int64   signed_blocks_window = 17;
   int64   min_signed_blocks = 18;
+
+  bytes _max_total_supply = 20;
+  int64 inflation_weight_ratio = 21;
+  int64 inflation_cycle_blocks = 22;
+  int64 min_bonding_blocks = 23;
+  int64 bonding_blocks_weight_ratio = 24;
+  bytes _reward_pool_address = 25;
+  bytes _burn_address = 26;
+  int64 burn_ratio = 27;
 }

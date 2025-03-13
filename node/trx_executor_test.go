@@ -132,7 +132,7 @@ func Test_BlockGasLimit(t *testing.T) {
 
 func newTrxCtx(bztx []byte, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
 	return ctrlertypes.NewTrxContext(bztx, height, time.Now().UnixMilli(), true, func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-		_txctx.GovHandler = govParams
+		_txctx.GovParams = govParams
 		_txctx.AcctHandler = acctHandler
 		_txctx.TrxAcctHandler = acctHandler
 		_txctx.ChainID = chainId

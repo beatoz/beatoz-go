@@ -79,7 +79,7 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 //		}
 //		txctx := _makeTrxCtx(txbz, func(_txctx *types.TrxContext) xerrors.XError {
 //			_txctx.ChainID = bcfg.ChainID
-//			_txctx.GovHandler = govParams
+//			_txctx.GovParams = govParams
 //			_txctx.AcctHandler = acctCtrler
 //			return nil
 //		})
@@ -114,7 +114,7 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 //				txbz := txs[idx%len(txs)]
 //				txctx := _makeTrxCtx(txbz, func(_txctx *types.TrxContext) xerrors.XError {
 //					_txctx.ChainID = bcfg.ChainID
-//					_txctx.GovHandler = govParams
+//					_txctx.GovParams = govParams
 //					_txctx.AcctHandler = acctCtrler
 //					return nil
 //				})
@@ -152,7 +152,7 @@ func Benchmark_AcctCtrler_ASync_ByChannel(b *testing.B) {
 		go makeTrxCtxRoutineEx(chIn, txs,
 			func(_txctx *types.TrxContext) xerrors.XError {
 				_txctx.ChainID = bcfg.ChainID
-				_txctx.GovHandler = govParams
+				_txctx.GovParams = govParams
 				_txctx.AcctHandler = acctCtrler
 				return nil
 			},
@@ -215,7 +215,7 @@ func Benchmark_AcctCtrler_ASync(b *testing.B) {
 				txbz := txs[rand.Intn(len(txs))]
 				txctx := _makeTrxCtx(txbz, func(_txctx *types.TrxContext) xerrors.XError {
 					_txctx.ChainID = bcfg.ChainID
-					_txctx.GovHandler = govParams
+					_txctx.GovParams = govParams
 					_txctx.AcctHandler = acctCtrler
 					return nil
 				})
@@ -256,7 +256,7 @@ func Benchmark_AcctCtrler_Sync(b *testing.B) {
 				true,
 				func(_txctx *types.TrxContext) xerrors.XError {
 					_txctx.ChainID = bcfg.ChainID
-					_txctx.GovHandler = govParams
+					_txctx.GovParams = govParams
 					_txctx.AcctHandler = acctCtrler
 					return nil
 				})

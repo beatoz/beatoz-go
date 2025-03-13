@@ -1,13 +1,13 @@
 package genesis
 
 import (
-	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types/crypto"
 )
 
 type GenesisAppState struct {
-	AssetHolders []*GenesisAssetHolder `json:"assetHolders"`
-	GovParams    *types2.GovParams     `json:"govParams"`
+	AssetHolders []*GenesisAssetHolder  `json:"assetHolders"`
+	GovParams    *ctrlertypes.GovParams `json:"govParams"`
 }
 
 func (ga *GenesisAppState) Hash() ([]byte, error) {
