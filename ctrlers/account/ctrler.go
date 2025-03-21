@@ -94,31 +94,45 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *btztypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) BeginBlock(ctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *AcctCtrler) BeginBlock(bctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	// do nothing
 	return nil, nil
 }
 
-func (ctrler *AcctCtrler) EndBlock(ctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	header := ctx.BlockInfo().Header
-	if header.GetProposerAddress() != nil && ctx.SumFee().Sign() > 0 {
-		//
-		// give fee to block proposer
+	header := bctx.BlockInfo().Header
+	sumFee := bctx.SumFee()
+	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
+
+		// give fee to block proposer and burn automatically by BurnRatio().
+		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovParams.BurnRatio())))
+		burned = new(uint256.Int).Div(burned, uint256.NewInt(100))
+		reward := new(uint256.Int).Sub(sumFee, burned)
+
 		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,
 		// the validator's account may not exist yet not in ledger.
-		acct := ctrler.findAccount(header.GetProposerAddress(), true)
-		if acct == nil {
-			acct = btztypes.NewAccount(header.GetProposerAddress())
+		proposer := ctrler.findAccount(header.GetProposerAddress(), true)
+		if proposer == nil {
+			proposer = btztypes.NewAccount(header.GetProposerAddress())
 		}
-		xerr := acct.AddBalance(ctx.SumFee())
-		if xerr != nil {
-			return nil, xerr
+		burnAcct := ctrler.FindAccount(bctx.GovParams.BurnAddress(), true)
+		if burnAcct == nil {
+			burnAcct = btztypes.NewAccount(header.GetProposerAddress())
 		}
 
-		return nil, ctrler.setAccount(acct, true)
+		if xerr := proposer.AddBalance(reward); xerr != nil {
+			return nil, xerr
+		}
+		if xerr := burnAcct.AddBalance(burned); xerr != nil {
+			return nil, xerr
+		}
+		_ = ctrler.setAccount(proposer, true)
+		_ = ctrler.setAccount(burnAcct, true)
+
+		return nil, nil
 	}
 	return nil, nil
 }

@@ -280,6 +280,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	return evts, nil
 }
 
+// DoPunish is only used to test
 func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -393,9 +394,9 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			return xerrors.ErrInvalidTrx.Wrapf("wrong amount: it should be multiple of %v", ctrlertypes.AmountPerPower())
 		}
 
-		txPower, xerr := ctrlertypes.AmountToPower(ctx.Tx.Amount)
-		if xerr != nil {
-			return xerr
+		txPower := int64(q.Uint64())
+		if txPower <= 0 {
+			return xerrors.ErrOverFlow.Wrapf("voting power is converted as negative(%v) from amount(%v)", txPower, ctx.Tx.Amount)
 		}
 		totalPower := int64(0)
 
@@ -459,14 +460,14 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 		//
 		// begin: issue #34: check updatable stake ratio
-		_delg := delegatee
-		if _delg == nil {
-			_delg = &Delegatee{
-				Addr:       ctx.Tx.To,
-				TotalPower: 0,
-			}
-		}
 		if len(ctrler.lastValidators) >= 3 {
+			_delg := delegatee
+			if _delg == nil {
+				_delg = &Delegatee{
+					Addr:       ctx.Tx.To,
+					TotalPower: 0,
+				}
+			}
 			if xerr := ctrler.stakeLimiter.CheckLimit(_delg, txPower); xerr != nil {
 				return xerrors.ErrUpdatableStakeRatio.Wrap(xerr)
 			}

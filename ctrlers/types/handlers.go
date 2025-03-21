@@ -47,6 +47,15 @@ type IGovParams interface {
 	SlashRatio() int64
 	SignedBlocksWindow() int64
 	MinSignedBlocks() int64
+
+	MaxTotalSupply() *uint256.Int
+	InflationWeightPermil() int64
+	InflationCycleBlocks() int64
+	MinBondingBlocks() int64
+	BondingBlocksWeightPermil() int64
+	RewardPoolAddress() types.Address
+	BurnAddress() types.Address
+	BurnRatio() int64
 }
 
 type IAccountHandler interface {

@@ -616,6 +616,8 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	ev = append(ev, ev2...)
 	ev = append(ev, ev3...)
 
+	//
+	// adjust block gas limit
 	newBlockGasLimit := ctrlertypes.AdjustBlockGasLimit(
 		ctrler.currBlockCtx.GetBlockGasLimit(),
 		ctrler.currBlockCtx.GetBlockGasUsed(),
