@@ -1,4 +1,4 @@
-package stake
+package vpower
 
 import (
 	"github.com/holiman/uint256"
@@ -11,8 +11,6 @@ var (
 	oneYearSeconds  int64 = 31_536_000
 	oneWeeksSeconds int64 = 604_800
 	twoWeeksSeconds int64 = oneWeeksSeconds * 2
-
-	powerRipeningCycle = oneYearSeconds
 )
 
 type Supplier struct {
@@ -46,14 +44,7 @@ func (supplier *Supplier) SetLastAdjustedHeight(h int64) {
 }
 
 // Issue returns the additional issued amount at the block height.
-func (supplier *Supplier) Issue(height int64, stakes []*Stake, durPermil int) *uint256.Int {
-	// current voting power weight
-	var vpows, vpdurs []int64
-	for _, s := range stakes {
-		vpows = append(vpows, s.Power)
-		vpdurs = append(vpdurs, height-s.StartHeight)
-	}
-
+func (supplier *Supplier) Issue(height int64, vpows []VPower, durPermil int) *uint256.Int {
 	// todo: Compute voting power weight `W` from `stakes`.
 
 	// todo: Compute total supply `totalSupply` at `height` and subtract `supplier.lastTotalSupply` from it.

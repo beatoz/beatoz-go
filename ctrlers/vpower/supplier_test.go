@@ -1,4 +1,4 @@
-package stake
+package vpower
 
 import (
 	"fmt"
@@ -40,16 +40,16 @@ func Test_AnnualSd(t *testing.T) {
 	adjustedSupply := types.ToFons(350_000_000)
 	adjustedHeight := int64(1)
 
-	btz, _ := types.FromFons(totalSupply)
-	w0 := votingPowerObj{
+	btz := 100_000_000 //types.FromFons(totalSupply)
+	w0 := vpTestObj{
 		vpow: int64(btz),
 		vdur: 0,
 	}
 	Wall := decimal.Zero
 
 	sumAdded := uint256.NewInt(0)
-	inflationCyle := twoWeeksSeconds
-	for i := inflationCyle + adjustedHeight; i <= 100*oneYearSeconds; i += inflationCyle {
+	inflationCyle := oneYearSeconds //twoWeeksSeconds
+	for i := inflationCyle + adjustedHeight; i <= 100*oneYearSeconds+1; i += inflationCyle {
 		preWall := Wall
 
 		w0.vdur = i
@@ -61,6 +61,11 @@ func Test_AnnualSd(t *testing.T) {
 			require.Equal(t, uint256.NewInt(0), sd)
 		}
 
+		// reward rate  = 100*fromFons(sd)/w0.vpow
+		_sd, _ := types.FromFons(sd)
+		rwdRate := decimal.NewFromUint64(_sd).Div(decimal.NewFromInt(w0.vpow))
+		inflRate := decimal.NewFromBigInt(sd.ToBig(), 0).Div(decimal.NewFromBigInt(maxSupply.ToBig(), 0))
+
 		sumAdded = new(uint256.Int).Add(sumAdded, sd)
 		totalSupply = new(uint256.Int).Add(totalSupply, sd)
 		require.True(t, totalSupply.Cmp(maxSupply) <= 0, totalSupply)
@@ -68,7 +73,9 @@ func Test_AnnualSd(t *testing.T) {
 		_added, _ := types.FromFons(sd)
 		_totsup, _ := types.FromFons(totalSupply)
 		_sumadded, _ := types.FromFons(sumAdded)
-		fmt.Println("year", 1+i/oneYearSeconds, "week", i/oneWeeksSeconds, "W", Wall, "added", _added, "cumu", _sumadded, "total", _totsup)
+		//fmt.Println("year", 1+i/oneYearSeconds, "week", i/oneWeeksSeconds, "W", Wall, "added", _added, "cumu", _sumadded, "total", _totsup, "reward rate", rwdRate.Truncate(2))
+		fmt.Printf("year: %3v (%4vw), total supply: %9v, added: %9v, sumAdded: %9v, rwdRate: % v, inflRate: %v, W: %v\n",
+			i/oneYearSeconds, i/oneWeeksSeconds, _totsup, _added, _sumadded, rwdRate.StringFixed(2), inflRate.StringFixed(2), Wall)
 
 		//// deflation
 		//if i%(oneYearSeconds*10) == 0 {

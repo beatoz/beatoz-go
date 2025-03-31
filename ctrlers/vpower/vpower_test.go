@@ -1,4 +1,4 @@
-package stake
+package vpower
 
 import (
 	"fmt"
@@ -6,16 +6,163 @@ import (
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tendermint/libs/rand"
+	"math"
 	"testing"
 )
 
-type votingPowerObj struct {
+func initVPowers() []*VPower {
+	var vpows []*VPower
+
+	for i := 0; i < 21; i++ {
+		vpow := &VPower{}
+
+		// self power
+		pow := bytes.RandInt64N(1_000_000) + 1_000_000
+		vpow.Add(pow, 1)
+
+		// delegating
+		for pow > 7000 {
+			_pow := max(bytes.RandInt64N(pow/100), 7000) // min amount of delegating
+
+			vpow.Add(pow, _pow)
+			pow -= _pow
+		}
+
+		vpows = append(vpows, vpow)
+	}
+
+	return vpows
+}
+
+func Test_VPower_AddSub(t *testing.T) {
+	from := rand.Bytes(20)
+	to := rand.Bytes(20)
+
+	var pows []int64
+	totalPower := int64(0)
+	vpow := &VPower{
+		From: from,
+		To:   to,
+	}
+
+	for i := 0; i < 10000; i++ {
+		pow := rand.Int63n(7_000_000)
+		vpow.Add(pow, int64(i+1))
+
+		pows = append(pows, pow)
+		totalPower += pow
+	}
+	require.Equal(t, int64(0), vpow.MaturePower())
+	require.Equal(t, totalPower, vpow.RisingPower())
+	require.Equal(t, totalPower, vpow.TotalPower())
+
+	_ = vpow.Compute(powerRipeningCycle+1, types.ToFons(math.MaxUint64), 200)
+	require.Equal(t, pows[0], vpow.MaturePower())
+	require.Equal(t, totalPower-pows[0], vpow.RisingPower())
+	require.Equal(t, totalPower, vpow.TotalPower())
+
+	_ = vpow.Compute(powerRipeningCycle+2, types.ToFons(math.MaxUint64), 200)
+	require.Equal(t, pows[0]+pows[1], vpow.MaturePower())
+	require.Equal(t, totalPower-pows[0]-pows[1], vpow.RisingPower())
+	require.Equal(t, totalPower, vpow.TotalPower())
+
+	sumReducedPower := int64(0)
+	originTotalPower := vpow.TotalPower()
+
+	for {
+		maturePower0 := vpow.MaturePower()
+		risingPower0 := vpow.RisingPower()
+		totalPower0 := vpow.TotalPower()
+		require.Equal(t, maturePower0+risingPower0, totalPower0)
+
+		// the request value may be greater than `totalPower0`.
+		reducedPower := vpow.Sub(rand.Int63n(totalPower0) + totalPower0/3)
+		sumReducedPower += reducedPower
+
+		//fmt.Println(maturePower0, risingPower0, totalPower0, _subPow, subPow)
+
+		if reducedPower >= maturePower0 {
+			require.Equal(t, int64(0), vpow.MaturePower(), "subPow", reducedPower, vpow)
+			require.Equal(t, maturePower0+risingPower0-reducedPower, vpow.RisingPower(), "subPow", reducedPower, vpow)
+			require.Equal(t, totalPower0-reducedPower, vpow.TotalPower(), "subPow", reducedPower, vpow)
+		} else {
+			require.Equal(t, maturePower0-reducedPower, vpow.MaturePower(), "subPow", reducedPower, vpow)
+			require.Equal(t, risingPower0, vpow.RisingPower(), "subPow", reducedPower, vpow)
+			require.Equal(t, totalPower0-reducedPower, vpow.TotalPower(), "subPow", reducedPower, vpow)
+		}
+
+		require.GreaterOrEqual(t, vpow.MaturePower(), int64(0))
+		require.GreaterOrEqual(t, vpow.RisingPower(), int64(0))
+		require.GreaterOrEqual(t, vpow.TotalPower(), int64(0))
+
+		if vpow.TotalPower() == 0 {
+			break
+		}
+	}
+	require.Equal(t, int64(0), vpow.MaturePower())
+	require.Equal(t, int64(0), vpow.RisingPower())
+	require.Equal(t, int64(0), vpow.TotalPower())
+	require.Equal(t, originTotalPower, sumReducedPower)
+}
+
+func Test_VPower_Weight(t *testing.T) {
+	maxSupply := types.ToFons(uint64(700_000_000))
+	initialSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := initialSupply.Clone()
+
+	//
+	// init []*VPower and []*vpTestObj
+	totalPower := int64(0)
+	vpWeights := initVPowers()
+	var vpObjs []*vpTestObj
+	for _, vpW := range vpWeights {
+		for _, rvpw := range vpW.risingWeights {
+			vpObjs = append(vpObjs, &vpTestObj{
+				vpow: rvpw.power,
+				vdur: rvpw.bondingHeight,
+			})
+			totalPower += rvpw.power
+		}
+	}
+
+	fmt.Println("vpWeights:", len(vpWeights), "vpObjs:", len(vpObjs), "totalPower:", totalPower)
+
+	preW := decimal.Zero
+	for height := int64(1); height < oneYearSeconds*10; /*10 years*/ height += powerRipeningCycle / 10 {
+		W0, W1 := decimal.Zero, decimal.Zero
+
+		// W of all vpWeights at `height`
+		for _, vpW := range vpWeights {
+			W0 = vpW.Compute(height, totalSupply, 200).Add(W0)
+		}
+
+		// W of all vpObjs at `height`
+		for _, vpo := range vpObjs {
+			W1 = Wi(vpo.vpow, vpo.vdur, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200).Add(W1)
+			vpo.vdur += powerRipeningCycle / 10
+		}
+
+		W0 = W0.Truncate(3)
+		W1 = W1.Truncate(3)
+
+		require.True(t, W1.Sub(W0).Abs().LessThanOrEqual(decimal.RequireFromString("0.001")), fmt.Sprintf("height: %v, VPower: %v, vpTestObj: %v", height, W0, W1))
+		added := Sd(height, powerRipeningCycle/52, 1, initialSupply, maxSupply, "0.3", W0, preW)
+		_ = totalSupply.Add(totalSupply, added)
+		preW = W0
+
+		//fmt.Println("height", height, "W0", W0, "W1", W1, "issued", types.ToBTOZ(added), "total", types.ToBTOZ(totalSupply), "dur0/1", dur0, dur1)
+	}
+
+}
+
+type vpTestObj struct {
 	vpow int64
 	vdur int64
 }
 
-func initVotingPowerObjs(maxPow int64) []votingPowerObj {
-	var vpObjs []votingPowerObj
+func initTestObjs(maxPow int64) []vpTestObj {
+	var vpObjs []vpTestObj
 	for maxPow > 7000 {
 		pow := max(bytes.RandInt64N(1_000_000), 7000)
 		v := struct {
@@ -32,85 +179,11 @@ func initVotingPowerObjs(maxPow int64) []votingPowerObj {
 	return vpObjs
 }
 
-func initVotingPowerWeights() []*VotingPowerWeight {
-	var vpws []*VotingPowerWeight
-
-	for i := 0; i < 21; i++ {
-		vpw := &VotingPowerWeight{}
-
-		// self power
-		pow := bytes.RandInt64N(1_000_000) + 1_000_000
-		vpw.Add(pow, 1)
-
-		// delegating
-		for pow > 7000 {
-			_pow := max(bytes.RandInt64N(pow/100), 7000) // min amount of delegating
-
-			vpw.Add(pow, _pow)
-			pow -= _pow
-		}
-
-		vpws = append(vpws, vpw)
-	}
-
-	return vpws
-}
-
-func Test_VotingPowerWeight(t *testing.T) {
-	maxSupply := types.ToFons(uint64(700_000_000))
-	initialSupply := types.ToFons(uint64(350_000_000))
-	totalSupply := initialSupply.Clone()
-
-	//
-	// init []*VotingPowerWeight and []*votingPowerObj
-	totalPower := int64(0)
-	vpWeights := initVotingPowerWeights()
-	var vpObjs []*votingPowerObj
-	for _, vpW := range vpWeights {
-		for _, rvpw := range vpW.risingPowers {
-			vpObjs = append(vpObjs, &votingPowerObj{
-				vpow: rvpw.power,
-				vdur: rvpw.bondingHeight,
-			})
-			totalPower += rvpw.power
-		}
-	}
-
-	fmt.Println("vpWeights:", len(vpWeights), "vpObjs:", len(vpObjs), "totalPower:", totalPower)
-
-	preW := decimal.Zero
-	for height := int64(1); height < oneYearSeconds*10; /*10 years*/ height += powerRipeningCycle / 10 {
-		W0, W1 := decimal.Zero, decimal.Zero
-
-		// W of all vpWeights at `height`
-		for _, vpW := range vpWeights {
-			W0 = vpW.Compute(height, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200).Add(W0)
-		}
-
-		// W of all vpObjs at `height`
-		for _, vpo := range vpObjs {
-			W1 = Wi(vpo.vpow, vpo.vdur, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200).Add(W1)
-			vpo.vdur += powerRipeningCycle / 10
-		}
-
-		W0 = W0.Truncate(3)
-		W1 = W1.Truncate(3)
-
-		require.True(t, W1.Sub(W0).Abs().LessThanOrEqual(decimal.RequireFromString("0.001")), fmt.Sprintf("height: %v, VotingPowerWeight: %v, votingPowerObj: %v", height, W0, W1))
-		added := Sd(height, powerRipeningCycle/52, 1, initialSupply, maxSupply, "0.3", W0, preW)
-		_ = totalSupply.Add(totalSupply, added)
-		preW = W0
-
-		//fmt.Println("height", height, "W0", W0, "W1", W1, "issued", types.ToBTOZ(added), "total", types.ToBTOZ(totalSupply), "dur0/1", dur0, dur1)
-	}
-
-}
-
 func Test_Wi(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
 
 	for idx := 0; idx < 1000; idx++ {
-		vpObjs := initVotingPowerObjs(int64(350_000_000))
+		vpObjs := initTestObjs(int64(350_000_000))
 		wa := decimal.NewFromInt(0)
 
 		for _, vpobj := range vpObjs {
@@ -131,7 +204,7 @@ func Test_Wa_SumWi(t *testing.T) {
 
 	for n := 0; n < 1000; n++ {
 		var vpows, vdurs []int64
-		vpObjs := initVotingPowerObjs(int64(350_000_000))
+		vpObjs := initTestObjs(int64(350_000_000))
 		// Sum Wi
 		sumWi0 := decimal.Zero
 		for _, vpobj := range vpObjs {
@@ -164,7 +237,7 @@ func Benchmark_SumWi(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		vpObjs := initVotingPowerObjs(int64(100_000_000))
+		vpObjs := initTestObjs(int64(100_000_000))
 		sumWi := decimal.Zero
 		b.StartTimer()
 
@@ -182,7 +255,7 @@ func Benchmark_Wa(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		var vpows, vdurs []int64
-		vpObjs := initVotingPowerObjs(int64(100_000_000))
+		vpObjs := initTestObjs(int64(100_000_000))
 		b.StartTimer()
 
 		for _, vpobj := range vpObjs {

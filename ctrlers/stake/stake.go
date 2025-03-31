@@ -14,6 +14,7 @@ import (
 	"sync"
 )
 
+// DEPRECATED
 type Stake struct {
 	From types.Address `json:"owner"`
 	To   types.Address `json:"to"`
