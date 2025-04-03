@@ -58,6 +58,10 @@ type GovParams struct {
 	burnAddress               types.Address
 	burnRatio                 int64
 
+	ripeningBlocks           int64
+	maxValidatorsOfDelegator int64
+	maxDelegatorsOfValidator int64
+
 	mtx sync.RWMutex
 }
 
@@ -94,6 +98,9 @@ func newGovParamsWith(interval int) *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -130,6 +137,9 @@ func Test1GovParams() *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -162,6 +172,9 @@ func Test2GovParams() *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -194,6 +207,9 @@ func Test3GovParams() *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -226,6 +242,9 @@ func Test4GovParams() *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -245,6 +264,9 @@ func Test5GovParams() *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -277,6 +299,9 @@ func Test6GovParams_NoStakeLimiter() *GovParams {
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%
+		ripeningBlocks:            secondsPerYear,
+		maxValidatorsOfDelegator:  1,
+		maxDelegatorsOfValidator:  1000,
 	}
 }
 
@@ -340,6 +365,9 @@ func (r *GovParams) fromProto(pm *GovParamsProto) {
 	r.rewardPoolAddress = pm.XRewardPoolAddress
 	r.burnAddress = pm.XBurnAddress
 	r.burnRatio = pm.BurnRatio
+	r.ripeningBlocks = pm.RipeningBlocks
+	r.maxValidatorsOfDelegator = pm.MaxValidatorsOfDelegator
+	r.maxDelegatorsOfValidator = pm.MaxDelegatorsOfValidator
 }
 
 func (r *GovParams) toProto() *GovParamsProto {
@@ -374,6 +402,9 @@ func (r *GovParams) toProto() *GovParamsProto {
 		XRewardPoolAddress:        r.rewardPoolAddress,
 		XBurnAddress:              r.burnAddress,
 		BurnRatio:                 r.burnRatio,
+		RipeningBlocks:            r.ripeningBlocks,
+		MaxValidatorsOfDelegator:  r.maxValidatorsOfDelegator,
+		MaxDelegatorsOfValidator:  r.maxDelegatorsOfValidator,
 	}
 	return a
 }
@@ -410,6 +441,9 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		RewardPoolAddress         string `json:"rewardPoolAddress"`
 		BurnAddress               string `json:"burnAddress"`
 		BurnRatio                 int64  `json:"burnRatio"`
+		RipeningBlocks            int64  `json:"ripeningBlocks"`
+		MaxValidatorsOfDelegator  int64  `json:"maxValidatorsOfDelegator"`
+		MaxDelegatorsOfValidator  int64  `json:"maxDelegatorsOfValidator"`
 	}{
 		Version:                   r.version,
 		MaxValidatorCnt:           r.maxValidatorCnt,
@@ -438,6 +472,9 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 		RewardPoolAddress:         r.rewardPoolAddress.String(),
 		BurnAddress:               r.burnAddress.String(),
 		BurnRatio:                 r.burnRatio,
+		RipeningBlocks:            r.ripeningBlocks,
+		MaxValidatorsOfDelegator:  r.maxValidatorsOfDelegator,
+		MaxDelegatorsOfValidator:  r.maxDelegatorsOfValidator,
 	}
 	return tmjson.Marshal(tm)
 }
@@ -471,6 +508,9 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 		RewardPoolAddress         string `json:"rewardPoolAddress"`
 		BurnAddress               string `json:"burnAddress"`
 		BurnRatio                 int64  `json:"burnRatio"`
+		RipeningBlocks            int64  `json:"ripeningBlocks"`
+		MaxValidatorsOfDelegator  int64  `json:"maxValidatorsOfDelegator"`
+		MaxDelegatorsOfValidator  int64  `json:"maxDelegatorsOfValidator"`
 	}{}
 
 	err := tmjson.Unmarshal(bz, tm)
@@ -533,6 +573,9 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 		return err
 	}
 	r.burnRatio = tm.BurnRatio
+	r.ripeningBlocks = tm.RipeningBlocks
+	r.maxValidatorsOfDelegator = tm.MaxValidatorsOfDelegator
+	r.maxDelegatorsOfValidator = tm.MaxDelegatorsOfValidator
 	return nil
 }
 
@@ -759,6 +802,27 @@ func (r *GovParams) BurnRatio() int64 {
 	return r.burnRatio
 }
 
+func (r *GovParams) RipeningBlocks() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.ripeningBlocks
+}
+
+func (r *GovParams) MaxValidatorsOfDelegator() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.maxValidatorsOfDelegator
+}
+
+func (r *GovParams) MaxDelegatorsOfValidator() int64 {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	return r.maxDelegatorsOfValidator
+}
+
 func (r *GovParams) String() string {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
@@ -910,6 +974,17 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 
 	if newParams.burnRatio == 0 {
 		newParams.burnRatio = oldParams.burnRatio
+	}
+
+	if newParams.ripeningBlocks == 0 {
+		newParams.ripeningBlocks = oldParams.ripeningBlocks
+	}
+
+	if newParams.maxValidatorsOfDelegator == 0 {
+		newParams.maxValidatorsOfDelegator = oldParams.maxValidatorsOfDelegator
+	}
+	if newParams.maxDelegatorsOfValidator == 0 {
+		newParams.maxDelegatorsOfValidator = oldParams.maxDelegatorsOfValidator
 	}
 }
 

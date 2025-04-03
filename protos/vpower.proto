@@ -1,0 +1,15 @@
+syntax = "proto3";
+package vpower;
+option go_package = "github.com/beatoz/beatoz-go/ctrlers/vpower";
+
+message powerChunk {
+  int64 power = 1;
+  int64 height = 2;
+  bytes tx_hash = 3;
+}
+message VPowerProto {
+  bytes from = 1;
+  bytes to = 2;
+  int64 sum_power = 3;
+  repeated powerChunk power_chunks = 4;
+}

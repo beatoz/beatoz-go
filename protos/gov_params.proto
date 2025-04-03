@@ -31,4 +31,7 @@ message GovParamsProto {
   bytes _reward_pool_address = 25;
   bytes _burn_address = 26;
   int64 burn_ratio = 27;
+  int64 ripening_blocks = 28;
+  int64 max_validators_of_delegator = 29;
+  int64 max_delegators_of_validator = 30;
 }

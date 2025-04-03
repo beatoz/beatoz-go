@@ -10,6 +10,7 @@ import (
 type IGettable interface {
 	Get(LedgerKey) (ILedgerItem, xerrors.XError)
 	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
+	Seek(prefix []byte, ascending bool, cb func(ILedgerItem) xerrors.XError) xerrors.XError
 }
 
 type ISettable interface {
@@ -41,6 +42,7 @@ type IStateLedger[T ILedgerItem] interface {
 	Version() int64
 	Get(LedgerKey, bool) (T, xerrors.XError)
 	Iterate(func(T) xerrors.XError, bool) xerrors.XError
+	Seek([]byte, bool, func(T) xerrors.XError, bool) xerrors.XError
 	Set(T, bool) xerrors.XError
 	Snapshot(bool) int
 	RevertToSnapshot(int, bool) xerrors.XError

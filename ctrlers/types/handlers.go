@@ -56,6 +56,10 @@ type IGovParams interface {
 	RewardPoolAddress() types.Address
 	BurnAddress() types.Address
 	BurnRatio() int64
+
+	RipeningBlocks() int64
+	MaxValidatorsOfDelegator() int64
+	MaxDelegatorsOfValidator() int64
 }
 
 type IAccountHandler interface {

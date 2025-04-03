@@ -44,7 +44,7 @@ func (supplier *Supplier) SetLastAdjustedHeight(h int64) {
 }
 
 // Issue returns the additional issued amount at the block height.
-func (supplier *Supplier) Issue(height int64, vpows []VPower, durPermil int) *uint256.Int {
+func (supplier *Supplier) Issue(height int64, vpows []Delegatee, durPermil int) *uint256.Int {
 	// todo: Compute voting power weight `W` from `stakes`.
 
 	// todo: Compute total supply `totalSupply` at `height` and subtract `supplier.lastTotalSupply` from it.
@@ -56,9 +56,11 @@ func (supplier *Supplier) Issue(height int64, vpows []VPower, durPermil int) *ui
 // It is computed as S(i) - S(i-C).
 //
 // DEPRECATED:
-// The `adjustHeight` and `adjustedSupply` may be changed between block `i-C` and block `i`
-// and these at block `i-C` are not known at block `i`.
-// Because these at block `i-C` are not known, S(i-C) could not be accurately computed.
+// The `adjustedHeight` and `adjustedSupply` may be changed between `block[height - inflationCycle]` and `block[height]`.
+// The following `adjustedHeight` and `adjustedSupply` are valid at `block[height]` but not at `block[height - inflationCycle]`.
+// Because of that, Si(height - inflationCycle, adjustedHeight, adjustedSupply,...) can not accurately be computed.
+// Sd can be accurately computed only when the adjustedXXX values did not change
+// between `block[height - inflationCycle]` and `block[height]`.
 func Sd(height, inflationCycle, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda string, wa, preWa decimal.Decimal) *uint256.Int {
 	if height < inflationCycle {
 		return uint256.NewInt(0)
@@ -69,14 +71,14 @@ func Sd(height, inflationCycle, adjustedHeight int64, adjustedSupply, smax *uint
 }
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(height, adjustedHeight int64, sadjusted, smax *uint256.Int, lambda string, wa decimal.Decimal) *uint256.Int {
+func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda string, wa decimal.Decimal) *uint256.Int {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
 	decLambdaAddedOne := decimal.RequireFromString(lambda).Add(decimalOne)
 	expWHid := wa.Mul(H(height-adjustedHeight, 1))
 
-	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, sadjusted).ToBig(), 0)
+	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
 	denom := decLambdaAddedOne.Pow(expWHid)
 
 	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)

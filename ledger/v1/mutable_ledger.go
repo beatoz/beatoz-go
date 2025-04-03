@@ -27,13 +27,13 @@ type MutableLedger struct {
 func NewMutableLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*MutableLedger, xerrors.XError) {
 	db, err := dbm.NewGoLevelDB(name, dbDir)
 	if err != nil {
-		return nil, xerrors.From(err)
+		return nil, xerrors.Wrap(err, "goleveldb open failed")
 	}
 
 	tree := iavl.NewMutableTree(db, cacheSize, false, iavl.NewNopLogger(), iavl.SyncOption(true))
 	if _, err := tree.LoadVersion(0); err != nil {
 		_ = tree.Close()
-		return nil, xerrors.From(err)
+		return nil, xerrors.Wrap(err, "tree's LoadVersion failed")
 	}
 
 	return &MutableLedger{
@@ -98,6 +98,9 @@ func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 			}
 		}
 
+		// todo: the following unlock code must not be allowed.
+		// this allows the callee to access the ledger's other method, which may update key or value of the tree.
+		// However, in iterating, the key and value MUST not updated.
 		ledger.mtx.RUnlock()
 		defer ledger.mtx.RLock()
 
@@ -113,6 +116,50 @@ func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 	} else if stopped {
 		return xerrStop
 	}
+	return nil
+}
+
+func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem) xerrors.XError) xerrors.XError {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	iter, err := ledger.tree.Iterator(prefix, nil, ascending)
+	if err != nil {
+		return xerrors.From(err)
+	}
+	defer func() {
+		_ = iter.Close()
+	}()
+
+	for ; iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if !bytes.HasPrefix(key, prefix) {
+			break
+		}
+		value := iter.Value()
+
+		item, ok := ledger.cachedObjs[unsafe.String(&key[0], len(key))]
+		if !ok {
+			item = ledger.newItemFunc()
+			if xerr := item.Decode(value); xerr != nil {
+				return xerr
+			} else if bytes.Compare(item.Key(), key) != 0 {
+				return xerrors.From(fmt.Errorf("MutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
+			}
+		}
+
+		//
+		// the following unlock code is added to allow accessing to `ledger` in `cb()`.
+		// But, in iteration, the key and value must not be modified!!!
+		// So, the following code should be removed.
+		//ledger.mtx.RUnlock()
+		//defer ledger.mtx.RLock()
+
+		if xerr := cb(item); xerr != nil {
+			return xerr
+		}
+	}
+
 	return nil
 }
 
@@ -248,12 +295,8 @@ func (ledger *MutableLedger) GetReadOnlyTree(ver int64) (*iavl.ImmutableTree, xe
 }
 
 func (ledger *MutableLedger) Close() xerrors.XError {
-	if ledger.db != nil {
-		if err := ledger.db.Close(); err != nil {
-			return xerrors.From(err)
-		}
-	}
-	ledger.db = nil
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
 
 	if ledger.tree != nil {
 		if err := ledger.tree.Close(); err != nil {
@@ -261,6 +304,13 @@ func (ledger *MutableLedger) Close() xerrors.XError {
 		}
 	}
 	ledger.tree = nil
+
+	if ledger.db != nil {
+		if err := ledger.db.Close(); err != nil {
+			return xerrors.From(err)
+		}
+	}
+	ledger.db = nil
 
 	ledger.revisions.reset()
 

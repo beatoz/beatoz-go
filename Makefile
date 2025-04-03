@@ -94,6 +94,8 @@ pbm:
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ delegatee.proto
+	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ vpower.proto
 
 install: $(TARGETOS)
 	@echo "[$(@)] Install binaries to $(LOCAL_GOPATH)/bin"

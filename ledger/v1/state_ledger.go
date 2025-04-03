@@ -67,9 +67,21 @@ func (ledger *StateLedger[T]) Iterate(cb func(T) xerrors.XError, exec bool) xerr
 	defer ledger.mtx.RUnlock()
 
 	return ledger.getLedger(exec).Iterate(func(item ILedgerItem) xerrors.XError {
+		// todo: the following unlock code must not be allowed.
+		// this allows the callee to access the ledger's other method, which may update key or value of the tree.
+		// However, in iterating, the key and value MUST not updated.
 		ledger.mtx.RUnlock()
 		defer ledger.mtx.RLock()
 
+		return cb(item.(T))
+	})
+}
+
+func (ledger *StateLedger[T]) Seek(prefix []byte, ascending bool, cb func(T) xerrors.XError, exec bool) xerrors.XError {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.getLedger(exec).Seek(prefix, ascending, func(item ILedgerItem) xerrors.XError {
 		return cb(item.(T))
 	})
 }

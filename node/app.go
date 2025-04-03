@@ -9,6 +9,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vm/evm"
+	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -38,6 +39,7 @@ type BeatozApp struct {
 	metaDB      *ctrlertypes.MetaDB
 	acctCtrler  *account.AcctCtrler
 	stakeCtrler *stake.StakeCtrler
+	vpowCtrler  *vpower.VPowerCtrler
 	govCtrler   *gov.GovCtrler
 	vmCtrler    *evm.EVMCtrler
 	txExecutor  *TrxExecutor
@@ -51,7 +53,7 @@ type BeatozApp struct {
 }
 
 func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
-	stateDB, err := ctrlertypes.OpenMetaDB("beatoz_app", config.DBDir())
+	metaDB, err := ctrlertypes.OpenMetaDB("beatoz_app", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
@@ -71,14 +73,20 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 		panic(err)
 	}
 
+	vpowCtrler, err := vpower.NewVPowerCtrler(config, metaDB.LastBlockHeight(), govCtrler, logger)
+	if err != nil {
+		panic(err)
+	}
+
 	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
 
 	txExecutor := NewTrxExecutor(logger)
 
 	return &BeatozApp{
-		metaDB:      stateDB,
+		metaDB:      metaDB,
 		acctCtrler:  acctCtrler,
 		stakeCtrler: stakeCtrler,
+		vpowCtrler:  vpowCtrler,
 		govCtrler:   govCtrler,
 		vmCtrler:    vmCtrler,
 		txExecutor:  txExecutor,

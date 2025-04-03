@@ -41,7 +41,7 @@ func Test_AnnualSd(t *testing.T) {
 	adjustedHeight := int64(1)
 
 	btz := 100_000_000 //types.FromFons(totalSupply)
-	w0 := vpTestObj{
+	w0 := testPowObj{
 		vpow: int64(btz),
 		vdur: 0,
 	}
@@ -53,7 +53,7 @@ func Test_AnnualSd(t *testing.T) {
 		preWall := Wall
 
 		w0.vdur = i
-		Wall = Wi(w0.vpow, w0.vdur, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200).Truncate(3)
+		Wall = Wi(w0.vpow, w0.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200).Truncate(3)
 		require.True(t, Wall.LessThanOrEqual(decimalOne))
 
 		sd := Sd(i, inflationCyle, adjustedHeight, adjustedSupply, maxSupply, "0.3", Wall, preWall)

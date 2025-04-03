@@ -104,7 +104,9 @@ func (ledger *MemLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XE
 					return true // stop
 				}
 			}
-
+			// todo: the following unlock code must not be allowed.
+			// this allows the callee to access the ledger's other method, which may update key or value of the tree.
+			// However, in iterating, the key and value MUST not updated.
 			ledger.mtx.RUnlock()
 			defer ledger.mtx.RLock()
 
@@ -125,6 +127,48 @@ func (ledger *MemLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XE
 	}
 
 	return xerrors.ErrNotFoundResult
+}
+
+func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem) xerrors.XError) xerrors.XError {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	if ledger.immuTree == nil {
+		return xerrors.ErrNotFoundResult
+	}
+
+	iter, err := ledger.immuTree.Iterator(prefix, nil, ascending)
+	if err != nil {
+		return xerrors.From(err)
+	}
+
+	for ; iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if !bytes.HasPrefix(key, prefix) {
+			break
+		}
+		value := iter.Value()
+
+		item, ok := ledger.items[unsafe.String(&key[0], len(key))]
+		if ok && item == nil {
+			// item maybe deleted.
+			continue // continue iteration
+		}
+		if !ok || item == nil {
+			item = ledger.newItemFunc()
+			if xerr := item.Decode(value); xerr != nil {
+				return xerr
+			} else if bytes.Compare(item.Key(), key) != 0 {
+				return xerrors.From(fmt.Errorf("MemLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
+			}
+		}
+
+		if xerr := cb(item); xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
 }
 
 func (ledger *MemLedger) Set(item ILedgerItem) xerrors.XError {

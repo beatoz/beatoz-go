@@ -815,6 +815,9 @@ func (ctrler *StakeCtrler) Commit() ([]byte, int64, xerrors.XError) {
 }
 
 func (ctrler *StakeCtrler) Close() xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	if ctrler.delegateeLedger != nil {
 		if xerr := ctrler.delegateeLedger.Close(); xerr != nil {
 			ctrler.logger.Error("delegateeLedger.Close()", "error", xerr.Error())
