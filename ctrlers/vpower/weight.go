@@ -30,6 +30,77 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, 
 	return q
 }
 
+func WaWeighted(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := decimalOne.Sub(_tau)
+
+	_maturedPower := int64(0)
+	weightedPower := decimal.Zero
+
+	for i, pow := range pows {
+		if vpdurs[i] >= ripeningCycle {
+			// mature power
+			_maturedPower += pow
+		} else {
+			decDur := decimal.NewFromInt(vpdurs[i]).Div(decimal.NewFromInt(ripeningCycle))
+			decCo := _tau.Mul(decDur).Add(_keppa)
+			decV := decimal.NewFromInt(pow)
+			weightedPower = weightedPower.Add(decCo.Mul(decV))
+		}
+	}
+
+	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
+	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
+	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
+	return q
+}
+
+func WaWeightedEx(powChunks []*PowerChunk, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := decimalOne.Sub(_tau)
+
+	_maturedPower := int64(0)
+	weightedPower := decimal.Zero
+
+	for _, pc := range powChunks {
+		dur := height - pc.Height
+		if dur >= ripeningCycle {
+			// mature power
+			_maturedPower += pc.Power
+		} else {
+			decDur := decimal.NewFromInt(dur).Div(decimal.NewFromInt(ripeningCycle))
+			decCo := _tau.Mul(decDur).Add(_keppa)
+			decV := decimal.NewFromInt(pc.Power)
+			weightedPower = weightedPower.Add(decCo.Mul(decV))
+		}
+	}
+
+	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
+	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
+	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
+	return q
+}
+
+func WaWeightedEx2(powChunks []*PowerChunk, maturePower, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := decimalOne.Sub(_tau)
+
+	weightedPower := decimal.Zero
+
+	for _, pc := range powChunks {
+		dur := height - pc.Height
+		decDur := decimal.NewFromInt(dur).Div(decimal.NewFromInt(ripeningCycle))
+		decCo := _tau.Mul(decDur).Add(_keppa)
+		decV := decimal.NewFromInt(pc.Power)
+		weightedPower = weightedPower.Add(decCo.Mul(decV))
+	}
+
+	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
+	decPowerAmt := weightedPower.Add(decimal.New(maturePower, int32(types.DECIMAL)))
+	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
+	return q
+}
+
 // Wi calculates the voting power weight `W_i` of a validator and delegator like the below.
 // `W_i = (tau * min(StakeDurationInSecond/RipeningCycle, 1) + keppa) * Stake_i / S_i`
 func Wi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {

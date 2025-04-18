@@ -9,6 +9,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
+	"sort"
 	"sync"
 )
 
@@ -39,14 +40,22 @@ func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
 	return ret
 }
 
-func LoadAllDelegatees(dgteesLedger v1.IStateLedger[*DelegateeProto], vpowLedger v1.IStateLedger[*VPowerProto], currHeight, ripeningBlocks int64) (DelegateeArray, xerrors.XError) {
-	var dgtees DelegateeArray
-
+func LoadAllDelegateeProtos(dgteesLedger v1.IStateLedger[*DelegateeProto]) ([]*DelegateeProto, xerrors.XError) {
+	var dgteeProtos []*DelegateeProto
 	if xerr := dgteesLedger.Seek([]byte(prefixDelegateeProto), true, func(elem *DelegateeProto) xerrors.XError {
-		dgtees = append(dgtees, NewDelegatee(elem.PubKey))
+		dgteeProtos = append(dgteeProtos, elem)
 		return nil
 	}, true); xerr != nil {
 		return nil, xerr
+	}
+	return dgteeProtos, nil
+}
+
+func LoadAllVPowerProtos(vpowLedger v1.IStateLedger[*VPowerProto], dgteeProtos []*DelegateeProto, currHeight, ripeningBlocks int64) (DelegateeArray, xerrors.XError) {
+	var dgtees DelegateeArray
+
+	for _, dgt := range dgteeProtos {
+		dgtees = append(dgtees, NewDelegatee(dgt.PubKey))
 	}
 
 	xerr := vpowLedger.Seek([]byte(prefixVPowerProto), true, func(vpow *VPowerProto) xerrors.XError {
@@ -122,17 +131,6 @@ func (dgtee *Delegatee) AddPowerWithTxHash(from types.Address, pow, height int64
 	return vpow
 }
 
-func (dgtee *Delegatee) GetDelegateeProto() *DelegateeProto {
-	dgtee.mtx.RLock()
-	defer dgtee.mtx.RUnlock()
-
-	proto := newDelegateeProto(dgtee.pubKey)
-	for _, v := range dgtee.mapPowers {
-		proto.AddPower(v.From, v.SumPower)
-	}
-	return proto
-}
-
 // DelPower decreases the power of `from` by `pow` and
 // returns `*VPowerProto` that has the removed power information.
 // NOTE: After calling DelPower, the dgtee.maturePower` MUST be recomputed.
@@ -204,6 +202,18 @@ func (dgtee *Delegatee) DelPowerWithTxHash(from types.Address, txhash []byte) (*
 		delete(dgtee.mapPowers, mapKey)
 	}
 	return removed, vpow
+}
+
+func (dgtee *Delegatee) FindPowerChunk(from types.Address, txhash bytes.HexBytes) *PowerChunk {
+	dgtee.mtx.RLock()
+	defer dgtee.mtx.RUnlock()
+
+	mapKey := from.String()
+	if vpow, ok := dgtee.mapPowers[mapKey]; !ok {
+		return nil
+	} else {
+		return vpow.findPowerChunk(txhash)
+	}
 }
 
 func (dgtee *Delegatee) TotalPower() int64 {
@@ -282,6 +292,23 @@ func (dgtee *Delegatee) Compute(height, ripeningCycle int64, totalSupply *uint25
 	return Wi(dgtee.sumMaturePower, ripeningCycle, ripeningCycle, _totolSupply, tauPermil).Add(_risingWeight)
 }
 
+func (dgtee *Delegatee) ComputeEx(height, ripeningCycle int64, totalSupply *uint256.Int, tauPermil int) decimal.Decimal {
+	dgtee.mtx.Lock()
+	defer dgtee.mtx.Unlock()
+
+	dgtee.sumMaturePower = 0
+	dgtee.sumOfBlocks = 0
+	dgtee.lastHeight = height
+
+	var powChunks []*PowerChunk
+	for _, vpow := range dgtee.mapPowers {
+		powChunks = append(powChunks, vpow.PowerChunks...)
+	}
+
+	_totolSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0)
+	return WaWeightedEx(powChunks, height, ripeningCycle, _totolSupply, tauPermil)
+}
+
 func (dgtee *Delegatee) Clone() *Delegatee {
 	dgtee.mtx.RLock()
 	defer dgtee.mtx.RUnlock()
@@ -300,6 +327,17 @@ func (dgtee *Delegatee) Clone() *Delegatee {
 		sumOfBlocks:    dgtee.sumOfBlocks,
 		lastHeight:     dgtee.lastHeight,
 	}
+}
+
+func (dgtee *Delegatee) GetDelegateeProto() *DelegateeProto {
+	dgtee.mtx.RLock()
+	defer dgtee.mtx.RUnlock()
+
+	proto := newDelegateeProto(dgtee.pubKey)
+	for _, v := range dgtee.mapPowers {
+		proto.AddPower(v.From, v.SumPower)
+	}
+	return proto
 }
 
 type DelegateeArray []*Delegatee
@@ -328,3 +366,49 @@ func findByPubKey(pubKey bytes.HexBytes, dgtees []*Delegatee) *Delegatee {
 	}
 	return nil
 }
+
+type orderByPowerDelegatees []*DelegateeProto
+
+func (dgtees orderByPowerDelegatees) Len() int {
+	return len(dgtees)
+}
+
+// descending order by TotalPower
+func (dgtees orderByPowerDelegatees) Less(i, j int) bool {
+	if dgtees[i].TotalPower != dgtees[j].TotalPower {
+		return dgtees[i].TotalPower > dgtees[j].TotalPower
+	}
+	if dgtees[i].SelfPower != dgtees[j].SelfPower {
+		return dgtees[i].SelfPower > dgtees[j].SelfPower
+	}
+	if dgtees[i].MaturePower != dgtees[j].MaturePower {
+		return dgtees[i].MaturePower > dgtees[j].MaturePower
+	}
+	if bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) > 0 {
+		return true
+	}
+	return false
+}
+
+func (dgtees orderByPowerDelegatees) Swap(i, j int) {
+	dgtees[i], dgtees[j] = dgtees[j], dgtees[i]
+}
+
+var _ sort.Interface = (orderByPowerDelegatees)(nil)
+
+type orderByAddrDelegatees []*DelegateeProto
+
+func (dgtees orderByAddrDelegatees) Len() int {
+	return len(dgtees)
+}
+
+// ascending order by address
+func (dgtees orderByAddrDelegatees) Less(i, j int) bool {
+	return bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) < 0
+}
+
+func (dgtees orderByAddrDelegatees) Swap(i, j int) {
+	dgtees[i], dgtees[j] = dgtees[j], dgtees[i]
+}
+
+var _ sort.Interface = (orderByAddrDelegatees)(nil)

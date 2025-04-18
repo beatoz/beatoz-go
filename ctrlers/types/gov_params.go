@@ -74,7 +74,7 @@ func newGovParamsWith(interval int) *GovParams {
 		version:                   1,
 		maxValidatorCnt:           21,
 		minValidatorStake:         uint256.MustFromDecimal("7000000000000000000000000"), // 7,000,000 BEATOZ
-		minDelegatorStake:         uint256.MustFromDecimal("0"),                         //  `0` means that the delegating is disable.
+		minDelegatorStake:         uint256.MustFromDecimal("4000000000000000000000"),    //  `0` means that the delegating is disable.
 		rewardPerPower:            uint256.NewInt(4_756_468_797),
 		lazyUnstakingBlocks:       2 * secondsPerWeek / int64(interval), // 2weeks blocks
 		lazyApplyingBlocks:        secondsPerDay / int64(interval),      // 1days blocks

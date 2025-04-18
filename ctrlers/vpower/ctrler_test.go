@@ -1,91 +1,233 @@
 package vpower
 
 import (
+	"bytes"
+	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/crypto"
+	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/beatoz/beatoz-sdk-go/web3"
+	"github.com/stretchr/testify/require"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
+	"github.com/tendermint/tendermint/crypto/secp256k1"
+	"github.com/tendermint/tendermint/libs/log"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
 )
 
 var (
-	config   = beatozcfg.DefaultConfig()
-	govParam = ctrlertypes.DefaultGovParams()
+	config    *beatozcfg.Config
+	acctMock  *mocks.AcctHandlerMock
+	govParams *ctrlertypes.GovParams
 )
 
-//func Test_Bond(t *testing.T) {
-//	config.DBPath = filepath.Join(os.TempDir(), "validator-ctrler-test")
-//	_ = os.RemoveAll(config.DBPath)
-//
-//	ctrler, xerr := NewVPowerCtrler(config, 0, govParam, log.NewNopLogger())
-//	require.NoError(t, xerr)
-//
-//	_, pubVal := crypto.NewKeypairBytes()
-//
-//	// not found validator
-//	xerr = ctrler.Bond(
-//		bytes.RandInt64N(700_000_000),
-//		1,
-//		types.RandAddress(), pubVal,
-//		bytes.RandBytes(32), true)
-//	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
-//
-//	expected := struct {
-//		totalPower int64
-//		selfPower  int64
-//	}{0, 0}
-//	height := int64(1)
-//
-//	// self voting power
-//	vpow := newVPower(
-//		bytes.RandInt64N(700_000_000),
-//		height,
-//		crypto.PubKeyBytes2Addr(pubVal),
-//		pubVal,
-//		bytes.RandBytes(32),
-//	)
-//
-//	// self bonding
-//	xerr = ctrler.Bond(vpow.Power, vpow.Height, vpow.From, vpow.PubKeyTo, vpow.TxHash, true)
-//	require.NoError(t, xerr)
-//
-//	expected.totalPower += vpow.Power
-//	expected.selfPower += vpow.Power
-//
-//	for ; height < 1000; height++ {
-//		from := types.RandAddress()
-//		if height%2 == 0 {
-//			// self bonding
-//			from = crypto.PubKeyBytes2Addr(pubVal)
-//		}
-//		vpow = newVPower(
-//			bytes.RandInt64N(700_000_000),
-//			height,
-//			from,
-//			pubVal,
-//			bytes.RandBytes(32),
-//		)
-//		xerr = ctrler.Bond(vpow.Power, vpow.Height, vpow.From, vpow.PubKeyTo, vpow.TxHash, true)
-//		require.NoError(t, xerr)
-//
-//		_, v, xerr := ctrler.Commit()
-//		require.NoError(t, xerr)
-//		require.Equal(t, height, v)
-//
-//		expected.totalPower += vpow.Power
-//		if height%2 == 0 {
-//			expected.selfPower += vpow.Power
-//		}
-//	}
-//
-//	require.NoError(t, ctrler.Close())
-//
-//	height--
-//	ctrler, xerr = NewVPowerCtrler(config, height, govParam, log.NewNopLogger())
-//	require.NoError(t, xerr, height)
-//
-//	fmt.Println(ctrler.allDelegatees[0].TotalPower(), ctrler.allDelegatees[0].SelfPower())
-//
-//	require.Equal(t, 1, len(ctrler.allDelegatees))
-//	require.Equal(t, expected.totalPower, ctrler.allDelegatees[0].TotalPower())
-//	require.Equal(t, expected.selfPower, ctrler.allDelegatees[0].SelfPower())
-//	require.NotEqual(t, ctrler.allDelegatees[0].SelfPower(), ctrler.allDelegatees[0].TotalPower())
-//	require.Equal(t, pubVal, ctrler.allDelegatees[0].pubKey)
-//}
+func init() {
+	config = beatozcfg.DefaultConfig()
+	config.SetRoot(filepath.Join(os.TempDir(), "test-vpowctrler"))
+	acctMock = mocks.NewAccountHandlerMock(10000)
+	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
+		w.GetAccount().SetBalance(types.ToFons(1_000_000_000))
+		return true
+	})
+
+	govParams = ctrlertypes.DefaultGovParams()
+
+}
+
+func Test_InitLedger(t *testing.T) {
+	ctrler, lastValUps, xerr := initCtrler(config)
+	require.NoError(t, xerr)
+
+	_, lastHeight, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+	require.Equal(t, int64(1), lastHeight)
+
+	require.NoError(t, ctrler.LoadLedger(lastHeight, govParams.RipeningBlocks(), int(govParams.MaxValidatorCnt())))
+
+	require.Len(t, ctrler.allDelegatees, len(lastValUps))
+	require.LessOrEqual(t, len(ctrler.lastValidators), int(govParams.MaxValidatorCnt()))
+
+	for _, dgt := range ctrler.allDelegatees {
+		require.True(t, checkExistDelegatee(dgt, lastValUps))
+	}
+	for _, dgt := range ctrler.lastValidators {
+		require.True(t, checkExistDelegatee(dgt, lastValUps))
+	}
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func Test_Bonding(t *testing.T) {
+	ctrler, lastValUps, xerr := initCtrler(config)
+	require.NoError(t, xerr)
+
+	_, lastHeight, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+	require.Equal(t, int64(1), lastHeight)
+
+	// to not validator
+	txctx, xerr := makeTrxCtx(types.RandAddress(), 4000, lastHeight+1)
+	require.NoError(t, xerr)
+	xerr = ctrler.ValidateTrx(txctx)
+	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
+
+	//
+	// to not validator (me) : self bonding
+	txctx, xerr = makeTrxCtx(nil, 4000, lastHeight+1)
+	require.NoError(t, xerr)
+
+	dgtee0, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
+	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+	dgtee0 = newDelegateeProto(txctx.SenderPubKey)
+	fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
+	vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
+	require.Nil(t, vpow)
+	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+	//------------------------------------------------------------------------------------------------------------------
+
+	//run tx
+	xerr = ctrler.ValidateTrx(txctx)
+	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
+	xerr = ctrler.ExecuteTrx(txctx)
+	require.NoError(t, xerr)
+	// check delegatee
+	dgtee1, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
+	require.NoError(t, xerr)
+	pw, _ := types.FromFons(txctx.Tx.Amount)
+	require.Equal(t, dgtee0.TotalPower+int64(pw), dgtee1.TotalPower)
+	require.Equal(t, dgtee0.SelfPower+int64(pw), dgtee1.SelfPower)
+	fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
+	// check vpow
+	vpow, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
+	require.NoError(t, xerr)
+	require.NotNil(t, vpow)
+	require.Equal(t, vpow.SumPower, vpow.sumPowerChunk())
+	require.EqualValues(t, txctx.TxHash, vpow.PowerChunks[len(vpow.PowerChunks)-1].TxHash)
+	require.EqualValues(t, lastHeight+1, vpow.PowerChunks[len(vpow.PowerChunks)-1].Height)
+	require.EqualValues(t, pw, vpow.PowerChunks[len(vpow.PowerChunks)-1].Power)
+	//------------------------------------------------------------------------------------------------------------------
+
+	//
+	// delegating to
+	to := crypto.PubKeyBytes2Addr(lastValUps[rand.Intn(len(lastValUps))].PubKey.GetSecp256K1())
+	txctx, xerr = makeTrxCtx(to, 4000, lastHeight+1)
+	require.NoError(t, xerr)
+
+	dgtee0, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
+	require.NoError(t, xerr)
+	dgtee0 = dgtee0.Clone()
+	fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
+	vpow, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
+	require.Nil(t, vpow)
+	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+
+	// run tx
+	xerr = ctrler.ValidateTrx(txctx)
+	require.NoError(t, xerr)
+	xerr = ctrler.ExecuteTrx(txctx)
+	require.NoError(t, xerr)
+
+	// check delegatee
+	dgtee1, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
+	require.NoError(t, xerr)
+	pw, _ = types.FromFons(txctx.Tx.Amount)
+	require.Equal(t, dgtee0.TotalPower+int64(pw), dgtee1.TotalPower)
+	require.Equal(t, dgtee0.SelfPower, dgtee1.SelfPower)
+	fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
+	// check vpow
+	vpow, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
+	require.NoError(t, xerr)
+	require.NotNil(t, vpow)
+	require.Equal(t, vpow.SumPower, vpow.sumPowerChunk())
+	require.EqualValues(t, txctx.TxHash, vpow.PowerChunks[len(vpow.PowerChunks)-1].TxHash)
+	require.EqualValues(t, lastHeight+1, vpow.PowerChunks[len(vpow.PowerChunks)-1].Height)
+	require.EqualValues(t, pw, vpow.PowerChunks[len(vpow.PowerChunks)-1].Power)
+	//------------------------------------------------------------------------------------------------------------------
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func initCtrler(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, xerrors.XError) {
+	ctrler, xerr := NewVPowerCtrler(cfg, 0, log.NewNopLogger())
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	var vals []abcitypes.ValidatorUpdate
+	for i := 0; i < 21; i++ {
+		_, pub := crypto.NewKeypairBytes()
+		pke := secp256k1.PubKey(pub)
+		pkp, err := cryptoenc.PubKeyToProto(pke)
+		if err != nil {
+			return nil, nil, xerrors.From(err)
+		}
+
+		vals = append(vals, abcitypes.ValidatorUpdate{
+			// Address:
+			PubKey: pkp,
+			Power:  1_000_000,
+		})
+	}
+	xerr = ctrler.InitLedger(vals)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+	return ctrler, vals, nil
+}
+
+func checkExistDelegatee(dgt *DelegateeProto, vups []abcitypes.ValidatorUpdate) bool {
+	for _, vup := range vups {
+		if euqalDelegatee(dgt, vup) {
+			return true
+		}
+	}
+	return false
+}
+func euqalDelegatee(dgt *DelegateeProto, vup abcitypes.ValidatorUpdate) bool {
+	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.TotalPower == vup.Power
+}
+
+func makeTrxCtx(to types.Address, power int64, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
+	from := acctMock.RandWallet()
+
+	if to == nil {
+		to = from.Address()
+	}
+	tx := web3.NewTrxStaking(
+		from.Address(),
+		to,
+		from.GetNonce(),
+		govParams.MinTrxGas(), govParams.GasPrice(),
+		types.ToFons(uint64(power)),
+	)
+	if _, _, err := from.SignTrxRLP(tx, config.ChainID); err != nil {
+		return nil, xerrors.From(err)
+	}
+
+	bz, xerr := tx.Encode()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	txCtx, xerr := ctrlertypes.NewTrxContext(bz, height, time.Now().Unix(), true,
+		func(_ctx *ctrlertypes.TrxContext) xerrors.XError {
+			_ctx.ChainID = config.ChainID
+			_ctx.AcctHandler = acctMock
+			_ctx.GovParams = govParams
+			return nil
+		},
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return txCtx, nil
+}

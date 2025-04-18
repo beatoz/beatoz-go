@@ -113,8 +113,7 @@ func (limiter *VPowerLimiter) checkUpdatablePowerLimit(val *Delegatee, diffPower
 	}
 
 	if ridx >= 0 && ridx < int(limiter.maxValidatorCnt) && diffPower < 0 {
-		// already validator and un-staking
-
+		// the `val` is already validator and un-staking
 		var candidate *powerObj
 		if len(limiter.powerObjs) > int(limiter.maxValidatorCnt) {
 			candidate = limiter.powerObjs[limiter.maxValidatorCnt]
@@ -122,7 +121,8 @@ func (limiter *VPowerLimiter) checkUpdatablePowerLimit(val *Delegatee, diffPower
 
 		// `diffPower` is negative
 		if candidate != nil && powObj.Power+diffPower < candidate.Power {
-			// `valObj` will be removed from validator set.
+			// the `val` will be removed from validator set.
+			// so, the power of `val` is included into updatedPower.
 			updatedPower += powObj.Power
 		} else {
 			updatedPower += -1 * diffPower
@@ -130,12 +130,15 @@ func (limiter *VPowerLimiter) checkUpdatablePowerLimit(val *Delegatee, diffPower
 	}
 
 	if (ridx < 0 || ridx >= int(limiter.maxValidatorCnt)) && diffPower > 0 {
+		// the `val` is not validator and staking
 		var lastVal *powerObj
 		if len(limiter.powerObjs) >= int(limiter.maxValidatorCnt) {
 			lastVal = limiter.powerObjs[limiter.maxValidatorCnt-1]
 		}
 
 		if lastVal != nil && powObj.Power+diffPower > lastVal.Power {
+			// the `lastVal` will be removed from validator set.
+			// so, the power of `lastVal` is included into updatedPower.
 			updatedPower += lastVal.Power
 		}
 	}

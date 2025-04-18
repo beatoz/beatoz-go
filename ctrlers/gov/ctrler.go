@@ -33,8 +33,8 @@ type GovCtrler struct {
 }
 
 func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
-	newGovParamsProvider := func() *ctrlertypes.GovParams { return &ctrlertypes.GovParams{} }
-	newProposalProvider := func() *proposal.GovProposal {
+	newGovParamsProvider := func() v1.ILedgerItem { return &ctrlertypes.GovParams{} }
+	newProposalProvider := func() v1.ILedgerItem {
 		return &proposal.GovProposal{}
 	}
 	lg := logger.With("module", "beatoz_GovCtrler")

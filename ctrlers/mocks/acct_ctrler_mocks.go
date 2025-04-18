@@ -17,7 +17,8 @@ type AcctHandlerMock struct {
 func NewAccountHandlerMock(walCnt int) *AcctHandlerMock {
 	var wals []*web3.Wallet
 	for i := 0; i < walCnt; i++ {
-		wals = append(wals, web3.NewWallet(nil))
+		w := web3.NewWallet(nil)
+		wals = append(wals, w)
 	}
 	return &AcctHandlerMock{wallets: wals}
 }

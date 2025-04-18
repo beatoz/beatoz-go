@@ -16,7 +16,7 @@ type StateLedger[T ILedgerItem] struct {
 
 var _ IStateLedger[ILedgerItem] = (*StateLedger[ILedgerItem])(nil)
 
-func NewStateLedger[T ILedgerItem](name, dbDir string, cacheSize int, newItem func() T, lg tmlog.Logger) (*StateLedger[T], xerrors.XError) {
+func NewStateLedger[T ILedgerItem](name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*StateLedger[T], xerrors.XError) {
 	newItemFunc := func() ILedgerItem { return newItem() }
 	_commitLedger, xerr := NewMutableLedger(name, dbDir, cacheSize, newItemFunc, lg)
 	if xerr != nil {

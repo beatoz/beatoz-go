@@ -47,9 +47,9 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovParams, logge
 		panic(err)
 	}
 
-	newDelegateeProvider := func() *Delegatee { return &Delegatee{} }
-	newStakeProvider := func() *Stake { return &Stake{} }
-	newRewardProvider := func() *Reward { return &Reward{} }
+	newDelegateeProvider := func() v1.ILedgerItem { return &Delegatee{} }
+	newStakeProvider := func() v1.ILedgerItem { return &Stake{} }
+	newRewardProvider := func() v1.ILedgerItem { return &Reward{} }
 
 	lg := logger.With("module", "beatoz_StakeCtrler")
 

@@ -26,3 +26,17 @@ func Test_Codec(t *testing.T) {
 	require.Equal(t, k0[len(prefixDelegateeProto):len(prefixDelegateeProto)+20], vpow.From)
 	require.Equal(t, k0[len(prefixDelegateeProto)+20:], vpow.To)
 }
+
+func Test_Key(t *testing.T) {
+	//h := rand.Int63()
+	//k := frozenKey(h)
+	//
+	//expected := []byte(fmt.Sprintf("%s%d", prefixFrozenVPowerProto, h))
+	//require.EqualValues(t, expected, k, "key", string(k))
+	//
+	//from := types.RandAddress()
+	//to := types.RandAddress()
+	//k = vpowerProtoKey(from, to)
+	//expected = append([]byte(prefixVPowerProto), append(from, to...)...)
+	//require.EqualValues(t, expected, k)
+}

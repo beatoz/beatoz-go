@@ -17,8 +17,8 @@ func Test_validatorUpdates(t *testing.T) {
 	maxValCnt := 5
 
 	for _i := 0; _i < 1000; _i++ {
-		var alls DelegateeArray
-		var lastVals DelegateeArray
+		var alls []*DelegateeProto
+		var lastVals []*DelegateeProto
 
 		topPow := int64(0)
 		bottomPow := int64(math.MaxInt64)
@@ -31,7 +31,7 @@ func Test_validatorUpdates(t *testing.T) {
 
 		newVals := selectValidators(alls, maxValCnt)
 		for i, v := range newVals {
-			require.Equal(t, topPow-int64(i), v.totalPower)
+			require.Equal(t, topPow-int64(i), v.TotalPower)
 		}
 
 		upVals := validatorUpdates(lastVals, newVals)
@@ -41,19 +41,19 @@ func Test_validatorUpdates(t *testing.T) {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
 
-			dgtee := findByPubKey(uPub.Bytes(), newVals)
+			dgtee := findDelegateeProtoByPubKey(uPub.Bytes(), newVals)
 			require.NotNil(t, dgtee)
-			require.Equal(t, dgtee.totalPower, u.Power)
+			require.Equal(t, dgtee.TotalPower, u.Power)
 		}
 
 		//
 		// add new validator
-		lastVals = copyDelegateeArray(newVals)
+		lastVals = copyDelegateeProtoArray(newVals)
 
-		sort.Sort(orderByPowerDelegatees(alls))
+		sort.Sort(orderByPowerDelegateeProtos(alls))
 		expectedOutDgtee := alls[maxValCnt-1]
 
-		bottomPow = alls[maxValCnt-1].totalPower
+		bottomPow = alls[maxValCnt-1].TotalPower
 		pow := bytes.RandInt64N(topPow-bottomPow) + bottomPow + 1
 		expectedNewDgtee := makeDelegateeOne(pow)
 
@@ -67,9 +67,9 @@ func Test_validatorUpdates(t *testing.T) {
 		for _, u := range upVals {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
-			if bytes.Equal(uPub.Bytes(), expectedNewDgtee.pubKey) {
-				require.Equal(t, expectedNewDgtee.totalPower, u.Power)
-			} else if bytes.Equal(uPub.Bytes(), expectedOutDgtee.pubKey) {
+			if bytes.Equal(uPub.Bytes(), expectedNewDgtee.PubKey) {
+				require.Equal(t, expectedNewDgtee.TotalPower, u.Power)
+			} else if bytes.Equal(uPub.Bytes(), expectedOutDgtee.PubKey) {
 				require.Equal(t, int64(0), u.Power)
 			} else {
 				require.True(t, false, "not reachable")
@@ -78,16 +78,16 @@ func Test_validatorUpdates(t *testing.T) {
 
 		//
 		// slash
-		lastVals = copyDelegateeArray(newVals)
+		lastVals = copyDelegateeProtoArray(newVals)
 
-		sort.Sort(orderByPowerDelegatees(alls))
+		sort.Sort(orderByPowerDelegateeProtos(alls))
 		expectedNewDgtee = alls[maxValCnt]
 
 		// slash the power of one of validators.
 		// as a result, the validator is excluded from validator set.
-		bottomPow = expectedNewDgtee.totalPower
+		bottomPow = expectedNewDgtee.TotalPower
 		expectedOutDgtee = alls[rand.Intn(maxValCnt)]
-		expectedOutDgtee.totalPower = bottomPow - 1
+		expectedOutDgtee.TotalPower = bottomPow - 1
 
 		newVals = selectValidators(alls, maxValCnt)
 		upVals = validatorUpdates(lastVals, newVals)
@@ -96,9 +96,9 @@ func Test_validatorUpdates(t *testing.T) {
 		for _, u := range upVals {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
-			if bytes.Equal(uPub.Bytes(), expectedNewDgtee.pubKey) {
-				require.Equal(t, expectedNewDgtee.totalPower, u.Power)
-			} else if bytes.Equal(uPub.Bytes(), expectedOutDgtee.pubKey) {
+			if bytes.Equal(uPub.Bytes(), expectedNewDgtee.PubKey) {
+				require.Equal(t, expectedNewDgtee.TotalPower, u.Power)
+			} else if bytes.Equal(uPub.Bytes(), expectedOutDgtee.PubKey) {
 				// it was removed.
 				require.Equal(t, int64(0), u.Power)
 			} else {
@@ -108,11 +108,11 @@ func Test_validatorUpdates(t *testing.T) {
 
 		//
 		// slash partially
-		lastVals = copyDelegateeArray(newVals)
+		lastVals = copyDelegateeProtoArray(newVals)
 
-		sort.Sort(orderByPowerDelegatees(alls))
+		sort.Sort(orderByPowerDelegateeProtos(alls))
 		expectedUpdatedVal := alls[0]
-		expectedUpdatedVal.totalPower--
+		expectedUpdatedVal.TotalPower--
 
 		// slash the power of one of validators.
 		// as a result, the changed power of validator is included validator update.
@@ -123,8 +123,8 @@ func Test_validatorUpdates(t *testing.T) {
 		for _, u := range upVals {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
-			if bytes.Equal(uPub.Bytes(), expectedUpdatedVal.pubKey) {
-				require.Equal(t, expectedUpdatedVal.totalPower, u.Power)
+			if bytes.Equal(uPub.Bytes(), expectedUpdatedVal.PubKey) {
+				require.Equal(t, expectedUpdatedVal.TotalPower, u.Power)
 			} else {
 				require.True(t, false, "not reachable")
 			}
@@ -132,24 +132,24 @@ func Test_validatorUpdates(t *testing.T) {
 	}
 }
 
-func makeDelegateeListRandPower(c int) []*Delegatee {
-	var ret []*Delegatee
+func makeDelegateeListRandPower(c int) []*DelegateeProto {
+	var ret []*DelegateeProto
 	for i := 0; i < c; i++ {
 		ret = append(ret, makeDelegateeOne(bytes.RandInt64N(700_000_000)))
 	}
 	return ret
 }
-func makeDelegateeList(c int, pow int64) []*Delegatee {
-	var ret []*Delegatee
+func makeDelegateeList(c int, pow int64) []*DelegateeProto {
+	var ret []*DelegateeProto
 	for i := 0; i < c; i++ {
 		ret = append(ret, makeDelegateeOne(pow))
 	}
 	return ret
 }
 
-func makeDelegateeOne(pow int64) *Delegatee {
+func makeDelegateeOne(pow int64) *DelegateeProto {
 	_, pub := crypto.NewKeypairBytes()
-	dgtee := NewDelegatee(pub)
-	dgtee.totalPower = pow
+	dgtee := newDelegateeProto(pub)
+	dgtee.TotalPower = pow
 	return dgtee
 }

@@ -197,7 +197,10 @@ func Test_Validator_Load(t *testing.T) {
 		r := twoWeeksSeconds + rand.Int63n(oneYearSeconds)
 		h := lastHeight + rand.Int63n(r/2)
 
-		dgtees, xerr := LoadAllDelegatees(ledgerDgtees, ledgerVPows, h, r)
+		dgtProtos, xerr := LoadAllDelegateeProtos(ledgerDgtees)
+		require.NoError(t, xerr)
+
+		dgtees, xerr := LoadAllVPowerProtos(ledgerVPows, dgtProtos, h, r)
 		require.NoError(t, xerr)
 		require.Equal(t, len(dgteeProtos), len(dgtees))
 
@@ -251,7 +254,7 @@ func Test_Validator_Load(t *testing.T) {
 }
 
 // Test_ComputeWeight tests that the sum of Wi and the result of Delegatee.Compute is same to decimal 6 places.
-func Test_ComputeWeight(t *testing.T) {
+func Test_Compute_vs_Wi(t *testing.T) {
 
 	//
 	// init []*Delegatee and []*testPowObj
@@ -314,6 +317,50 @@ func Test_ComputeWeight(t *testing.T) {
 
 }
 
+func Test_Compute_vs_ComputeEx(t *testing.T) {
+	maxDgtCnt := 42
+	vpowCnt := 10000
+	dgteeProtos, vpowProtos, ledgerDgtees, ledgerVPows, lastHeight, xerr := initVPowerLedger(maxDgtCnt, vpowCnt)
+	require.NoError(t, xerr)
+	require.Equal(t, maxDgtCnt, len(dgteeProtos))
+	require.Equal(t, maxDgtCnt*vpowCnt, len(vpowProtos))
+
+	fmt.Println("Delegatee Count", len(dgteeProtos), "VPowerProto Count", len(vpowProtos))
+
+	totalSupply := types.ToFons(math.MaxUint64)
+
+	for i := 0; i < 10; i++ {
+		wCompute, wComputeEx := decimal.Zero, decimal.Zero
+
+		r := powerRipeningCycle
+		h := lastHeight + powerRipeningCycle/2 //lastHeight + bytes.RandInt64N(powerRipeningCycle+1)
+
+		dgtProtos, xerr := LoadAllDelegateeProtos(ledgerDgtees)
+		require.NoError(t, xerr)
+
+		dgtees, xerr := LoadAllVPowerProtos(ledgerVPows, dgtProtos, h, r)
+		require.NoError(t, xerr)
+		require.Equal(t, len(dgteeProtos), len(dgtees))
+
+		//Compute
+		start := time.Now()
+		for _, d := range dgtees {
+			wCompute = wCompute.Add(d.Compute(h, r, totalSupply, 200))
+		}
+		dur0 := time.Since(start)
+
+		//ComputeEx
+		start = time.Now()
+		for _, d := range dgtees {
+			wComputeEx = wComputeEx.Add(d.ComputeEx(h, r, totalSupply, 200))
+		}
+		dur1 := time.Since(start)
+
+		require.Equal(t, wComputeEx.String(), wComputeEx.String())
+		fmt.Printf("Compute:%v, ComputeEx:%v, ComputeEx/Compute:%.2v%%\n", dur0, dur1, dur1*100/dur0)
+	}
+}
+
 func Benchmark_Load(b *testing.B) {
 	maxDgtCnt := 42
 	vpowCnt := 10000
@@ -327,7 +374,10 @@ func Benchmark_Load(b *testing.B) {
 		r := twoWeeksSeconds + rand.Int63n(oneYearSeconds)
 		h := lastHeight + rand.Int63n(r/2)
 
-		dgtees, xerr := LoadAllDelegatees(ledgerDgtees, ledgerVPows, h, r)
+		dgtProtos, xerr := LoadAllDelegateeProtos(ledgerDgtees)
+		require.NoError(b, xerr)
+
+		dgtees, xerr := LoadAllVPowerProtos(ledgerVPows, dgtProtos, h, r)
 		require.NoError(b, xerr)
 		require.Equal(b, maxDgtCnt, len(dgtees))
 	}
@@ -345,15 +395,18 @@ func Benchmark_Compute(b *testing.B) {
 	//r := powerRipeningCycle
 	//h := lastHeight + 1
 
-	// about 396.396993 ms/op (396396993 ns/op)
-	r := powerRipeningCycle
-	h := lastHeight + powerRipeningCycle/2
-
-	//// best case: about 33.799914 ms/op (33799914 ns/op)
+	//// about 396.396993 ms/op (396396993 ns/op)
 	//r := powerRipeningCycle
-	//h := lastHeight + powerRipeningCycle + 1
+	//h := lastHeight + powerRipeningCycle/2
 
-	dgtees, xerr := LoadAllDelegatees(ledgerDgtees, ledgerVPows, h, r)
+	// best case: about 48.866198 ms/op (48866198 ns/op)
+	r := powerRipeningCycle
+	h := lastHeight + powerRipeningCycle + 1
+
+	dgtProtos, xerr := LoadAllDelegateeProtos(ledgerDgtees)
+	require.NoError(b, xerr)
+
+	dgtees, xerr := LoadAllVPowerProtos(ledgerVPows, dgtProtos, h, r)
 	require.NoError(b, xerr)
 	require.Equal(b, len(dgteeProtos), len(dgtees))
 
@@ -366,6 +419,42 @@ func Benchmark_Compute(b *testing.B) {
 	}
 }
 
+func Benchmark_ComputeEx(b *testing.B) {
+	maxDgtCnt := 42
+	vpowCnt := 10000
+	dgteeProtos, vpowProtos, ledgerDgtees, ledgerVPows, lastHeight, xerr := initVPowerLedger(maxDgtCnt, vpowCnt)
+	require.NoError(b, xerr)
+	require.Equal(b, maxDgtCnt, len(dgteeProtos))
+	require.Equal(b, maxDgtCnt*vpowCnt, len(vpowProtos))
+
+	//// worst case: about 733.409784 ms/op (733409784 ns/op)
+	//r := powerRipeningCycle
+	//h := lastHeight + 1
+
+	//// about 396.396993 ms/op (396396993 ns/op)
+	//r := powerRipeningCycle
+	//h := lastHeight + powerRipeningCycle/2
+
+	// best case: about 33.799914 ms/op (33799914 ns/op)
+	r := powerRipeningCycle
+	h := lastHeight + powerRipeningCycle + 1
+
+	dgtProtos, xerr := LoadAllDelegateeProtos(ledgerDgtees)
+	require.NoError(b, xerr)
+
+	dgtees, xerr := LoadAllVPowerProtos(ledgerVPows, dgtProtos, h, r)
+	require.NoError(b, xerr)
+	require.Equal(b, len(dgteeProtos), len(dgtees))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for _, d := range dgtees {
+			_ = d.ComputeEx(h, r, types.ToFons(math.MaxUint64), 200)
+		}
+	}
+}
+
 func initVPowerLedger(dgteeCnt, powCnt int) ([]*DelegateeProto, []*VPowerProto, v1.IStateLedger[*DelegateeProto], v1.IStateLedger[*VPowerProto], int64, error) {
 	var dgtProtos []*DelegateeProto
 	var vpowProtos []*VPowerProto
@@ -374,11 +463,11 @@ func initVPowerLedger(dgteeCnt, powCnt int) ([]*DelegateeProto, []*VPowerProto, 
 	dbpath := filepath.Join(os.TempDir(), "vpower_ledger_test")
 	_ = os.RemoveAll(dbpath)
 
-	ledgerDgtees, xerr := v1.NewStateLedger[*DelegateeProto]("dgtees", dbpath, 128, func() *DelegateeProto { return &DelegateeProto{} }, log.NewNopLogger())
+	ledgerDgtees, xerr := v1.NewStateLedger[*DelegateeProto]("dgtees", dbpath, 128, func() v1.ILedgerItem { return &DelegateeProto{} }, log.NewNopLogger())
 	if xerr != nil {
 		return nil, nil, nil, nil, 0, xerr
 	}
-	ledgerVPow, xerr := v1.NewStateLedger[*VPowerProto]("vpows", dbpath, 2048, func() *VPowerProto { return &VPowerProto{} }, log.NewNopLogger())
+	ledgerVPow, xerr := v1.NewStateLedger[*VPowerProto]("vpows", dbpath, 2048, func() v1.ILedgerItem { return &VPowerProto{} }, log.NewNopLogger())
 	if xerr != nil {
 		return nil, nil, nil, nil, 0, xerr
 	}
@@ -417,22 +506,22 @@ func initVPowerLedger(dgteeCnt, powCnt int) ([]*DelegateeProto, []*VPowerProto, 
 		return nil, nil, nil, nil, 0, xerr
 	}
 
-	if xerr := ledgerDgtees.Close(); xerr != nil {
-		return nil, nil, nil, nil, 0, xerr
-	}
-	if xerr := ledgerVPow.Close(); xerr != nil {
-		return nil, nil, nil, nil, 0, xerr
-	}
-
-	// re-open
-	ledgerDgtees, xerr = v1.NewStateLedger[*DelegateeProto]("dgtees", dbpath, 128, func() *DelegateeProto { return &DelegateeProto{} }, log.NewNopLogger())
-	if xerr != nil {
-		return nil, nil, nil, nil, 0, xerr
-	}
-	ledgerVPow, xerr = v1.NewStateLedger[*VPowerProto]("vpows", dbpath, 2048, func() *VPowerProto { return &VPowerProto{} }, log.NewNopLogger())
-	if xerr != nil {
-		return nil, nil, nil, nil, 0, xerr
-	}
+	//if xerr := ledgerDgtees.Close(); xerr != nil {
+	//	return nil, nil, nil, nil, 0, xerr
+	//}
+	//if xerr := ledgerVPow.Close(); xerr != nil {
+	//	return nil, nil, nil, nil, 0, xerr
+	//}
+	//
+	//// re-open
+	//ledgerDgtees, xerr = v1.NewStateLedger[*DelegateeProto]("dgtees", dbpath, 128, func() v1.ILedgerItem { return &DelegateeProto{} }, log.NewNopLogger())
+	//if xerr != nil {
+	//	return nil, nil, nil, nil, 0, xerr
+	//}
+	//ledgerVPow, xerr = v1.NewStateLedger[*VPowerProto]("vpows", dbpath, 2048, func() v1.ILedgerItem { return &VPowerProto{} }, log.NewNopLogger())
+	//if xerr != nil {
+	//	return nil, nil, nil, nil, 0, xerr
+	//}
 
 	return dgtProtos, vpowProtos, ledgerDgtees, ledgerVPow, lastHeight, nil
 }

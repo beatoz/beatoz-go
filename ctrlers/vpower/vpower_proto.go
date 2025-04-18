@@ -10,13 +10,14 @@ import (
 )
 
 var (
-	prefixVPowerProto = "vp"
+	prefixVPowerProto       = "vp"
+	prefixFrozenVPowerProto = "fz"
 )
 
-func vpowKey(prefix, k0, k1 []byte) v1.LedgerKey {
-	k := make([]byte, len(prefix)+len(k0)+len(k1))
-	copy(k, prefix)
-	copy(k[len(prefix):], append(k0, k1...))
+func vpowerProtoKey(k0, k1 []byte) v1.LedgerKey {
+	k := make([]byte, len(prefixVPowerProto)+len(k0)+len(k1))
+	copy(k, prefixVPowerProto)
+	copy(k[len(prefixVPowerProto):], append(k0, k1...))
 	return k
 }
 
@@ -49,7 +50,7 @@ func newVPowerWithTxHash(from, to types.Address, pow, height int64, txhash []byt
 }
 
 func (x *VPowerProto) Key() v1.LedgerKey {
-	return vpowKey([]byte(prefixVPowerProto), x.From, x.To)
+	return vpowerProtoKey(x.From, x.To)
 }
 
 func (x *VPowerProto) Encode() ([]byte, xerrors.XError) {
@@ -73,29 +74,52 @@ func (x *VPowerProto) IsSelfPower() bool {
 	return bytes.Equal(x.From, x.To)
 }
 
-func (x *VPowerProto) addPowerChunk(pow, height int64) {
-	x.SumPower += pow
-	x.PowerChunks = append(x.PowerChunks, &PowerChunk{Power: pow, Height: height})
-}
-
-func (x *VPowerProto) delPowerChunk(idx int) {
-	x.SumPower -= x.PowerChunks[idx].Power
-	x.PowerChunks = append(x.PowerChunks[:idx], x.PowerChunks[idx+1:]...)
-}
-
-func (x *VPowerProto) addPowerWithTxHash(pow, height int64, txhash []byte) {
-	x.SumPower += pow
-	x.PowerChunks = append(x.PowerChunks, &PowerChunk{Power: pow, Height: height, TxHash: txhash})
-}
-
-func (x *VPowerProto) delPowerWithTxHash(txhash []byte) {
-	for i, c := range x.PowerChunks {
-		if bytes.Equal(txhash, c.TxHash) {
-			x.delPowerChunk(i)
-			return
+func (x *VPowerProto) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
+	for _, pc := range x.PowerChunks {
+		if bytes.Equal(pc.TxHash, txhash) {
+			return pc
 		}
 	}
-	return
+	return nil
+}
+
+func (x *VPowerProto) addPowerChunk(pow, height int64) *PowerChunk {
+	added := &PowerChunk{Power: pow, Height: height}
+	x.PowerChunks = append(x.PowerChunks, added)
+	x.SumPower += added.Power
+	return added
+}
+
+func (x *VPowerProto) delPowerChunk(idx int) *PowerChunk {
+	removed := x.PowerChunks[idx]
+	x.PowerChunks = append(x.PowerChunks[:idx], x.PowerChunks[idx+1:]...)
+	x.SumPower -= removed.Power
+	return removed
+}
+
+func (x *VPowerProto) addPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunk {
+	added := &PowerChunk{Power: pow, Height: height, TxHash: txhash}
+	x.PowerChunks = append(x.PowerChunks, added)
+	x.SumPower += added.Power
+	return added
+}
+
+func (x *VPowerProto) delPowerWithTxHash(txhash []byte) *PowerChunk {
+	for i, c := range x.PowerChunks {
+		if bytes.Equal(txhash, c.TxHash) {
+			return x.delPowerChunk(i)
+		}
+	}
+	return nil
+}
+
+// sumPowerChunk is used for test
+func (x *VPowerProto) sumPowerChunk() int64 {
+	ret := int64(0)
+	for _, pc := range x.PowerChunks {
+		ret += pc.Power
+	}
+	return ret
 }
 
 func (x *VPowerProto) Clone() *VPowerProto {
