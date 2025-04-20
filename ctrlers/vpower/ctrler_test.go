@@ -2,7 +2,6 @@ package vpower
 
 import (
 	"bytes"
-	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -80,14 +79,14 @@ func Test_Bonding(t *testing.T) {
 	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
 
 	//
-	// to not validator (me) : self bonding
+	// to not validator (self bonding)
 	txctx, xerr = makeTrxCtx(nil, 4000, lastHeight+1)
 	require.NoError(t, xerr)
-
+	// txctx.Tx.To is not validator and nothing must be not found about txctx.Tx.To.
 	dgtee0, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	dgtee0 = newDelegateeProto(txctx.SenderPubKey)
-	fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
+	//fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
 	vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
 	require.Nil(t, vpow)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
@@ -98,14 +97,14 @@ func Test_Bonding(t *testing.T) {
 	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
 	xerr = ctrler.ExecuteTrx(txctx)
 	require.NoError(t, xerr)
-	// check delegatee
+	// check delegatee: the `txctx.Tx.To` should found to `dgteesLedger`.
 	dgtee1, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
 	require.NoError(t, xerr)
 	pw, _ := types.FromFons(txctx.Tx.Amount)
 	require.Equal(t, dgtee0.TotalPower+int64(pw), dgtee1.TotalPower)
 	require.Equal(t, dgtee0.SelfPower+int64(pw), dgtee1.SelfPower)
-	fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
-	// check vpow
+	//fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
+	// check vpow: the vpow of `txctx.Tx.From` should be found to `vpowsLedger`.
 	vpow, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, vpow)
@@ -116,15 +115,17 @@ func Test_Bonding(t *testing.T) {
 	//------------------------------------------------------------------------------------------------------------------
 
 	//
-	// delegating to
+	// delegating to `to`: `to` is validator
 	to := crypto.PubKeyBytes2Addr(lastValUps[rand.Intn(len(lastValUps))].PubKey.GetSecp256K1())
 	txctx, xerr = makeTrxCtx(to, 4000, lastHeight+1)
 	require.NoError(t, xerr)
-
+	// the `txctx.Tx.To` should be found in `dgteesLedger`.
 	dgtee0, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
 	require.NoError(t, xerr)
+	// Because `dgtee0` will be updated in `ExecuteTrx`, it's origin should be copied at here.
 	dgtee0 = dgtee0.Clone()
-	fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
+	//fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
+	// check vpow: the vpow of `txctx.TxFrom` should be not found in `vpowsLedger` yet.
 	vpow, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
 	require.Nil(t, vpow)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
@@ -135,14 +136,15 @@ func Test_Bonding(t *testing.T) {
 	xerr = ctrler.ExecuteTrx(txctx)
 	require.NoError(t, xerr)
 
-	// check delegatee
+	// check delegatee:  the `txctx.Tx.To` should be found in `dgteesLedger`
+	// and is't power should be updated by `txctx.Tx.Amount`.
 	dgtee1, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
 	require.NoError(t, xerr)
 	pw, _ = types.FromFons(txctx.Tx.Amount)
 	require.Equal(t, dgtee0.TotalPower+int64(pw), dgtee1.TotalPower)
 	require.Equal(t, dgtee0.SelfPower, dgtee1.SelfPower)
-	fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
-	// check vpow
+	//fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
+	// check vpow: the vpow of `txctx.Tx.From` should be found in `vpowsLedger`.
 	vpow, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, vpow)

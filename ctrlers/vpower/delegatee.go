@@ -306,7 +306,7 @@ func (dgtee *Delegatee) ComputeEx(height, ripeningCycle int64, totalSupply *uint
 	}
 
 	_totolSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0)
-	return WaWeightedEx(powChunks, height, ripeningCycle, _totolSupply, tauPermil)
+	return WaWeightedWithPowerChunks(powChunks, height, ripeningCycle, _totolSupply, tauPermil)
 }
 
 func (dgtee *Delegatee) Clone() *Delegatee {

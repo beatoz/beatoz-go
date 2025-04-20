@@ -325,11 +325,11 @@ func Test_Compute_vs_ComputeEx(t *testing.T) {
 	require.Equal(t, maxDgtCnt, len(dgteeProtos))
 	require.Equal(t, maxDgtCnt*vpowCnt, len(vpowProtos))
 
-	fmt.Println("Delegatee Count", len(dgteeProtos), "VPowerProto Count", len(vpowProtos))
-
 	totalSupply := types.ToFons(math.MaxUint64)
 
-	for i := 0; i < 10; i++ {
+	nOp := 10
+	dur0, dur1 := time.Duration(0), time.Duration(0)
+	for i := 0; i < nOp; i++ {
 		wCompute, wComputeEx := decimal.Zero, decimal.Zero
 
 		r := powerRipeningCycle
@@ -347,18 +347,20 @@ func Test_Compute_vs_ComputeEx(t *testing.T) {
 		for _, d := range dgtees {
 			wCompute = wCompute.Add(d.Compute(h, r, totalSupply, 200))
 		}
-		dur0 := time.Since(start)
+		dur0 += time.Since(start)
 
 		//ComputeEx
 		start = time.Now()
 		for _, d := range dgtees {
 			wComputeEx = wComputeEx.Add(d.ComputeEx(h, r, totalSupply, 200))
 		}
-		dur1 := time.Since(start)
+		dur1 += time.Since(start)
 
 		require.Equal(t, wComputeEx.String(), wComputeEx.String())
-		fmt.Printf("Compute:%v, ComputeEx:%v, ComputeEx/Compute:%.2v%%\n", dur0, dur1, dur1*100/dur0)
 	}
+	dur0 /= time.Duration(nOp)
+	dur1 /= time.Duration(nOp)
+	fmt.Printf("Compute:%v, ComputeEx:%v, ComputeEx/Compute:%.2v%%\n", dur0, dur1, dur1*100/dur0)
 }
 
 func Benchmark_Load(b *testing.B) {
@@ -523,6 +525,7 @@ func initVPowerLedger(dgteeCnt, powCnt int) ([]*DelegateeProto, []*VPowerProto, 
 	//	return nil, nil, nil, nil, 0, xerr
 	//}
 
+	fmt.Println("Delegatee Count", len(dgtProtos), "VPowerProto Count", len(vpowProtos))
 	return dgtProtos, vpowProtos, ledgerDgtees, ledgerVPow, lastHeight, nil
 }
 

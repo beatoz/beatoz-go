@@ -37,7 +37,8 @@ func initTestObjs(maxPow int64) []testPowObj {
 func Test_Wi(t *testing.T) {
 	totalSupply := types.ToFons(uint64(700_000_000))
 
-	for idx := 0; idx < 1000; idx++ {
+	nOp := 1000
+	for idx := 0; idx < nOp; idx++ {
 		vpObjs := initTestObjs(int64(700_000_000))
 		wa := decimal.NewFromInt(0)
 
@@ -60,7 +61,8 @@ func Test_Wa_vs_SumWi(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
 	tau := 200 // 0.200
 
-	for n := 0; n < 1000; n++ {
+	nOp := 1000
+	for n := 0; n < nOp; n++ {
 		var vpows, vdurs []int64
 		vpObjs := initTestObjs(int64(350_000_000))
 		// Sum Wi
@@ -94,8 +96,11 @@ func Test_Wa_vs_SumWi(t *testing.T) {
 func Test_Wa_vs_SumWi_vs_WaWeighted(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
 	tau := 200 // 0.200
-
-	for n := 0; n < 1000; n++ {
+	nOp := 1000
+	dur0 := time.Duration(0)
+	dur1 := time.Duration(0)
+	dur2 := time.Duration(0)
+	for n := 0; n < nOp; n++ {
 		var vpows, vdurs []int64
 		vpObjs := initTestObjs(int64(350_000_000))
 
@@ -111,21 +116,21 @@ func Test_Wa_vs_SumWi_vs_WaWeighted(t *testing.T) {
 			vdurs = append(vdurs, vpobj.vdur)
 		}
 		sumWi0 = sumWi0.Truncate(6)
-		dur0 := time.Since(start)
+		dur0 += time.Since(start)
 		//fmt.Println("sum of Wi", sumWi0)
 
 		// Wa
 		start = time.Now()
 		sumWi1 := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
 		sumWi1 = sumWi1.Truncate(6)
-		dur1 := time.Since(start)
+		dur1 += time.Since(start)
 		//fmt.Println("Wa return", sumWi1)
 
 		// WaWeighted
 		start = time.Now()
 		sumWi2 := WaWeighted(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
 		sumWi2 = sumWi2.Truncate(6)
-		dur2 := time.Since(start)
+		dur2 += time.Since(start)
 
 		require.True(t, sumWi0.LessThanOrEqual(decimalOne), "SumWi0", sumWi0, "nth", n)
 		require.True(t, sumWi1.LessThanOrEqual(decimalOne), "SumWi1", sumWi1, "nth", n)
@@ -133,9 +138,9 @@ func Test_Wa_vs_SumWi_vs_WaWeighted(t *testing.T) {
 
 		require.True(t, sumWi0.Equal(sumWi1), fmt.Sprintf("SumWi0:%v, SumWi1:%v, nth:%v", sumWi0, sumWi1, n))
 		require.True(t, sumWi1.Equal(sumWi2), fmt.Sprintf("SumWi1:%v, SumWi2:%v, nth:%v", sumWi1, sumWi2, n))
-
-		fmt.Println("SumWi", dur0, "Wa", dur1, "WaWeighted", dur2)
 	}
+
+	fmt.Println("SumWi", dur0/time.Duration(nOp), "Wa", dur1/time.Duration(nOp), "WaWeighted", dur2/time.Duration(nOp))
 }
 
 func Benchmark_SumWi(b *testing.B) {
