@@ -42,7 +42,7 @@ func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
 
 func LoadAllDelegateeProtos(dgteesLedger v1.IStateLedger[*DelegateeProto]) ([]*DelegateeProto, xerrors.XError) {
 	var dgteeProtos []*DelegateeProto
-	if xerr := dgteesLedger.Seek([]byte(prefixDelegateeProto), true, func(elem *DelegateeProto) xerrors.XError {
+	if xerr := dgteesLedger.Iterate(func(elem *DelegateeProto) xerrors.XError {
 		dgteeProtos = append(dgteeProtos, elem)
 		return nil
 	}, true); xerr != nil {
@@ -58,7 +58,7 @@ func LoadAllVPowerProtos(vpowLedger v1.IStateLedger[*VPowerProto], dgteeProtos [
 		dgtees = append(dgtees, NewDelegatee(dgt.PubKey))
 	}
 
-	xerr := vpowLedger.Seek([]byte(prefixVPowerProto), true, func(vpow *VPowerProto) xerrors.XError {
+	xerr := vpowLedger.Iterate(func(vpow *VPowerProto) xerrors.XError {
 		stratHeight := vpow.PowerChunks[0].Height
 		lastHeight := vpow.PowerChunks[len(vpow.PowerChunks)-1].Height
 		if stratHeight <= 0 {

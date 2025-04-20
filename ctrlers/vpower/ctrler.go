@@ -353,23 +353,18 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	// decrease the power of `dgteeProto` by `pc.Power`
 	dgteeProto.DelPower(vpow.From, pc.Power)
 
-	//if dgteeProto.SelfPower == 0 {
-	//	// un-bonding all voting powers of `dgteeProto`
-	//
-	//}
-	//
-	//if dgteeProto.TotalPower == 0 {
-	//	// this changed delegate will be committed at Commit()
-	//	if xerr := ctrler.delegateeLedger.Del(delegatee.Key(), ctx.Exec); xerr != nil {
-	//		return xerr
-	//	}
-	//
-	//} else {
-	//	// this changed delegate will be committed at Commit()
-	//	if xerr := ctrler.delegateeLedger.Set(delegatee, ctx.Exec); xerr != nil {
-	//		return xerr
-	//	}
-	//}
+	if dgteeProto.SelfPower == 0 {
+		// todo: un-bonding all voting powers delegated to `dgteeProto`
+	}
+
+	if dgteeProto.TotalPower == 0 {
+		// todo: remove `dgteeProto`
+
+	} else {
+		if xerr := ctrler.dgteesLedger.Set(dgteeProto, ctx.Exec); xerr != nil {
+			return xerr
+		}
+	}
 
 	//
 	// todo: freeze the power chunk `pc` deleted from `vpowsLedger`
