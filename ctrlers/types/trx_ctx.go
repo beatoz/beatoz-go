@@ -33,7 +33,8 @@ type TrxContext struct {
 	StakeHandler IStakeHandler
 	ChainID      string
 
-	Callback func(*TrxContext, xerrors.XError)
+	ValidateResult interface{}
+	Callback       func(*TrxContext, xerrors.XError)
 }
 
 type NewTrxContextCb func(*TrxContext) xerrors.XError

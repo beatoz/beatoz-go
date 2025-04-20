@@ -126,6 +126,12 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	return nil, nil
 }
 
+type validateResult struct {
+	txPower   int64
+	dgtProto  *DelegateeProto
+	vpowProto *VPowerProto
+}
+
 func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -151,8 +157,8 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		totalPower, selfPower := int64(0), int64(0)
 
+		// NOTE: Do not find from `allDelegatees`.
 		// Only if there is no update on allDelegatees, it's possible to find from `allDelegatees`.
-		//dgtee := findByAddr(ctx.Tx.To, ctrler.allDelegatees)
 		dgtee, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
 		if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
 			return xerr
@@ -207,70 +213,55 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrOverFlow.Wrapf("validator(%v) power overflow occurs.\ntx:%v", dgtee.Address(), ctx.Tx)
 		}
 
+		//
 		// todo: Implement stake limiter
-		////
-		//// begin: issue #34: check updatable stake ratio
-		//if len(ctrler.lastValidators) >= 3 {
-		//	_delg := dgtee
-		//	if _delg == nil {
-		//		_delg = &Delegatee{
-		//			addr:       ctx.Tx.To,
-		//			totalPower: 0,
-		//		}
-		//	}
-		//	if xerr := ctrler.vpowLimiter.CheckLimit(_delg, txPower); xerr != nil {
-		//		return xerrors.ErrUpdatableStakeRatio.Wrap(xerr)
-		//	}
-		//}
-		//// end: issue #34: check updatable stake ratio
-		////
+		//
+
+		// set the result of ValidateTrx
+		ctx.ValidateResult = &validateResult{
+			txPower:   txPower,
+			dgtProto:  dgtee,
+			vpowProto: nil,
+		}
+
 	case ctrlertypes.TRX_UNSTAKING:
-		////
-		//// begin: issue #34: check updatable stake ratio
-		//// find delegatee
-		//// todo: Do not find from `allDelegatees`
-		//dgtee := findByAddr(ctx.Tx.To, ctrler.allDelegatees)
-		//if dgtee == nil {
-		//	return xerrors.ErrNotFoundDelegatee.Wrapf("validator(%v)", ctx.Tx.To)
-		//}
-		//
-		//// find the stake from a delegatee
-		//txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
-		//if txhash == nil || len(txhash) != 32 {
-		//	return xerrors.ErrInvalidTrxPayloadParams
-		//}
-		//
-		//vpow := dgtee.FindPowerChunk(ctx.Tx.From, txhash)
-		//if vpow == nil {
-		//	return xerrors.ErrNotFoundStake
-		//}
-		//
-		//// todo: implement checking updatable limitation.
-		////if len(ctrler.lastValidators) >= 3 {
-		////	if xerr := ctrler.stakeLimiter.CheckLimit(dgtee, -1*s0.Power); xerr != nil {
-		////		return xerrors.ErrUpdatableStakeRatio.Wrap(xerr)
-		////	}
-		////}
-		//// end: issue #34: check updatable stake ratio
-		////
+		// todo: Resolve issue #34: check updatable stake ratio
+
+		// NOTE: Do not find from `allDelegatees`.
+		// `ctx.Tx.To` must already be a delegator (or validator), so it should be found in the `dgteesLedger`.
+		dgtee, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
+		if xerr != nil {
+			return xerr
+		}
+
+		// find the voting power from a delegatee
+		txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
+		if txhash == nil || len(txhash) != 32 {
+			return xerrors.ErrInvalidTrxPayloadParams
+		}
+
+		// Since the bonding tx pointed to by `txhash` must have already been executed
+		// and created a voting chunk as a result,
+		// the voting power chunk with `txhash` must be found in `vpowsLedger`.
+		vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, ctx.Tx.To), ctx.Exec)
+		if xerr != nil {
+			return xerr
+		}
+		pc := vpow.findPowerChunk(txhash)
+		if pc == nil {
+			return xerrors.ErrNotFoundStake
+		}
+
+		// todo: implement checking updatable limitation.
+
+		// set the result of ValidateTrx
+		ctx.ValidateResult = &validateResult{
+			dgtProto:  dgtee,
+			vpowProto: vpow,
+		}
 	case ctrlertypes.TRX_WITHDRAW:
 		// todo: implement withdraw reward
-		//if ctx.Tx.Amount.Sign() != 0 {
-		//	return xerrors.ErrInvalidTrx.Wrapf("amount must be 0")
-		//}
-		//txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadWithdraw)
-		//if !ok {
-		//	return xerrors.ErrInvalidTrxPayloadType
-		//}
 
-		//rwd, xerr := ctrler.rewardLedger.Get(ctx.Tx.From, ctx.Exec)
-		//if xerr != nil {
-		//	return xerr
-		//}
-		//
-		//if txpayload.ReqAmt.Cmp(rwd.cumulated) > 0 {
-		//	return xerrors.ErrInvalidTrx.Wrapf("insufficient reward")
-		//}
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
@@ -297,13 +288,14 @@ func (ctrler *VPowerCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// NOTE: DO NOT FIND a delegatee from `allDelegatees`.
 	// If `allDelegatees` is updated, unexpected results may occur in CheckTx etc.
-	dgteeProto, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
+	dgteeProto := ctx.ValidateResult.(*validateResult).dgtProto
 	if dgteeProto == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self bonding: add new delegatee
 		dgteeProto = newDelegateeProto(ctx.SenderPubKey)
 	}
 
 	if dgteeProto == nil {
+		// `newDelegateeProto` does not fail, so this code is not reachable.
 		// there is no delegatee whose address is ctx.Tx.To
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
@@ -334,55 +326,39 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 }
 
 func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	// todo: Implement exeUnbonding
+	// find delegatee
+	dgteeProto := ctx.ValidateResult.(*validateResult).dgtProto
+	if dgteeProto == nil {
+		panic("not reachable")
+	}
 
-	//// find delegatee
-	//dgteeProto, xerr := ctrler.dgteesLedger.Get(ctx.Tx.To, ctx.Exec)
-	//if xerr != nil {
-	//	return xerr
+	// remove the voting power chunk from a delegatee
+	txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
+	if txhash == nil {
+		panic("not reachable")
+	}
+	vpow := ctx.ValidateResult.(*validateResult).vpowProto
+	if vpow == nil {
+		panic("not reachable")
+	}
+
+	//
+	// Remove power
+	//
+	// delete the power chunk with `txhash`
+	pc := vpow.delPowerWithTxHash(txhash)
+	if pc == nil {
+		return xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no stake(txhash:%v) from %v", ctx.Tx.To, txhash, ctx.Tx.From)
+	}
+	// decrease the power of `dgteeProto` by `pc.Power`
+	dgteeProto.DelPower(vpow.From, pc.Power)
+
+	//if dgteeProto.SelfPower == 0 {
+	//	// un-bonding all voting powers of `dgteeProto`
+	//
 	//}
 	//
-	//// delete the stake from a delegatee
-	//txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
-	//if txhash == nil || len(txhash) != 32 {
-	//	return xerrors.ErrInvalidTrxPayloadParams
-	//}
-	//
-	//vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, ctx.Tx.To), ctx.Exec)
-	//if xerr != nil {
-	//	return xerrors.ErrNotFoundStake.Wrapf("validator(%v) is delegated from %v", ctx.Tx.To, ctx.Tx.From)
-	//}
-	//// issue #43
-	//// check that tx's sender is stake's owner
-	//// No longer needed.
-	//// Since ctx.Tx.From is included in the key of vpow,
-	//// Only the vpow of the From that sent the current Tx is looked up and processed.
-	//// In other words, the vpow of another user that is not related to ctx.Tx.From cannot be processed with only txhash.
-	////if ctx.Tx.From.Compare(vpow.From) != 0 {
-	////	return xerrors.ErrNotFoundStake.Wrapf("you are not the stake owner")
-	////}
-	//
-	//pc := vpow.delPowerWithTxHash(txhash)
-	//if pc == nil {
-	//	return xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no stake(txhash:%v) from %v", ctx.Tx.To, txhash, ctx.Tx.From)
-	//}
-	//
-	//refundHeight := ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
-	//frozen := &FrozenVPowerProto{
-	//	newVPower(vpow.From, nil, pc.Power, refundHeight),
-	//}
-	//
-	//_ = ctrler.frozenLedger.Set(frozen, ctx.Exec) // add s0 to frozen ledger
-	//
-	//if delegatee.SelfPower == 0 {
-	//	stakes := delegatee.DelAllStakes()
-	//	for _, _s0 := range stakes {
-	//		_s0.RefundHeight = ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
-	//		_ = ctrler.frozenLedger.Set(_s0, ctx.Exec) // add s0 to frozen ledger
-	//	}
-	//}
-	//
-	//if delegatee.TotalPower == 0 {
+	//if dgteeProto.TotalPower == 0 {
 	//	// this changed delegate will be committed at Commit()
 	//	if xerr := ctrler.delegateeLedger.Del(delegatee.Key(), ctx.Exec); xerr != nil {
 	//		return xerr
@@ -394,6 +370,15 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	//		return xerr
 	//	}
 	//}
+
+	//
+	// todo: freeze the power chunk `pc` deleted from `vpowsLedger`
+	//
+	//refundHeight := ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
+	//frozen := &FrozenVPowerProto{
+	//	newVPower(vpow.From, nil, pc.Power, refundHeight),
+	//}
+	//_ = ctrler.frozenLedger.Set(frozen, ctx.Exec) // add s0 to frozen ledger
 
 	return nil
 }
@@ -439,6 +424,13 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 		ctrler.dgteesLedger = nil
 	}
 	return nil
+}
+
+func (ctrler *VPowerCtrler) GetVPowersOf(addr types.Address) ([]*VPowerProto, xerrors.XError) {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	ctrler.vpowsLedger.Seek()
 }
 
 func (ctrler *VPowerCtrler) Bond(pow, height int64, from types.Address, pubTo bytes.HexBytes, txhash bytes.HexBytes, exec bool) xerrors.XError {
