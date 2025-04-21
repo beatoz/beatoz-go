@@ -14,7 +14,7 @@ type IGettable interface {
 }
 
 type ISettable interface {
-	Set(ILedgerItem) xerrors.XError
+	Set(LedgerKey, ILedgerItem) xerrors.XError
 	Del(LedgerKey) xerrors.XError
 	Snapshot() int
 	RevertToSnapshot(int) xerrors.XError
@@ -43,7 +43,7 @@ type IStateLedger[T ILedgerItem] interface {
 	Get(LedgerKey, bool) (T, xerrors.XError)
 	Iterate(func(T) xerrors.XError, bool) xerrors.XError
 	Seek([]byte, bool, func(T) xerrors.XError, bool) xerrors.XError
-	Set(T, bool) xerrors.XError
+	Set(LedgerKey, T, bool) xerrors.XError
 	Snapshot(bool) int
 	RevertToSnapshot(int, bool) xerrors.XError
 	Del(LedgerKey, bool) xerrors.XError
@@ -75,7 +75,7 @@ type IStateLedger[T ILedgerItem] interface {
 //}
 
 type ILedgerItem interface {
-	Key() LedgerKey
+	//Key() LedgerKey
 	Encode() ([]byte, xerrors.XError)
 	Decode([]byte) xerrors.XError
 }

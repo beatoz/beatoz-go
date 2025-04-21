@@ -2,7 +2,6 @@ package v1
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	dbm "github.com/cosmos/iavl/db"
@@ -51,8 +50,8 @@ func (ledger *MutableLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	_keystr := unsafe.String(&key[0], len(key))
-	if obj, ok := ledger.cachedObjs[_keystr]; ok {
+	keystr := unsafe.String(&key[0], len(key))
+	if obj, ok := ledger.cachedObjs[keystr]; ok {
 		return obj, nil
 	}
 
@@ -60,7 +59,7 @@ func (ledger *MutableLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 	if xerr != nil {
 		return nil, xerr
 	}
-	ledger.cachedObjs[_keystr] = item
+	ledger.cachedObjs[keystr] = item
 	return item, nil
 }
 
@@ -73,29 +72,22 @@ func (ledger *MutableLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 		item := ledger.newItemFunc()
 		if xerr := item.Decode(bz); xerr != nil {
 			return nil, xerr
-		} else if bytes.Compare(item.Key(), key) != 0 {
-			return nil, xerrors.From(fmt.Errorf("MutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
 		}
 		return item, nil
 	}
 }
 
+// Iterate do not travel the elements not committed.
 func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	var xerrStop xerrors.XError
 	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
-		item, ok := ledger.cachedObjs[unsafe.String(&key[0], len(key))]
-		if !ok {
-			item = ledger.newItemFunc()
-			if xerr := item.Decode(value); xerr != nil {
-				xerrStop = xerr
-				return true // stop
-			} else if bytes.Compare(item.Key(), key) != 0 {
-				xerrStop = xerrors.From(fmt.Errorf("MutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-				return true // stop
-			}
+		item := ledger.newItemFunc()
+		if xerr := item.Decode(value); xerr != nil {
+			xerrStop = xerr
+			return true // stop
 		}
 
 		// todo: the following unlock code must not be allowed.
@@ -138,14 +130,9 @@ func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb func(ILedger
 		}
 		value := iter.Value()
 
-		item, ok := ledger.cachedObjs[unsafe.String(&key[0], len(key))]
-		if !ok {
-			item = ledger.newItemFunc()
-			if xerr := item.Decode(value); xerr != nil {
-				return xerr
-			} else if bytes.Compare(item.Key(), key) != 0 {
-				return xerrors.From(fmt.Errorf("MutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-			}
+		item := ledger.newItemFunc()
+		if xerr := item.Decode(value); xerr != nil {
+			return xerr
 		}
 
 		//
@@ -163,21 +150,19 @@ func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb func(ILedger
 	return nil
 }
 
-func (ledger *MutableLedger) Set(item ILedgerItem) xerrors.XError {
+func (ledger *MutableLedger) Set(key LedgerKey, item ILedgerItem) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	if xerr := ledger.set(item); xerr != nil {
+	if xerr := ledger.set(key, item); xerr != nil {
 		return xerr
 	}
 
-	_key := item.Key()
-	ledger.cachedObjs[unsafe.String(&_key[0], len(_key))] = item
+	ledger.cachedObjs[unsafe.String(&key[0], len(key))] = item
 	return nil
 }
 
-func (ledger *MutableLedger) set(item ILedgerItem) xerrors.XError {
-	key := item.Key()
+func (ledger *MutableLedger) set(key LedgerKey, item ILedgerItem) xerrors.XError {
 	oldVal, err := ledger.tree.Get(key)
 	if err != nil {
 		return xerrors.From(err)
@@ -194,7 +179,7 @@ func (ledger *MutableLedger) set(item ILedgerItem) xerrors.XError {
 
 	ledger.logger.Debug("set item to tree", "key", key, "oldVal", oldVal, "newVal", newVal)
 
-	if oldVal == nil || bytes.Compare(oldVal, newVal) != 0 {
+	if bytes.Compare(oldVal, newVal) != 0 {
 		// if `oldVal` is `nil`, it means that the item is created, and it should be removed in reverting.
 		// if `oldVal` is not equal to `newVal`, it means that the item is updated, and `oldVal` will be restored in reverting.
 		ledger.revisions.set(key, oldVal)
@@ -242,8 +227,6 @@ func (ledger *MutableLedger) RevertToSnapshot(snap int) xerrors.XError {
 			restoreItem := ledger.newItemFunc()
 			if xerr := restoreItem.Decode(kv.val); xerr != nil {
 				return xerr
-			} else if bytes.Compare(restoreItem.Key(), kv.key) != 0 {
-				return xerrors.From(fmt.Errorf("MutableLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", kv.key, restoreItem.Key()))
 			}
 			ledger.cachedObjs[unsafe.String(&kv.key[0], len(kv.key))] = restoreItem
 		} else {

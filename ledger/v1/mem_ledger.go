@@ -2,7 +2,6 @@ package v1
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -11,10 +10,11 @@ import (
 )
 
 // MemLedger cannot be committed, everything else is like MutableLedger.
+
 type MemLedger struct {
 	immuTree    *iavl.ImmutableTree
-	items       map[string]ILedgerItem
-	revisions   *revisionList[ILedgerItem]
+	memStorage  map[string][]byte
+	revisions   *revisionList[[]byte]
 	newItemFunc func() ILedgerItem
 	logger      tmlog.Logger
 	mtx         sync.RWMutex
@@ -34,8 +34,8 @@ func NewMemLedgerAt(ver int64, from IMutable, lg tmlog.Logger) (*MemLedger, xerr
 
 	return &MemLedger{
 		immuTree:    tree,
-		items:       make(map[string]ILedgerItem),
-		revisions:   newSnapshotList[ILedgerItem](),
+		memStorage:  make(map[string][]byte),
+		revisions:   newSnapshotList[[]byte](),
 		newItemFunc: from.(*MutableLedger).newItemFunc,
 		logger:      lg.With("ledger", "MemLedger"),
 	}, nil
@@ -49,39 +49,36 @@ func (ledger *MemLedger) Get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 }
 
 func (ledger *MemLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
-	item, ok := ledger.items[unsafe.String(&key[0], len(key))]
-	if ok {
-		if item != nil {
-			return item, nil
-		} else {
-			// the `item` maybe deleted on MemLedger.
-			return nil, xerrors.ErrNotFoundResult
-		}
+	bz, xerr := ledger.findRawBytes(key)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	if ledger.immuTree != nil {
-		bz, err := ledger.immuTree.Get(key)
-		if err != nil {
-			return nil, xerrors.From(err)
-		} else if bz == nil {
-			return nil, xerrors.ErrNotFoundResult
-		}
-
-		item = ledger.newItemFunc()
-		if xerr := item.Decode(bz); xerr != nil {
-			return nil, xerr
-		} else if bytes.Compare(item.Key(), key) != 0 {
-			return nil, xerrors.From(fmt.Errorf("MemLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-		}
-
-		ledger.items[unsafe.String(&key[0], len(key))] = item
-	} else {
-		return nil, xerrors.ErrNotFoundResult
+	item := ledger.newItemFunc()
+	if xerr := item.Decode(bz); xerr != nil {
+		return nil, xerr
 	}
 	return item, nil
-
 }
 
+func (ledger *MemLedger) findRawBytes(key LedgerKey) ([]byte, xerrors.XError) {
+	keystr := unsafe.String(&key[0], len(key))
+	bz, ok := ledger.memStorage[keystr]
+	if !ok {
+		_bz, err := ledger.immuTree.Get(key)
+		if err != nil {
+			return nil, xerrors.From(err)
+		}
+		bz = _bz
+	}
+
+	if bz == nil {
+		return nil, xerrors.ErrNotFoundResult
+	}
+	return bz, nil
+}
+
+// Iterate do not travel the elements created or updated by Set
 func (ledger *MemLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError {
 	if ledger.immuTree != nil {
 		ledger.mtx.RLock()
@@ -89,21 +86,12 @@ func (ledger *MemLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XE
 
 		var xerrStop xerrors.XError
 		stopped, err := ledger.immuTree.Iterate(func(key []byte, value []byte) bool {
-			item, ok := ledger.items[unsafe.String(&key[0], len(key))]
-			if ok && item == nil {
-				// item maybe deleted.
-				return false // continue iteration
+			item := ledger.newItemFunc()
+			if xerr := item.Decode(value); xerr != nil {
+				xerrStop = xerr
+				return true // stop
 			}
-			if !ok || item == nil {
-				item = ledger.newItemFunc()
-				if xerr := item.Decode(value); xerr != nil {
-					xerrStop = xerr
-					return true // stop
-				} else if bytes.Compare(item.Key(), key) != 0 {
-					xerrStop = xerrors.From(fmt.Errorf("MemLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-					return true // stop
-				}
-			}
+
 			// todo: the following unlock code must not be allowed.
 			// this allows the callee to access the ledger's other method, which may update key or value of the tree.
 			// However, in iterating, the key and value MUST not updated.
@@ -147,20 +135,11 @@ func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem
 		if !bytes.HasPrefix(key, prefix) {
 			break
 		}
-		value := iter.Value()
 
-		item, ok := ledger.items[unsafe.String(&key[0], len(key))]
-		if ok && item == nil {
-			// item maybe deleted.
-			continue // continue iteration
-		}
-		if !ok || item == nil {
-			item = ledger.newItemFunc()
-			if xerr := item.Decode(value); xerr != nil {
-				return xerr
-			} else if bytes.Compare(item.Key(), key) != 0 {
-				return xerrors.From(fmt.Errorf("MemLedger: the key is compromised - the requested key(%x) is not equal to the key(%x) decoded in value", key, item.Key()))
-			}
+		value := iter.Value()
+		item := ledger.newItemFunc()
+		if xerr := item.Decode(value); xerr != nil {
+			return xerr
 		}
 
 		if xerr := cb(item); xerr != nil {
@@ -171,26 +150,40 @@ func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem
 	return nil
 }
 
-func (ledger *MemLedger) Set(item ILedgerItem) xerrors.XError {
+// Set:
+//   memStorage 에서 조회
+//     없으면 immuTree 에서 조회
+//       없으면 revisions 에 nil set
+//     	 있으면 revisions 에 immuTree.value 를 set.
+//     있으면 revisions 에 memStorage.value를 set.
+//   memStroage 에 새로운 value set
+
+func (ledger *MemLedger) Set(key LedgerKey, item ILedgerItem) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	_key := item.Key()
-	_keyStr := unsafe.String(&_key[0], len(_key))
-
-	oldItem, ok := ledger.items[_keyStr]
-	ledger.items[_keyStr] = item
-
-	if ok {
-		// exists.
-		// when reverting, it should be restored as 'old'
-		ledger.revisions.set(_key, oldItem)
-	} else {
-		// not exists.
-		// when reverting, it should be removed.
-		ledger.revisions.set(_key, nil)
+	keystr := unsafe.String(&key[0], len(key))
+	oldVal, ok := ledger.memStorage[keystr]
+	if !ok {
+		_old, err := ledger.immuTree.Get(key)
+		if err != nil {
+			return xerrors.From(err)
+		}
+		oldVal = _old // if _old is nil, it means deleted.
 	}
 
+	newVal, xerr := item.Encode()
+	if xerr != nil {
+		return xerr
+	}
+
+	if bytes.Compare(oldVal, newVal) != 0 {
+		// if `oldVal` is `nil`, it means that the item is created, and it should be removed in reverting.
+		// if `oldVal` is not equal to `newVal`, it means that the item is updated, and `oldVal` will be restored in reverting.
+		ledger.revisions.set(key, oldVal)
+	}
+
+	ledger.memStorage[keystr] = newVal
 	return nil
 }
 
@@ -198,10 +191,13 @@ func (ledger *MemLedger) Del(key LedgerKey) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	if oldItem, ok := ledger.items[unsafe.String(&key[0], len(key))]; ok {
-		ledger.items[unsafe.String(&key[0], len(key))] = nil
-		ledger.revisions.set(key, oldItem)
+	keystr := unsafe.String(&key[0], len(key))
+	if oldVal, ok := ledger.memStorage[keystr]; ok {
+		ledger.revisions.set(key, oldVal)
 	}
+
+	ledger.memStorage[keystr] = nil // delete from memory. don't read from immuTree.
+
 	return nil
 }
 
@@ -219,14 +215,8 @@ func (ledger *MemLedger) RevertToSnapshot(snap int) xerrors.XError {
 	restores := ledger.revisions.revs[snap:]
 	for i := len(restores) - 1; i >= 0; i-- {
 		kv := restores[i]
-		if kv.val != nil {
-			_item := kv.val.(ILedgerItem)
-			_key := _item.Key()
-			ledger.items[unsafe.String(&_key[0], len(_key))] = _item
-		} else {
-			_key := kv.key
-			ledger.items[unsafe.String(&_key[0], len(_key))] = nil
-		}
+		keystr := unsafe.String(&kv.key[0], len(kv.key))
+		ledger.memStorage[keystr] = kv.val
 	}
 	ledger.revisions.revert(snap)
 	return nil

@@ -73,13 +73,13 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 		addr := crypto.PubKeyBytes2Addr(v.PubKey.GetSecp256K1())
 
 		vpow := newVPowerWithTxHash(addr, addr, v.Power, int64(1), bytes.ZeroBytes(32))
-		if xerr := ctrler.vpowsLedger.Set(vpow, true); xerr != nil {
+		if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, true); xerr != nil {
 			return xerr
 		}
 
 		dgtProto := newDelegateeProto(v.PubKey.GetSecp256K1())
 		dgtProto.AddPower(addr, v.Power)
-		if xerr := ctrler.dgteesLedger.Set(dgtProto, true); xerr != nil {
+		if xerr := ctrler.dgteesLedger.Set(dgtProto.Key(), dgtProto, true); xerr != nil {
 			return xerr
 		}
 	}
@@ -313,12 +313,12 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	}
 
 	vpow := newVPowerWithTxHash(ctx.Tx.From, ctx.Tx.To, power, ctx.Height, ctx.TxHash)
-	if xerr := ctrler.vpowsLedger.Set(vpow, ctx.Exec); xerr != nil {
+	if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
 	dgteeProto.AddPower(ctx.Tx.From, power)
-	if xerr := ctrler.dgteesLedger.Set(dgteeProto, ctx.Exec); xerr != nil {
+	if xerr := ctrler.dgteesLedger.Set(dgteeProto.Key(), dgteeProto, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -361,7 +361,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 		// todo: remove `dgteeProto`
 
 	} else {
-		if xerr := ctrler.dgteesLedger.Set(dgteeProto, ctx.Exec); xerr != nil {
+		if xerr := ctrler.dgteesLedger.Set(dgteeProto.Key(), dgteeProto, ctx.Exec); xerr != nil {
 			return xerr
 		}
 	}
@@ -418,59 +418,6 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 		}
 		ctrler.dgteesLedger = nil
 	}
-	return nil
-}
-
-func (ctrler *VPowerCtrler) GetVPowersOf(addr types.Address) ([]*VPowerProto, xerrors.XError) {
-	ctrler.mtx.RLock()
-	defer ctrler.mtx.RUnlock()
-
-	ctrler.vpowsLedger.Seek()
-}
-
-func (ctrler *VPowerCtrler) Bond(pow, height int64, from types.Address, pubTo bytes.HexBytes, txhash bytes.HexBytes, exec bool) xerrors.XError {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-	//
-	//valAddr := crypto.PubKeyBytes2Addr(pubTo)
-	//val := findByAddr(valAddr, ctrler.allDelegatees)
-	//if val == nil {
-	//	if bytes.Equal(from, valAddr) {
-	//		// self bonding
-	//		val = NewDelegatee(pubTo)
-	//		ctrler.allDelegatees = append(ctrler.allDelegatees, val)
-	//	} else {
-	//		return xerrors.ErrNotFoundDelegatee
-	//	}
-	//}
-	//
-	//vpow := val.AddPowerWithTxHash(from, pow, height, txhash)
-	//if xerr := ctrler.vpowsLedger.Set(vpow, exec); xerr != nil {
-	//	return xerr
-	//}
-
-	return nil
-}
-
-func (ctrler *VPowerCtrler) Unbond(pow int64, from, to types.Address, exec bool) xerrors.XError {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	//val := findByAddr(to, ctrler.allDelegatees)
-	//if val == nil {
-	//	return xerrors.ErrNotFoundDelegatee
-	//}
-	//
-	//snap := ctrler.vpowLedger.Snapshot(exec)
-	//
-	//removed, updated := val.DelPower(from, pow)
-	//
-	//if removed != nil && updated != nil {
-	//	if xerr := ctrler.vpowLedger.Set(updated, exec); xerr != nil {
-	//		_ = ctrler.vpowLedger.RevertToSnapshot(snap, exec)
-	//		return xerr
-	//	}
-	//}
 	return nil
 }
 

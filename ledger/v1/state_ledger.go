@@ -86,11 +86,11 @@ func (ledger *StateLedger[T]) Seek(prefix []byte, ascending bool, cb func(T) xer
 	})
 }
 
-func (ledger *StateLedger[T]) Set(item T, exec bool) xerrors.XError {
+func (ledger *StateLedger[T]) Set(key LedgerKey, item T, exec bool) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	if xerr := ledger.getLedger(exec).Set(item); xerr != nil {
+	if xerr := ledger.getLedger(exec).Set(key, item); xerr != nil {
 		return xerr
 	}
 	return nil

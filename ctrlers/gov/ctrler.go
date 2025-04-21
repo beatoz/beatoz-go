@@ -80,7 +80,7 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 		return xerrors.ErrInitChain.Wrapf("wrong parameter: GovCtrler::InitLedger requires *genesis.GenesisAppState")
 	}
 	ctrler.GovParams = *genAppState.GovParams
-	_ = ctrler.paramsState.Set(&ctrler.GovParams, true)
+	_ = ctrler.paramsState.Set(ctrler.GovParams.Key(), &ctrler.GovParams, true)
 	return nil
 }
 
@@ -134,7 +134,7 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 				slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRatio())
 				slashedPower += slashed
 
-				if xerr := ctrler.proposalState.Set(prop, true); xerr != nil {
+				if xerr := ctrler.proposalState.Set(prop.Key(), prop, true); xerr != nil {
 					return xerr
 				}
 				break
@@ -279,7 +279,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	if xerr != nil {
 		return xerr
 	}
-	if xerr = ctrler.proposalState.Set(prop, ctx.Exec); xerr != nil {
+	if xerr = ctrler.proposalState.Set(prop.Key(), prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -295,7 +295,7 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	if xerr = prop.DoVote(ctx.Tx.From, txpayload.Choice); xerr != nil {
 		return xerr
 	}
-	if xerr = ctrler.proposalState.Set(prop, ctx.Exec); xerr != nil {
+	if xerr = ctrler.proposalState.Set(prop.Key(), prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
 	if prop.MajorOption != nil {
@@ -363,7 +363,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []aby
 			majorOpt := prop.UpdateMajorOption()
 			if majorOpt != nil {
 				// freeze the proposal
-				if xerr := ctrler.frozenState.Set(prop, true); xerr != nil {
+				if xerr := ctrler.frozenState.Set(prop.Key(), prop, true); xerr != nil {
 					return xerr
 				}
 				frozen = append(frozen, prop.TxHash)
@@ -405,7 +405,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerror
 						return xerrors.From(err)
 					}
 					ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
-					if xerr := ctrler.paramsState.Set(newGovParams, true); xerr != nil {
+					if xerr := ctrler.paramsState.Set(newGovParams.Key(), newGovParams, true); xerr != nil {
 						ctrler.logger.Error("Apply proposal", "error", xerr, "newGovParams", newGovParams)
 						return xerr
 					}

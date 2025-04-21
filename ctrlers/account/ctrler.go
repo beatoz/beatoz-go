@@ -293,7 +293,7 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.Set(acct, exec)
+	return ctrler.acctState.Set(acct.Key(), acct, exec)
 }
 
 func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
@@ -320,7 +320,7 @@ type SimuAcctCtrler struct {
 }
 
 func (memCtrler *SimuAcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return memCtrler.simuLedger.Set(acct)
+	return memCtrler.simuLedger.Set(acct.Key(), acct)
 }
 
 func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btztypes.Account {

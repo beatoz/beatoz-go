@@ -104,7 +104,7 @@ func (ctrler *StakeCtrler) InitLedger(req interface{}) xerrors.XError {
 			if xerr := d.AddStake(s0); xerr != nil {
 				return xerr
 			}
-			if xerr := ctrler.delegateeLedger.Set(d, true); xerr != nil {
+			if xerr := ctrler.delegateeLedger.Set(d.Key(), d, true); xerr != nil {
 				return xerr
 			}
 		}
@@ -241,7 +241,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 			}
 
 			_ = delegatee.ProcessNotSignedBlock(signedHeight)
-			_ = ctrler.delegateeLedger.Set(delegatee, true)
+			_ = ctrler.delegateeLedger.Set(delegatee.Key(), delegatee, true)
 
 			s := signedHeight - ctrler.govParams.SignedBlocksWindow()
 			if s < 0 {
@@ -263,7 +263,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 				stakes := delegatee.DelAllStakes()
 				for _, _s0 := range stakes {
 					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyUnstakingBlocks()
-					_ = ctrler.frozenLedger.Set(_s0, true) // add s0 to frozen ledger
+					_ = ctrler.frozenLedger.Set(_s0.Key(), _s0, true) // add s0 to frozen ledger
 				}
 				_ = ctrler.delegateeLedger.Del(delegatee.Key(), true)
 			}
@@ -297,7 +297,7 @@ func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (
 
 	// Punish the delegators as well as validator. issue #51
 	slashed := delegatee.DoSlash(slashRatio)
-	_ = ctrler.delegateeLedger.Set(delegatee, true)
+	_ = ctrler.delegateeLedger.Set(delegatee.Key(), delegatee, true)
 
 	return slashed, nil
 }
@@ -368,7 +368,7 @@ func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint
 		rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
 		_ = rwdObj.Issue(rwd, height)
 
-		if xerr := ctrler.rewardLedger.Set(rwdObj, true); xerr != nil {
+		if xerr := ctrler.rewardLedger.Set(rwdObj.Key(), rwdObj, true); xerr != nil {
 			ctrler.logger.Error("fail to reward to", s0.From, "err:", xerr)
 			continue
 		}
@@ -581,7 +581,7 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 	if xerr := delegatee.AddStake(s0); xerr != nil {
 		return xerr
 	}
-	if xerr := ctrler.delegateeLedger.Set(delegatee, ctx.Exec); xerr != nil {
+	if xerr := ctrler.delegateeLedger.Set(delegatee.Key(), delegatee, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -615,13 +615,13 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	_ = delegatee.DelStake(txhash)
 
 	s0.RefundHeight = ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
-	_ = ctrler.frozenLedger.Set(s0, ctx.Exec) // add s0 to frozen ledger
+	_ = ctrler.frozenLedger.Set(s0.Key(), s0, ctx.Exec) // add s0 to frozen ledger
 
 	if delegatee.SelfPower == 0 {
 		stakes := delegatee.DelAllStakes()
 		for _, _s0 := range stakes {
 			_s0.RefundHeight = ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
-			_ = ctrler.frozenLedger.Set(_s0, ctx.Exec) // add s0 to frozen ledger
+			_ = ctrler.frozenLedger.Set(_s0.Key(), _s0, ctx.Exec) // add s0 to frozen ledger
 		}
 	}
 
@@ -633,7 +633,7 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 	} else {
 		// this changed delegate will be committed at Commit()
-		if xerr := ctrler.delegateeLedger.Set(delegatee, ctx.Exec); xerr != nil {
+		if xerr := ctrler.delegateeLedger.Set(delegatee.Key(), delegatee, ctx.Exec); xerr != nil {
 			return xerr
 		}
 	}
@@ -668,7 +668,7 @@ func (ctrler *StakeCtrler) exeWithdraw(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		return xerr
 	}
 
-	xerr = ctrler.rewardLedger.Set(rwd, ctx.Exec)
+	xerr = ctrler.rewardLedger.Set(rwd.Key(), rwd, ctx.Exec)
 	if xerr != nil {
 		return xerr
 	}

@@ -60,7 +60,8 @@ func Benchmark_Set_V1(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		require.NoError(b, ledger.Set(testItemsV1[i%len(testItemsV1)]))
+		it := testItemsV1[i%len(testItemsV1)]
+		require.NoError(b, ledger.Set(it.Key(), it))
 	}
 	b.StopTimer()
 
@@ -78,7 +79,8 @@ func Benchmark_Set_V1_Mem(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		require.NoError(b, ledger.Set(testItemsV1[i%len(testItemsV1)]))
+		it := testItemsV1[i%len(testItemsV1)]
+		require.NoError(b, ledger.Set(it.Key(), it))
 	}
 	b.StopTimer()
 
@@ -173,7 +175,7 @@ func Benchmark_Commit_V1(b *testing.B) {
 		// set test data
 		for j := 0; j < 20_000; j++ {
 			item := newTestItemV1(bytes.RandHexString(512))
-			require.NoError(b, ledger.Set(item))
+			require.NoError(b, ledger.Set(item.Key(), item))
 			totalTxs++
 		}
 
