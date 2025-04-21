@@ -22,20 +22,20 @@ func (ctrler *VPowerCtrler) updateValidators(maxVals int) []abcitypes.ValidatorU
 
 // selectValidators returns the top maxVals delegatees, sorted in descending order of power.
 // NOTE: The order of elements in `delegatees` are rearranged based on their power in descending order.
-func selectValidators(delegatees []*DelegateeProto, maxVals int) []*DelegateeProto {
-	sort.Sort(orderByPowerDelegateeProtos(delegatees))
-	ret := make([]*DelegateeProto, libs.MinInt(len(delegatees), maxVals))
+func selectValidators(delegatees []*DelegateeV1, maxVals int) []*DelegateeV1 {
+	sort.Sort(orderByPowerDelegateeV1(delegatees))
+	ret := make([]*DelegateeV1, libs.MinInt(len(delegatees), maxVals))
 	copy(ret, delegatees[:len(ret)])
 	return ret
 }
 
 // validatorUpdates returns the difference between `lastVals` and `newVals`.
 // NOTE: The elements in both lastVals and newVals are reordered by `addr` in ascending order.
-func validatorUpdates(lastVals, newVals []*DelegateeProto) []abcitypes.ValidatorUpdate {
+func validatorUpdates(lastVals, newVals []*DelegateeV1) []abcitypes.ValidatorUpdate {
 	valUpdates := make(abcitypes.ValidatorUpdates, 0, len(lastVals)+len(newVals))
 
-	sort.Sort(orderByPubDelegateeProtos(lastVals))
-	sort.Sort(orderByPubDelegateeProtos(newVals))
+	sort.Sort(orderByPubDelegateeV1(lastVals))
+	sort.Sort(orderByPubDelegateeV1(newVals))
 
 	i, j := 0, 0
 	for i < len(lastVals) && j < len(newVals) {

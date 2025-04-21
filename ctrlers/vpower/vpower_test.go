@@ -9,22 +9,24 @@ import (
 )
 
 func Test_Codec(t *testing.T) {
-	vpow := &VPowerProto{
-		From:     types.RandAddress(),
-		To:       types.RandAddress(),
-		SumPower: 100,
-		PowerChunks: []*PowerChunk{
-			{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
-			{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
-			{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
-			{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
-			{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
+	vpow := &VPower{
+		VPowerProto: VPowerProto{
+			SumPower: rand.Int63(),
+			PowerChunks: []*PowerChunk{
+				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
+				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
+				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
+				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
+				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
+			},
 		},
+		from: types.RandAddress(),
+		to:   types.RandAddress(),
 	}
 	k0 := vpow.Key()
 	require.EqualValues(t, []byte(prefixVPowerProto), k0[:len(prefixDelegateeProto)])
-	require.Equal(t, k0[len(prefixDelegateeProto):len(prefixDelegateeProto)+20], vpow.From)
-	require.Equal(t, k0[len(prefixDelegateeProto)+20:], vpow.To)
+	require.Equal(t, k0[len(prefixDelegateeProto):len(prefixDelegateeProto)+20], vpow.from)
+	require.Equal(t, k0[len(prefixDelegateeProto)+20:], vpow.to)
 }
 
 func Test_Key(t *testing.T) {

@@ -839,6 +839,7 @@ func MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
 }
 
+// DEPRECATED
 func AmountToPower(amt *uint256.Int) (int64, xerrors.XError) {
 	// 1 VotingPower == 1 BEATOZ
 	_vp := new(uint256.Int).Div(amt, amountPerPower)
@@ -849,11 +850,13 @@ func AmountToPower(amt *uint256.Int) (int64, xerrors.XError) {
 	return vp, nil
 }
 
+// DEPRECATED
 func PowerToAmount(power int64) *uint256.Int {
 	// 1 VotingPower == 1 BEATOZ = 10^18 amount
 	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), amountPerPower)
 }
 
+// DEPRECATED
 func AmountPerPower() *uint256.Int {
 	return amountPerPower.Clone()
 }

@@ -19,7 +19,7 @@ type Delegatee struct {
 	addr   types.Address
 	pubKey bytes.HexBytes
 
-	mapPowers  map[string]*VPowerProto
+	mapPowers  map[string]*VPower
 	totalPower int64
 
 	// the following fields are used when calculating the weight of voting power.
@@ -35,7 +35,7 @@ func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
 	ret := &Delegatee{
 		addr:      addr,
 		pubKey:    pubKey,
-		mapPowers: make(map[string]*VPowerProto),
+		mapPowers: make(map[string]*VPower),
 	}
 	return ret
 }
@@ -51,14 +51,14 @@ func LoadAllDelegateeProtos(dgteesLedger v1.IStateLedger[*DelegateeProto]) ([]*D
 	return dgteeProtos, nil
 }
 
-func LoadAllVPowerProtos(vpowLedger v1.IStateLedger[*VPowerProto], dgteeProtos []*DelegateeProto, currHeight, ripeningBlocks int64) (DelegateeArray, xerrors.XError) {
+func LoadAllVPowerProtos(vpowLedger v1.IStateLedger[*VPower], dgteeProtos []*DelegateeProto, currHeight, ripeningBlocks int64) (DelegateeArray, xerrors.XError) {
 	var dgtees DelegateeArray
 
 	for _, dgt := range dgteeProtos {
 		dgtees = append(dgtees, NewDelegatee(dgt.PubKey))
 	}
 
-	xerr := vpowLedger.Iterate(func(vpow *VPowerProto) xerrors.XError {
+	xerr := vpowLedger.Iterate(func(vpow *VPower) xerrors.XError {
 		stratHeight := vpow.PowerChunks[0].Height
 		lastHeight := vpow.PowerChunks[len(vpow.PowerChunks)-1].Height
 		if stratHeight <= 0 {
@@ -68,15 +68,15 @@ func LoadAllVPowerProtos(vpowLedger v1.IStateLedger[*VPowerProto], dgteeProtos [
 			return xerrors.NewOrdinary("the height when the voting power was bonded is greater than the current height")
 		}
 
-		dgtee := findByAddr(vpow.To, dgtees)
+		dgtee := findByAddr(vpow.to, dgtees)
 		if dgtee == nil {
 			return xerrors.ErrNotFoundDelegatee
 		}
 
-		if _, ok := dgtee.mapPowers[types.Address(vpow.From).String()]; ok {
-			return xerrors.From(fmt.Errorf("VPower[validaotr(%v):delegator(%v)] pair is duplicated", dgtee.addr, vpow.From))
+		if _, ok := dgtee.mapPowers[types.Address(vpow.from).String()]; ok {
+			return xerrors.From(fmt.Errorf("VPower[validaotr(%v):delegator(%v)] pair is duplicated", dgtee.addr, vpow.from))
 		}
-		dgtee.mapPowers[types.Address(vpow.From).String()] = vpow
+		dgtee.mapPowers[vpow.from.String()] = vpow
 		dgtee.totalPower += vpow.SumPower
 
 		for _, c := range vpow.PowerChunks {
@@ -96,7 +96,7 @@ func LoadAllVPowerProtos(vpowLedger v1.IStateLedger[*VPowerProto], dgteeProtos [
 // AddPower increases the power of `from` by `pow`.
 // It means that the `from` delegates the `pow` to `dgtee`.
 // NOTE: After calling AddPower, the `dgtee.maturePower` MUST be recomputed.
-func (dgtee *Delegatee) AddPower(from types.Address, pow, height int64) *VPowerProto {
+func (dgtee *Delegatee) AddPower(from types.Address, pow, height int64) *VPower {
 	dgtee.mtx.Lock()
 	defer dgtee.mtx.Unlock()
 
@@ -114,7 +114,7 @@ func (dgtee *Delegatee) AddPower(from types.Address, pow, height int64) *VPowerP
 	return vpow
 }
 
-func (dgtee *Delegatee) AddPowerWithTxHash(from types.Address, pow, height int64, txhash []byte) *VPowerProto {
+func (dgtee *Delegatee) AddPowerWithTxHash(from types.Address, pow, height int64, txhash []byte) *VPower {
 	dgtee.mtx.Lock()
 	defer dgtee.mtx.Unlock()
 
@@ -134,7 +134,7 @@ func (dgtee *Delegatee) AddPowerWithTxHash(from types.Address, pow, height int64
 // DelPower decreases the power of `from` by `pow` and
 // returns `*VPowerProto` that has the removed power information.
 // NOTE: After calling DelPower, the dgtee.maturePower` MUST be recomputed.
-func (dgtee *Delegatee) DelPower(from types.Address, pow int64) (*VPowerProto, *VPowerProto) {
+func (dgtee *Delegatee) DelPower(from types.Address, pow int64) (*VPower, *VPower) {
 	dgtee.mtx.Lock()
 	defer dgtee.mtx.Unlock()
 
@@ -144,10 +144,7 @@ func (dgtee *Delegatee) DelPower(from types.Address, pow int64) (*VPowerProto, *
 		return nil, nil
 	}
 
-	removed := &VPowerProto{
-		From: vpow.From,
-		To:   vpow.To,
-	}
+	removed := newVPower(vpow.from, vpow.to, 0, 0)
 	for i := len(vpow.PowerChunks) - 1; i >= 0; i-- {
 		pc := vpow.PowerChunks[i]
 
@@ -175,7 +172,7 @@ func (dgtee *Delegatee) DelPower(from types.Address, pow int64) (*VPowerProto, *
 	return removed, vpow
 }
 
-func (dgtee *Delegatee) DelPowerWithTxHash(from types.Address, txhash []byte) (*VPowerProto, *VPowerProto) {
+func (dgtee *Delegatee) DelPowerWithTxHash(from types.Address, txhash []byte) (*VPower, *VPower) {
 	dgtee.mtx.Lock()
 	defer dgtee.mtx.Unlock()
 
@@ -185,10 +182,7 @@ func (dgtee *Delegatee) DelPowerWithTxHash(from types.Address, txhash []byte) (*
 		return nil, nil
 	}
 
-	removed := &VPowerProto{
-		From: vpow.From,
-		To:   vpow.To,
-	}
+	removed := newVPower(vpow.from, vpow.to, 0, 0)
 	for i, pc := range vpow.PowerChunks {
 		if bytes.Equal(txhash, pc.TxHash) {
 			vpow.delPowerChunk(i)
@@ -313,7 +307,7 @@ func (dgtee *Delegatee) Clone() *Delegatee {
 	dgtee.mtx.RLock()
 	defer dgtee.mtx.RUnlock()
 
-	mapPowersClone := make(map[string]*VPowerProto)
+	mapPowersClone := make(map[string]*VPower)
 	for k, vpow := range dgtee.mapPowers {
 		mapPowersClone[k] = vpow.Clone()
 	}
@@ -335,7 +329,7 @@ func (dgtee *Delegatee) GetDelegateeProto() *DelegateeProto {
 
 	proto := newDelegateeProto(dgtee.pubKey)
 	for _, v := range dgtee.mapPowers {
-		proto.AddPower(v.From, v.SumPower)
+		proto.AddPower(v.from, v.SumPower)
 	}
 	return proto
 }

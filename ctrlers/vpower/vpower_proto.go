@@ -14,6 +14,12 @@ var (
 	prefixFrozenVPowerProto = "fz"
 )
 
+type VPower struct {
+	VPowerProto
+	from types.Address
+	to   types.Address
+}
+
 func vpowerProtoKey(k0, k1 []byte) v1.LedgerKey {
 	k := make([]byte, len(prefixVPowerProto)+len(k0)+len(k1))
 	copy(k, prefixVPowerProto)
@@ -21,10 +27,10 @@ func vpowerProtoKey(k0, k1 []byte) v1.LedgerKey {
 	return k
 }
 
-func newVPower(from, to types.Address, pow, height int64) *VPowerProto {
-	ret := &VPowerProto{
-		From: from,
-		To:   to,
+func newVPower(from, to types.Address, pow, height int64) *VPower {
+	ret := &VPower{
+		from: from,
+		to:   to,
 	}
 
 	if pow > 0 && height > 0 {
@@ -34,10 +40,10 @@ func newVPower(from, to types.Address, pow, height int64) *VPowerProto {
 	return ret
 }
 
-func newVPowerWithTxHash(from, to types.Address, pow, height int64, txhash []byte) *VPowerProto {
-	ret := &VPowerProto{
-		From: from,
-		To:   to,
+func newVPowerWithTxHash(from, to types.Address, pow, height int64, txhash []byte) *VPower {
+	ret := &VPower{
+		from: from,
+		to:   to,
 	}
 
 	if pow > 0 && height > 0 && len(txhash) > 0 {
@@ -49,11 +55,11 @@ func newVPowerWithTxHash(from, to types.Address, pow, height int64, txhash []byt
 	return ret
 }
 
-func (x *VPowerProto) Key() v1.LedgerKey {
-	return vpowerProtoKey(x.From, x.To)
+func (x *VPower) Key() v1.LedgerKey {
+	return vpowerProtoKey(x.from, x.to)
 }
 
-func (x *VPowerProto) Encode() ([]byte, xerrors.XError) {
+func (x *VPower) Encode() ([]byte, xerrors.XError) {
 	if d, err := proto.Marshal(x); err != nil {
 		return nil, xerrors.From(err)
 	} else {
@@ -61,20 +67,20 @@ func (x *VPowerProto) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (x *VPowerProto) Decode(d []byte) xerrors.XError {
+func (x *VPower) Decode(d []byte) xerrors.XError {
 	if err := proto.Unmarshal(d, x); err != nil {
 		return xerrors.From(err)
 	}
 	return nil
 }
 
-var _ v1.ILedgerItem = (*VPowerProto)(nil)
+var _ v1.ILedgerItem = (*VPower)(nil)
 
-func (x *VPowerProto) IsSelfPower() bool {
-	return bytes.Equal(x.From, x.To)
+func (x *VPower) IsSelfPower() bool {
+	return bytes.Equal(x.from, x.to)
 }
 
-func (x *VPowerProto) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
+func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
 	for _, pc := range x.PowerChunks {
 		if bytes.Equal(pc.TxHash, txhash) {
 			return pc
@@ -83,28 +89,28 @@ func (x *VPowerProto) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
 	return nil
 }
 
-func (x *VPowerProto) addPowerChunk(pow, height int64) *PowerChunk {
+func (x *VPower) addPowerChunk(pow, height int64) *PowerChunk {
 	added := &PowerChunk{Power: pow, Height: height}
 	x.PowerChunks = append(x.PowerChunks, added)
 	x.SumPower += added.Power
 	return added
 }
 
-func (x *VPowerProto) delPowerChunk(idx int) *PowerChunk {
+func (x *VPower) delPowerChunk(idx int) *PowerChunk {
 	removed := x.PowerChunks[idx]
 	x.PowerChunks = append(x.PowerChunks[:idx], x.PowerChunks[idx+1:]...)
 	x.SumPower -= removed.Power
 	return removed
 }
 
-func (x *VPowerProto) addPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunk {
+func (x *VPower) addPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunk {
 	added := &PowerChunk{Power: pow, Height: height, TxHash: txhash}
 	x.PowerChunks = append(x.PowerChunks, added)
 	x.SumPower += added.Power
 	return added
 }
 
-func (x *VPowerProto) delPowerWithTxHash(txhash []byte) *PowerChunk {
+func (x *VPower) delPowerWithTxHash(txhash []byte) *PowerChunk {
 	for i, c := range x.PowerChunks {
 		if bytes.Equal(txhash, c.TxHash) {
 			return x.delPowerChunk(i)
@@ -114,7 +120,7 @@ func (x *VPowerProto) delPowerWithTxHash(txhash []byte) *PowerChunk {
 }
 
 // sumPowerChunk is used for test
-func (x *VPowerProto) sumPowerChunk() int64 {
+func (x *VPower) sumPowerChunk() int64 {
 	ret := int64(0)
 	for _, pc := range x.PowerChunks {
 		ret += pc.Power
@@ -122,14 +128,17 @@ func (x *VPowerProto) sumPowerChunk() int64 {
 	return ret
 }
 
-func (x *VPowerProto) Clone() *VPowerProto {
+func (x *VPower) Clone() *VPower {
 	copiedChunks := make([]*PowerChunk, len(x.PowerChunks))
 	for i, c := range x.PowerChunks {
 		copiedChunks[i] = &PowerChunk{Power: c.Power, Height: c.Height, TxHash: bytes.Copy(c.TxHash)}
 	}
-	return &VPowerProto{
-		From:        bytes.Copy(x.From),
-		To:          bytes.Copy(x.To),
-		PowerChunks: copiedChunks,
+	return &VPower{
+		VPowerProto: VPowerProto{
+			SumPower:    x.SumPower,
+			PowerChunks: copiedChunks,
+		},
+		from: bytes.Copy(x.from),
+		to:   bytes.Copy(x.to),
 	}
 }

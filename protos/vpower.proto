@@ -8,8 +8,8 @@ message powerChunk {
   bytes tx_hash = 3;
 }
 message VPowerProto {
-  bytes from = 1;
-  bytes to = 2;
-  int64 sum_power = 3;
-  repeated powerChunk power_chunks = 4;
+//  bytes from = 1;
+//  bytes to = 2;
+  int64 sum_power = 1;
+  repeated powerChunk power_chunks = 2;
 }

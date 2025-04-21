@@ -41,16 +41,16 @@ func Test_validatorUpdates(t *testing.T) {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
 
-			dgtee := findDelegateeProtoByPubKey(uPub.Bytes(), newVals)
+			dgtee := findDelegateeV1ByPubKey(uPub.Bytes(), newVals)
 			require.NotNil(t, dgtee)
 			require.Equal(t, dgtee.TotalPower, u.Power)
 		}
 
 		//
 		// add new validator
-		lastVals = copyDelegateeProtoArray(newVals)
+		lastVals = copyDelegateeV1Array(newVals)
 
-		sort.Sort(orderByPowerDelegateeProtos(alls))
+		sort.Sort(orderByPowerDelegateeV1(alls))
 		expectedOutDgtee := alls[maxValCnt-1]
 
 		bottomPow = alls[maxValCnt-1].TotalPower
@@ -78,9 +78,9 @@ func Test_validatorUpdates(t *testing.T) {
 
 		//
 		// slash
-		lastVals = copyDelegateeProtoArray(newVals)
+		lastVals = copyDelegateeV1Array(newVals)
 
-		sort.Sort(orderByPowerDelegateeProtos(alls))
+		sort.Sort(orderByPowerDelegateeV1(alls))
 		expectedNewDgtee = alls[maxValCnt]
 
 		// slash the power of one of validators.
@@ -108,9 +108,9 @@ func Test_validatorUpdates(t *testing.T) {
 
 		//
 		// slash partially
-		lastVals = copyDelegateeProtoArray(newVals)
+		lastVals = copyDelegateeV1Array(newVals)
 
-		sort.Sort(orderByPowerDelegateeProtos(alls))
+		sort.Sort(orderByPowerDelegateeV1(alls))
 		expectedUpdatedVal := alls[0]
 		expectedUpdatedVal.TotalPower--
 

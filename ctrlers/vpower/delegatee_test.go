@@ -219,10 +219,10 @@ func Test_Validator_Load(t *testing.T) {
 
 			dgtTotalPower := int64(0)
 			for k, vpow := range dgt.mapPowers {
-				// All `VPowerProto` in dgt.mapPowers must have `From` equal to their map key 'k'.
-				require.EqualValues(t, k, types.Address(vpow.From).String())
+				// All `VPower` in dgt.mapPowers must have `From` equal to their map key 'k'.
+				require.EqualValues(t, k, types.Address(vpow.from).String())
 				// All `VPowerProto` in dgt.mapPowers must have `To` as dgt.addr.
-				require.EqualValues(t, dgt.addr, vpow.To)
+				require.EqualValues(t, dgt.addr, vpow.to)
 
 				sumPower := int64(0)
 				for _, c := range vpow.PowerChunks {
@@ -483,7 +483,7 @@ func initVPowerLedger(dgteeCnt, powCnt int) ([]*DelegateeProto, []*VPowerProto, 
 			lastHeight = max(lastHeight, height)
 
 			vpow := dgtee.AddPowerWithTxHash(from, pow, height, txhash)
-			if xerr := ledgerVPow.Set(vpow, true); xerr != nil {
+			if xerr := ledgerVPow.Set(vpow.Key(), vpow, true); xerr != nil {
 				return nil, nil, nil, nil, 0, xerr
 			}
 
@@ -493,7 +493,7 @@ func initVPowerLedger(dgteeCnt, powCnt int) ([]*DelegateeProto, []*VPowerProto, 
 		}
 
 		dgtProto := dgtee.GetDelegateeProto()
-		if xerr := ledgerDgtees.Set(dgtProto, true); xerr != nil {
+		if xerr := ledgerDgtees.Set(dgtProto.Key(), dgtProto, true); xerr != nil {
 			return nil, nil, nil, nil, 0, xerr
 		}
 		dgtProtos = append(dgtProtos, dgtProto)

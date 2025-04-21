@@ -19,11 +19,11 @@ import (
 
 type VPowerCtrler struct {
 	//frozenLedger v1.IStateLedger[*FrozenVPowerProto]
-	vpowsLedger  v1.IStateLedger[*VPowerProto]
-	dgteesLedger v1.IStateLedger[*DelegateeProto]
+	vpowsLedger  v1.IStateLedger[*VPower]
+	dgteesLedger v1.IStateLedger[*DelegateeV1]
 
-	allDelegatees  []*DelegateeProto
-	lastValidators []*DelegateeProto
+	allDelegatees  []*DelegateeV1
+	lastValidators []*DelegateeV1
 
 	vpowLimiter *VPowerLimiter
 
@@ -39,12 +39,12 @@ func NewVPowerCtrler(config *cfg.Config, height int64, logger tmlog.Logger) (*VP
 	//	return nil, xerr
 	//}
 
-	vpowsLedger, xerr := v1.NewStateLedger[*VPowerProto]("vpows", config.DBDir(), 2048, func() v1.ILedgerItem { return &VPowerProto{} }, lg)
+	vpowsLedger, xerr := v1.NewStateLedger[*VPower]("vpows", config.DBDir(), 2048, func() v1.ILedgerItem { return &VPower{} }, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	dgteesLedger, xerr := v1.NewStateLedger[*DelegateeProto]("dgtees", config.DBDir(), 21, func() v1.ILedgerItem { return &DelegateeProto{} }, lg)
+	dgteesLedger, xerr := v1.NewStateLedger[*DelegateeV1]("dgtees", config.DBDir(), 21, func() v1.ILedgerItem { return &DelegateeV1{} }, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -70,16 +70,16 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	}
 
 	for _, v := range initValidators {
-		addr := crypto.PubKeyBytes2Addr(v.PubKey.GetSecp256K1())
+		//addr := crypto.PubKeyBytes2Addr(v.PubKey.GetSecp256K1())
+		dgt := newDelegateeProto(v.PubKey.GetSecp256K1())
 
-		vpow := newVPowerWithTxHash(addr, addr, v.Power, int64(1), bytes.ZeroBytes(32))
+		vpow := newVPowerWithTxHash(dgt.addr, dgt.addr, v.Power, int64(1), bytes.ZeroBytes(32))
 		if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, true); xerr != nil {
 			return xerr
 		}
 
-		dgtProto := newDelegateeProto(v.PubKey.GetSecp256K1())
-		dgtProto.AddPower(addr, v.Power)
-		if xerr := ctrler.dgteesLedger.Set(dgtProto.Key(), dgtProto, true); xerr != nil {
+		dgt.AddPower(dgt.addr, v.Power)
+		if xerr := ctrler.dgteesLedger.Set(dgt.Key(), dgt, true); xerr != nil {
 			return xerr
 		}
 	}
@@ -95,18 +95,13 @@ func (ctrler *VPowerCtrler) LoadLedger(height, ripeningBlocks int64, maxValCnt i
 }
 
 func (ctrler *VPowerCtrler) loadLedger(height, ripeningBlocks int64, maxValCnt int) xerrors.XError {
-	dgtProtos, xerr := LoadAllDelegateeProtos(ctrler.dgteesLedger)
+	dgtees, xerr := LoadAllDelegateeV1(ctrler.dgteesLedger)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, xerr = LoadAllVPowerProtos(ctrler.vpowsLedger, dgtProtos, height, ripeningBlocks)
-	if xerr != nil {
-		return xerr
-	}
-
-	ctrler.allDelegatees = dgtProtos
-	ctrler.lastValidators = selectValidators(dgtProtos, maxValCnt)
+	ctrler.allDelegatees = dgtees
+	ctrler.lastValidators = selectValidators(dgtees, maxValCnt)
 	return nil
 }
 
@@ -127,9 +122,9 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 }
 
 type validateResult struct {
-	txPower   int64
-	dgtProto  *DelegateeProto
-	vpowProto *VPowerProto
+	dgtee   *DelegateeV1
+	vpow    *VPower
+	txPower int64
 }
 
 func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -219,9 +214,9 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// set the result of ValidateTrx
 		ctx.ValidateResult = &validateResult{
-			txPower:   txPower,
-			dgtProto:  dgtee,
-			vpowProto: nil,
+			dgtee:   dgtee,
+			vpow:    nil,
+			txPower: txPower,
 		}
 
 	case ctrlertypes.TRX_UNSTAKING:
@@ -256,8 +251,9 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// set the result of ValidateTrx
 		ctx.ValidateResult = &validateResult{
-			dgtProto:  dgtee,
-			vpowProto: vpow,
+			dgtee:   dgtee,
+			vpow:    vpow,
+			txPower: pc.Power,
 		}
 	case ctrlertypes.TRX_WITHDRAW:
 		// todo: implement withdraw reward
@@ -276,8 +272,8 @@ func (ctrler *VPowerCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_STAKING:
 		return ctrler.execBonding(ctx)
-	//case ctrlertypes.TRX_UNSTAKING:
-	//	return ctrler.exeUnstaking(ctx)
+	case ctrlertypes.TRX_UNSTAKING:
+		return ctrler.exeUnbonding(ctx)
 	//case ctrlertypes.TRX_WITHDRAW:
 	//	return ctrler.exeWithdraw(ctx)
 	default:
@@ -288,7 +284,7 @@ func (ctrler *VPowerCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// NOTE: DO NOT FIND a delegatee from `allDelegatees`.
 	// If `allDelegatees` is updated, unexpected results may occur in CheckTx etc.
-	dgteeProto := ctx.ValidateResult.(*validateResult).dgtProto
+	dgteeProto := ctx.ValidateResult.(*validateResult).dgtee
 	if dgteeProto == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self bonding: add new delegatee
 		dgteeProto = newDelegateeProto(ctx.SenderPubKey)
@@ -327,7 +323,7 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// find delegatee
-	dgteeProto := ctx.ValidateResult.(*validateResult).dgtProto
+	dgteeProto := ctx.ValidateResult.(*validateResult).dgtee
 	if dgteeProto == nil {
 		panic("not reachable")
 	}
@@ -337,7 +333,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	if txhash == nil {
 		panic("not reachable")
 	}
-	vpow := ctx.ValidateResult.(*validateResult).vpowProto
+	vpow := ctx.ValidateResult.(*validateResult).vpow
 	if vpow == nil {
 		panic("not reachable")
 	}
@@ -351,7 +347,11 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 		return xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no stake(txhash:%v) from %v", ctx.Tx.To, txhash, ctx.Tx.From)
 	}
 	// decrease the power of `dgteeProto` by `pc.Power`
-	dgteeProto.DelPower(vpow.From, pc.Power)
+	dgteeProto.DelPower(vpow.from, pc.Power)
+
+	if len(vpow.PowerChunks) == 0 {
+
+	}
 
 	if dgteeProto.SelfPower == 0 {
 		// todo: un-bonding all voting powers delegated to `dgteeProto`
