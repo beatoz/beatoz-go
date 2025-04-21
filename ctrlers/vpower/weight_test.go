@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+var (
+	powerRipeningCycle = oneYearSeconds
+)
+
 type testPowObj struct {
 	vpow int64
 	vdur int64

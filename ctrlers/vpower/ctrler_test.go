@@ -28,8 +28,10 @@ var (
 )
 
 func init() {
+	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
+	_ = os.RemoveAll(rootDir)
 	config = beatozcfg.DefaultConfig()
-	config.SetRoot(filepath.Join(os.TempDir(), "test-vpowctrler"))
+	config.SetRoot(rootDir)
 	acctMock = mocks.NewAccountHandlerMock(10000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(types.ToFons(1_000_000_000))
@@ -80,12 +82,13 @@ func Test_Bonding(t *testing.T) {
 
 	//
 	// to not validator (self bonding)
-	txctx, xerr = makeTrxCtx(nil, 4000, lastHeight+1)
+	power, _ := types.FromFons(govParams.MinValidatorStake())
+	txctx, xerr = makeTrxCtx(nil, int64(power), lastHeight+1)
 	require.NoError(t, xerr)
-	// txctx.Tx.To is not validator and nothing must be not found about txctx.Tx.To.
+	// txctx.Tx.To is not validator and nothing must be found about txctx.Tx.To.
 	dgtee0, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
-	dgtee0 = newDelegateeProto(txctx.SenderPubKey)
+	dgtee0 = newDelegateeV1(txctx.SenderPubKey)
 	//fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
 	vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
 	require.Nil(t, vpow)
@@ -94,12 +97,13 @@ func Test_Bonding(t *testing.T) {
 
 	//run tx
 	xerr = ctrler.ValidateTrx(txctx)
-	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
+	require.NoError(t, xerr)
 	xerr = ctrler.ExecuteTrx(txctx)
 	require.NoError(t, xerr)
-	// check delegatee: the `txctx.Tx.To` should found to `dgteesLedger`.
+	// check delegatee: the `txctx.Tx.To` should be found in `dgteesLedger`.
 	dgtee1, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
 	require.NoError(t, xerr)
+	require.NotNil(t, dgtee1)
 	pw, _ := types.FromFons(txctx.Tx.Amount)
 	require.Equal(t, dgtee0.TotalPower+int64(pw), dgtee1.TotalPower)
 	require.Equal(t, dgtee0.SelfPower+int64(pw), dgtee1.SelfPower)
@@ -186,7 +190,7 @@ func initCtrler(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpda
 	return ctrler, vals, nil
 }
 
-func checkExistDelegatee(dgt *DelegateeProto, vups []abcitypes.ValidatorUpdate) bool {
+func checkExistDelegatee(dgt *DelegateeV1, vups []abcitypes.ValidatorUpdate) bool {
 	for _, vup := range vups {
 		if euqalDelegatee(dgt, vup) {
 			return true
@@ -194,7 +198,7 @@ func checkExistDelegatee(dgt *DelegateeProto, vups []abcitypes.ValidatorUpdate) 
 	}
 	return false
 }
-func euqalDelegatee(dgt *DelegateeProto, vup abcitypes.ValidatorUpdate) bool {
+func euqalDelegatee(dgt *DelegateeV1, vup abcitypes.ValidatorUpdate) bool {
 	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.TotalPower == vup.Power
 }
 

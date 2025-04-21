@@ -71,14 +71,14 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	for _, v := range initValidators {
 		//addr := crypto.PubKeyBytes2Addr(v.PubKey.GetSecp256K1())
-		dgt := newDelegateeProto(v.PubKey.GetSecp256K1())
+		dgt := newDelegateeV1(v.PubKey.GetSecp256K1())
 
 		vpow := newVPowerWithTxHash(dgt.addr, dgt.addr, v.Power, int64(1), bytes.ZeroBytes(32))
 		if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, true); xerr != nil {
 			return xerr
 		}
 
-		dgt.AddPower(dgt.addr, v.Power)
+		dgt.addPower(dgt.addr, v.Power)
 		if xerr := ctrler.dgteesLedger.Set(dgt.Key(), dgt, true); xerr != nil {
 			return xerr
 		}
@@ -193,7 +193,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			// it's delegating. check minSelfStakeRatio
 			selfatio := dgtee.SelfPower * int64(100) / (dgtee.TotalPower + txPower)
 			if selfatio < ctx.GovParams.MinSelfStakeRatio() {
-				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, added: %v", dgtee.Address(), dgtee.SelfPower, dgtee.TotalPower, txPower))
+				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, added: %v", dgtee.addr, dgtee.SelfPower, dgtee.TotalPower, txPower))
 			}
 
 			totalPower = dgtee.TotalPower
@@ -205,7 +205,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			// The sender's balance is checked at `commonValidation()` at `trx_executor.go`
 			// and `txPower` is converted from `ctx.Tx.Amount`.
 			// Because of that, overflow can not be occurred.
-			return xerrors.ErrOverFlow.Wrapf("validator(%v) power overflow occurs.\ntx:%v", dgtee.Address(), ctx.Tx)
+			return xerrors.ErrOverFlow.Wrapf("validator(%v) power overflow occurs.\ntx:%v", ctx.Tx.To, ctx.Tx)
 		}
 
 		//
@@ -214,7 +214,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// set the result of ValidateTrx
 		ctx.ValidateResult = &validateResult{
-			dgtee:   dgtee,
+			dgtee:   dgtee, // it is nil in self-bonding
 			vpow:    nil,
 			txPower: txPower,
 		}
@@ -284,14 +284,14 @@ func (ctrler *VPowerCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// NOTE: DO NOT FIND a delegatee from `allDelegatees`.
 	// If `allDelegatees` is updated, unexpected results may occur in CheckTx etc.
-	dgteeProto := ctx.ValidateResult.(*validateResult).dgtee
-	if dgteeProto == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
+	dgtee := ctx.ValidateResult.(*validateResult).dgtee
+	if dgtee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self bonding: add new delegatee
-		dgteeProto = newDelegateeProto(ctx.SenderPubKey)
+		dgtee = newDelegateeV1(ctx.SenderPubKey)
 	}
 
-	if dgteeProto == nil {
-		// `newDelegateeProto` does not fail, so this code is not reachable.
+	if dgtee == nil {
+		// `newDelegateeV1` does not fail, so this code is not reachable.
 		// there is no delegatee whose address is ctx.Tx.To
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
@@ -313,8 +313,9 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		return xerr
 	}
 
-	dgteeProto.AddPower(ctx.Tx.From, power)
-	if xerr := ctrler.dgteesLedger.Set(dgteeProto.Key(), dgteeProto, ctx.Exec); xerr != nil {
+	dgtee.addPower(ctx.Tx.From, power)
+	dgtee.addDelegator(ctx.Tx.From)
+	if xerr := ctrler.dgteesLedger.Set(dgtee.Key(), dgtee, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -322,9 +323,11 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 }
 
 func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	var freezingPowerChunks []*PowerChunk
+
 	// find delegatee
-	dgteeProto := ctx.ValidateResult.(*validateResult).dgtee
-	if dgteeProto == nil {
+	dgtee := ctx.ValidateResult.(*validateResult).dgtee
+	if dgtee == nil {
 		panic("not reachable")
 	}
 
@@ -342,28 +345,41 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	// Remove power
 	//
 	// delete the power chunk with `txhash`
-	pc := vpow.delPowerWithTxHash(txhash)
+	var pc = vpow.delPowerWithTxHash(txhash)
 	if pc == nil {
 		return xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no stake(txhash:%v) from %v", ctx.Tx.To, txhash, ctx.Tx.From)
 	}
-	// decrease the power of `dgteeProto` by `pc.Power`
-	dgteeProto.DelPower(vpow.from, pc.Power)
-
+	dgtee.delPower(vpow.from, pc.Power)
 	if len(vpow.PowerChunks) == 0 {
-
-	}
-
-	if dgteeProto.SelfPower == 0 {
-		// todo: un-bonding all voting powers delegated to `dgteeProto`
-	}
-
-	if dgteeProto.TotalPower == 0 {
-		// todo: remove `dgteeProto`
-
-	} else {
-		if xerr := ctrler.dgteesLedger.Set(dgteeProto.Key(), dgteeProto, ctx.Exec); xerr != nil {
+		dgtee.delDelegator(vpow.from)
+		if xerr := ctrler.vpowsLedger.Del(vpow.Key(), ctx.Exec); xerr != nil {
 			return xerr
 		}
+	} else if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, ctx.Exec); xerr != nil {
+		return xerr
+	}
+	freezingPowerChunks = append(freezingPowerChunks, pc)
+
+	// decrease the power of `dgteeProto` by `pc.Power`
+	if dgtee.SelfPower == 0 {
+		// todo: un-bonding all voting powers delegated to `dgteeProto`
+		for _, _from := range dgtee.Delegators {
+			_vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(_from, dgtee.addr), ctx.Exec)
+			if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
+				return xerr
+			}
+			if _vpow != nil {
+				if xerr := ctrler.vpowsLedger.Del(vpow.Key(), ctx.Exec); xerr != nil {
+					return xerr
+				}
+				freezingPowerChunks = append(freezingPowerChunks, _vpow.PowerChunks...)
+			}
+		}
+		if xerr := ctrler.dgteesLedger.Del(dgtee.Key(), ctx.Exec); xerr != nil {
+			return xerr
+		}
+	} else if xerr := ctrler.dgteesLedger.Set(dgtee.Key(), dgtee, ctx.Exec); xerr != nil {
+		return xerr
 	}
 
 	//

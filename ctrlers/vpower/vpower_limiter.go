@@ -24,20 +24,20 @@ type VPowerLimiter struct {
 	mtx sync.RWMutex
 }
 
-func NewVPowerLimiter(vals DelegateeArray, maxValCnt, indiLimitRatio, upLimitRatio int64) *VPowerLimiter {
+func NewVPowerLimiter(vals []*Delegatee, maxValCnt, indiLimitRatio, upLimitRatio int64) *VPowerLimiter {
 	ret := &VPowerLimiter{}
 	ret.Reset(vals, maxValCnt, indiLimitRatio, upLimitRatio)
 	return ret
 }
 
-func (limiter *VPowerLimiter) Reset(vals DelegateeArray, maxValCnt, indiLimitRatio, upLimitRatio int64) {
+func (limiter *VPowerLimiter) Reset(vals []*Delegatee, maxValCnt, indiLimitRatio, upLimitRatio int64) {
 	limiter.mtx.Lock()
 	defer limiter.mtx.Unlock()
 
 	limiter.reset(vals, maxValCnt, indiLimitRatio, upLimitRatio)
 }
 
-func (limiter *VPowerLimiter) reset(vals DelegateeArray, maxValCnt, indiLimitRatio, upLimitRatio int64) {
+func (limiter *VPowerLimiter) reset(vals []*Delegatee, maxValCnt, indiLimitRatio, upLimitRatio int64) {
 	_base := int64(0)
 	var pobjs []*powerObj
 	for i, v := range vals {

@@ -17,8 +17,8 @@ func Test_validatorUpdates(t *testing.T) {
 	maxValCnt := 5
 
 	for _i := 0; _i < 1000; _i++ {
-		var alls []*DelegateeProto
-		var lastVals []*DelegateeProto
+		var alls []*DelegateeV1
+		var lastVals []*DelegateeV1
 
 		topPow := int64(0)
 		bottomPow := int64(math.MaxInt64)
@@ -132,24 +132,25 @@ func Test_validatorUpdates(t *testing.T) {
 	}
 }
 
-func makeDelegateeListRandPower(c int) []*DelegateeProto {
-	var ret []*DelegateeProto
-	for i := 0; i < c; i++ {
-		ret = append(ret, makeDelegateeOne(bytes.RandInt64N(700_000_000)))
-	}
-	return ret
-}
-func makeDelegateeList(c int, pow int64) []*DelegateeProto {
-	var ret []*DelegateeProto
-	for i := 0; i < c; i++ {
-		ret = append(ret, makeDelegateeOne(pow))
-	}
-	return ret
-}
+//
+//func makeDelegateeListRandPower(c int) []*DelegateeProto {
+//	var ret []*DelegateeProto
+//	for i := 0; i < c; i++ {
+//		ret = append(ret, makeDelegateeOne(bytes.RandInt64N(700_000_000)))
+//	}
+//	return ret
+//}
+//func makeDelegateeList(c int, pow int64) []*DelegateeProto {
+//	var ret []*DelegateeProto
+//	for i := 0; i < c; i++ {
+//		ret = append(ret, makeDelegateeOne(pow))
+//	}
+//	return ret
+//}
 
-func makeDelegateeOne(pow int64) *DelegateeProto {
+func makeDelegateeOne(pow int64) *DelegateeV1 {
 	_, pub := crypto.NewKeypairBytes()
-	dgtee := newDelegateeProto(pub)
+	dgtee := newDelegateeV1(pub)
 	dgtee.TotalPower = pow
 	return dgtee
 }

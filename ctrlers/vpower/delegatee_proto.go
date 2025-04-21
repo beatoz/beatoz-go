@@ -23,7 +23,7 @@ func dgteeProtoKey(addr types.Address) v1.LedgerKey {
 	return append([]byte(prefixDelegateeProto), addr...)
 }
 
-func newDelegateeProto(pubKey bytes.HexBytes) *DelegateeV1 {
+func newDelegateeV1(pubKey bytes.HexBytes) *DelegateeV1 {
 	return &DelegateeV1{
 		DelegateeProto: DelegateeProto{
 			PubKey: pubKey,
@@ -63,18 +63,41 @@ func (x *DelegateeV1) Decode(d []byte) xerrors.XError {
 	return nil
 }
 
-func (x *DelegateeV1) AddPower(from types.Address, pow int64) {
+func (x *DelegateeV1) addPower(from types.Address, pow int64) {
 	x.TotalPower += pow
 	if bytes.Equal(from, x.addr) {
 		x.SelfPower += pow
 	}
 }
 
-func (x *DelegateeV1) DelPower(from types.Address, pow int64) {
+func (x *DelegateeV1) delPower(from types.Address, pow int64) {
 	x.TotalPower -= pow
 	if bytes.Equal(from, x.addr) {
 		x.SelfPower -= pow
 	}
+}
+
+func (x *DelegateeV1) hasDelegator(from types.Address) bool {
+	for _, d := range x.Delegators {
+		if bytes.Equal(d, from) {
+			return true
+		}
+	}
+	return false
+}
+func (x *DelegateeV1) addDelegator(from types.Address) {
+	if !x.hasDelegator(from) {
+		x.Delegators = append(x.Delegators, from)
+	}
+}
+func (x *DelegateeV1) delDelegator(from types.Address) {
+	for i := len(x.Delegators) - 1; i >= 0; i-- {
+		if bytes.Equal(x.Delegators[i], from) {
+			x.Delegators = append(x.Delegators[:i], x.Delegators[i+1:]...)
+			return
+		}
+	}
+	return
 }
 
 func (x *DelegateeV1) Clone() *DelegateeV1 {
