@@ -120,8 +120,8 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 		}
 		burnAcct := ctrler.findAccount(bctx.GovParams.BurnAddress(), true)
 		if burnAcct == nil {
-			burnAcct = btztypes.NewAccount(header.GetProposerAddress())
-			ctrler.logger.Debug("Burn tx fee", "total tx fee", sumFee.Dec(), "burned", burned.Dec(), "burn address", burnAcct.Address)
+			burnAcct = btztypes.NewAccount(bctx.GovParams.BurnAddress())
+			ctrler.logger.Debug("Burn tx fee", "total tx fee", sumFee.Dec(), "reward", reward.Dec(), "burned", burned.Dec(), "burn address", burnAcct.Address)
 		}
 
 		if xerr := proposer.AddBalance(reward); xerr != nil {
