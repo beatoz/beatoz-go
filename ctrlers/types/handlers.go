@@ -27,8 +27,8 @@ type ITrxHandler interface {
 type IGovParams interface {
 	Version() int64
 	MaxValidatorCnt() int64
-	MinValidatorStake() *uint256.Int
-	MinDelegatorStake() *uint256.Int
+	MinValidatorPower() int64
+	MinDelegatorPower() int64
 	// DEPRECATED
 	RewardPerPower() *uint256.Int
 	LazyUnstakingBlocks() int64

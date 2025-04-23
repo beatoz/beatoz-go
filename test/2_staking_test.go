@@ -57,11 +57,12 @@ func TestMinSelfStakeRatio(t *testing.T) {
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
 
 	// self-staking must be allowed.
-	// already stake + new stake >= govParams.MinValidatorStake
-	allowedMinStake := new(uint256.Int).Sub(govParams.MinValidatorStake(), ctrlertypes.PowerToAmount(valStakes.SelfPower))
-	if allowedMinStake.Sign() <= 0 {
-		allowedMinStake = rtypes0.ToFons(10)
+	// already stake + new stake >= govParams.MinValidatorPower
+	allowedMinPower := govParams.MinValidatorPower() - valStakes.SelfPower
+	if allowedMinPower <= 0 {
+		allowedMinPower = 10
 	}
+	allowedMinStake := ctrlertypes.PowerToAmount(allowedMinPower)
 
 	require.NoError(t, valWal.SyncAccount(bzweb3))
 	require.NoError(t, valWal.Unlock(defaultRpcNode.Pass))
@@ -175,8 +176,7 @@ func TestMinValidatorStake(t *testing.T) {
 	require.NoError(t, sender.Unlock(defaultRpcNode.Pass))
 	require.NoError(t, sender.SyncAccount(bzweb3))
 
-	minValidatorStake := govParams.MinValidatorStake()
-	_amt := new(uint256.Int).Sub(minValidatorStake, ctrlertypes.PowerToAmount(1))
+	_amt := ctrlertypes.PowerToAmount(govParams.MinValidatorPower() - 1)
 	ret, err := sender.StakingSync(sender.Address(), defGas, defGasPrice, _amt, bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code)

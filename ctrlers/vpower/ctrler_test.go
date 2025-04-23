@@ -11,7 +11,6 @@ import (
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
@@ -32,7 +31,6 @@ var (
 
 func init() {
 	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
-	_ = os.RemoveAll(rootDir)
 	config = beatozcfg.DefaultConfig()
 	config.SetRoot(rootDir)
 	acctMock = mocks.NewAccountHandlerMock(1000)
@@ -45,6 +43,8 @@ func init() {
 }
 
 func Test_InitLedger(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
 	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps), len(valWallets))
@@ -114,9 +114,14 @@ func Test_InitLedger(t *testing.T) {
 
 	require.Equal(t, totalPower0, totalPower1)
 	require.Equal(t, totalPower0, totalPower2)
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
 func Test_LoadLedger(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
 	ctrler, lastValUps, _, xerr := initCtrler(config)
 	require.NoError(t, xerr)
 
@@ -141,6 +146,7 @@ func Test_LoadLedger(t *testing.T) {
 }
 
 func Test_Bonding(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
 	require.NoError(t, xerr)
@@ -246,7 +252,7 @@ func Test_Bonding(t *testing.T) {
 }
 
 func Test_Bonding_ToNotValidator(t *testing.T) {
-	require.NoError(t, os.RemoveAll(config.DBDir()))
+	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
 	require.NoError(t, xerr)
@@ -267,7 +273,7 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 
 	//
 	// to not validator (self bonding)
-	power = int64(new(uint256.Int).Div(govParams.MinValidatorStake(), ctrlertypes.AmountPerPower()).Uint64())
+	power = govParams.MinValidatorPower()
 	txctx, xerr = makeBondingTrxCtx(fromWallet, nil, power, lastHeight+1)
 	require.NoError(t, xerr)
 	require.Equal(t, fromWallet.Address(), txctx.Tx.From)
@@ -306,7 +312,7 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 }
 
 func Test_Unbonding(t *testing.T) {
-	require.NoError(t, os.RemoveAll(config.DBDir()))
+	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
 	require.NoError(t, xerr)
@@ -389,7 +395,7 @@ func Test_Unbonding(t *testing.T) {
 }
 
 func Test_Unbonding_AllSelfPower(t *testing.T) {
-	require.NoError(t, os.RemoveAll(config.DBDir()))
+	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	ctrler, _, valWallets, xerr := initCtrler(config)
 	require.NoError(t, xerr)

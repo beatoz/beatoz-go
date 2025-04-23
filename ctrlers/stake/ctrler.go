@@ -130,10 +130,8 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	// and the Beatoz can check the signatures through `lastVotes` in block height `N+4`.
 	if xerr := ctrler.delegateeLedger.Iterate(func(d *Delegatee) xerrors.XError {
 		// issue #59
-		// Only `Delegatee` who has deposited more than `MinValidatorStake` can become validator.
-		if minPower, xerr := ctrlertypes.AmountToPower(ctrler.govParams.MinValidatorStake()); xerr != nil {
-			return xerr
-		} else if d.SelfPower >= minPower {
+		// Only `Delegatee` who has deposited more than `MinValidatorPower` can become validator.
+		if d.SelfPower >= ctrler.govParams.MinValidatorPower() {
 			ctrler.allDelegatees = append(ctrler.allDelegatees, d)
 		}
 		return nil
@@ -409,7 +407,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			// self staking
 
 			// issue #59
-			// check MinValidatorStake
+			// check MinValidatorPower
 
 			selfPower := txPower
 			if delegatee != nil {
@@ -417,12 +415,8 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 				totalPower = delegatee.GetTotalPower()
 			}
 
-			minPower, xerr := ctrlertypes.AmountToPower(ctrler.govParams.MinValidatorStake())
-			if xerr != nil {
-				return xerr
-			}
-			if selfPower < minPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: a minimum is %v", ctrler.govParams.MinValidatorStake())
+			if selfPower < ctrler.govParams.MinValidatorPower() {
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: a minimum is %v", ctrler.govParams.MinValidatorPower())
 			}
 		} else {
 			// delegating
@@ -432,12 +426,9 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			}
 
 			// RG-78: check minDelegatorStake
-			minDelegatorPower, xerr := ctrlertypes.AmountToPower(ctx.GovParams.MinDelegatorStake())
-			if xerr != nil {
-				return xerr
-			}
-			if minDelegatorPower > 0 && minDelegatorPower > txPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", ctrler.govParams.MinDelegatorStake())
+			minDelegatorPower := ctx.GovParams.MinDelegatorPower()
+			if minDelegatorPower > txPower {
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", minDelegatorPower)
 			}
 
 			// it's delegating. check minSelfStakeRatio

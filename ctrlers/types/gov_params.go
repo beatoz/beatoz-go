@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	//DEPRECATED
 	amountPerPower         = uint256.NewInt(1_000000000_000000000) // 1BEATOZ == 1Power
 	secondsPerMinute int64 = 60
 	secondsPerHour   int64 = 60 * secondsPerMinute
@@ -26,8 +27,8 @@ var (
 type GovParams struct {
 	version           int64
 	maxValidatorCnt   int64
-	minValidatorStake *uint256.Int
-	minDelegatorStake *uint256.Int
+	minValidatorPower int64
+	minDelegatorPower int64
 
 	// DEPRECATED
 	rewardPerPower *uint256.Int
@@ -73,8 +74,8 @@ func newGovParamsWith(interval int) *GovParams {
 	return &GovParams{
 		version:                   1,
 		maxValidatorCnt:           21,
-		minValidatorStake:         uint256.MustFromDecimal("7000000000000000000000000"), // 7,000,000 BEATOZ
-		minDelegatorStake:         uint256.MustFromDecimal("4000000000000000000000"),    //  `0` means that the delegating is disable.
+		minValidatorPower:         7_000_000, // 7,000,000 BEATOZ
+		minDelegatorPower:         4_000,     //  `0` means that the delegating is disable.
 		rewardPerPower:            uint256.NewInt(4_756_468_797),
 		lazyUnstakingBlocks:       2 * secondsPerWeek / int64(interval), // 2weeks blocks
 		lazyApplyingBlocks:        secondsPerDay / int64(interval),      // 1days blocks
@@ -112,8 +113,8 @@ func Test1GovParams() *GovParams {
 	return &GovParams{
 		version:                   1,
 		maxValidatorCnt:           10,
-		minValidatorStake:         uint256.MustFromDecimal("1000000000000000000"), // 1 BEATOZ
-		minDelegatorStake:         uint256.NewInt(0),                              // issue(hotfix) RG78
+		minValidatorPower:         1, // 1 BEATOZ
+		minDelegatorPower:         1, // issue(hotfix) RG78
 		rewardPerPower:            uint256.NewInt(2_000_000_000),
 		lazyUnstakingBlocks:       10,
 		lazyApplyingBlocks:        10,
@@ -147,8 +148,8 @@ func Test2GovParams() *GovParams {
 	return &GovParams{
 		version:                   2,
 		maxValidatorCnt:           10,
-		minValidatorStake:         uint256.MustFromDecimal("5000000000000000000"), // 5 BEATOZ
-		minDelegatorStake:         uint256.NewInt(0),                              // issue(hotfix) RG78
+		minValidatorPower:         5, // 5 BEATOZ
+		minDelegatorPower:         0, // issue(hotfix) RG78
 		rewardPerPower:            uint256.NewInt(2_000_000_000),
 		lazyUnstakingBlocks:       30,
 		lazyApplyingBlocks:        40,
@@ -182,8 +183,8 @@ func Test3GovParams() *GovParams {
 	return &GovParams{
 		version:                   4,
 		maxValidatorCnt:           13,
-		minValidatorStake:         uint256.MustFromDecimal("0"),
-		minDelegatorStake:         uint256.NewInt(0), // issue(hotfix) RG78
+		minValidatorPower:         0,
+		minDelegatorPower:         0, // issue(hotfix) RG78
 		rewardPerPower:            uint256.NewInt(0),
 		lazyUnstakingBlocks:       20,
 		lazyApplyingBlocks:        0,
@@ -217,8 +218,8 @@ func Test4GovParams() *GovParams {
 	return &GovParams{
 		version:                   4,
 		maxValidatorCnt:           13,
-		minValidatorStake:         uint256.MustFromDecimal("7000000000000000000000000"),
-		minDelegatorStake:         uint256.NewInt(0), // issue(hotfix) RG78
+		minValidatorPower:         7_000_000,
+		minDelegatorPower:         0, // issue(hotfix) RG78
 		rewardPerPower:            uint256.NewInt(4_756_468_797),
 		lazyUnstakingBlocks:       20,
 		lazyApplyingBlocks:        259200,
@@ -251,7 +252,7 @@ func Test4GovParams() *GovParams {
 func Test5GovParams() *GovParams {
 	return &GovParams{
 		version:                   3,
-		minValidatorStake:         uint256.MustFromDecimal("0"),
+		minValidatorPower:         0,
 		minSelfStakeRatio:         40,
 		maxUpdatableStakeRatio:    50,
 		maxIndividualStakeRatio:   50,
@@ -274,8 +275,8 @@ func Test6GovParams_NoStakeLimiter() *GovParams {
 	return &GovParams{
 		version:                   2,
 		maxValidatorCnt:           10,
-		minValidatorStake:         uint256.MustFromDecimal("5000000000000000000"), // 5 BEATOZ
-		minDelegatorStake:         uint256.NewInt(0),                              // issue(hotfix) RG78
+		minValidatorPower:         5, // 5 BEATOZ
+		minDelegatorPower:         0, // issue(hotfix) RG78
 		rewardPerPower:            uint256.NewInt(2_000_000_000),
 		lazyUnstakingBlocks:       30,
 		lazyApplyingBlocks:        40,
@@ -340,8 +341,8 @@ func (r *GovParams) fromProto(pm *GovParamsProto) {
 
 	r.version = pm.Version
 	r.maxValidatorCnt = pm.MaxValidatorCnt
-	r.minValidatorStake = new(uint256.Int).SetBytes(pm.XMinValidatorStake)
-	r.minDelegatorStake = new(uint256.Int).SetBytes(pm.XMinDelegatorStake)
+	r.minValidatorPower = pm.XMinValidatorPower
+	r.minDelegatorPower = pm.XMinDelegatorPower
 	r.rewardPerPower = new(uint256.Int).SetBytes(pm.XRewardPerPower)
 	r.lazyUnstakingBlocks = pm.LazyUnstakingBlocks
 	r.lazyApplyingBlocks = pm.LazyApplyingBlocks
@@ -377,8 +378,8 @@ func (r *GovParams) toProto() *GovParamsProto {
 	a := &GovParamsProto{
 		Version:                   r.version,
 		MaxValidatorCnt:           r.maxValidatorCnt,
-		XMinValidatorStake:        r.minValidatorStake.Bytes(),
-		XMinDelegatorStake:        r.minDelegatorStake.Bytes(),
+		XMinValidatorPower:        r.minValidatorPower,
+		XMinDelegatorPower:        r.minDelegatorPower,
 		XRewardPerPower:           r.rewardPerPower.Bytes(),
 		LazyUnstakingBlocks:       r.lazyUnstakingBlocks,
 		LazyApplyingBlocks:        r.lazyApplyingBlocks,
@@ -416,8 +417,8 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 	tm := &struct {
 		Version                   int64  `json:"version"`
 		MaxValidatorCnt           int64  `json:"maxValidatorCnt"`
-		MinValidatorStake         string `json:"minValidatorStake"`
-		MinDelegatorStake         string `json:"minDelegatorStake"`
+		MinValidatorPower         int64  `json:"minValidatorPower"`
+		MinDelegatorPower         int64  `json:"minDelegatorPower"`
 		RewardPerPower            string `json:"rewardPerPower"`
 		LazyUnstakingBlocks       int64  `json:"lazyUnstakingBlocks"`
 		LazyApplyingBlocks        int64  `json:"lazyApplyingBlocks"`
@@ -447,9 +448,9 @@ func (r *GovParams) MarshalJSON() ([]byte, error) {
 	}{
 		Version:                   r.version,
 		MaxValidatorCnt:           r.maxValidatorCnt,
-		MinValidatorStake:         uint256ToString(r.minValidatorStake), // hex-string
-		MinDelegatorStake:         uint256ToString(r.minDelegatorStake), // hex-string
-		RewardPerPower:            uint256ToString(r.rewardPerPower),    // hex-string
+		MinValidatorPower:         r.minValidatorPower,
+		MinDelegatorPower:         r.minDelegatorPower,
+		RewardPerPower:            uint256ToString(r.rewardPerPower),
 		LazyUnstakingBlocks:       r.lazyUnstakingBlocks,
 		LazyApplyingBlocks:        r.lazyApplyingBlocks,
 		GasPrice:                  uint256ToString(r.gasPrice),
@@ -483,8 +484,8 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 	tm := &struct {
 		Version                   int64  `json:"version"`
 		MaxValidatorCnt           int64  `json:"maxValidatorCnt"`
-		MinValidatorStake         string `json:"minValidatorStake"`
-		MinDelegatorStake         string `json:"minDelegatorStake"`
+		MinValidatorPower         int64  `json:"minValidatorPower"`
+		MinDelegatorPower         int64  `json:"minDelegatorPower"`
 		RewardPerPower            string `json:"rewardPerPower"`
 		LazyUnstakingBlocks       int64  `json:"lazyUnstakingBlocks"`
 		LazyApplyingBlocks        int64  `json:"lazyApplyingBlocks"`
@@ -523,17 +524,8 @@ func (r *GovParams) UnmarshalJSON(bz []byte) error {
 
 	r.version = tm.Version
 	r.maxValidatorCnt = tm.MaxValidatorCnt
-	r.minValidatorStake, err = stringToUint256(tm.MinValidatorStake)
-	if err != nil {
-		return err
-	}
-	r.minDelegatorStake, err = stringToUint256(tm.MinDelegatorStake)
-	if err != nil {
-		return err
-	} else if r.minDelegatorStake == nil {
-		// RG-78: If `MinDelegatorStake` is 0, it means  that the `MinDelegatorStake` is not checked.
-		r.minDelegatorStake = uint256.NewInt(0)
-	}
+	r.minValidatorPower = tm.MinValidatorPower
+	r.minDelegatorPower = tm.MinDelegatorPower
 
 	r.rewardPerPower, err = stringToUint256(tm.RewardPerPower)
 	if err != nil {
@@ -611,22 +603,18 @@ func (r *GovParams) MaxValidatorCnt() int64 {
 	return r.maxValidatorCnt
 }
 
-func (r *GovParams) MinValidatorStake() *uint256.Int {
+func (r *GovParams) MinValidatorPower() int64 {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	return r.minValidatorStake
+	return r.minValidatorPower
 }
 
-func (r *GovParams) MinDelegatorStake() *uint256.Int {
+func (r *GovParams) MinDelegatorPower() int64 {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	if r.minDelegatorStake == nil {
-		return uint256.NewInt(0)
-	}
-
-	return r.minDelegatorStake
+	return r.minDelegatorPower
 }
 
 // DEPRECATED
@@ -879,12 +867,12 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 		newParams.maxValidatorCnt = oldParams.maxValidatorCnt
 	}
 
-	if newParams.minValidatorStake == nil || newParams.minValidatorStake.IsZero() {
-		newParams.minValidatorStake = oldParams.minValidatorStake
+	if newParams.minValidatorPower == 0 {
+		newParams.minValidatorPower = oldParams.minValidatorPower
 	}
 
-	if newParams.minDelegatorStake == nil || newParams.minDelegatorStake.IsZero() {
-		newParams.minDelegatorStake = oldParams.minDelegatorStake
+	if newParams.minDelegatorPower == 0 {
+		newParams.minDelegatorPower = oldParams.minDelegatorPower
 	}
 
 	if newParams.rewardPerPower == nil || newParams.rewardPerPower.IsZero() {

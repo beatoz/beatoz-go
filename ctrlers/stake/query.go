@@ -2,7 +2,6 @@ package stake
 
 import (
 	"fmt"
-	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
@@ -96,11 +95,7 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		var delegatees PowerOrderDelegatees
 		xerr = atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
 			d := item.(*Delegatee)
-			minPower, xerr := types2.AmountToPower(ctrler.govParams.MinValidatorStake())
-			if xerr != nil {
-				return xerr
-			}
-			if d.SelfPower >= minPower {
+			if d.SelfPower >= ctrler.govParams.MinValidatorPower() {
 				delegatees = append(delegatees, d)
 			}
 			return nil

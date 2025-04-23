@@ -160,28 +160,18 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				totalPower = dgtee.TotalPower
 			}
 
-			minPower, xerr := ctrlertypes.AmountToPower(ctx.GovParams.MinValidatorStake())
-			if xerr != nil {
-				return xerr
-			}
-			if selfPower < minPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: %v < %v(minimum)", ctx.Tx.Amount.Dec(), ctx.GovParams.MinValidatorStake())
+			if selfPower < ctx.GovParams.MinValidatorPower() {
+				return xerrors.ErrInvalidTrx.Wrapf("too small power to become validator: %v < %v(minimum)", txPower, ctx.GovParams.MinValidatorPower())
 			}
 		} else {
 			if dgtee == nil {
 				return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 			}
 
-			// RG-78: check minDelegatorStake
-			minDelegatorPower, xerr := ctrlertypes.AmountToPower(ctx.GovParams.MinDelegatorStake())
-			if xerr != nil {
-				return xerr
-			}
-			if minDelegatorPower == 0 {
-				return xerrors.ErrInvalidTrx.Wrapf("delegating is not allowed yet")
-			}
-			if minDelegatorPower > 0 && minDelegatorPower > txPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", ctx.Tx.Amount.Dec(), ctx.GovParams.MinDelegatorStake())
+			// RG-78: check minDelegatorPower
+			minDelegatorPower := ctx.GovParams.MinDelegatorPower()
+			if minDelegatorPower > txPower {
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", txPower, minDelegatorPower)
 			}
 
 			// it's delegating. check minSelfStakeRatio
