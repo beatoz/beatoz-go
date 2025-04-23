@@ -5,6 +5,7 @@ import (
 	"github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,8 +17,7 @@ var (
 
 type VPower struct {
 	VPowerProto
-	from types.Address
-	to   types.Address
+	to types.Address
 }
 
 func vpowerProtoKey(k0, k1 []byte) v1.LedgerKey {
@@ -27,36 +27,20 @@ func vpowerProtoKey(k0, k1 []byte) v1.LedgerKey {
 	return k
 }
 
-func newVPower(from, to types.Address, pow, height int64) *VPower {
+func newVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
 	ret := &VPower{
-		from: from,
-		to:   to,
-	}
-
-	if pow > 0 && height > 0 {
-		ret.addPowerChunk(pow, height)
-	}
-
-	return ret
-}
-
-func newVPowerWithTxHash(from, to types.Address, pow, height int64, txhash []byte) *VPower {
-	ret := &VPower{
-		from: from,
-		to:   to,
-	}
-
-	if pow > 0 && height > 0 && len(txhash) > 0 {
-		ret.addPowerWithTxHash(pow, height, txhash)
-	} else {
-		panic(fmt.Errorf("negative. from:%v, to:%v, pow:%v, height:%v, txhash:%x", from, to, pow, height, txhash))
+		VPowerProto: VPowerProto{
+			From:     from,
+			PubKeyTo: pubKey,
+		},
+		to: crypto.PubKeyBytes2Addr(pubKey),
 	}
 
 	return ret
 }
 
 func (x *VPower) Key() v1.LedgerKey {
-	return vpowerProtoKey(x.from, x.to)
+	return vpowerProtoKey(x.From, x.to)
 }
 
 func (x *VPower) Encode() ([]byte, xerrors.XError) {
@@ -71,13 +55,14 @@ func (x *VPower) Decode(d []byte) xerrors.XError {
 	if err := proto.Unmarshal(d, x); err != nil {
 		return xerrors.From(err)
 	}
+	x.to = crypto.PubKeyBytes2Addr(x.PubKeyTo)
 	return nil
 }
 
 var _ v1.ILedgerItem = (*VPower)(nil)
 
 func (x *VPower) IsSelfPower() bool {
-	return bytes.Equal(x.from, x.to)
+	return bytes.Equal(x.From, x.to)
 }
 
 func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
@@ -135,10 +120,19 @@ func (x *VPower) Clone() *VPower {
 	}
 	return &VPower{
 		VPowerProto: VPowerProto{
+			From:        bytes.Copy(x.From),
+			PubKeyTo:    bytes.Copy(x.PubKeyTo),
 			SumPower:    x.SumPower,
 			PowerChunks: copiedChunks,
 		},
-		from: bytes.Copy(x.from),
-		to:   bytes.Copy(x.to),
+		to: bytes.Copy(x.to),
 	}
+}
+
+func (x *VPower) String() string {
+	pcstr := ""
+	for _, pc := range x.PowerChunks {
+		pcstr += fmt.Sprintf("[power:%v, height:%v, txhash:%x]", pc.Power, pc.Height, pc.TxHash)
+	}
+	return fmt.Sprintf("from:%v, to:%v, powerChunks: %v", x.From, x.to, pcstr)
 }

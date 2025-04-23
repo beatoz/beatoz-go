@@ -1,6 +1,7 @@
 package xerrors
 
 import (
+	"errors"
 	"fmt"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -35,19 +36,19 @@ const (
 )
 
 var (
-	ErrCommon     = New(ErrCodeOrdinary, "beatoz error", nil)
-	ErrOverFlow   = New(ErrCodeOrdinary, "overflow", nil)
-	ErrInitChain  = New(ErrCodeInitChain, "InitChain failed", nil)
-	ErrCheckTx    = New(ErrCodeCheckTx, "CheckTx failed", nil)
-	ErrBeginBlock = New(ErrCodeBeginBlock, "BeginBlock failed", nil)
-	ErrDeliverTx  = New(ErrCodeDeliverTx, "DeliverTx failed", nil)
-	ErrEndBlock   = New(ErrCodeEndBlock, "EndBlock failed", nil)
-	ErrCommit     = New(ErrCodeCommit, "Commit failed", nil)
-	ErrQuery      = New(ErrCodeQuery, "query failed", nil)
+	ErrCommon     = New(ErrCodeOrdinary, "beatoz error")
+	ErrOverFlow   = New(ErrCodeOrdinary, "overflow")
+	ErrInitChain  = New(ErrCodeInitChain, "InitChain failed")
+	ErrCheckTx    = New(ErrCodeCheckTx, "CheckTx failed")
+	ErrBeginBlock = New(ErrCodeBeginBlock, "BeginBlock failed")
+	ErrDeliverTx  = New(ErrCodeDeliverTx, "DeliverTx failed")
+	ErrEndBlock   = New(ErrCodeEndBlock, "EndBlock failed")
+	ErrCommit     = New(ErrCodeCommit, "Commit failed")
+	ErrQuery      = New(ErrCodeQuery, "query failed")
 
-	ErrNotFoundAccount         = New(ErrCodeNotFoundAccount, "not found account", nil)
-	ErrInvalidAccountType      = New(ErrCodeInvalidAccountType, "invalid account type", nil)
-	ErrInvalidTrx              = New(ErrCodeInvalidTrx, "invalid transaction", nil)
+	ErrNotFoundAccount         = New(ErrCodeNotFoundAccount, "not found account")
+	ErrInvalidAccountType      = New(ErrCodeInvalidAccountType, "invalid account type")
+	ErrInvalidTrx              = New(ErrCodeInvalidTrx, "invalid transaction")
 	ErrNegGas                  = ErrInvalidTrx.Wrap(NewOrdinary("negative gas"))
 	ErrInvalidGas              = ErrInvalidTrx.Wrap(NewOrdinary("invalid gas"))
 	ErrInvalidGasPrice         = ErrInvalidTrx.Wrap(NewOrdinary("invalid gas price"))
@@ -59,18 +60,18 @@ var (
 	ErrInvalidTrxPayloadType   = ErrInvalidTrx.Wrap(NewOrdinary("wrong transaction payload type"))
 	ErrInvalidTrxPayloadParams = ErrInvalidTrx.Wrap(NewOrdinary("invalid params of transaction payload"))
 	ErrInvalidTrxSig           = ErrInvalidTrx.Wrap(NewOrdinary("invalid signature"))
-	ErrNotFoundTx              = New(ErrCodeNotFoundTx, "not found tx", nil)
-	ErrNotFoundDelegatee       = New(ErrCodeNotFoundDelegatee, "not found delegatee", nil)
-	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake", nil)
-	ErrNotFoundProposal        = New(ErrCodeNotFoundProposal, "not found proposal", nil)
-	ErrNotFoundVoter           = New(ErrCodeNotFoundVoter, "not found voter", nil)
-	ErrNotFoundReward          = New(ErrCodeNotFoundReward, "not found reward", nil)
-	ErrUpdatableStakeRatio     = New(ErrCodeUpdatableStakeRatio, "exceeded updatable stake ratio", nil)
+	ErrNotFoundTx              = New(ErrCodeNotFoundTx, "not found tx")
+	ErrNotFoundDelegatee       = New(ErrCodeNotFoundDelegatee, "not found delegatee")
+	ErrNotFoundStake           = New(ErrCodeNotFoundStake, "not found stake")
+	ErrNotFoundProposal        = New(ErrCodeNotFoundProposal, "not found proposal")
+	ErrNotFoundVoter           = New(ErrCodeNotFoundVoter, "not found voter")
+	ErrNotFoundReward          = New(ErrCodeNotFoundReward, "not found reward")
+	ErrUpdatableStakeRatio     = New(ErrCodeUpdatableStakeRatio, "exceeded updatable stake ratio")
 
-	ErrInvalidQueryPath   = New(ErrCodeInvalidQueryPath, "invalid query path", nil)
-	ErrInvalidQueryParams = New(ErrCodeInvalidQueryParams, "invalid query parameters", nil)
+	ErrInvalidQueryPath   = New(ErrCodeInvalidQueryPath, "invalid query path")
+	ErrInvalidQueryParams = New(ErrCodeInvalidQueryParams, "invalid query parameters")
 
-	ErrNotFoundResult = New(ErrCodeNotFoundResult, "not found result", nil)
+	ErrNotFoundResult = New(ErrCodeNotFoundResult, "not found result")
 
 	// new style errors
 	ErrUnknownTrxType        = NewOrdinary("unknown transaction type")
@@ -84,8 +85,11 @@ type XError interface {
 	Code() uint32
 	Cause() error
 	Error() string
+	Msg() string
 	Wrap(error) XError
 	Wrapf(string, ...any) XError
+	Contains(XError) bool
+	Equal(XError) bool
 }
 
 type xerror struct {
@@ -94,11 +98,10 @@ type xerror struct {
 	cause error
 }
 
-func New(code uint32, msg string, err error) XError {
+func New(code uint32, msg string) XError {
 	return &xerror{
-		code:  code,
-		msg:   msg,
-		cause: err,
+		code: code,
+		msg:  msg,
 	}
 }
 
@@ -124,42 +127,62 @@ func Wrap(err error, msg string) XError {
 	}
 }
 
-func (e *xerror) Code() uint32 {
+func (xerr *xerror) Code() uint32 {
 	type hascode interface {
 		Cause() error
 	}
 
-	return e.code
+	return xerr.code
 }
 
-func (e *xerror) Error() string {
-	msg := e.msg
+func (xerr *xerror) Error() string {
+	msg := xerr.msg
 
-	if e.cause != nil {
-		msg += "\n\t" + e.cause.Error()
+	if xerr.cause != nil {
+		msg += "\n\t" + xerr.cause.Error()
 	}
 
 	return msg
 
 }
 
-func (e *xerror) Cause() error {
-	return e.cause
+func (xerr *xerror) Msg() string {
+	return xerr.msg
 }
 
-func (e *xerror) Wrap(err error) XError {
-	w, ok := e.cause.(XError)
-	if w != nil && ok {
-		err = w.Wrap(err)
-	}
+func (xerr *xerror) Cause() error {
+	return xerr.cause
+}
 
+func (xerr *xerror) Wrap(err error) XError {
 	return &xerror{
-		code:  e.code,
-		msg:   e.msg,
+		code:  xerr.code,
+		msg:   xerr.msg,
 		cause: err,
 	}
 }
 
-func (e *xerror) Wrapf(format string, args ...any) XError {
-	return e.Wrap(fmt.Errorf(format, args...))
+func (xerr *xerror) Wrapf(format string, args ...any) XError {
+	return xerr.Wrap(New(ErrCodeOrdinary, fmt.Sprintf(format, args...)))
 }
+
+func (xerr *xerror) Contains(other XError) bool {
+	if xerr.code == other.Code() && xerr.msg == other.Msg() {
+		return true
+	} else if xerr.cause != nil {
+		if _xerr, ok := xerr.cause.(*xerror); ok {
+			return _xerr.Contains(other)
+		} else {
+			return errors.Is(xerr.cause, other)
+		}
+	}
+	return false
+}
+
+func (xerr *xerror) Equal(other XError) bool {
+	return xerr.code == other.Code()
+}
+
+//func (xerr *xerror) DeepEqual(other XError) bool {
+//	return xerr.code == other.Code() && xerr.msg == other.Error() && errors.Is(xerr.cause, other.Cause())
+//}

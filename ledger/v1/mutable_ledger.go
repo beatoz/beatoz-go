@@ -197,7 +197,8 @@ func (ledger *MutableLedger) Del(key LedgerKey) xerrors.XError {
 	}
 	ledger.logger.Debug("delete item from tree", "key", key, "value", oldVal, "removed", removed)
 
-	if oldVal != nil && removed {
+	//if oldVal != nil && removed {
+	if removed {
 		// In reverting, `oldVal` will be restored.
 		ledger.revisions.set(key, oldVal)
 	}

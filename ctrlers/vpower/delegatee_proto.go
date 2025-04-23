@@ -60,6 +60,7 @@ func (x *DelegateeV1) Decode(d []byte) xerrors.XError {
 	if err := proto.Unmarshal(d, x); err != nil {
 		return xerrors.From(err)
 	}
+	x.addr = crypto.PubKeyBytes2Addr(x.PubKey)
 	return nil
 }
 

@@ -11,6 +11,8 @@ import (
 func Test_Codec(t *testing.T) {
 	vpow := &VPower{
 		VPowerProto: VPowerProto{
+			From:     types.RandAddress(),
+			PubKeyTo: bytes.RandBytes(33),
 			SumPower: rand.Int63(),
 			PowerChunks: []*PowerChunk{
 				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
@@ -20,13 +22,12 @@ func Test_Codec(t *testing.T) {
 				{Power: rand.Int63(), Height: rand.Int63(), TxHash: bytes.RandBytes(32)},
 			},
 		},
-		from: types.RandAddress(),
-		to:   types.RandAddress(),
+		to: types.RandAddress(),
 	}
 	k0 := vpow.Key()
 	require.EqualValues(t, []byte(prefixVPowerProto), k0[:len(prefixDelegateeProto)])
-	require.Equal(t, k0[len(prefixDelegateeProto):len(prefixDelegateeProto)+20], vpow.from)
-	require.Equal(t, k0[len(prefixDelegateeProto)+20:], vpow.to)
+	require.EqualValues(t, k0[len(prefixDelegateeProto):len(prefixDelegateeProto)+20], vpow.From)
+	require.EqualValues(t, k0[len(prefixDelegateeProto)+20:], vpow.to)
 }
 
 func Test_Key(t *testing.T) {

@@ -72,14 +72,8 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	for _, v := range initValidators {
 		//addr := crypto.PubKeyBytes2Addr(v.PubKey.GetSecp256K1())
 		dgt := newDelegateeV1(v.PubKey.GetSecp256K1())
-
-		vpow := newVPowerWithTxHash(dgt.addr, dgt.addr, v.Power, int64(1), bytes.ZeroBytes(32))
-		if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, true); xerr != nil {
-			return xerr
-		}
-
-		dgt.addPower(dgt.addr, v.Power)
-		if xerr := ctrler.dgteesLedger.Set(dgt.Key(), dgt, true); xerr != nil {
+		vpow := newVPower(dgt.addr, dgt.PubKey)
+		if xerr := ctrler.bondPowerChunk(dgt, vpow, v.Power, int64(1), bytes.ZeroBytes(32), true); xerr != nil {
 			return xerr
 		}
 	}
@@ -121,7 +115,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	return nil, nil
 }
 
-type validateResult struct {
+type bondingTrxOpt struct {
 	dgtee   *DelegateeV1
 	vpow    *VPower
 	txPower int64
@@ -171,7 +165,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				return xerr
 			}
 			if selfPower < minPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: a minimum is %v", ctx.GovParams.MinValidatorStake())
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become validator: %v < %v(minimum)", ctx.Tx.Amount.Dec(), ctx.GovParams.MinValidatorStake())
 			}
 		} else {
 			if dgtee == nil {
@@ -187,13 +181,13 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				return xerrors.ErrInvalidTrx.Wrapf("delegating is not allowed yet")
 			}
 			if minDelegatorPower > 0 && minDelegatorPower > txPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", ctx.GovParams.MinDelegatorStake())
+				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", ctx.Tx.Amount.Dec(), ctx.GovParams.MinDelegatorStake())
 			}
 
 			// it's delegating. check minSelfStakeRatio
 			selfatio := dgtee.SelfPower * int64(100) / (dgtee.TotalPower + txPower)
 			if selfatio < ctx.GovParams.MinSelfStakeRatio() {
-				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, added: %v", dgtee.addr, dgtee.SelfPower, dgtee.TotalPower, txPower))
+				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.TotalPower, txPower))
 			}
 
 			totalPower = dgtee.TotalPower
@@ -213,7 +207,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		//
 
 		// set the result of ValidateTrx
-		ctx.ValidateResult = &validateResult{
+		ctx.ValidateResult = &bondingTrxOpt{
 			dgtee:   dgtee, // it is nil in self-bonding
 			vpow:    nil,
 			txPower: txPower,
@@ -226,7 +220,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		// `ctx.Tx.To` must already be a delegator (or validator), so it should be found in the `dgteesLedger`.
 		dgtee, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
 		if xerr != nil {
-			return xerr
+			return xerrors.ErrNotFoundDelegatee.Wrap(xerr)
 		}
 
 		// find the voting power from a delegatee
@@ -240,7 +234,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		// the voting power chunk with `txhash` must be found in `vpowsLedger`.
 		vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, ctx.Tx.To), ctx.Exec)
 		if xerr != nil {
-			return xerr
+			return xerrors.ErrNotFoundStake.Wrap(xerr)
 		}
 		pc := vpow.findPowerChunk(txhash)
 		if pc == nil {
@@ -250,7 +244,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		// todo: implement checking updatable limitation.
 
 		// set the result of ValidateTrx
-		ctx.ValidateResult = &validateResult{
+		ctx.ValidateResult = &bondingTrxOpt{
 			dgtee:   dgtee,
 			vpow:    vpow,
 			txPower: pc.Power,
@@ -284,7 +278,7 @@ func (ctrler *VPowerCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// NOTE: DO NOT FIND a delegatee from `allDelegatees`.
 	// If `allDelegatees` is updated, unexpected results may occur in CheckTx etc.
-	dgtee := ctx.ValidateResult.(*validateResult).dgtee
+	dgtee := ctx.ValidateResult.(*bondingTrxOpt).dgtee
 	if dgtee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self bonding: add new delegatee
 		dgtee = newDelegateeV1(ctx.SenderPubKey)
@@ -296,28 +290,30 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
 
+	var vpow *VPower
+	power := ctx.ValidateResult.(*bondingTrxOpt).txPower
+
+	if dgtee.hasDelegator(ctx.Tx.From) {
+		_vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, dgtee.addr), ctx.Exec)
+		if xerr != nil {
+			return xerr
+		}
+		vpow = _vpow
+	} else {
+		vpow = newVPower(ctx.Tx.From, dgtee.PubKey)
+	}
+	if xerr := ctrler.bondPowerChunk(
+		dgtee, vpow,
+		power, ctx.Height, ctx.TxHash,
+		ctx.Exec); xerr != nil {
+		return xerr
+	}
+
 	// Update sender account balance
 	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
 		return xerr
 	}
 	_ = ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec)
-
-	// create VPower and delegate it to `dgtee`
-	power, xerr := ctrlertypes.AmountToPower(ctx.Tx.Amount)
-	if xerr != nil {
-		return xerr
-	}
-
-	vpow := newVPowerWithTxHash(ctx.Tx.From, ctx.Tx.To, power, ctx.Height, ctx.TxHash)
-	if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, ctx.Exec); xerr != nil {
-		return xerr
-	}
-
-	dgtee.addPower(ctx.Tx.From, power)
-	dgtee.addDelegator(ctx.Tx.From)
-	if xerr := ctrler.dgteesLedger.Set(dgtee.Key(), dgtee, ctx.Exec); xerr != nil {
-		return xerr
-	}
 
 	return nil
 }
@@ -326,7 +322,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	var freezingPowerChunks []*PowerChunk
 
 	// find delegatee
-	dgtee := ctx.ValidateResult.(*validateResult).dgtee
+	dgtee := ctx.ValidateResult.(*bondingTrxOpt).dgtee
 	if dgtee == nil {
 		panic("not reachable")
 	}
@@ -336,7 +332,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	if txhash == nil {
 		panic("not reachable")
 	}
-	vpow := ctx.ValidateResult.(*validateResult).vpow
+	vpow := ctx.ValidateResult.(*bondingTrxOpt).vpow
 	if vpow == nil {
 		panic("not reachable")
 	}
@@ -344,23 +340,12 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	//
 	// Remove power
 	//
-	// delete the power chunk with `txhash`
-	var pc = vpow.delPowerWithTxHash(txhash)
-	if pc == nil {
-		return xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no stake(txhash:%v) from %v", ctx.Tx.To, txhash, ctx.Tx.From)
-	}
-	dgtee.delPower(vpow.from, pc.Power)
-	if len(vpow.PowerChunks) == 0 {
-		dgtee.delDelegator(vpow.from)
-		if xerr := ctrler.vpowsLedger.Del(vpow.Key(), ctx.Exec); xerr != nil {
-			return xerr
-		}
-	} else if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, ctx.Exec); xerr != nil {
+	if pc, xerr := ctrler.unbondPowerChunk(dgtee, vpow, txhash, ctx.Exec); xerr != nil {
 		return xerr
+	} else {
+		freezingPowerChunks = append(freezingPowerChunks, pc)
 	}
-	freezingPowerChunks = append(freezingPowerChunks, pc)
 
-	// decrease the power of `dgteeProto` by `pc.Power`
 	if dgtee.SelfPower == 0 {
 		// todo: un-bonding all voting powers delegated to `dgteeProto`
 		for _, _from := range dgtee.Delegators {
@@ -369,17 +354,15 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 				return xerr
 			}
 			if _vpow != nil {
-				if xerr := ctrler.vpowsLedger.Del(vpow.Key(), ctx.Exec); xerr != nil {
+				freezingPowerChunks = append(freezingPowerChunks, _vpow.PowerChunks...)
+				if xerr := ctrler.vpowsLedger.Del(_vpow.Key(), ctx.Exec); xerr != nil {
 					return xerr
 				}
-				freezingPowerChunks = append(freezingPowerChunks, _vpow.PowerChunks...)
 			}
 		}
 		if xerr := ctrler.dgteesLedger.Del(dgtee.Key(), ctx.Exec); xerr != nil {
 			return xerr
 		}
-	} else if xerr := ctrler.dgteesLedger.Set(dgtee.Key(), dgtee, ctx.Exec); xerr != nil {
-		return xerr
 	}
 
 	//
