@@ -3,6 +3,7 @@ package stake
 import (
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
@@ -29,9 +30,9 @@ type StakeCtrler struct {
 
 	allDelegatees     DelegateeArray
 	lastValidators    DelegateeArray
-	delegateeLedger   v1.IStateLedger[*Delegatee]
-	frozenLedger      v1.IStateLedger[*Stake]
-	rewardLedger      v1.IStateLedger[*Reward]
+	delegateeLedger   v1.IStateLedger
+	frozenLedger      v1.IStateLedger
+	rewardLedger      v1.IStateLedger
 	rwdLedgUpInterval int64
 	lastRwdHash       []byte
 	stakeLimiter      *StakeLimiter
@@ -47,24 +48,24 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovParams, logge
 		panic(err)
 	}
 
-	newDelegateeProvider := func() v1.ILedgerItem { return &Delegatee{} }
-	newStakeProvider := func() v1.ILedgerItem { return &Stake{} }
-	newRewardProvider := func() v1.ILedgerItem { return &Reward{} }
+	newDelegateeProvider := func(key v1.LedgerKey) v1.ILedgerItem { return &Delegatee{} }
+	newStakeProvider := func(key v1.LedgerKey) v1.ILedgerItem { return &Stake{} }
+	newRewardProvider := func(key v1.LedgerKey) v1.ILedgerItem { return &Reward{} }
 
 	lg := logger.With("module", "beatoz_StakeCtrler")
 
 	// for all delegatees
-	delegateeLedger, xerr := v1.NewStateLedger[*Delegatee]("delegatees", config.DBDir(), 2048, newDelegateeProvider, lg)
+	delegateeLedger, xerr := v1.NewStateLedger("delegatees", config.DBDir(), 2048, newDelegateeProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	frozenLedger, xerr := v1.NewStateLedger[*Stake]("frozen", config.DBDir(), 2048, newStakeProvider, lg)
+	frozenLedger, xerr := v1.NewStateLedger("frozen", config.DBDir(), 2048, newStakeProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	rewardLedger, xerr := v1.NewStateLedger[*Reward]("rewards", config.DBDir(), 2048, newRewardProvider, lg)
+	rewardLedger, xerr := v1.NewStateLedger("rewards", config.DBDir(), 2048, newRewardProvider, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -128,9 +129,10 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
 	// So, the accounts can start signing from block height `N+3`
 	// and the Beatoz can check the signatures through `lastVotes` in block height `N+4`.
-	if xerr := ctrler.delegateeLedger.Iterate(func(d *Delegatee) xerrors.XError {
+	if xerr := ctrler.delegateeLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		// issue #59
 		// Only `Delegatee` who has deposited more than `MinValidatorPower` can become validator.
+		d, _ := item.(*Delegatee)
 		if d.SelfPower >= ctrler.govParams.MinValidatorPower() {
 			ctrler.allDelegatees = append(ctrler.allDelegatees, d)
 		}
@@ -214,7 +216,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 					"target height", heightOfPower, "current height", blockCtx.Height())
 				continue
 			}
-			delegatee := item.(*Delegatee)
+			delegatee, _ := item.(*Delegatee)
 			if delegatee.TotalPower != vote.Validator.Power {
 				ctrler.logger.Error("Wrong power", "delegatee", delegatee.Addr, "power of ledger", delegatee.TotalPower, "power of VoteInfo", vote.Validator.Power)
 				continue
@@ -225,7 +227,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		} else {
 			// check MinSignedBlocks
 			signedHeight := blockCtx.Height() - 1
-			delegatee, xerr := ctrler.delegateeLedger.Get(vote.Validator.Address, true)
+			item, xerr := ctrler.delegateeLedger.Get(vote.Validator.Address, true)
 			if xerr != nil {
 				// it's possible that a `delegatee` is not found.
 				// `vote.Validator.Address` has existed since block[height - 4],
@@ -238,6 +240,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 				continue
 			}
 
+			delegatee, _ := item.(*Delegatee)
 			_ = delegatee.ProcessNotSignedBlock(signedHeight)
 			_ = ctrler.delegateeLedger.Set(delegatee.Key(), delegatee, true)
 
@@ -288,12 +291,13 @@ func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (
 
 // doPunish is executed at BeginBlock
 func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
-	delegatee, xerr := ctrler.delegateeLedger.Get(evi.Validator.Address, true)
+	item, xerr := ctrler.delegateeLedger.Get(evi.Validator.Address, true)
 	if xerr != nil {
 		return 0, xerr
 	}
 
 	// Punish the delegators as well as validator. issue #51
+	delegatee, _ := item.(*Delegatee)
 	slashed := delegatee.DoSlash(slashRatio)
 	_ = ctrler.delegateeLedger.Set(delegatee.Key(), delegatee, true)
 
@@ -331,7 +335,7 @@ func (ctrler *StakeCtrler) DoReward(height int64, votes []abcitypes.VoteInfo) (*
 					"target height", heightForReward, "current height", height)
 				continue
 			}
-			delegatee := item.(*Delegatee)
+			delegatee, _ := item.(*Delegatee)
 			if delegatee.TotalPower != vote.Validator.Power {
 				panic(fmt.Errorf("delegatee(%v)'s power(%v) is not same as the power(%v) of VoteInfo at block[%v]",
 					delegatee.Addr, delegatee.TotalPower, vote.Validator.Power, heightForReward))
@@ -354,9 +358,9 @@ func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint
 	issuedReward := uint256.NewInt(0)
 
 	for _, s0 := range delegatee.Stakes {
-		rwdObj, xerr := ctrler.rewardLedger.Get(s0.From, true)
+		item, xerr := ctrler.rewardLedger.Get(s0.From, true)
 		if xerr == xerrors.ErrNotFoundResult {
-			rwdObj = NewReward(s0.From)
+			item = NewReward(s0.From)
 		} else if xerr != nil {
 			ctrler.logger.Error("fail to find reward object of", s0.From)
 			continue
@@ -364,6 +368,7 @@ func (ctrler *StakeCtrler) doRewardTo(delegatee *Delegatee, height int64) (*uint
 
 		power := uint256.NewInt(uint64(s0.Power))
 		rwd := new(uint256.Int).Mul(power, ctrler.govParams.RewardPerPower())
+		rwdObj, _ := item.(*Reward)
 		_ = rwdObj.Issue(rwd, height)
 
 		if xerr := ctrler.rewardLedger.Set(rwdObj.Key(), rwdObj, true); xerr != nil {
@@ -398,11 +403,12 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 		totalPower := int64(0)
 
-		delegatee, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
+		item, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
 		if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 			return xerr
 		}
 
+		delegatee, _ := item.(*Delegatee) // item may be nil
 		if bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 			// self staking
 
@@ -470,7 +476,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		//
 		// begin: issue #34: check updatable stake ratio
 		// find delegatee
-		delegatee, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
+		item, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
 		if xerr != nil {
 			return xerr
 		}
@@ -481,6 +487,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
 
+		delegatee, _ := item.(*Delegatee)
 		_, s0 := delegatee.FindStake(txhash)
 		if s0 == nil {
 			return xerrors.ErrNotFoundStake
@@ -506,11 +513,12 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			return xerrors.ErrInvalidTrxPayloadType
 		}
 
-		rwd, xerr := ctrler.rewardLedger.Get(ctx.Tx.From, ctx.Exec)
+		item, xerr := ctrler.rewardLedger.Get(ctx.Tx.From, ctx.Exec)
 		if xerr != nil {
 			return xerr
 		}
 
+		rwd, _ := item.(*Reward)
 		if txpayload.ReqAmt.Cmp(rwd.cumulated) > 0 {
 			return xerrors.ErrInvalidTrx.Wrapf("insufficient reward")
 		}
@@ -540,17 +548,15 @@ func (ctrler *StakeCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErro
 }
 
 func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	delegatee, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
+	item, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return xerr
 	}
-
-	if delegatee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
+	if item == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// add new delegatee
-		delegatee = NewDelegatee(ctx.Tx.From, ctx.SenderPubKey)
+		item = NewDelegatee(ctx.Tx.From, ctx.SenderPubKey)
 	}
-
-	if delegatee == nil {
+	if item == nil {
 		// there is no delegatee whose address is ctx.Tx.To
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
@@ -569,6 +575,7 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 	}
 	s0 := NewStakeWithPower(ctx.Tx.From, ctx.Tx.To, power, ctx.Height+1, ctx.TxHash)
 
+	delegatee, _ := item.(*Delegatee)
 	if xerr := delegatee.AddStake(s0); xerr != nil {
 		return xerr
 	}
@@ -581,7 +588,7 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 
 func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// find delegatee
-	delegatee, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
+	item, xerr := ctrler.delegateeLedger.Get(ctx.Tx.To, ctx.Exec)
 	if xerr != nil {
 		return xerr
 	}
@@ -592,6 +599,7 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		return xerrors.ErrInvalidTrxPayloadParams
 	}
 
+	delegatee, _ := item.(*Delegatee)
 	_, s0 := delegatee.FindStake(txhash)
 	if s0 == nil {
 		return xerrors.ErrNotFoundStake
@@ -649,11 +657,12 @@ func (ctrler *StakeCtrler) exeWithdraw(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 	snap := ctrler.rewardLedger.Snapshot(ctx.Exec)
 
-	rwd, xerr := ctrler.rewardLedger.Get(ctx.Tx.From, ctx.Exec)
+	item, xerr := ctrler.rewardLedger.Get(ctx.Tx.From, ctx.Exec)
 	if xerr != nil {
 		return xerr
 	}
 
+	rwd, _ := item.(*Reward)
 	xerr = rwd.Withdraw(txpayload.ReqAmt, ctx.Height)
 	if xerr != nil {
 		return xerr
@@ -688,7 +697,15 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 }
 
 func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertypes.IAccountHandler) xerrors.XError {
-	return ctrler.frozenLedger.Iterate(func(s0 *Stake) xerrors.XError {
+	var removedKeys []v1.LedgerKey
+	defer func() {
+		for _, k := range removedKeys {
+			//_ = ctrler.frozenLedger.Del(s0.TxHash, true)
+			_ = ctrler.frozenLedger.Del(k, true)
+		}
+	}()
+	return ctrler.frozenLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		s0, _ := item.(*Stake)
 		if s0.RefundHeight <= height {
 			// un-freezing s0
 			refundAmt := ctrlertypes.PowerToAmount(s0.Power)
@@ -698,7 +715,7 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 				return xerr
 			}
 
-			_ = ctrler.frozenLedger.Del(s0.TxHash, true)
+			removedKeys = append(removedKeys, proposal.LedgerKeyFrozenProp(s0.TxHash))
 		}
 		return nil
 	}, true)
@@ -865,9 +882,10 @@ func (ctrler *StakeCtrler) Delegatee(addr types.Address) *Delegatee {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
+	if item, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
 		return nil
 	} else {
+		delegatee, _ := item.(*Delegatee)
 		return delegatee
 	}
 }
@@ -877,11 +895,12 @@ func (ctrler *StakeCtrler) TotalPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
+	if item, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
 		return 0
-	} else if delegatee == nil {
+	} else if item == nil {
 		return 0
 	} else {
+		delegatee, _ := item.(*Delegatee)
 		return delegatee.TotalPower
 	}
 }
@@ -891,11 +910,12 @@ func (ctrler *StakeCtrler) SelfPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
+	if item, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
 		return 0
-	} else if delegatee == nil {
+	} else if item == nil {
 		return 0
 	} else {
+		delegatee, _ := item.(*Delegatee)
 		return delegatee.SelfPower
 	}
 }
@@ -905,11 +925,12 @@ func (ctrler *StakeCtrler) DelegatedPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	if delegatee, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
+	if item, xerr := ctrler.delegateeLedger.Get(addr, true); xerr != nil {
 		return 0
-	} else if delegatee == nil {
+	} else if item == nil {
 		return 0
 	} else {
+		delegatee, _ := item.(*Delegatee)
 		return delegatee.TotalPower - delegatee.SelfPower
 	}
 }
@@ -920,7 +941,8 @@ func (ctrler *StakeCtrler) ReadTotalAmount() *uint256.Int {
 	defer ctrler.mtx.RUnlock()
 
 	ret := uint256.NewInt(0)
-	_ = ctrler.delegateeLedger.Iterate(func(delegatee *Delegatee) xerrors.XError {
+	_ = ctrler.delegateeLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		delegatee, _ := item.(*Delegatee)
 		amt := ctrlertypes.PowerToAmount(delegatee.TotalPower)
 		_ = ret.Add(ret, amt)
 		return nil
@@ -934,7 +956,8 @@ func (ctrler *StakeCtrler) ReadTotalPower() int64 {
 	defer ctrler.mtx.RUnlock()
 
 	ret := int64(0)
-	_ = ctrler.delegateeLedger.Iterate(func(delegatee *Delegatee) xerrors.XError {
+	_ = ctrler.delegateeLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		delegatee, _ := item.(*Delegatee)
 		ret += delegatee.GetTotalPower()
 		return nil
 	}, true)
@@ -947,7 +970,8 @@ func (ctrler *StakeCtrler) ReadFrozenStakes() []*Stake {
 	defer ctrler.mtx.RUnlock()
 
 	var ret []*Stake
-	_ = ctrler.frozenLedger.Iterate(func(s0 *Stake) xerrors.XError {
+	_ = ctrler.frozenLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		s0, _ := item.(*Stake)
 		ret = append(ret, s0)
 		return nil
 	}, true)
@@ -958,10 +982,12 @@ func (ctrler *StakeCtrler) rewardOf(addr types.Address) *Reward {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	rwd, xerr := ctrler.rewardLedger.Get(addr, true)
+	item, xerr := ctrler.rewardLedger.Get(addr, true)
 	if xerr != nil {
 		return nil
 	}
+
+	rwd, _ := item.(*Reward)
 	return rwd
 }
 
@@ -969,11 +995,12 @@ func (ctrler *StakeCtrler) readRewardOf(addr types.Address) *Reward {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	rwd, xerr := ctrler.rewardLedger.Get(addr, true)
+	item, xerr := ctrler.rewardLedger.Get(addr, true)
 	if xerr != nil {
 		return nil
 	}
 
+	rwd, _ := item.(*Reward)
 	return rwd
 }
 

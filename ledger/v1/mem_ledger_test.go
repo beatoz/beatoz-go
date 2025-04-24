@@ -22,7 +22,7 @@ func init() {
 	}
 	_ = os.RemoveAll(dbDir)
 
-	_ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	_ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func(key LedgerKey) ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	if xerr != nil {

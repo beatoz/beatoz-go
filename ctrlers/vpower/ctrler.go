@@ -19,8 +19,8 @@ import (
 
 type VPowerCtrler struct {
 	//frozenLedger v1.IStateLedger[*FrozenVPowerProto]
-	vpowsLedger  v1.IStateLedger[*VPower]
-	dgteesLedger v1.IStateLedger[*DelegateeV1]
+	vpowsLedger  v1.IStateLedger
+	dgteesLedger v1.IStateLedger
 
 	allDelegatees  []*DelegateeV1
 	lastValidators []*DelegateeV1
@@ -39,12 +39,12 @@ func NewVPowerCtrler(config *cfg.Config, height int64, logger tmlog.Logger) (*VP
 	//	return nil, xerr
 	//}
 
-	vpowsLedger, xerr := v1.NewStateLedger[*VPower]("vpows", config.DBDir(), 2048, func() v1.ILedgerItem { return &VPower{} }, lg)
+	vpowsLedger, xerr := v1.NewStateLedger("vpows", config.DBDir(), 2048, func(key v1.LedgerKey) v1.ILedgerItem { return &VPower{} }, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	dgteesLedger, xerr := v1.NewStateLedger[*DelegateeV1]("dgtees", config.DBDir(), 21, func() v1.ILedgerItem { return &DelegateeV1{} }, lg)
+	dgteesLedger, xerr := v1.NewStateLedger("dgtees", config.DBDir(), 21, func(key v1.LedgerKey) v1.ILedgerItem { return &DelegateeV1{} }, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -148,10 +148,12 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// NOTE: Do not find from `allDelegatees`.
 		// Only if there is no update on allDelegatees, it's possible to find from `allDelegatees`.
-		dgtee, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
+		item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
 		if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
 			return xerr
 		}
+
+		dgtee, _ := item.(*DelegateeV1) // item may be nil
 		if bytes.Equal(ctx.Tx.From, ctx.Tx.To) {
 			// self bonding
 			selfPower = txPower
@@ -208,10 +210,12 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// NOTE: Do not find from `allDelegatees`.
 		// `ctx.Tx.To` must already be a delegator (or validator), so it should be found in the `dgteesLedger`.
-		dgtee, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
+		item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
 		if xerr != nil {
 			return xerrors.ErrNotFoundDelegatee.Wrap(xerr)
 		}
+
+		dgtee, _ := item.(*DelegateeV1)
 
 		// find the voting power from a delegatee
 		txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
@@ -222,10 +226,12 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		// Since the bonding tx pointed to by `txhash` must have already been executed
 		// and created a voting chunk as a result,
 		// the voting power chunk with `txhash` must be found in `vpowsLedger`.
-		vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, ctx.Tx.To), ctx.Exec)
+		item, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, ctx.Tx.To), ctx.Exec)
 		if xerr != nil {
 			return xerrors.ErrNotFoundStake.Wrap(xerr)
 		}
+
+		vpow, _ := item.(*VPower)
 		pc := vpow.findPowerChunk(txhash)
 		if pc == nil {
 			return xerrors.ErrNotFoundStake
@@ -284,11 +290,11 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	power := ctx.ValidateResult.(*bondingTrxOpt).txPower
 
 	if dgtee.hasDelegator(ctx.Tx.From) {
-		_vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, dgtee.addr), ctx.Exec)
+		item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, dgtee.addr), ctx.Exec)
 		if xerr != nil {
 			return xerr
 		}
-		vpow = _vpow
+		vpow, _ = item.(*VPower)
 	} else {
 		vpow = newVPower(ctx.Tx.From, dgtee.PubKey)
 	}
@@ -339,10 +345,12 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	if dgtee.SelfPower == 0 {
 		// todo: un-bonding all voting powers delegated to `dgteeProto`
 		for _, _from := range dgtee.Delegators {
-			_vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(_from, dgtee.addr), ctx.Exec)
+			item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(_from, dgtee.addr), ctx.Exec)
 			if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
 				return xerr
 			}
+
+			_vpow, _ := item.(*VPower) // item may be nil
 			if _vpow != nil {
 				freezingPowerChunks = append(freezingPowerChunks, _vpow.PowerChunks...)
 				if xerr := ctrler.vpowsLedger.Del(_vpow.Key(), ctx.Exec); xerr != nil {

@@ -210,8 +210,9 @@ func TestFreezingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
-	frozenProp, xerr := govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
+	item, xerr := govCtrler.frozenState.Get(proposal.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
+	frozenProp, _ := item.(*proposal.GovProposal)
 	require.NotNil(t, frozenProp.MajorOption)
 	// prop.MajorOption is nil, so...
 	prop.MajorOption = frozenProp.MajorOption
@@ -254,7 +255,7 @@ func TestApplyingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr := govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
+	frozenProp, xerr := govCtrler.frozenState.Get(proposal.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozenProp)
 
@@ -269,7 +270,7 @@ func TestApplyingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr = govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
+	frozenProp, xerr = govCtrler.frozenState.Get(proposal.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, frozenProp)
 

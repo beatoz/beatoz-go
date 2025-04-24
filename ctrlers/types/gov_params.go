@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
-	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -314,9 +313,17 @@ func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
 	return ret, nil
 }
 
-func (r *GovParams) Key() v1.LedgerKey {
-	return bytes.ZeroBytes(32)
+var KeyPrefixGovParams = []byte{0x01}
+
+func LedgerKeyGovParams() v1.LedgerKey {
+	_key := make([]byte, len(KeyPrefixGovParams))
+	copy(_key, KeyPrefixGovParams)
+	return _key
 }
+
+//func (r *GovParams) Key() v1.LedgerKey {
+//	return LedgerKeyGovParams()
+//}
 
 func (r *GovParams) Decode(bz []byte) xerrors.XError {
 	pm := &GovParamsProto{}

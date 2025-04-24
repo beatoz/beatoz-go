@@ -5,7 +5,6 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
-	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
@@ -112,11 +111,12 @@ func TestProposalDuplicate(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, c := range cases2 {
-		key := c.txctx.TxHash
-		prop, xerr := govCtrler.proposalState.Get(key, false)
+		key := proposal.LedgerKeyProposal(c.txctx.TxHash)
+		item, xerr := govCtrler.proposalState.Get(key, false)
 		require.NoError(t, xerr)
-		require.NotNil(t, prop)
-		require.Equal(t, key, bytes.HexBytes(prop.Key()))
+		require.NotNil(t, item)
+		prop, _ := item.(*proposal.GovProposal)
+		require.EqualValues(t, key, proposal.LedgerKeyProposal(prop.TxHash))
 	}
 	for i, c := range cases2 {
 		require.Error(t, xerrors.ErrDuplicatedKey, runCase(c), "index", i)

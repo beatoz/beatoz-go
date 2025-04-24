@@ -7,10 +7,13 @@ import (
 	"sort"
 )
 
+type FuncNewItemFor func(LedgerKey) ILedgerItem
+type FuncIterate func(LedgerKey, ILedgerItem) xerrors.XError
+
 type IGettable interface {
 	Get(LedgerKey) (ILedgerItem, xerrors.XError)
-	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
-	Seek(prefix []byte, ascending bool, cb func(ILedgerItem) xerrors.XError) xerrors.XError
+	Iterate(FuncIterate) xerrors.XError
+	Seek([]byte, bool, FuncIterate) xerrors.XError
 }
 
 type ISettable interface {
@@ -38,12 +41,12 @@ type IMutable interface {
 	Close() xerrors.XError
 }
 
-type IStateLedger[T ILedgerItem] interface {
+type IStateLedger interface {
 	Version() int64
-	Get(LedgerKey, bool) (T, xerrors.XError)
-	Iterate(func(T) xerrors.XError, bool) xerrors.XError
-	Seek([]byte, bool, func(T) xerrors.XError, bool) xerrors.XError
-	Set(LedgerKey, T, bool) xerrors.XError
+	Get(LedgerKey, bool) (ILedgerItem, xerrors.XError)
+	Iterate(FuncIterate, bool) xerrors.XError
+	Seek([]byte, bool, FuncIterate, bool) xerrors.XError
+	Set(LedgerKey, ILedgerItem, bool) xerrors.XError
 	Snapshot(bool) int
 	RevertToSnapshot(int, bool) xerrors.XError
 	Del(LedgerKey, bool) xerrors.XError

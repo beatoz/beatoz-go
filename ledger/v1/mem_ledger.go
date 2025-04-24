@@ -12,12 +12,12 @@ import (
 // MemLedger cannot be committed, everything else is like MutableLedger.
 
 type MemLedger struct {
-	immuTree    *iavl.ImmutableTree
-	memStorage  map[string][]byte
-	revisions   *revisionList[[]byte]
-	newItemFunc func() ILedgerItem
-	logger      tmlog.Logger
-	mtx         sync.RWMutex
+	immuTree   *iavl.ImmutableTree
+	memStorage map[string][]byte
+	revisions  *revisionList[[]byte]
+	newItemFor FuncNewItemFor
+	logger     tmlog.Logger
+	mtx        sync.RWMutex
 }
 
 var _ IImitable = (*MemLedger)(nil)
@@ -33,11 +33,11 @@ func NewMemLedgerAt(ver int64, from IMutable, lg tmlog.Logger) (*MemLedger, xerr
 	}
 
 	return &MemLedger{
-		immuTree:    tree,
-		memStorage:  make(map[string][]byte),
-		revisions:   newSnapshotList[[]byte](),
-		newItemFunc: from.(*MutableLedger).newItemFunc,
-		logger:      lg.With("ledger", "MemLedger"),
+		immuTree:   tree,
+		memStorage: make(map[string][]byte),
+		revisions:  newSnapshotList[[]byte](),
+		newItemFor: from.(*MutableLedger).newItemFor,
+		logger:     lg.With("ledger", "MemLedger"),
 	}, nil
 }
 
@@ -54,7 +54,7 @@ func (ledger *MemLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 		return nil, xerr
 	}
 
-	item := ledger.newItemFunc()
+	item := ledger.newItemFor(key)
 	if xerr := item.Decode(bz); xerr != nil {
 		return nil, xerr
 	}
@@ -79,26 +79,26 @@ func (ledger *MemLedger) findRawBytes(key LedgerKey) ([]byte, xerrors.XError) {
 }
 
 // Iterate do not travel the elements created or updated by Set
-func (ledger *MemLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError {
+func (ledger *MemLedger) Iterate(cb FuncIterate) xerrors.XError {
 	if ledger.immuTree != nil {
 		ledger.mtx.RLock()
 		defer ledger.mtx.RUnlock()
 
 		var xerrStop xerrors.XError
 		stopped, err := ledger.immuTree.Iterate(func(key []byte, value []byte) bool {
-			item := ledger.newItemFunc()
+			item := ledger.newItemFor(key)
 			if xerr := item.Decode(value); xerr != nil {
 				xerrStop = xerr
 				return true // stop
 			}
 
-			// todo: the following unlock code must not be allowed.
-			// this allows the callee to access the ledger's other method, which may update key or value of the tree.
-			// However, in iterating, the key and value MUST not updated.
-			ledger.mtx.RUnlock()
-			defer ledger.mtx.RLock()
+			//// todo: the following unlock code must not be allowed.
+			//// this allows the callee to access the ledger's other method, which may update key or value of the tree.
+			//// However, in iterating, the key and value MUST not updated.
+			//ledger.mtx.RUnlock()
+			//defer ledger.mtx.RLock()
 
-			if xerr := cb(item); xerr != nil {
+			if xerr := cb(key, item); xerr != nil {
 				xerrStop = xerr
 				return true // stop
 			}
@@ -117,7 +117,7 @@ func (ledger *MemLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XE
 	return xerrors.ErrNotFoundResult
 }
 
-func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem) xerrors.XError) xerrors.XError {
+func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb FuncIterate) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
@@ -137,12 +137,12 @@ func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem
 		}
 
 		value := iter.Value()
-		item := ledger.newItemFunc()
+		item := ledger.newItemFor(key)
 		if xerr := item.Decode(value); xerr != nil {
 			return xerr
 		}
 
-		if xerr := cb(item); xerr != nil {
+		if xerr := cb(key, item); xerr != nil {
 			return xerr
 		}
 	}

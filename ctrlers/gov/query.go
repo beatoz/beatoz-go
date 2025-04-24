@@ -30,8 +30,8 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 
 		if txhash == nil || len(txhash) == 0 {
 			var readProposals []*_response
-			if xerr := atProposalLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
-				prop := item.(*proposal.GovProposal)
+			if xerr := atProposalLedger.Seek(proposal.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+				prop, _ := item.(*proposal.GovProposal)
 				readProposals = append(readProposals, &_response{
 					Status:   "voting",
 					Proposal: prop,
@@ -41,8 +41,8 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			if xerr = atFrozenLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
-				prop := item.(*proposal.GovProposal)
+			if xerr = atFrozenLedger.Seek(proposal.KeyPrefixFrozenProp, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+				prop, _ := item.(*proposal.GovProposal)
 				readProposals = append(readProposals, &_response{
 					Status:   "frozen",
 					Proposal: prop,
@@ -58,13 +58,11 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 			return v, nil
 		} else {
-			item, xerr := atProposalLedger.Get(txhash)
-			prop := item.(*proposal.GovProposal)
+			item, xerr := atProposalLedger.Get(proposal.LedgerKeyProposal(txhash))
 			resp := &_response{Status: "voting"}
 			if xerr != nil {
 				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
-					item, xerr = atFrozenLedger.Get(txhash)
-					prop = item.(*proposal.GovProposal)
+					item, xerr = atFrozenLedger.Get(proposal.LedgerKeyFrozenProp(txhash))
 					if xerr != nil {
 						return nil, xerrors.ErrQuery.Wrap(xerr)
 					}
@@ -73,6 +71,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 					return nil, xerrors.ErrQuery.Wrap(xerr)
 				}
 			}
+			prop, _ := item.(*proposal.GovProposal)
 			resp.Proposal = prop
 
 			v, err := tmjson.Marshal(resp)

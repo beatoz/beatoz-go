@@ -37,14 +37,27 @@ func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlo
 	}, nil
 }
 
-func (prop *GovProposal) Key() v1.LedgerKey {
-	prop.mtx.RLock()
-	defer prop.mtx.RUnlock()
+var KeyPrefixProposal = []byte{0x02}
+var KeyPrefixFrozenProp = []byte{0x03}
 
-	_key := make([]byte, len(prop.TxHash))
-	copy(_key, prop.TxHash)
+func LedgerKeyProposal(txhash []byte) v1.LedgerKey {
+	_key := make([]byte, len(KeyPrefixProposal)+len(txhash))
+	copy(_key, append(KeyPrefixProposal, txhash...))
 	return _key
 }
+
+func LedgerKeyFrozenProp(txhash []byte) v1.LedgerKey {
+	_key := make([]byte, len(KeyPrefixFrozenProp)+len(txhash))
+	copy(_key, append(KeyPrefixFrozenProp, txhash...))
+	return _key
+}
+
+//func (prop *GovProposal) Key() v1.LedgerKey {
+//	prop.mtx.RLock()
+//	defer prop.mtx.RUnlock()
+//
+//	return LedgerKeyProposal(prop.TxHash)
+//}
 
 func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {
 	prop.mtx.RLock()

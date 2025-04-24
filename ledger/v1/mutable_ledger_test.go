@@ -15,7 +15,7 @@ import (
 func TestLedger_RevertToSnapshot_Set0(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func(key LedgerKey) ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)
@@ -58,7 +58,7 @@ func TestLedger_RevertToSnapshot_Set0(t *testing.T) {
 func TestMutableLedger_RevertToSnapshot_Set1(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func(key LedgerKey) ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)
@@ -123,7 +123,7 @@ func TestMutableLedger_RevertToSnapshot_Set2(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
 
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func(key LedgerKey) ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)
@@ -163,7 +163,7 @@ func TestMutableLedger_RevertToSnapshot_Set_Updated(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
 
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func(key LedgerKey) ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)
@@ -203,7 +203,7 @@ func TestMutableLedger_RevertToSnapshot_Set_Updated(t *testing.T) {
 func TestMutableLedger_RevertToSnapshot_Del(t *testing.T) {
 	dbDir, err := os.MkdirTemp("", "ledger_test")
 	require.NoError(t, err)
-	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func() ILedgerItem {
+	ledger, xerr := NewMutableLedger("ledger_test", dbDir, 1000000, func(key LedgerKey) ILedgerItem {
 		return &Item{}
 	}, log.NewNopLogger())
 	require.NoError(t, xerr)

@@ -16,14 +16,14 @@ type MutableLedger struct {
 	revisions  *revisionList[[]byte]
 	cachedObjs map[string]ILedgerItem
 
-	newItemFunc func() ILedgerItem
-	cacheSize   int
+	newItemFor FuncNewItemFor
+	cacheSize  int
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
 
-func NewMutableLedger(name, dbDir string, cacheSize int, newItem func() ILedgerItem, lg tmlog.Logger) (*MutableLedger, xerrors.XError) {
+func NewMutableLedger(name, dbDir string, cacheSize int, newItem FuncNewItemFor, lg tmlog.Logger) (*MutableLedger, xerrors.XError) {
 	db, err := dbm.NewGoLevelDB(name, dbDir)
 	if err != nil {
 		return nil, xerrors.Wrap(err, "goleveldb open failed")
@@ -36,13 +36,13 @@ func NewMutableLedger(name, dbDir string, cacheSize int, newItem func() ILedgerI
 	}
 
 	return &MutableLedger{
-		db:          db,
-		tree:        tree,
-		revisions:   newSnapshotList[[]byte](),
-		cachedObjs:  make(map[string]ILedgerItem),
-		newItemFunc: newItem,
-		cacheSize:   cacheSize,
-		logger:      lg.With("ledger", "MutableLedger"),
+		db:         db,
+		tree:       tree,
+		revisions:  newSnapshotList[[]byte](),
+		cachedObjs: make(map[string]ILedgerItem),
+		newItemFor: newItem,
+		cacheSize:  cacheSize,
+		logger:     lg.With("ledger", "MutableLedger"),
 	}, nil
 }
 
@@ -69,7 +69,7 @@ func (ledger *MutableLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 	} else if bz == nil {
 		return nil, xerrors.ErrNotFoundResult
 	} else {
-		item := ledger.newItemFunc()
+		item := ledger.newItemFor(key)
 		if xerr := item.Decode(bz); xerr != nil {
 			return nil, xerr
 		}
@@ -78,25 +78,25 @@ func (ledger *MutableLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 }
 
 // Iterate do not travel the elements not committed.
-func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError {
+func (ledger *MutableLedger) Iterate(cb FuncIterate) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	var xerrStop xerrors.XError
 	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
-		item := ledger.newItemFunc()
+		item := ledger.newItemFor(key)
 		if xerr := item.Decode(value); xerr != nil {
 			xerrStop = xerr
 			return true // stop
 		}
 
-		// todo: the following unlock code must not be allowed.
-		// this allows the callee to access the ledger's other method, which may update key or value of the tree.
-		// However, in iterating, the key and value MUST not updated.
-		ledger.mtx.RUnlock()
-		defer ledger.mtx.RLock()
+		//// todo: the following unlock code must not be allowed.
+		//// this allows the callee to access the ledger's other method, which may update key or value of the tree.
+		//// However, in iterating, the key and value MUST not updated.
+		//ledger.mtx.RUnlock()
+		//defer ledger.mtx.RLock()
 
-		if xerr := cb(item); xerr != nil {
+		if xerr := cb(key, item); xerr != nil {
 			xerrStop = xerr
 			return true // stop
 		}
@@ -111,7 +111,7 @@ func (ledger *MutableLedger) Iterate(cb func(ILedgerItem) xerrors.XError) xerror
 	return nil
 }
 
-func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb func(ILedgerItem) xerrors.XError) xerrors.XError {
+func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb FuncIterate) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
@@ -130,19 +130,12 @@ func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb func(ILedger
 		}
 		value := iter.Value()
 
-		item := ledger.newItemFunc()
+		item := ledger.newItemFor(key)
 		if xerr := item.Decode(value); xerr != nil {
 			return xerr
 		}
 
-		//
-		// the following unlock code is added to allow accessing to `ledger` in `cb()`.
-		// But, in iteration, the key and value must not be modified!!!
-		// So, the following code should be removed.
-		//ledger.mtx.RUnlock()
-		//defer ledger.mtx.RLock()
-
-		if xerr := cb(item); xerr != nil {
+		if xerr := cb(key, item); xerr != nil {
 			return xerr
 		}
 	}
@@ -225,7 +218,7 @@ func (ledger *MutableLedger) RevertToSnapshot(snap int) xerrors.XError {
 			if _, err := ledger.tree.Set(kv.key, kv.val); err != nil {
 				return xerrors.From(err)
 			}
-			restoreItem := ledger.newItemFunc()
+			restoreItem := ledger.newItemFor(kv.key)
 			if xerr := restoreItem.Decode(kv.val); xerr != nil {
 				return xerr
 			}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"strings"
 )
 
 const (
@@ -162,6 +163,11 @@ func (xerr *xerror) Wrap(err error) XError {
 				msg:   xerr.msg,
 				cause: cerr.Wrap(err),
 			}
+		} else {
+			// In this case, the value of `xerr.cause` is `error` type.
+			// So the value of `xerr.cause` is set to the new error `err`
+			// and the existing value disappears.
+			// errors.Wrap ???
 		}
 	}
 	return &xerror{
@@ -176,7 +182,7 @@ func (xerr *xerror) Wrapf(format string, args ...any) XError {
 }
 
 func (xerr *xerror) Contains(other XError) bool {
-	if xerr.code == other.Code() && xerr.msg == other.Msg() {
+	if xerr.code == other.Code() && strings.Contains(xerr.Error(), other.Error()) {
 		return true
 	} else if xerr.cause != nil {
 		if _xerr, ok := xerr.cause.(*xerror); ok {

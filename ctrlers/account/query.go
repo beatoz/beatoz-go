@@ -15,22 +15,18 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	var acct *btztypes.Account
 	item, xerr := immuLedger.Get(req.Data)
 	if xerr != nil {
-		acct = btztypes.NewAccount(req.Data)
-	} else {
-		acct = item.(*btztypes.Account)
+		item = btztypes.NewAccount(req.Data)
 	}
-
-	//acct, xerr := ctrler.acctState.Get(req.Data, false)
-	//if xerr != nil {
-	//	acct = btztypes.NewAccount(req.Data)
-	//}
+	if item == nil {
+		return nil, xerrors.ErrQuery.Wrap(xerrors.ErrNotFoundAccount)
+	}
 
 	// NOTE
 	// `Account::Balance`, which type is *uint256.Int, is marshaled to hex-string.
 	// To marshal this value to decimal format...
+	acct, _ := item.(*btztypes.Account)
 	_acct := &struct {
 		Address types.Address  `json:"address"`
 		Name    string         `json:"name,omitempty"`

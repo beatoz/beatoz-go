@@ -14,7 +14,7 @@ import (
 )
 
 type AcctCtrler struct {
-	acctState v1.IStateLedger[*btztypes.Account]
+	acctState v1.IStateLedger
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
@@ -23,7 +23,7 @@ type AcctCtrler struct {
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
 	lg := logger.With("module", "beatoz_AcctCtrler")
 
-	if _state, xerr := v1.NewStateLedger[*btztypes.Account]("accounts", config.DBDir(), 2048, func() v1.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
+	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 2048, func(key v1.LedgerKey) v1.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
@@ -187,7 +187,7 @@ func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *btztypes.A
 		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
-		return acct
+		return acct.(*btztypes.Account)
 	}
 }
 
@@ -294,7 +294,7 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.Set(acct.Key(), acct, exec)
+	return ctrler.acctState.Set(btztypes.LedgerKeyAccount(acct.Address), acct, exec)
 }
 
 func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
@@ -321,7 +321,7 @@ type SimuAcctCtrler struct {
 }
 
 func (memCtrler *SimuAcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return memCtrler.simuLedger.Set(acct.Key(), acct)
+	return memCtrler.simuLedger.Set(btztypes.LedgerKeyAccount(acct.Address), acct)
 }
 
 func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btztypes.Account {

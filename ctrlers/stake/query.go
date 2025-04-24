@@ -38,8 +38,8 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		}
 
 		var stakes []*Stake
-		if err := atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
-			d := item.(*Delegatee)
+		if err := atledger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			d, _ := item.(*Delegatee)
 			for _, s0 := range d.Stakes {
 				if bytes.Compare(s0.From, types.Address(req.Data)) == 0 {
 					stakes = append(stakes, s0)
@@ -76,8 +76,8 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		}
 
 		retPower := int64(0)
-		xerr = atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
-			d := item.(*Delegatee)
+		xerr = atledger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			d, _ := item.(*Delegatee)
 			retPower += d.TotalPower
 			return nil
 		})
@@ -93,8 +93,8 @@ func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XE
 		}
 
 		var delegatees PowerOrderDelegatees
-		xerr = atledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
-			d := item.(*Delegatee)
+		xerr = atledger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			d, _ := item.(*Delegatee)
 			if d.SelfPower >= ctrler.govParams.MinValidatorPower() {
 				delegatees = append(delegatees, d)
 			}

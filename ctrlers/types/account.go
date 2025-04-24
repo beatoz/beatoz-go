@@ -193,12 +193,20 @@ func (acct *Account) Type() int16 {
 	return types.ACCT_COMMON_TYPE
 }
 
-func (acct *Account) Key() v1.LedgerKey {
-	acct.mtx.RLock()
-	acct.mtx.RUnlock()
+var KeyPrefixAccount = []byte{0x00}
 
-	return acct.Address
+func LedgerKeyAccount(addr types.Address) v1.LedgerKey {
+	key := make([]byte, len(KeyPrefixAccount)+len(addr))
+	copy(key, append(KeyPrefixAccount, addr...))
+	return key
 }
+
+//func (acct *Account) Key() v1.LedgerKey {
+//	acct.mtx.RLock()
+//	acct.mtx.RUnlock()
+//
+//	return acct.Address
+//}
 
 func (acct *Account) Encode() ([]byte, xerrors.XError) {
 	if bz, err := proto.Marshal(&AcctProto{

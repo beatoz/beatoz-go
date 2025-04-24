@@ -35,3 +35,29 @@ func Test_Contains(t *testing.T) {
 	require.True(t, xerr1.Contains(xerr0))
 	require.False(t, xerr1.Contains(xerrNotContained))
 }
+
+func Test_Equal(t *testing.T) {
+	xerr := ErrNotFoundResult
+	require.Equal(t, ErrNotFoundResult, xerr)
+	require.True(t, ErrNotFoundResult == xerr)
+	require.False(t, ErrNotFoundResult != xerr)
+	require.True(t, errors.Is(xerr, ErrNotFoundResult))
+	require.True(t, xerr.Equal(ErrNotFoundResult))
+
+	xerr = ErrNotFoundProposal
+	require.Equal(t, ErrNotFoundProposal, xerr)
+	require.True(t, ErrNotFoundProposal == xerr)
+	require.False(t, ErrNotFoundProposal != xerr)
+	require.True(t, errors.Is(xerr, ErrNotFoundProposal))
+	require.True(t, xerr.Equal(ErrNotFoundProposal))
+
+	xerr = ErrInvalidGas
+	require.Equal(t, ErrInvalidGas, xerr)
+	require.True(t, ErrInvalidGas == xerr)
+	require.False(t, ErrInvalidGas != xerr)
+	require.True(t, errors.Is(xerr, ErrInvalidGas))
+	require.True(t, xerr.Equal(ErrInvalidGas))
+	require.True(t, xerr.Contains(ErrInvalidGas))
+	require.True(t, xerr.Contains(ErrInvalidTrx))
+	require.False(t, xerr.Contains(ErrInvalidGasPrice))
+}

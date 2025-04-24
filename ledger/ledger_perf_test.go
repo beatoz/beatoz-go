@@ -235,7 +235,7 @@ func newTestItemV1(data string) *TestItemV1 {
 	}
 }
 
-func emptyTestItemV1() v1.ILedgerItem {
+func emptyTestItemV1(key v1.LedgerKey) v1.ILedgerItem {
 	return &TestItemV1{
 		TestItemV0: &TestItemV0{},
 	}
