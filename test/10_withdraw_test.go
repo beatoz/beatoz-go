@@ -12,11 +12,11 @@ import (
 
 func TestWithdraw(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
-	val0 := randValidatorWallet()
-	require.NoError(t, val0.SyncAccount(bzweb3))
+	val0 := validatorWallets[0] // active validator
 	require.NoError(t, val0.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, val0.SyncAccount(bzweb3))
 
-	fmt.Println("original balance", val0.GetBalance().Dec())
+	fmt.Println("validator", val0.Address(), "balance", val0.GetBalance().Dec())
 
 	at := int64(0)
 	for {
@@ -70,14 +70,15 @@ func TestWithdraw(t *testing.T) {
 
 	// check balance of val0
 	oriBal := val0.GetBalance()
-
-	time.Sleep(3 * time.Second)
+	usedFee := gasToFee(defGas, defGasPrice)
+	rwdFee := new(uint256.Int).Mul(usedFee, uint256.NewInt(uint64(100-defGovParams.BurnRatio())))
+	rwdFee = rwdFee.Div(rwdFee, uint256.NewInt(uint64(100)))
+	expectedBal := new(uint256.Int).Add(oriBal, reqAmt)
+	expectedBal = expectedBal.Sub(expectedBal, usedFee)
+	expectedBal = expectedBal.Add(expectedBal, rwdFee)
 
 	require.NoError(t, val0.SyncAccount(bzweb3))
-
 	curBal := val0.GetBalance()
-	expectedBal := new(uint256.Int).Add(oriBal, reqAmt)
-	require.Equal(t, expectedBal, curBal)
 
-	fmt.Println(oriBal.Dec(), reqAmt.Dec(), curBal.Dec())
+	require.Equal(t, expectedBal, curBal)
 }

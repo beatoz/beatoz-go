@@ -12,34 +12,65 @@ import (
 // when tx fee should be given to the validator(proposer) but the validator does not exist in ledger,
 // a panic is generated in previous version.
 func TestTransfer0(t *testing.T) {
+
 	bzweb3 := randBeatozWeb3()
 
 	sender := randCommonWallet()
 	require.NoError(t, sender.Unlock([]byte("1111")))
 	require.NoError(t, sender.SyncAccount(bzweb3))
+	senderBalance := sender.GetBalance()
 
 	receiver := randCommonWallet()
+	require.NoError(t, receiver.Unlock([]byte("1111")))
+	require.NoError(t, receiver.SyncAccount(bzweb3))
+	receiverBalance := sender.GetBalance()
+	fmt.Println("before: sender balance", senderBalance.Dec(), "receiver balance", receiverBalance.Dec())
 
+	fmt.Println("transfer 1 BTOZ")
 	txRet, err := sender.TransferCommit(receiver.Address(), defGas, defGasPrice, types3.ToFons(1), bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.CheckTx.Code, txRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.DeliverTx.Code, txRet.DeliverTx.Log)
 
+	senderBalance.Sub(senderBalance, gasToFee(defGas, defGasPrice))
+	senderBalance.Sub(senderBalance, types3.ToFons(1))
+	receiverBalance.Add(receiverBalance, types3.ToFons(1))
+
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.NoError(t, receiver.SyncAccount(bzweb3))
+	require.Equal(t, senderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, receiverBalance.Dec(), receiver.GetBalance().Dec())
+	fmt.Println("sender", sender.Address(), "receiver", receiver.Address())
+	fmt.Println("after: sender balance", senderBalance.Dec(), "receiver balance", receiverBalance.Dec())
+
 	// For next test
 	// transfer asset to validator
-	require.NoError(t, sender.SyncAccount(bzweb3))
 	_amt := new(uint256.Int).Div(sender.GetBalance(), uint256.NewInt(2))
-	fmt.Println("wallet amount", sender.GetBalance().Dec())
+	val0 := validatorWallets[0]
+	require.NoError(t, val0.SyncAccount(bzweb3))
+	validatorBalance := val0.GetBalance()
+
+	fmt.Println("--------------------------------------------------------")
+	fmt.Println("sender", sender.Address(), "validator0", val0.Address())
+	fmt.Println("before: sender balance", sender.GetBalance().Dec(), "validator0 balance", val0.GetBalance().Dec())
 	fmt.Println("transfer amount", _amt.Dec())
 
-	val0 := validatorWallets[0]
 	txRet, err = sender.TransferCommit(val0.Address(), defGas, defGasPrice, _amt, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.CheckTx.Code, txRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.DeliverTx.Code, txRet.DeliverTx.Log)
 
+	fmt.Println("before: sender balance", sender.GetBalance().Dec(), "validator0 balance", val0.GetBalance().Dec())
+	require.NoError(t, sender.SyncAccount(bzweb3))
 	require.NoError(t, val0.SyncAccount(bzweb3))
-	fmt.Println("validator", val0.Address(), "balance", val0.GetBalance().Dec())
+
+	_rwd := gasToFee(defGas, defGasPrice)
+	_rwd = _rwd.Mul(_rwd, uint256.NewInt(uint64(100-defGovParams.BurnRatio())))
+	_rwd = _rwd.Div(_rwd, uint256.NewInt(uint64(100)))
+	_amt.Add(_amt, validatorBalance)
+	_amt.Add(_amt, _rwd)
+	require.Equal(t, _amt.Dec(), val0.GetBalance().Dec())
+
 }
 
 // Disable test case

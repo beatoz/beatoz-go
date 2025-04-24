@@ -155,6 +155,15 @@ func (xerr *xerror) Cause() error {
 }
 
 func (xerr *xerror) Wrap(err error) XError {
+	if xerr.cause != nil {
+		if cerr, ok := xerr.cause.(*xerror); ok {
+			return &xerror{
+				code:  xerr.code,
+				msg:   xerr.msg,
+				cause: cerr.Wrap(err),
+			}
+		}
+	}
 	return &xerror{
 		code:  xerr.code,
 		msg:   xerr.msg,

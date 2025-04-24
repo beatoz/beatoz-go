@@ -38,7 +38,7 @@ func test_on_internal_node(m *testing.M) {
 	}
 	subWg.Wait()
 
-	prepareTest(peers[:1]) // peers[0] is active validator node
+	prepareTest(peers) // peers[0] is active validator node
 
 	exitCode := m.Run()
 
