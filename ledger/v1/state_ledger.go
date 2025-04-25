@@ -60,12 +60,6 @@ func (ledger *StateLedger) Iterate(cb FuncIterate, exec bool) xerrors.XError {
 	defer ledger.mtx.RUnlock()
 
 	return ledger.getLedger(exec).Iterate(func(key LedgerKey, item ILedgerItem) xerrors.XError {
-		//// todo: the following unlock code must not be allowed.
-		//// this allows the callee to access the ledger's other method, which may update key or value of the tree.
-		//// However, in iterating, the key and value MUST not updated.
-		//ledger.mtx.RUnlock()
-		//defer ledger.mtx.RLock()
-
 		return cb(key, item)
 	})
 }

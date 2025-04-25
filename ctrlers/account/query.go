@@ -15,7 +15,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	item, xerr := immuLedger.Get(req.Data)
+	item, xerr := immuLedger.Get(btztypes.LedgerKeyAccount(req.Data))
 	if xerr != nil {
 		item = btztypes.NewAccount(req.Data)
 	}

@@ -34,7 +34,7 @@ func newDelegateeV1(pubKey bytes.HexBytes) *DelegateeV1 {
 
 func LoadAllDelegateeV1(ledger v1.IStateLedger) ([]*DelegateeV1, xerrors.XError) {
 	var dgtees []*DelegateeV1
-	if xerr := ledger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+	if xerr := ledger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgtee, _ := item.(*DelegateeV1)
 		dgtee.addr = crypto.PubKeyBytes2Addr(dgtee.PubKey)
 		dgtees = append(dgtees, dgtee)

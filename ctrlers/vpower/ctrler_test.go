@@ -60,7 +60,7 @@ func Test_InitLedger(t *testing.T) {
 	}
 
 	totalPower1 := int64(0)
-	xerr = ctrler.dgteesLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.dgteesLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgt, _ := item.(*DelegateeV1)
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
@@ -85,7 +85,7 @@ func Test_InitLedger(t *testing.T) {
 	}, true)
 
 	totalPower2 := int64(0)
-	xerr = ctrler.vpowsLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowsLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
@@ -188,7 +188,7 @@ func Test_Bonding(t *testing.T) {
 		require.True(t, found)
 	}
 
-	xerr = ctrler.vpowsLedger.Iterate(func(item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowsLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		sum := int64(0)
 		for _, pc := range vpow.PowerChunks {

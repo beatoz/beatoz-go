@@ -90,12 +90,6 @@ func (ledger *MutableLedger) Iterate(cb FuncIterate) xerrors.XError {
 			return true // stop
 		}
 
-		//// todo: the following unlock code must not be allowed.
-		//// this allows the callee to access the ledger's other method, which may update key or value of the tree.
-		//// However, in iterating, the key and value MUST not updated.
-		//ledger.mtx.RUnlock()
-		//defer ledger.mtx.RLock()
-
 		if xerr := cb(key, item); xerr != nil {
 			xerrStop = xerr
 			return true // stop

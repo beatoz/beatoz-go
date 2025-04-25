@@ -2,8 +2,8 @@ package gov
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
+	"github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
-	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -86,7 +86,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		govParams, xerr := atledger.Get(bytes.ZeroBytes(32))
+		govParams, xerr := atledger.Get(types.LedgerKeyGovParams())
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}

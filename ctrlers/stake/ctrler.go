@@ -3,7 +3,6 @@ package stake
 import (
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
-	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
@@ -697,9 +696,9 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 }
 
 func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertypes.IAccountHandler) xerrors.XError {
-	var removedKeys []v1.LedgerKey
+	var removed []bytes.HexBytes
 	defer func() {
-		for _, k := range removedKeys {
+		for _, k := range removed {
 			//_ = ctrler.frozenLedger.Del(s0.TxHash, true)
 			_ = ctrler.frozenLedger.Del(k, true)
 		}
@@ -715,7 +714,7 @@ func (ctrler *StakeCtrler) unfreezingStakes(height int64, acctHandler ctrlertype
 				return xerr
 			}
 
-			removedKeys = append(removedKeys, proposal.LedgerKeyFrozenProp(s0.TxHash))
+			removed = append(removed, s0.TxHash)
 		}
 		return nil
 	}, true)
