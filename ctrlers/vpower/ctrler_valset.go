@@ -45,16 +45,16 @@ func validatorUpdates(lastVals, newVals []*DelegateeV1) []abcitypes.ValidatorUpd
 			valUpdates = append(valUpdates, abcitypes.UpdateValidator(lastVals[i].PubKey, 0, "secp256k1"))
 			i++
 		} else if ret == 0 {
-			if lastVals[i].TotalPower != newVals[j].TotalPower {
+			if lastVals[i].SumPower != newVals[j].SumPower {
 				// if power is changed, add newer who has updated power
-				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newVals[j].PubKey, int64(newVals[j].TotalPower), "secp256k1"))
+				valUpdates = append(valUpdates, abcitypes.UpdateValidator(newVals[j].PubKey, int64(newVals[j].SumPower), "secp256k1"))
 			} else {
 				// if the power is not changed, exclude the validator in updated validators
 			}
 			i++
 			j++
 		} else { // ret > 0
-			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newVals[j].PubKey, int64(newVals[j].TotalPower), "secp256k1"))
+			valUpdates = append(valUpdates, abcitypes.UpdateValidator(newVals[j].PubKey, int64(newVals[j].SumPower), "secp256k1"))
 			j++
 		}
 	}
@@ -65,7 +65,7 @@ func validatorUpdates(lastVals, newVals []*DelegateeV1) []abcitypes.ValidatorUpd
 	}
 	for ; j < len(newVals); j++ {
 		// added newer
-		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newVals[j].PubKey, int64(newVals[j].TotalPower), "secp256k1"))
+		valUpdates = append(valUpdates, abcitypes.UpdateValidator(newVals[j].PubKey, int64(newVals[j].SumPower), "secp256k1"))
 	}
 
 	return valUpdates

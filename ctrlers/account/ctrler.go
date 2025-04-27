@@ -183,7 +183,7 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *btztypes.A
 }
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *btztypes.Account {
-	if acct, xerr := ctrler.acctState.Get(btztypes.LedgerKeyAccount(addr), exec); xerr != nil {
+	if acct, xerr := ctrler.acctState.Get(v1.LedgerKeyAccount(addr), exec); xerr != nil {
 		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
@@ -294,7 +294,7 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.Set(btztypes.LedgerKeyAccount(acct.Address), acct, exec)
+	return ctrler.acctState.Set(v1.LedgerKeyAccount(acct.Address), acct, exec)
 }
 
 func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
@@ -321,7 +321,7 @@ type SimuAcctCtrler struct {
 }
 
 func (memCtrler *SimuAcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return memCtrler.simuLedger.Set(btztypes.LedgerKeyAccount(acct.Address), acct)
+	return memCtrler.simuLedger.Set(v1.LedgerKeyAccount(acct.Address), acct)
 }
 
 func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btztypes.Account {
@@ -347,7 +347,7 @@ func (memCtrler *SimuAcctCtrler) FindAccount(addr types.Address, exec bool) *btz
 }
 
 func (memCtrler *SimuAcctCtrler) findAccount(addr types.Address) *btztypes.Account {
-	if acct, xerr := memCtrler.simuLedger.Get(btztypes.LedgerKeyAccount(addr)); xerr != nil {
+	if acct, xerr := memCtrler.simuLedger.Get(v1.LedgerKeyAccount(addr)); xerr != nil {
 		//memCtrler.logger.Debug("SimuAcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {

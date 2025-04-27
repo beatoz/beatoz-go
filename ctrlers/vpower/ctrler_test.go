@@ -60,12 +60,17 @@ func Test_InitLedger(t *testing.T) {
 	}
 
 	totalPower1 := int64(0)
-	xerr = ctrler.dgteesLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgt, _ := item.(*DelegateeV1)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr, nil), key)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr, nil), dgt.key)
+
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
 		for i, w := range valWallets {
 			if bytes.Equal(w.Address(), dgt.addr) {
+				// do not break to check that `dgt` is duplicated.
+				// if valUp and wallet is not nil, it means that the `dgt` is duplicated.
 				require.Nil(t, valUp)
 				require.Nil(t, wallet)
 				valUp = &lastValUps[i]
@@ -77,16 +82,21 @@ func Test_InitLedger(t *testing.T) {
 		require.EqualValues(t, valUp.PubKey.GetSecp256K1(), dgt.PubKey)
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgt.PubKey), dgt.addr)
 		require.EqualValues(t, wallet.Address(), dgt.addr)
-		require.EqualValues(t, valUp.Power, dgt.TotalPower)
-		require.EqualValues(t, valUp.Power, dgt.SelfPower)
+		require.Equal(t, valUp.Power, dgt.SumPower)
+		require.Equal(t, valUp.Power, dgt.SelfPower)
+		require.Equal(t, 1, len(dgt.Delegators))
+		require.EqualValues(t, dgt.addr, dgt.Delegators[0])
 
-		totalPower1 += dgt.TotalPower
+		totalPower1 += dgt.SumPower
 		return nil
 	}, true)
 
 	totalPower2 := int64(0)
-	xerr = ctrler.vpowsLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
+		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), key)
+		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), vpow.key)
+
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
 		for i, vup := range lastValUps {
@@ -103,6 +113,9 @@ func Test_InitLedger(t *testing.T) {
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
 		require.EqualValues(t, wallet.Address(), vpow.to)
 		require.EqualValues(t, valUp.Power, vpow.SumPower)
+		require.Equal(t, 1, len(vpow.PowerChunks))
+		require.Equal(t, valUp.Power, vpow.PowerChunks[0].Power)
+		require.EqualValues(t, bytes2.ZeroBytes(32), vpow.PowerChunks[0].TxHash)
 
 		sum := int64(0)
 		for _, pc := range vpow.PowerChunks {
@@ -132,7 +145,7 @@ func Test_LoadLedger(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, int64(1), lastHeight)
 
-	require.NoError(t, ctrler.LoadLedger(lastHeight, govParams.RipeningBlocks(), int(govParams.MaxValidatorCnt())))
+	require.NoError(t, ctrler.LoadLedger(int(govParams.MaxValidatorCnt())))
 
 	require.Len(t, ctrler.allDelegatees, len(lastValUps))
 	require.LessOrEqual(t, len(ctrler.lastValidators), int(govParams.MaxValidatorCnt()))
@@ -171,10 +184,9 @@ func Test_Bonding(t *testing.T) {
 	for i, fromWal := range fromWals {
 		valWal := valWals[i]
 		txhash := txhashes[i]
-		item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(fromWal.Address(), valWal.Address()), true)
+		vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 		require.NoError(t, xerr)
 
-		vpow, _ := item.(*VPower)
 		sum := int64(0)
 		found := false
 		for _, pc := range vpow.PowerChunks {
@@ -188,8 +200,14 @@ func Test_Bonding(t *testing.T) {
 		require.True(t, found)
 	}
 
-	xerr = ctrler.vpowsLedger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	fromCountOfDgtee := make(map[string]int)
+	sumPowerOfDgtee := make(map[string]int64)
+	xerr = ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
+		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
+		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), key)
+		require.EqualValues(t, key, vpow.key)
+
 		sum := int64(0)
 		for _, pc := range vpow.PowerChunks {
 			sum += pc.Power
@@ -200,20 +218,34 @@ func Test_Bonding(t *testing.T) {
 			found := false
 			for i, txhash := range txhashes {
 				if bytes.Equal(txhash, pc.TxHash) {
+					require.False(t, found) // it must be found only once.
 					from := fromWals[i].Address()
 					to := valWals[i].Address()
 					require.EqualValues(t, from, vpow.From)
 					require.EqualValues(t, to, vpow.to)
 					require.EqualValues(t, to, crypto.PubKeyBytes2Addr(vpow.PubKeyTo))
-
 					require.Equal(t, powers[i], pc.Power)
 					found = true
-					break
 				}
 			}
 			require.True(t, found, "power chunk txhash", pc.TxHash)
 		}
 		require.Equal(t, sum, vpow.SumPower)
+
+		fromCountOfDgtee[vpow.to.String()]++
+		sumPowerOfDgtee[vpow.to.String()] += vpow.SumPower
+		return nil
+	}, true)
+	require.NoError(t, xerr)
+
+	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		dgtee, _ := item.(*DelegateeV1)
+		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), key)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), dgtee.key)
+		require.EqualValues(t, key, dgtee.key)
+		require.Equal(t, fromCountOfDgtee[dgtee.addr.String()], len(dgtee.Delegators))
+		require.Equal(t, sumPowerOfDgtee[dgtee.addr.String()], dgtee.SumPower)
 		return nil
 	}, true)
 	require.NoError(t, xerr)
@@ -223,21 +255,19 @@ func Test_Bonding(t *testing.T) {
 	onceFroms := removeDupWallets(fromWals)
 
 	for _, valWal := range onceWals {
-		item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(valWal.Address()), true)
+		dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
 		require.NoError(t, xerr)
-		require.NotNil(t, item)
-		dgtee, _ := item.(*DelegateeV1)
+		require.NotNil(t, dgtee)
 		require.EqualValues(t, valWal.Address(), dgtee.addr)
 
 		sumPower := int64(0)
 		for _, fromWal := range onceFroms {
-			item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(fromWal.Address(), valWal.Address()), true)
+			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 			if xerr != nil && xerr.Contains(xerrors.ErrNotFoundResult) {
-				continue
+				continue // `fromWal` may not delegate to `valWal`. So, it may be not found.
 			}
 			require.NoError(t, xerr)
 
-			vpow, _ := item.(*VPower)
 			sum := int64(0)
 			for _, pc := range vpow.PowerChunks {
 				sum += pc.Power
@@ -247,12 +277,12 @@ func Test_Bonding(t *testing.T) {
 			sumPower += sum
 
 		}
-		require.EqualValues(t, sumPower, dgtee.TotalPower-dgtee.SelfPower, func() string {
+		require.EqualValues(t, sumPower, dgtee.SumPower-dgtee.SelfPower, func() string {
 			ret := ""
 			for _, d := range dgtee.Delegators {
 				ret += fmt.Sprintf("%x\n", d)
 			}
-			return fmt.Sprintf("validator:%v\ntotal:%v, self:%v, total-self:%v\ndelegators\n%s", dgtee.addr, dgtee.TotalPower, dgtee.SelfPower, dgtee.TotalPower-dgtee.SelfPower, ret)
+			return fmt.Sprintf("validator:%v\ntotal:%v, self:%v, total-self:%v\ndelegators\n%s", dgtee.addr, dgtee.SumPower, dgtee.SelfPower, dgtee.SumPower-dgtee.SelfPower, ret)
 		}())
 	}
 
@@ -277,8 +307,7 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 	// not validator
 	txctx, xerr := makeBondingTrxCtx(fromWallet, types.RandAddress(), power, lastHeight+1)
 	require.NoError(t, xerr)
-	xerr = ctrler.ValidateTrx(txctx)
-	require.Error(t, xerrors.ErrNotFoundDelegatee, xerr)
+	require.Error(t, xerrors.ErrNotFoundDelegatee, executeTransaction(ctrler, txctx))
 
 	//
 	// to not validator (self bonding)
@@ -288,31 +317,28 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 	require.Equal(t, fromWallet.Address(), txctx.Tx.From)
 	require.Equal(t, fromWallet.Address(), txctx.Tx.To)
 	// txctx.Tx.To is not validator and nothing must be found about txctx.Tx.To.
-	_, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
+	_, xerr = ctrler.readDelegatee(txctx.Tx.To, txctx.Exec)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	//fmt.Println("validator(before)", dgtee0.Address(), dgtee0.TotalPower, dgtee0.SelfPower)
-	item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
-	require.Nil(t, item)
+	vpow, xerr := ctrler.readVPower(txctx.Tx.From, txctx.Tx.To, true)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+	require.Nil(t, vpow)
 	//run tx
-	xerr = ctrler.ValidateTrx(txctx)
-	require.NoError(t, xerr)
-	xerr = ctrler.ExecuteTrx(txctx)
-	require.NoError(t, xerr)
-	// check delegatee: the `txctx.Tx.To` should be found in `dgteesLedger`.
-	item, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(txctx.Tx.To), txctx.Exec)
-	require.NoError(t, xerr)
-	require.NotNil(t, item)
 
-	dgtee1, _ := item.(*DelegateeV1)
-	require.Equal(t, power, dgtee1.TotalPower)
-	require.Equal(t, power, dgtee1.SelfPower)
+	require.NoError(t, executeTransaction(ctrler, txctx))
+
+	// check delegatee: the `txctx.Tx.To` should be found in `dgteesLedger`.
+	dgtee, xerr := ctrler.readDelegatee(txctx.Tx.To, txctx.Exec)
+	require.NoError(t, xerr)
+	require.NotNil(t, dgtee)
+
+	require.Equal(t, power, dgtee.SumPower)
+	require.Equal(t, power, dgtee.SelfPower)
 	//fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
 	// check vpow: the vpow of `txctx.Tx.From` should be found to `vpowsLedger`.
-	item, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(txctx.Tx.From, txctx.Tx.To), true)
+	vpow, xerr = ctrler.readVPower(txctx.Tx.From, txctx.Tx.To, true)
 	require.NoError(t, xerr)
-	require.NotNil(t, item)
-	vpow, _ := item.(*VPower)
+	require.NotNil(t, vpow)
 	require.Equal(t, vpow.SumPower, vpow.sumPowerChunk())
 	require.EqualValues(t, txctx.TxHash, vpow.PowerChunks[len(vpow.PowerChunks)-1].TxHash)
 	require.EqualValues(t, lastHeight+1, vpow.PowerChunks[len(vpow.PowerChunks)-1].Height)
@@ -344,27 +370,22 @@ func Test_Unbonding(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, valAddr, txctx0.Tx.To)
 
-	item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(valAddr), txctx0.Exec)
+	dgtee0, xerr := ctrler.readDelegatee(valAddr, txctx0.Exec)
 	require.NoError(t, xerr)
+	require.NotNil(t, dgtee0)
 
-	dgtee0, _ := item.(*DelegateeV1)
-	totalPower0 := dgtee0.TotalPower
+	totalPower0 := dgtee0.SumPower
 	selfPower0 := dgtee0.SelfPower
 
 	// run tx
-	xerr = ctrler.ValidateTrx(txctx0)
-	require.NoError(t, xerr)
-	xerr = ctrler.ExecuteTrx(txctx0)
-	require.NoError(t, xerr)
+	require.NoError(t, executeTransaction(ctrler, txctx0))
 
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
 
-	item, xerr = ctrler.dgteesLedger.Get(dgteeProtoKey(valAddr), txctx0.Exec)
+	dgtee1, xerr := ctrler.readDelegatee(valAddr, txctx0.Exec)
 	require.NoError(t, xerr)
-
-	dgtee1, _ := item.(*DelegateeV1)
-	require.Equal(t, totalPower0+power, dgtee1.TotalPower)
+	require.Equal(t, totalPower0+power, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
 
 	// -----------------------------------------------------------------------------------------------------------------
@@ -391,19 +412,14 @@ func Test_Unbonding(t *testing.T) {
 	// 4. all ok
 	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, valAddr, lastHeight+1, txctx0.TxHash)
 	require.NoError(t, xerr)
-	xerr = ctrler.ValidateTrx(txctx1)
-	require.NoError(t, xerr)
-	xerr = ctrler.ExecuteTrx(txctx1)
-	require.NoError(t, xerr)
+	require.NoError(t, executeTransaction(ctrler, txctx1))
 	// commit
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
 
-	item, xerr = ctrler.dgteesLedger.Get(dgtee0.Key(), txctx1.Exec)
-	require.NoError(t, xerr)
-
-	dgtee1, _ = item.(*DelegateeV1)
-	require.Equal(t, totalPower0, dgtee1.TotalPower)
+	dgtee1, xerr = ctrler.readDelegatee(dgtee0.addr, txctx1.Exec)
+	require.NoError(t, xerr, dgtee0.key)
+	require.Equal(t, totalPower0, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
 	// -----------------------------------------------------------------------------------------------------------------
 	//
@@ -432,17 +448,16 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 		txctx, xerr := makeUnbondingTrxCtx(valWal, valWal.Address(), lastHeight+1, bytes2.ZeroBytes(32))
 		require.NoError(t, xerr)
 
-		require.NoError(t, ctrler.ValidateTrx(txctx), valWal.Address())
-		require.NoError(t, ctrler.ExecuteTrx(txctx))
+		require.NoError(t, executeTransaction(ctrler, txctx))
 
-		dgtee, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(valWal.Address()), true)
+		dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
 		require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 		require.Nil(t, dgtee)
 	}
 
 	for _, valWal := range onceWals {
 		for _, fromWal := range froms {
-			vpow, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(fromWal.Address(), valWal.Address()), true)
+			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 			require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 			require.Nil(t, vpow)
 		}
@@ -464,41 +479,35 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 	addedPower0 := int64(0)
 
 	for i := 0; i < count; i++ {
-		// `fromWallet` delegates to `valWals0`
+		// `fromWallet` delegates to `valWallet`
 
 		fromWallet := acctMock.RandWallet()
-		fromWals0 = append(fromWals0, fromWallet)
-
 		valWallet := valWallets[rand.Intn(len(valWallets))]
-		valAddr := valWallet.Address()
-		valWals0 = append(valWals0, valWallet)
-
 		power := bytes2.RandInt64N(1_000) + 4000
+
+		txctx0, xerr := makeBondingTrxCtx(fromWallet, valWallet.Address(), power, lastHeight+1)
+		require.NoError(t, xerr)
+		require.EqualValues(t, valWallet.Address(), txctx0.Tx.To)
+
+		require.NoError(t, executeTransaction(ctrler, txctx0))
+
+		fromWals0 = append(fromWals0, fromWallet)
+		valWals0 = append(valWals0, valWallet)
+		txhashes = append(txhashes, txctx0.TxHash)
 		powers0 = append(powers0, power)
 		addedPower0 += power
-
-		txctx0, xerr := makeBondingTrxCtx(fromWallet, valAddr, power, lastHeight+1)
-		txhashes = append(txhashes, txctx0.TxHash)
-		require.NoError(t, xerr)
-		require.Equal(t, valAddr, txctx0.Tx.To)
-
-		// run tx
-		xerr = ctrler.ValidateTrx(txctx0)
-		require.NoError(t, xerr)
-		xerr = ctrler.ExecuteTrx(txctx0)
-		require.NoError(t, xerr)
 	}
 
 	for i, fromWal := range fromWals0 {
 		valWal := valWals0[i]
 		txhash := txhashes[i]
-		item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(fromWal.Address(), valWal.Address()), true)
+		vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 		require.NoError(t, xerr)
 
-		vpow, _ := item.(*VPower)
 		found := false
 		for _, pc := range vpow.PowerChunks {
 			if bytes.Equal(txhash, pc.TxHash) {
+				require.False(t, found) // to check duplication
 				require.Equal(t, powers0[i], pc.Power, vpow)
 				found = true
 			}
@@ -511,21 +520,19 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 	onceFroms := removeDupWallets(fromWals0)
 
 	for _, valWal := range onceWals {
-		item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(valWal.Address()), true)
+		dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
 		require.NoError(t, xerr)
-
-		dgtee, _ := item.(*DelegateeV1)
 		require.EqualValues(t, valWal.Address(), dgtee.addr)
 
 		sumPower := int64(0)
+		fromCnt := 0
 		for _, fromWal := range onceFroms {
-			item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(fromWal.Address(), valWal.Address()), true)
+			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 			if xerr != nil && xerr.Contains(xerrors.ErrNotFoundResult) {
-				continue
+				continue // `fromWal` may not delegate to `valWal`.
 			}
 			require.NoError(t, xerr)
 
-			vpow, _ := item.(*VPower)
 			sum := int64(0)
 			for _, pc := range vpow.PowerChunks {
 				sum += pc.Power
@@ -533,14 +540,15 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 			}
 			require.EqualValues(t, sum, vpow.SumPower)
 			sumPower += sum
-
+			fromCnt++
 		}
-		require.EqualValues(t, sumPower, dgtee.TotalPower-dgtee.SelfPower, func() string {
+		require.Equal(t, fromCnt+1, len(dgtee.Delegators)) // `fromCnt` dose not include self address.
+		require.EqualValues(t, sumPower, dgtee.SumPower-dgtee.SelfPower, func() string {
 			ret := ""
 			for _, d := range dgtee.Delegators {
 				ret += fmt.Sprintf("%x\n", d)
 			}
-			return fmt.Sprintf("validator:%v\ntotal:%v, self:%v, total-self:%v\ndelegators\n%s", dgtee.addr, dgtee.TotalPower, dgtee.SelfPower, dgtee.TotalPower-dgtee.SelfPower, ret)
+			return fmt.Sprintf("validator:%v\ntotal:%v, self:%v, total-self:%v\ndelegators\n%s", dgtee.addr, dgtee.SumPower, dgtee.SelfPower, dgtee.SumPower-dgtee.SelfPower, ret)
 		}())
 	}
 
@@ -591,7 +599,7 @@ func checkExistDelegatee(dgt *DelegateeV1, vups []abcitypes.ValidatorUpdate) boo
 	return false
 }
 func euqalDelegatee(dgt *DelegateeV1, vup abcitypes.ValidatorUpdate) bool {
-	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.TotalPower == vup.Power
+	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.SumPower == vup.Power
 }
 
 func makeBondingTrxCtx(fromAcct *web3.Wallet, to types.Address, power int64, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
@@ -672,4 +680,14 @@ func removeDupWallets(walllets []*web3.Wallet) []*web3.Wallet {
 		result = append(result, v)
 	}
 	return result
+}
+
+func executeTransaction(ctrler *VPowerCtrler, txctx *ctrlertypes.TrxContext) xerrors.XError {
+	if xerr := ctrler.ValidateTrx(txctx); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.ExecuteTrx(txctx); xerr != nil {
+		return xerr
+	}
+	return nil
 }

@@ -313,14 +313,6 @@ func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
 	return ret, nil
 }
 
-var KeyPrefixGovParams = []byte{0x01}
-
-func LedgerKeyGovParams() v1.LedgerKey {
-	_key := make([]byte, len(KeyPrefixGovParams))
-	copy(_key, KeyPrefixGovParams)
-	return _key
-}
-
 //func (r *GovParams) Key() v1.LedgerKey {
 //	return LedgerKeyGovParams()
 //}

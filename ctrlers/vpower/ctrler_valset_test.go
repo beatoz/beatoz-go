@@ -31,7 +31,7 @@ func Test_validatorUpdates(t *testing.T) {
 
 		newVals := selectValidators(alls, maxValCnt)
 		for i, v := range newVals {
-			require.Equal(t, topPow-int64(i), v.TotalPower)
+			require.Equal(t, topPow-int64(i), v.SumPower)
 		}
 
 		upVals := validatorUpdates(lastVals, newVals)
@@ -43,7 +43,7 @@ func Test_validatorUpdates(t *testing.T) {
 
 			dgtee := findDelegateeV1ByPubKey(uPub.Bytes(), newVals)
 			require.NotNil(t, dgtee)
-			require.Equal(t, dgtee.TotalPower, u.Power)
+			require.Equal(t, dgtee.SumPower, u.Power)
 		}
 
 		//
@@ -53,7 +53,7 @@ func Test_validatorUpdates(t *testing.T) {
 		sort.Sort(orderByPowerDelegateeV1(alls))
 		expectedOutDgtee := alls[maxValCnt-1]
 
-		bottomPow = alls[maxValCnt-1].TotalPower
+		bottomPow = alls[maxValCnt-1].SumPower
 		pow := bytes.RandInt64N(topPow-bottomPow) + bottomPow + 1
 		expectedNewDgtee := makeDelegateeOne(pow)
 
@@ -68,7 +68,7 @@ func Test_validatorUpdates(t *testing.T) {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
 			if bytes.Equal(uPub.Bytes(), expectedNewDgtee.PubKey) {
-				require.Equal(t, expectedNewDgtee.TotalPower, u.Power)
+				require.Equal(t, expectedNewDgtee.SumPower, u.Power)
 			} else if bytes.Equal(uPub.Bytes(), expectedOutDgtee.PubKey) {
 				require.Equal(t, int64(0), u.Power)
 			} else {
@@ -85,9 +85,9 @@ func Test_validatorUpdates(t *testing.T) {
 
 		// slash the power of one of validators.
 		// as a result, the validator is excluded from validator set.
-		bottomPow = expectedNewDgtee.TotalPower
+		bottomPow = expectedNewDgtee.SumPower
 		expectedOutDgtee = alls[rand.Intn(maxValCnt)]
-		expectedOutDgtee.TotalPower = bottomPow - 1
+		expectedOutDgtee.SumPower = bottomPow - 1
 
 		newVals = selectValidators(alls, maxValCnt)
 		upVals = validatorUpdates(lastVals, newVals)
@@ -97,7 +97,7 @@ func Test_validatorUpdates(t *testing.T) {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
 			if bytes.Equal(uPub.Bytes(), expectedNewDgtee.PubKey) {
-				require.Equal(t, expectedNewDgtee.TotalPower, u.Power)
+				require.Equal(t, expectedNewDgtee.SumPower, u.Power)
 			} else if bytes.Equal(uPub.Bytes(), expectedOutDgtee.PubKey) {
 				// it was removed.
 				require.Equal(t, int64(0), u.Power)
@@ -112,7 +112,7 @@ func Test_validatorUpdates(t *testing.T) {
 
 		sort.Sort(orderByPowerDelegateeV1(alls))
 		expectedUpdatedVal := alls[0]
-		expectedUpdatedVal.TotalPower--
+		expectedUpdatedVal.SumPower--
 
 		// slash the power of one of validators.
 		// as a result, the changed power of validator is included validator update.
@@ -124,7 +124,7 @@ func Test_validatorUpdates(t *testing.T) {
 			uPub, err := cryptoenc.PubKeyFromProto(u.PubKey)
 			require.NoError(t, err)
 			if bytes.Equal(uPub.Bytes(), expectedUpdatedVal.PubKey) {
-				require.Equal(t, expectedUpdatedVal.TotalPower, u.Power)
+				require.Equal(t, expectedUpdatedVal.SumPower, u.Power)
 			} else {
 				require.True(t, false, "not reachable")
 			}
@@ -151,6 +151,6 @@ func Test_validatorUpdates(t *testing.T) {
 func makeDelegateeOne(pow int64) *DelegateeV1 {
 	_, pub := crypto.NewKeypairBytes()
 	dgtee := newDelegateeV1(pub)
-	dgtee.TotalPower = pow
+	dgtee.SumPower = pow
 	return dgtee
 }

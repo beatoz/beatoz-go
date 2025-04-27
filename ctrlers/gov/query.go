@@ -2,7 +2,6 @@ package gov
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
-	"github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -30,7 +29,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 
 		if txhash == nil || len(txhash) == 0 {
 			var readProposals []*_response
-			if xerr := atProposalLedger.Seek(proposal.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			if xerr := atProposalLedger.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 				prop, _ := item.(*proposal.GovProposal)
 				readProposals = append(readProposals, &_response{
 					Status:   "voting",
@@ -41,7 +40,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			if xerr = atFrozenLedger.Seek(proposal.KeyPrefixFrozenProp, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			if xerr = atFrozenLedger.Seek(v1.KeyPrefixFrozenProp, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 				prop, _ := item.(*proposal.GovProposal)
 				readProposals = append(readProposals, &_response{
 					Status:   "frozen",
@@ -58,11 +57,11 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 			}
 			return v, nil
 		} else {
-			item, xerr := atProposalLedger.Get(proposal.LedgerKeyProposal(txhash))
+			item, xerr := atProposalLedger.Get(v1.LedgerKeyProposal(txhash))
 			resp := &_response{Status: "voting"}
 			if xerr != nil {
 				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
-					item, xerr = atFrozenLedger.Get(proposal.LedgerKeyFrozenProp(txhash))
+					item, xerr = atFrozenLedger.Get(v1.LedgerKeyFrozenProp(txhash))
 					if xerr != nil {
 						return nil, xerrors.ErrQuery.Wrap(xerr)
 					}
@@ -86,7 +85,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		govParams, xerr := atledger.Get(types.LedgerKeyGovParams())
+		govParams, xerr := atledger.Get(v1.LedgerKeyGovParams())
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}

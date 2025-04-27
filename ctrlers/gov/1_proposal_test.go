@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -111,12 +112,12 @@ func TestProposalDuplicate(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, c := range cases2 {
-		key := proposal.LedgerKeyProposal(c.txctx.TxHash)
+		key := v1.LedgerKeyProposal(c.txctx.TxHash)
 		item, xerr := govCtrler.proposalState.Get(key, false)
 		require.NoError(t, xerr)
 		require.NotNil(t, item)
 		prop, _ := item.(*proposal.GovProposal)
-		require.EqualValues(t, key, proposal.LedgerKeyProposal(prop.TxHash))
+		require.EqualValues(t, key, v1.LedgerKeyProposal(prop.TxHash))
 	}
 	for i, c := range cases2 {
 		require.Error(t, xerrors.ErrDuplicatedKey, runCase(c), "index", i)

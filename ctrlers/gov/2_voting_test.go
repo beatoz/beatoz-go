@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -210,7 +211,7 @@ func TestFreezingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
-	item, xerr := govCtrler.frozenState.Get(proposal.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
+	item, xerr := govCtrler.frozenState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	frozenProp, _ := item.(*proposal.GovProposal)
 	require.NotNil(t, frozenProp.MajorOption)
@@ -255,7 +256,7 @@ func TestApplyingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr := govCtrler.frozenState.Get(proposal.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
+	frozenProp, xerr := govCtrler.frozenState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozenProp)
 
@@ -270,7 +271,7 @@ func TestApplyingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr = govCtrler.frozenState.Get(proposal.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
+	frozenProp, xerr = govCtrler.frozenState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, frozenProp)
 

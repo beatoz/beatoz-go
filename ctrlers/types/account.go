@@ -193,14 +193,6 @@ func (acct *Account) Type() int16 {
 	return types.ACCT_COMMON_TYPE
 }
 
-var KeyPrefixAccount = []byte{0x00}
-
-func LedgerKeyAccount(addr types.Address) v1.LedgerKey {
-	key := make([]byte, len(KeyPrefixAccount)+len(addr))
-	copy(key, append(KeyPrefixAccount, addr...))
-	return key
-}
-
 //func (acct *Account) Key() v1.LedgerKey {
 //	acct.mtx.RLock()
 //	acct.mtx.RUnlock()

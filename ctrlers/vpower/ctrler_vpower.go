@@ -1,9 +1,50 @@
 package vpower
 
 import (
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
+
+func (ctrler *VPowerCtrler) loadLedger() ([]*DelegateeV1, xerrors.XError) {
+	var dgtees []*DelegateeV1
+	xerr := ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		dgtee, _ := item.(*DelegateeV1)
+		dgtees = append(dgtees, dgtee)
+		return nil
+	}, true)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return dgtees, nil
+}
+
+func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*DelegateeV1, xerrors.XError) {
+	var ret *DelegateeV1
+	item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(addr, nil), exec)
+	if xerr == nil {
+		ret, _ = item.(*DelegateeV1)
+	}
+	return ret, xerr
+}
+
+func (ctrler *VPowerCtrler) delDelegatee(addr types.Address, exec bool) xerrors.XError {
+	return ctrler.powersState.Del(v1.LedgerKeyDelegatee(addr, nil), exec)
+}
+
+func (ctrler *VPowerCtrler) readVPower(from, to types.Address, exec bool) (*VPower, xerrors.XError) {
+	var ret *VPower
+	item, xerr := ctrler.powersState.Get(v1.LedgerKeyVPower(from, to), exec)
+	if xerr == nil {
+		ret, _ = item.(*VPower)
+	}
+	return ret, xerr
+}
+
+func (ctrler *VPowerCtrler) delVPower(from, to types.Address, exec bool) xerrors.XError {
+	return ctrler.powersState.Del(v1.LedgerKeyVPower(from, to), exec)
+}
 
 func (ctrler *VPowerCtrler) bondPowerChunk(
 	dgtee *DelegateeV1,
@@ -14,13 +55,14 @@ func (ctrler *VPowerCtrler) bondPowerChunk(
 	exec bool) xerrors.XError {
 
 	_ = vpow.addPowerWithTxHash(power, height, txhash)
-	if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, exec); xerr != nil {
+	if xerr := ctrler.powersState.Set(vpow.key, vpow, exec); xerr != nil {
 		return xerr
 	}
 
 	dgtee.addPower(vpow.From, power)
 	dgtee.addDelegator(vpow.From)
-	if xerr := ctrler.dgteesLedger.Set(dgtee.Key(), dgtee, exec); xerr != nil {
+
+	if xerr := ctrler.powersState.Set(dgtee.key, dgtee, exec); xerr != nil {
 		return xerr
 	}
 	return nil
@@ -34,15 +76,19 @@ func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *DelegateeV1, vpow *VPower, t
 	}
 	// decrease the power of `dgteeProto` by `pc.Power`
 	dgtee.delPower(vpow.From, pc.Power)
+
 	if len(vpow.PowerChunks) == 0 {
 		dgtee.delDelegator(vpow.From)
-		if xerr := ctrler.vpowsLedger.Del(vpow.Key(), exec); xerr != nil {
+		if xerr := ctrler.powersState.Del(vpow.key, exec); xerr != nil {
 			return nil, xerr
 		}
-	} else if xerr := ctrler.vpowsLedger.Set(vpow.Key(), vpow, exec); xerr != nil {
-		return nil, xerr
+	} else {
+		if xerr := ctrler.powersState.Set(vpow.key, vpow, exec); xerr != nil {
+			return nil, xerr
+		}
 	}
-	if xerr := ctrler.dgteesLedger.Set(dgtee.Key(), dgtee, exec); xerr != nil {
+
+	if xerr := ctrler.powersState.Set(dgtee.key, dgtee, exec); xerr != nil {
 		return nil, xerr
 	}
 	return pc, nil

@@ -10,43 +10,21 @@ import (
 	"sort"
 )
 
-var (
-	prefixDelegateeProto = "dg"
-)
-
 type DelegateeV1 struct {
 	DelegateeProto
 	addr types.Address
-}
-
-func dgteeProtoKey(addr types.Address) v1.LedgerKey {
-	return append([]byte(prefixDelegateeProto), addr...)
+	key  v1.LedgerKey
 }
 
 func newDelegateeV1(pubKey bytes.HexBytes) *DelegateeV1 {
-	return &DelegateeV1{
+	ret := &DelegateeV1{
 		DelegateeProto: DelegateeProto{
 			PubKey: pubKey,
 		},
-		addr: crypto.PubKeyBytes2Addr(pubKey),
 	}
-}
-
-func LoadAllDelegateeV1(ledger v1.IStateLedger) ([]*DelegateeV1, xerrors.XError) {
-	var dgtees []*DelegateeV1
-	if xerr := ledger.Iterate(func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		dgtee, _ := item.(*DelegateeV1)
-		dgtee.addr = crypto.PubKeyBytes2Addr(dgtee.PubKey)
-		dgtees = append(dgtees, dgtee)
-		return nil
-	}, true); xerr != nil {
-		return nil, xerr
-	}
-	return dgtees, nil
-}
-
-func (x *DelegateeV1) Key() v1.LedgerKey {
-	return dgteeProtoKey(x.addr)
+	ret.addr = crypto.PubKeyBytes2Addr(pubKey)
+	ret.key = v1.LedgerKeyDelegatee(ret.addr, nil)
+	return ret
 }
 
 func (x *DelegateeV1) Encode() ([]byte, xerrors.XError) {
@@ -62,18 +40,19 @@ func (x *DelegateeV1) Decode(d []byte) xerrors.XError {
 		return xerrors.From(err)
 	}
 	x.addr = crypto.PubKeyBytes2Addr(x.PubKey)
+	x.key = v1.LedgerKeyDelegatee(x.addr, nil)
 	return nil
 }
 
 func (x *DelegateeV1) addPower(from types.Address, pow int64) {
-	x.TotalPower += pow
+	x.SumPower += pow
 	if bytes.Equal(from, x.addr) {
 		x.SelfPower += pow
 	}
 }
 
 func (x *DelegateeV1) delPower(from types.Address, pow int64) {
-	x.TotalPower -= pow
+	x.SumPower -= pow
 	if bytes.Equal(from, x.addr) {
 		x.SelfPower -= pow
 	}
@@ -106,7 +85,7 @@ func (x *DelegateeV1) Clone() *DelegateeV1 {
 	return &DelegateeV1{
 		DelegateeProto: DelegateeProto{
 			PubKey:      bytes.Copy(x.PubKey),
-			TotalPower:  x.TotalPower,
+			SumPower:    x.SumPower,
 			SelfPower:   x.SelfPower,
 			MaturePower: x.MaturePower,
 		},
@@ -147,8 +126,8 @@ func (dgtees orderByPowerDelegateeV1) Len() int {
 
 // descending order by TotalPower
 func (dgtees orderByPowerDelegateeV1) Less(i, j int) bool {
-	if dgtees[i].TotalPower != dgtees[j].TotalPower {
-		return dgtees[i].TotalPower > dgtees[j].TotalPower
+	if dgtees[i].SumPower != dgtees[j].SumPower {
+		return dgtees[i].SumPower > dgtees[j].SumPower
 	}
 	if dgtees[i].SelfPower != dgtees[j].SelfPower {
 		return dgtees[i].SelfPower > dgtees[j].SelfPower

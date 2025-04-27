@@ -1,6 +1,7 @@
 package vpower
 
 import (
+	bytes2 "bytes"
 	"errors"
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
@@ -8,7 +9,6 @@ import (
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -19,8 +19,8 @@ import (
 
 type VPowerCtrler struct {
 	//frozenLedger v1.IStateLedger[*FrozenVPowerProto]
-	vpowsLedger  v1.IStateLedger
-	dgteesLedger v1.IStateLedger
+	powersState v1.IStateLedger
+	//dgteesLedger v1.IStateLedger
 
 	allDelegatees  []*DelegateeV1
 	lastValidators []*DelegateeV1
@@ -31,6 +31,15 @@ type VPowerCtrler struct {
 	mtx    sync.RWMutex
 }
 
+func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
+	if bytes2.HasPrefix(key, v1.KeyPrefixVPower) {
+		return &VPower{}
+	} else if bytes2.HasPrefix(key, v1.KeyPrefixDelegatee) {
+		return &DelegateeV1{}
+	}
+	panic("invalid key prefix")
+}
+
 func NewVPowerCtrler(config *cfg.Config, height int64, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_VPowerCtrler")
 
@@ -39,22 +48,16 @@ func NewVPowerCtrler(config *cfg.Config, height int64, logger tmlog.Logger) (*VP
 	//	return nil, xerr
 	//}
 
-	vpowsLedger, xerr := v1.NewStateLedger("vpows", config.DBDir(), 2048, func(key v1.LedgerKey) v1.ILedgerItem { return &VPower{} }, lg)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	dgteesLedger, xerr := v1.NewStateLedger("dgtees", config.DBDir(), 21, func(key v1.LedgerKey) v1.ILedgerItem { return &DelegateeV1{} }, lg)
+	powersState, xerr := v1.NewStateLedger("vpows", config.DBDir(), 21*2048, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	return &VPowerCtrler{
 		//frozenLedger:   frozenLedger,
-		vpowsLedger:  vpowsLedger,
-		dgteesLedger: dgteesLedger,
-		vpowLimiter:  nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRatio(), govParams.MaxUpdatableStakeRatio()),
-		logger:       lg,
+		powersState: powersState,
+		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRatio(), govParams.MaxUpdatableStakeRatio()),
+		logger:      lg,
 	}, nil
 }
 
@@ -70,7 +73,6 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	}
 
 	for _, v := range initValidators {
-		//addr := crypto.PubKeyBytes2Addr(v.PubKey.GetSecp256K1())
 		dgt := newDelegateeV1(v.PubKey.GetSecp256K1())
 		vpow := newVPower(dgt.addr, dgt.PubKey)
 		if xerr := ctrler.bondPowerChunk(dgt, vpow, v.Power, int64(1), bytes.ZeroBytes(32), true); xerr != nil {
@@ -81,19 +83,14 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
-func (ctrler *VPowerCtrler) LoadLedger(height, ripeningBlocks int64, maxValCnt int) xerrors.XError {
+func (ctrler *VPowerCtrler) LoadLedger(maxValCnt int) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.loadLedger(height, ripeningBlocks, maxValCnt)
-}
-
-func (ctrler *VPowerCtrler) loadLedger(height, ripeningBlocks int64, maxValCnt int) xerrors.XError {
-	dgtees, xerr := LoadAllDelegateeV1(ctrler.dgteesLedger)
+	dgtees, xerr := ctrler.loadLedger()
 	if xerr != nil {
 		return xerr
 	}
-
 	ctrler.allDelegatees = dgtees
 	ctrler.lastValidators = selectValidators(dgtees, maxValCnt)
 	return nil
@@ -148,18 +145,17 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// NOTE: Do not find from `allDelegatees`.
 		// Only if there is no update on allDelegatees, it's possible to find from `allDelegatees`.
-		item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
+		dgtee, xerr := ctrler.readDelegatee(ctx.Tx.To, ctx.Exec)
 		if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
 			return xerr
 		}
 
-		dgtee, _ := item.(*DelegateeV1) // item may be nil
 		if bytes.Equal(ctx.Tx.From, ctx.Tx.To) {
 			// self bonding
 			selfPower = txPower
 			if dgtee != nil {
 				selfPower += dgtee.SelfPower
-				totalPower = dgtee.TotalPower
+				totalPower = dgtee.SumPower
 			}
 
 			if selfPower < ctx.GovParams.MinValidatorPower() {
@@ -177,12 +173,12 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			}
 
 			// it's delegating. check minSelfStakeRatio
-			selfatio := dgtee.SelfPower * int64(100) / (dgtee.TotalPower + txPower)
+			selfatio := dgtee.SelfPower * int64(100) / (dgtee.SumPower + txPower)
 			if selfatio < ctx.GovParams.MinSelfStakeRatio() {
-				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.TotalPower, txPower))
+				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.SumPower, txPower))
 			}
 
-			totalPower = dgtee.TotalPower
+			totalPower = dgtee.SumPower
 		}
 
 		// check overflow
@@ -210,12 +206,10 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		// NOTE: Do not find from `allDelegatees`.
 		// `ctx.Tx.To` must already be a delegator (or validator), so it should be found in the `dgteesLedger`.
-		item, xerr := ctrler.dgteesLedger.Get(dgteeProtoKey(ctx.Tx.To), ctx.Exec)
+		dgtee, xerr := ctrler.readDelegatee(ctx.Tx.To, ctx.Exec)
 		if xerr != nil {
 			return xerrors.ErrNotFoundDelegatee.Wrap(xerr)
 		}
-
-		dgtee, _ := item.(*DelegateeV1)
 
 		// find the voting power from a delegatee
 		txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
@@ -226,12 +220,11 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		// Since the bonding tx pointed to by `txhash` must have already been executed
 		// and created a voting chunk as a result,
 		// the voting power chunk with `txhash` must be found in `vpowsLedger`.
-		item, xerr = ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, ctx.Tx.To), ctx.Exec)
+		vpow, xerr := ctrler.readVPower(ctx.Tx.From, ctx.Tx.To, ctx.Exec)
 		if xerr != nil {
 			return xerrors.ErrNotFoundStake.Wrap(xerr)
 		}
 
-		vpow, _ := item.(*VPower)
 		pc := vpow.findPowerChunk(txhash)
 		if pc == nil {
 			return xerrors.ErrNotFoundStake
@@ -290,11 +283,11 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	power := ctx.ValidateResult.(*bondingTrxOpt).txPower
 
 	if dgtee.hasDelegator(ctx.Tx.From) {
-		item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(ctx.Tx.From, dgtee.addr), ctx.Exec)
+		_vpow, xerr := ctrler.readVPower(ctx.Tx.From, dgtee.addr, ctx.Exec)
 		if xerr != nil {
 			return xerr
 		}
-		vpow, _ = item.(*VPower)
+		vpow = _vpow
 	} else {
 		vpow = newVPower(ctx.Tx.From, dgtee.PubKey)
 	}
@@ -345,20 +338,19 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	if dgtee.SelfPower == 0 {
 		// todo: un-bonding all voting powers delegated to `dgteeProto`
 		for _, _from := range dgtee.Delegators {
-			item, xerr := ctrler.vpowsLedger.Get(vpowerProtoKey(_from, dgtee.addr), ctx.Exec)
+			_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, ctx.Exec)
 			if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
 				return xerr
 			}
 
-			_vpow, _ := item.(*VPower) // item may be nil
 			if _vpow != nil {
 				freezingPowerChunks = append(freezingPowerChunks, _vpow.PowerChunks...)
-				if xerr := ctrler.vpowsLedger.Del(_vpow.Key(), ctx.Exec); xerr != nil {
+				if xerr := ctrler.delVPower(_vpow.From, _vpow.to, ctx.Exec); xerr != nil {
 					return xerr
 				}
 			}
 		}
-		if xerr := ctrler.dgteesLedger.Del(dgtee.Key(), ctx.Exec); xerr != nil {
+		if xerr := ctrler.delDelegatee(dgtee.addr, ctx.Exec); xerr != nil {
 			return xerr
 		}
 	}
@@ -383,37 +375,23 @@ func (ctrler *VPowerCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	h0, v0, xerr := ctrler.vpowsLedger.Commit()
+	h0, v0, xerr := ctrler.powersState.Commit()
 	if xerr != nil {
 		return nil, 0, xerr
 	}
 
-	h1, v1, xerr := ctrler.dgteesLedger.Commit()
-	if xerr != nil {
-		return nil, 0, xerr
-	}
-
-	if v0 != v1 {
-		return nil, -1, xerrors.ErrCommit.Wrapf("error: VPowerCtrler.Commit() has wrong version - ver0:%v, ver1:%v", v0, v1)
-	}
-	return crypto.DefaultHash(h0, h1), v0, nil
+	return h0, v0, nil
 }
 
 func (ctrler *VPowerCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.vpowsLedger != nil {
-		if xerr := ctrler.vpowsLedger.Close(); xerr != nil {
+	if ctrler.powersState != nil {
+		if xerr := ctrler.powersState.Close(); xerr != nil {
 			ctrler.logger.Error("vpowsLedger.Close()", "error", xerr.Error())
 		}
-		ctrler.vpowsLedger = nil
-	}
-	if ctrler.dgteesLedger != nil {
-		if xerr := ctrler.dgteesLedger.Close(); xerr != nil {
-			ctrler.logger.Error("dgteesLedger.Close()", "error", xerr.Error())
-		}
-		ctrler.dgteesLedger = nil
+		ctrler.powersState = nil
 	}
 	return nil
 }

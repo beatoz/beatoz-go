@@ -4,8 +4,5 @@ option go_package = "github.com/beatoz/beatoz-go/ctrlers/vpower";
 
 message delegatee_proto {
   bytes pub_key = 1;
-  repeated bytes delegators = 2;
-  int64 total_power = 3;
-  int64 self_power = 4;
-  int64 mature_power = 5;
+  int64 power = 2;
 }

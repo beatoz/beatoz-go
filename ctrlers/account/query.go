@@ -2,6 +2,7 @@ package account
 
 import (
 	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -15,7 +16,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	item, xerr := immuLedger.Get(btztypes.LedgerKeyAccount(req.Data))
+	item, xerr := immuLedger.Get(v1.LedgerKeyAccount(req.Data))
 	if xerr != nil {
 		item = btztypes.NewAccount(req.Data)
 	}

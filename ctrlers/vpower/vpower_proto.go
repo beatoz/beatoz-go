@@ -10,21 +10,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	prefixVPowerProto       = "vp"
-	prefixFrozenVPowerProto = "fz"
-)
-
 type VPower struct {
 	VPowerProto
-	to types.Address
-}
-
-func vpowerProtoKey(k0, k1 []byte) v1.LedgerKey {
-	k := make([]byte, len(prefixVPowerProto)+len(k0)+len(k1))
-	copy(k, prefixVPowerProto)
-	copy(k[len(prefixVPowerProto):], append(k0, k1...))
-	return k
+	to  types.Address
+	key v1.LedgerKey
 }
 
 func newVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
@@ -33,15 +22,15 @@ func newVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
 			From:     from,
 			PubKeyTo: pubKey,
 		},
-		to: crypto.PubKeyBytes2Addr(pubKey),
 	}
-
+	ret.to = crypto.PubKeyBytes2Addr(pubKey)
+	ret.key = v1.LedgerKeyVPower(ret.From, ret.to)
 	return ret
 }
 
-func (x *VPower) Key() v1.LedgerKey {
-	return vpowerProtoKey(x.From, x.to)
-}
+//func (x *VPower) Key() v1.LedgerKey {
+//	return x.key
+//}
 
 func (x *VPower) Encode() ([]byte, xerrors.XError) {
 	if d, err := proto.Marshal(x); err != nil {
@@ -56,6 +45,7 @@ func (x *VPower) Decode(d []byte) xerrors.XError {
 		return xerrors.From(err)
 	}
 	x.to = crypto.PubKeyBytes2Addr(x.PubKeyTo)
+	x.key = v1.LedgerKeyVPower(x.From, x.to)
 	return nil
 }
 
