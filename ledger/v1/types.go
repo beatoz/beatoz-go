@@ -2,6 +2,7 @@ package v1
 
 import (
 	"bytes"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	"sort"
@@ -113,3 +114,49 @@ func (a LedgerKeyList) Swap(i, j int) {
 }
 
 var _ sort.Interface = LedgerKeyList(nil)
+var (
+	KeyPrefixAccount    = []byte{0x00}
+	KeyPrefixGovParams  = []byte{0x10}
+	KeyPrefixProposal   = []byte{0x11}
+	KeyPrefixFrozenProp = []byte{0x12}
+	KeyPrefixDelegatee  = []byte{0x20}
+	KeyPrefixVPower     = []byte{0x21}
+)
+
+func LedgerKeyProposal(txhash []byte) LedgerKey {
+	_key := make([]byte, len(KeyPrefixProposal)+len(txhash))
+	copy(_key, append(KeyPrefixProposal, txhash...))
+	return _key
+}
+
+func LedgerKeyFrozenProp(txhash []byte) LedgerKey {
+	_key := make([]byte, len(KeyPrefixFrozenProp)+len(txhash))
+	copy(_key, append(KeyPrefixFrozenProp, txhash...))
+	return _key
+}
+
+func LedgerKeyAccount(addr types.Address) LedgerKey {
+	key := make([]byte, len(KeyPrefixAccount)+len(addr))
+	copy(key, append(KeyPrefixAccount, addr...))
+	return key
+}
+
+func LedgerKeyGovParams() LedgerKey {
+	_key := make([]byte, len(KeyPrefixGovParams))
+	copy(_key, KeyPrefixGovParams)
+	return _key
+}
+
+func LedgerKeyVPower(k0, k1 []byte) LedgerKey {
+	k := make([]byte, len(KeyPrefixVPower)+len(k0)+len(k1))
+	copy(k, KeyPrefixVPower)
+	copy(k[len(KeyPrefixVPower):], append(k0, k1...))
+	return k
+}
+
+func LedgerKeyDelegatee(k0, k1 []byte) LedgerKey {
+	k := make([]byte, len(KeyPrefixDelegatee)+len(k0)+len(k1))
+	copy(k, KeyPrefixDelegatee)
+	copy(k[len(KeyPrefixDelegatee):], append(k0, k1...))
+	return k
+}
