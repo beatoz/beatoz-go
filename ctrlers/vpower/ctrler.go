@@ -18,9 +18,7 @@ import (
 )
 
 type VPowerCtrler struct {
-	//frozenLedger v1.IStateLedger[*FrozenVPowerProto]
 	powersState v1.IStateLedger
-	//dgteesLedger v1.IStateLedger
 
 	allDelegatees  []*DelegateeV1
 	lastValidators []*DelegateeV1
@@ -40,25 +38,23 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 	panic("invalid key prefix")
 }
 
-func NewVPowerCtrler(config *cfg.Config, height int64, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
+func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_VPowerCtrler")
-
-	//frozenLedger, xerr := v1.NewStateLedger[*FrozenVPowerProto]("frozen", config.DBDir(), 2048, func() v1.ILedgerItem { return &FrozenVPowerProto{} }, lg)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
 
 	powersState, xerr := v1.NewStateLedger("vpows", config.DBDir(), 21*2048, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return &VPowerCtrler{
-		//frozenLedger:   frozenLedger,
+	ret := &VPowerCtrler{
 		powersState: powersState,
 		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRatio(), govParams.MaxUpdatableStakeRatio()),
 		logger:      lg,
-	}, nil
+	}
+	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
+		return nil, xerr
+	}
+	return ret, nil
 }
 
 // InitLedger creates the voting power of the genesis validators.
@@ -83,22 +79,32 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
-func (ctrler *VPowerCtrler) LoadLedger(maxValCnt int) xerrors.XError {
+func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	dgtees, xerr := ctrler.loadLedger()
+	dgtees, xerr := ctrler.loadDelegatees()
 	if xerr != nil {
 		return xerr
 	}
+
+	var lastVals []*DelegateeV1
+	if dgtees != nil {
+		lastVals = selectValidators(dgtees, maxValCnt)
+	}
+
 	ctrler.allDelegatees = dgtees
-	ctrler.lastValidators = selectValidators(dgtees, maxValCnt)
+	ctrler.lastValidators = lastVals
 	return nil
 }
 
 func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
+
+	if bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
+		// calculate reward...
+	}
 
 	//todo: all validator list 재구성
 	//todo: slashing

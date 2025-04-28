@@ -145,7 +145,7 @@ func Test_LoadLedger(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, int64(1), lastHeight)
 
-	require.NoError(t, ctrler.LoadLedger(int(govParams.MaxValidatorCnt())))
+	require.NoError(t, ctrler.LoadDelegatees(int(govParams.MaxValidatorCnt())))
 
 	require.Len(t, ctrler.allDelegatees, len(lastValUps))
 	require.LessOrEqual(t, len(ctrler.lastValidators), int(govParams.MaxValidatorCnt()))

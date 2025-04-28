@@ -7,7 +7,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
-func (ctrler *VPowerCtrler) loadLedger() ([]*DelegateeV1, xerrors.XError) {
+func (ctrler *VPowerCtrler) loadDelegatees() ([]*DelegateeV1, xerrors.XError) {
 	var dgtees []*DelegateeV1
 	xerr := ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgtee, _ := item.(*DelegateeV1)
