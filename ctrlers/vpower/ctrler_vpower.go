@@ -113,6 +113,10 @@ func (ctrler *VPowerCtrler) freezePowerChunk(from types.Address, pc *PowerChunkP
 }
 
 func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerrors.XError {
+	return ctrler._unfreezePowerChunk(bctx.Height(), bctx.AcctHandler)
+}
+
+func (ctrler *VPowerCtrler) _unfreezePowerChunk(refundHeight int64, acctHandler types2.IAccountHandler) xerrors.XError {
 	var removed []v1.LedgerKey
 	defer func() {
 		for _, k := range removed {
@@ -121,15 +125,16 @@ func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerror
 	}()
 
 	return ctrler.powersState.Seek(
-		v1.LedgerKeyFrozenVPower(bctx.Height(), nil),
+		v1.LedgerKeyFrozenVPower(refundHeight, nil),
 		true,
 		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 			frozen, _ := item.(*FrozenVPower)
 			refundAmt := types2.PowerToAmount(frozen.RefundPower)
 
-			from := key[1:21]
+			//height := key[1:9]
+			from := key[9:29]
 
-			xerr := bctx.AcctHandler.Reward(from, refundAmt, true)
+			xerr := acctHandler.Reward(from, refundAmt, true)
 			if xerr != nil {
 				return xerr
 			}
@@ -137,4 +142,26 @@ func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerror
 			removed = append(removed, key)
 			return nil
 		}, true)
+}
+
+func (ctrler *VPowerCtrler) readFrozenVPower(refundHeight int64, from types.Address, exec bool) (*FrozenVPower, xerrors.XError) {
+	var ret *FrozenVPower
+	item, xerr := ctrler.powersState.Get(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+	if xerr == nil {
+		ret, _ = item.(*FrozenVPower)
+	}
+	return ret, xerr
+}
+
+func (ctrler *VPowerCtrler) delFrozenVPower(refundHeight int64, from types.Address, exec bool) xerrors.XError {
+	return ctrler.powersState.Del(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+}
+
+func (ctrler *VPowerCtrler) countOf(keyPrefix []byte, exec bool) int {
+	ret := 0
+	_ = ctrler.powersState.Seek(keyPrefix, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		ret++
+		return nil
+	}, exec)
+	return ret
 }

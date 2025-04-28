@@ -398,29 +398,66 @@ func Test_Unbonding(t *testing.T) {
 	require.NoError(t, xerr)
 	xerr = ctrler.ValidateTrx(txctx1)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundStake))
+	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	// 2. wrong to
 	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, types.RandAddress(), lastHeight+1, txctx0.TxHash)
 	require.NoError(t, xerr)
 	xerr = ctrler.ValidateTrx(txctx1)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundDelegatee))
+	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	// 3. wrong txhash
 	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, valAddr, lastHeight+1, bytes2.RandBytes(32))
 	require.NoError(t, xerr)
 	xerr = ctrler.ValidateTrx(txctx1)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundStake))
+	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	//
 	// 4. all ok
 	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, valAddr, lastHeight+1, txctx0.TxHash)
 	require.NoError(t, xerr)
 	require.NoError(t, executeTransaction(ctrler, txctx1))
+	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	// commit
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
 
+	// one frozen vpower has been added by executing txctx1.
 	dgtee1, xerr = ctrler.readDelegatee(dgtee0.addr, txctx1.Exec)
 	require.NoError(t, xerr, dgtee0.key)
 	require.Equal(t, totalPower0, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
+	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	refundHeight := lastHeight + govParams.LazyUnstakingBlocks()
+	frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromWallet.Address(), true)
+	require.NoError(t, xerr)
+	require.NotNil(t, frozen)
+	require.Equal(t, power, frozen.RefundPower)
+	require.Equal(t, 1, len(frozen.PowerChunks))
+	require.Equal(t, power, frozen.PowerChunks[0].Power)
+	require.Equal(t, txctx0.Height, frozen.PowerChunks[0].Height)
+	require.EqualValues(t, txctx0.TxHash, frozen.PowerChunks[0].TxHash)
+
+	// nothing happens because refundHeight has not been reached.
+	xerr = ctrler._unfreezePowerChunk(refundHeight-1, acctMock)
+	require.NoError(t, xerr)
+	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWallet.Address(), true)
+	require.NoError(t, xerr)
+	require.NotNil(t, frozen)
+	require.Equal(t, power, frozen.RefundPower)
+	require.Equal(t, 1, len(frozen.PowerChunks))
+	require.Equal(t, power, frozen.PowerChunks[0].Power)
+	require.Equal(t, txctx0.Height, frozen.PowerChunks[0].Height)
+	require.EqualValues(t, txctx0.TxHash, frozen.PowerChunks[0].TxHash)
+
+	// frozen vpower has been removed because refundHeight has been reached.
+	xerr = ctrler._unfreezePowerChunk(refundHeight, acctMock)
+	require.NoError(t, xerr)
+	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWallet.Address(), true)
+	require.Error(t, xerr)
+	require.Nil(t, frozen)
+
 	// -----------------------------------------------------------------------------------------------------------------
 	//
 

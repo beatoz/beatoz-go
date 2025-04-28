@@ -34,8 +34,10 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 		return &VPower{}
 	} else if bytes2.HasPrefix(key, v1.KeyPrefixDelegatee) {
 		return &DelegateeV1{}
+	} else if bytes2.HasPrefix(key, v1.KeyPrefixFrozenVPower) {
+		return &FrozenVPower{}
 	}
-	panic("invalid key prefix")
+	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
 }
 
 func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
