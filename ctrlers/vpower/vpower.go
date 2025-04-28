@@ -28,10 +28,6 @@ func newVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
 	return ret
 }
 
-//func (x *VPower) Key() v1.LedgerKey {
-//	return x.key
-//}
-
 func (x *VPower) Encode() ([]byte, xerrors.XError) {
 	if d, err := proto.Marshal(x); err != nil {
 		return nil, xerrors.From(err)
@@ -55,7 +51,7 @@ func (x *VPower) IsSelfPower() bool {
 	return bytes.Equal(x.From, x.to)
 }
 
-func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
+func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunkProto {
 	for _, pc := range x.PowerChunks {
 		if bytes.Equal(pc.TxHash, txhash) {
 			return pc
@@ -64,28 +60,28 @@ func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunk {
 	return nil
 }
 
-func (x *VPower) addPowerChunk(pow, height int64) *PowerChunk {
-	added := &PowerChunk{Power: pow, Height: height}
+func (x *VPower) addPowerChunk(pow, height int64) *PowerChunkProto {
+	added := &PowerChunkProto{Power: pow, Height: height}
 	x.PowerChunks = append(x.PowerChunks, added)
 	x.SumPower += added.Power
 	return added
 }
 
-func (x *VPower) delPowerChunk(idx int) *PowerChunk {
+func (x *VPower) delPowerChunk(idx int) *PowerChunkProto {
 	removed := x.PowerChunks[idx]
 	x.PowerChunks = append(x.PowerChunks[:idx], x.PowerChunks[idx+1:]...)
 	x.SumPower -= removed.Power
 	return removed
 }
 
-func (x *VPower) addPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunk {
-	added := &PowerChunk{Power: pow, Height: height, TxHash: txhash}
+func (x *VPower) addPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunkProto {
+	added := &PowerChunkProto{Power: pow, Height: height, TxHash: txhash}
 	x.PowerChunks = append(x.PowerChunks, added)
 	x.SumPower += added.Power
 	return added
 }
 
-func (x *VPower) delPowerWithTxHash(txhash []byte) *PowerChunk {
+func (x *VPower) delPowerWithTxHash(txhash []byte) *PowerChunkProto {
 	for i, c := range x.PowerChunks {
 		if bytes.Equal(txhash, c.TxHash) {
 			return x.delPowerChunk(i)
@@ -104,9 +100,9 @@ func (x *VPower) sumPowerChunk() int64 {
 }
 
 func (x *VPower) Clone() *VPower {
-	copiedChunks := make([]*PowerChunk, len(x.PowerChunks))
+	copiedChunks := make([]*PowerChunkProto, len(x.PowerChunks))
 	for i, c := range x.PowerChunks {
-		copiedChunks[i] = &PowerChunk{Power: c.Power, Height: c.Height, TxHash: bytes.Copy(c.TxHash)}
+		copiedChunks[i] = &PowerChunkProto{Power: c.Power, Height: c.Height, TxHash: bytes.Copy(c.TxHash)}
 	}
 	return &VPower{
 		VPowerProto: VPowerProto{

@@ -223,9 +223,9 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
 
-		// Since the bonding tx pointed to by `txhash` must have already been executed
-		// and created a voting chunk as a result,
-		// the voting power chunk with `txhash` must be found in `vpowsLedger`.
+		// Since the bonding tx identified by `txhash` must have already been executed
+		// and created a power chunk as a result,
+		// the voting power chunk with `txhash` must be found.
 		vpow, xerr := ctrler.readVPower(ctx.Tx.From, ctx.Tx.To, ctx.Exec)
 		if xerr != nil {
 			return xerrors.ErrNotFoundStake.Wrap(xerr)
@@ -314,7 +314,6 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 }
 
 func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	var freezingPowerChunks []*PowerChunk
 
 	// find delegatee
 	dgtee := ctx.ValidateResult.(*bondingTrxOpt).dgtee
@@ -332,17 +331,20 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 		panic("not reachable")
 	}
 
+	refundHeight := ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
+
 	//
 	// Remove power
 	//
+
 	if pc, xerr := ctrler.unbondPowerChunk(dgtee, vpow, txhash, ctx.Exec); xerr != nil {
 		return xerr
-	} else {
-		freezingPowerChunks = append(freezingPowerChunks, pc)
+	} else if xerr = ctrler.freezePowerChunk(vpow.From, pc, refundHeight, ctx.Exec); xerr != nil {
+		return xerr
 	}
 
 	if dgtee.SelfPower == 0 {
-		// todo: un-bonding all voting powers delegated to `dgteeProto`
+		// un-bonding all voting powers delegated to `dgteeProto`
 		for _, _from := range dgtee.Delegators {
 			_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, ctx.Exec)
 			if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
@@ -350,9 +352,14 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 			}
 
 			if _vpow != nil {
-				freezingPowerChunks = append(freezingPowerChunks, _vpow.PowerChunks...)
 				if xerr := ctrler.delVPower(_vpow.From, _vpow.to, ctx.Exec); xerr != nil {
 					return xerr
+				}
+
+				for _, _pc := range _vpow.PowerChunks {
+					if xerr = ctrler.freezePowerChunk(_vpow.From, _pc, refundHeight, ctx.Exec); xerr != nil {
+						return xerr
+					}
 				}
 			}
 		}
@@ -360,15 +367,6 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 			return xerr
 		}
 	}
-
-	//
-	// todo: freeze the power chunk `pc` deleted from `vpowsLedger`
-	//
-	//refundHeight := ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
-	//frozen := &FrozenVPowerProto{
-	//	newVPower(vpow.From, nil, pc.Power, refundHeight),
-	//}
-	//_ = ctrler.frozenLedger.Set(frozen, ctx.Exec) // add s0 to frozen ledger
 
 	return nil
 }
@@ -395,7 +393,7 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 
 	if ctrler.powersState != nil {
 		if xerr := ctrler.powersState.Close(); xerr != nil {
-			ctrler.logger.Error("vpowsLedger.Close()", "error", xerr.Error())
+			ctrler.logger.Error("powersState.Close()", "error", xerr.Error())
 		}
 		ctrler.powersState = nil
 	}

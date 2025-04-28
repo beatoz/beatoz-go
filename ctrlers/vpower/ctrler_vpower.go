@@ -1,6 +1,7 @@
 package vpower
 
 import (
+	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -68,7 +69,7 @@ func (ctrler *VPowerCtrler) bondPowerChunk(
 	return nil
 }
 
-func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *DelegateeV1, vpow *VPower, txhash bytes.HexBytes, exec bool) (*PowerChunk, xerrors.XError) {
+func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *DelegateeV1, vpow *VPower, txhash bytes.HexBytes, exec bool) (*PowerChunkProto, xerrors.XError) {
 	// delete the power chunk with `txhash`
 	var pc = vpow.delPowerWithTxHash(txhash)
 	if pc == nil {
@@ -92,4 +93,48 @@ func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *DelegateeV1, vpow *VPower, t
 		return nil, xerr
 	}
 	return pc, nil
+}
+
+func (ctrler *VPowerCtrler) freezePowerChunk(from types.Address, pc *PowerChunkProto, refundHeight int64, exec bool) xerrors.XError {
+	item, xerr := ctrler.powersState.Get(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
+		return xerr
+	}
+	if item == nil {
+		// xerr is xerrors.ErrNotFoundResult
+		item = newFrozenVPower(0)
+	}
+
+	frozen, _ := item.(*FrozenVPower)
+	frozen.RefundPower += pc.Power
+	frozen.PowerChunks = append(frozen.PowerChunks, pc)
+
+	return ctrler.powersState.Set(v1.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
+}
+
+func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerrors.XError {
+	var removed []v1.LedgerKey
+	defer func() {
+		for _, k := range removed {
+			_ = ctrler.powersState.Del(k, true)
+		}
+	}()
+
+	return ctrler.powersState.Seek(
+		v1.LedgerKeyFrozenVPower(bctx.Height(), nil),
+		true,
+		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			frozen, _ := item.(*FrozenVPower)
+			refundAmt := types2.PowerToAmount(frozen.RefundPower)
+
+			from := key[1:21]
+
+			xerr := bctx.AcctHandler.Reward(from, refundAmt, true)
+			if xerr != nil {
+				return xerr
+			}
+
+			removed = append(removed, key)
+			return nil
+		}, true)
 }

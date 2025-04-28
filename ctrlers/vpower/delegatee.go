@@ -192,7 +192,7 @@ type Delegatee struct {
 //	return removed, vpow
 //}
 //
-//func (dgtee *Delegatee) FindPowerChunk(from types.Address, txhash bytes.HexBytes) *PowerChunk {
+//func (dgtee *Delegatee) FindPowerChunk(from types.Address, txhash bytes.HexBytes) *PowerChunkProto {
 //	dgtee.mtx.RLock()
 //	defer dgtee.mtx.RUnlock()
 //
@@ -288,7 +288,7 @@ type Delegatee struct {
 //	dgtee.sumOfBlocks = 0
 //	dgtee.lastHeight = height
 //
-//	var powChunks []*PowerChunk
+//	var powChunks []*PowerChunkProto
 //	for _, vpow := range dgtee.mapPowers {
 //		powChunks = append(powChunks, vpow.PowerChunks...)
 //	}

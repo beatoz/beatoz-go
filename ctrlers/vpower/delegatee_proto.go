@@ -84,10 +84,9 @@ func (x *DelegateeV1) delDelegator(from types.Address) {
 func (x *DelegateeV1) Clone() *DelegateeV1 {
 	return &DelegateeV1{
 		DelegateeProto: DelegateeProto{
-			PubKey:      bytes.Copy(x.PubKey),
-			SumPower:    x.SumPower,
-			SelfPower:   x.SelfPower,
-			MaturePower: x.MaturePower,
+			PubKey:    bytes.Copy(x.PubKey),
+			SumPower:  x.SumPower,
+			SelfPower: x.SelfPower,
 		},
 		addr: bytes.Copy(x.addr),
 	}
@@ -131,9 +130,6 @@ func (dgtees orderByPowerDelegateeV1) Less(i, j int) bool {
 	}
 	if dgtees[i].SelfPower != dgtees[j].SelfPower {
 		return dgtees[i].SelfPower > dgtees[j].SelfPower
-	}
-	if dgtees[i].MaturePower != dgtees[j].MaturePower {
-		return dgtees[i].MaturePower > dgtees[j].MaturePower
 	}
 	if bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) > 0 {
 		return true

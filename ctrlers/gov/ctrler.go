@@ -2,6 +2,7 @@ package gov
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
@@ -331,27 +332,27 @@ func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Ev
 		return nil, xerr
 	}
 
-	for _, h := range frozen {
+	for _, k := range frozen {
 		evts = append(evts, abcitypes.Event{
 			Type: "proposal",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("frozen"), Value: []byte(h.String()), Index: true},
+				{Key: []byte("frozen"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}
-	for _, h := range removed {
+	for _, k := range removed {
 		evts = append(evts, abcitypes.Event{
 			Type: "proposal",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("removed"), Value: []byte(h.String()), Index: true},
+				{Key: []byte("removed"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}
-	for _, h := range applied {
+	for _, k := range applied {
 		evts = append(evts, abcitypes.Event{
 			Type: "proposal",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("applied"), Value: []byte(h.String()), Index: true},
+				{Key: []byte("applied"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}
@@ -360,18 +361,18 @@ func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Ev
 }
 
 // freezeProposals is called from EndBlock
-func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []abytes.HexBytes, xerrors.XError) {
-	var frozen []abytes.HexBytes
-	var removed []abytes.HexBytes
+func (ctrler *GovCtrler) freezeProposals(height int64) ([]v1.LedgerKey, []v1.LedgerKey, xerrors.XError) {
+	var frozen []v1.LedgerKey
+	var removed []v1.LedgerKey
 
 	defer func() {
-		for _, txhash := range frozen {
+		for _, k := range frozen {
 			// freezing
-			_ = ctrler.proposalState.Del(v1.LedgerKeyProposal(txhash), true)
+			_ = ctrler.proposalState.Del(k, true)
 		}
-		for _, txhash := range removed {
+		for _, k := range removed {
 			// remove
-			_ = ctrler.proposalState.Del(v1.LedgerKeyProposal(txhash), true)
+			_ = ctrler.proposalState.Del(k, true)
 		}
 	}()
 
@@ -387,11 +388,11 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []aby
 				if xerr := ctrler.frozenState.Set(v1.LedgerKeyFrozenProp(prop.TxHash), prop, true); xerr != nil {
 					return xerr
 				}
-				frozen = append(frozen, prop.TxHash)
+				frozen = append(frozen, key)
 			} else {
 				// do nothing. the proposal will be just removed.
 				ctrler.logger.Debug("Freeze proposal", "warning", "not found major option")
-				removed = append(removed, prop.TxHash)
+				removed = append(removed, key)
 			}
 		}
 		return nil
@@ -400,13 +401,13 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]abytes.HexBytes, []aby
 }
 
 // applyProposals is called from EndBlock
-func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerrors.XError) {
-	var applied []abytes.HexBytes
+func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.XError) {
+	var applied []v1.LedgerKey
 
 	defer func() {
-		for _, txhash := range applied {
+		for _, k := range applied {
 			// remove
-			_ = ctrler.frozenState.Del(v1.LedgerKeyFrozenProp(txhash), true)
+			_ = ctrler.frozenState.Del(k, true)
 		}
 	}()
 
@@ -445,11 +446,10 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]abytes.HexBytes, xerror
 				}
 				ctrler.newGovParams = newGovParams
 			default:
-				key := v1.LedgerKeyProposal(prop.TxHash)
-				ctrler.logger.Debug("Apply proposal", "key(txHash)", abytes.HexBytes(key[:]), "type", prop.OptType)
+				ctrler.logger.Debug("Apply proposal", "key(txHash)", prop.TxHash, "type", prop.OptType)
 			}
 
-			applied = append(applied, prop.TxHash)
+			applied = append(applied, key) // this key will be removed from frozenState
 
 		}
 		return nil

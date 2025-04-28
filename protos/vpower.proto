@@ -2,7 +2,7 @@ syntax = "proto3";
 package vpower;
 option go_package = "github.com/beatoz/beatoz-go/ctrlers/vpower";
 
-message powerChunk {
+message powerChunkProto {
   int64 power = 1;
   int64 height = 2;
   bytes tx_hash = 3;
@@ -11,5 +11,11 @@ message VPowerProto {
   bytes from = 1;
   bytes pub_key_to = 2;
   int64 sum_power = 3;
-  repeated powerChunk power_chunks = 4;
+  repeated powerChunkProto power_chunks = 4;
+}
+message FrozenVPowerProto {
+//  bytes from = 1;
+//  int64 refund_height = 2;
+  int64 refund_power = 1;
+  repeated powerChunkProto power_chunks = 2;
 }

@@ -2,7 +2,6 @@ package v1
 
 import (
 	"bytes"
-	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	"sort"
@@ -54,29 +53,7 @@ type IStateLedger interface {
 	Commit() ([]byte, int64, xerrors.XError)
 	Close() xerrors.XError
 	ImitableLedgerAt(int64) (IImitable, xerrors.XError)
-
-	//RevertAll()
-	//ApplyRevisions() xerrors.XError
-	//ImitableLedgerAt(int64) (ILedger, xerrors.XError)
-	//MempoolLedgerAt(int64) (ILedger, xerrors.XError)
 }
-
-//type ILedger interface {
-//	Version() int64
-//	Set(ILedgerItem) xerrors.XError
-//	Get(LedgerKey) (ILedgerItem, xerrors.XError)
-//	Del(LedgerKey) xerrors.XError
-//	Iterate(cb func(ILedgerItem) xerrors.XError) xerrors.XError
-//	Commit() ([]byte, int64, xerrors.XError)
-//	Close() xerrors.XError
-//
-//	Snapshot() int
-//	RevertToSnapshot(int) xerrors.XError
-//	//RevertAll()
-//	//ApplyRevisions() xerrors.XError
-//	//ImitableLedgerAt(int64) (ILedger, xerrors.XError)
-//	//MempoolLedgerAt(int64) (ILedger, xerrors.XError)
-//}
 
 type ILedgerItem interface {
 	//Key() LedgerKey
@@ -85,20 +62,6 @@ type ILedgerItem interface {
 }
 
 type LedgerKey = []byte
-
-//const LEDGERKEYSIZE = 32
-//
-//type LedgerKey = [LEDGERKEYSIZE]byte
-//
-//func ToLedgerKey(s []byte) LedgerKey {
-//	var ret LedgerKey
-//	n := len(s)
-//	if n > LEDGERKEYSIZE {
-//		n = LEDGERKEYSIZE
-//	}
-//	copy(ret[:], s[:n])
-//	return ret
-//}
 
 type LedgerKeyList []LedgerKey
 
@@ -114,49 +77,3 @@ func (a LedgerKeyList) Swap(i, j int) {
 }
 
 var _ sort.Interface = LedgerKeyList(nil)
-var (
-	KeyPrefixAccount    = []byte{0x00}
-	KeyPrefixGovParams  = []byte{0x10}
-	KeyPrefixProposal   = []byte{0x11}
-	KeyPrefixFrozenProp = []byte{0x12}
-	KeyPrefixDelegatee  = []byte{0x20}
-	KeyPrefixVPower     = []byte{0x21}
-)
-
-func LedgerKeyProposal(txhash []byte) LedgerKey {
-	_key := make([]byte, len(KeyPrefixProposal)+len(txhash))
-	copy(_key, append(KeyPrefixProposal, txhash...))
-	return _key
-}
-
-func LedgerKeyFrozenProp(txhash []byte) LedgerKey {
-	_key := make([]byte, len(KeyPrefixFrozenProp)+len(txhash))
-	copy(_key, append(KeyPrefixFrozenProp, txhash...))
-	return _key
-}
-
-func LedgerKeyAccount(addr types.Address) LedgerKey {
-	key := make([]byte, len(KeyPrefixAccount)+len(addr))
-	copy(key, append(KeyPrefixAccount, addr...))
-	return key
-}
-
-func LedgerKeyGovParams() LedgerKey {
-	_key := make([]byte, len(KeyPrefixGovParams))
-	copy(_key, KeyPrefixGovParams)
-	return _key
-}
-
-func LedgerKeyVPower(k0, k1 []byte) LedgerKey {
-	k := make([]byte, len(KeyPrefixVPower)+len(k0)+len(k1))
-	copy(k, KeyPrefixVPower)
-	copy(k[len(KeyPrefixVPower):], append(k0, k1...))
-	return k
-}
-
-func LedgerKeyDelegatee(k0, k1 []byte) LedgerKey {
-	k := make([]byte, len(KeyPrefixDelegatee)+len(k0)+len(k1))
-	copy(k, KeyPrefixDelegatee)
-	copy(k[len(KeyPrefixDelegatee):], append(k0, k1...))
-	return k
-}

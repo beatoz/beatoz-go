@@ -55,7 +55,7 @@ func WaWeighted(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.D
 	return q
 }
 
-func WaWeightedWithPowerChunks(powChunks []*PowerChunk, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+func WaWeightedWithPowerChunks(powChunks []*PowerChunkProto, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := decimalOne.Sub(_tau)
 
@@ -81,7 +81,7 @@ func WaWeightedWithPowerChunks(powChunks []*PowerChunk, height int64, ripeningCy
 	return q
 }
 
-func WaWeightedEx2(powChunks []*PowerChunk, maturePower, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+func WaWeightedEx2(powChunks []*PowerChunkProto, maturePower, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := decimalOne.Sub(_tau)
 

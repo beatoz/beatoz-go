@@ -335,7 +335,7 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 	require.Equal(t, power, dgtee.SumPower)
 	require.Equal(t, power, dgtee.SelfPower)
 	//fmt.Println("validator(after)", dgtee1.Address(), dgtee1.TotalPower, dgtee1.SelfPower)
-	// check vpow: the vpow of `txctx.Tx.From` should be found to `vpowsLedger`.
+	// check vpow: the vpow of `txctx.Tx.From` should be found.
 	vpow, xerr = ctrler.readVPower(txctx.Tx.From, txctx.Tx.To, true)
 	require.NoError(t, xerr)
 	require.NotNil(t, vpow)
