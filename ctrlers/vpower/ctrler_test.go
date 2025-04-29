@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 )
@@ -181,90 +182,45 @@ func Test_Bonding(t *testing.T) {
 	ctrler, xerr = NewVPowerCtrler(config, 0, log.NewNopLogger())
 	require.NoError(t, xerr)
 
+	//
+	// test for all from wallets
 	for i, fromWal := range fromWals {
 		valWal := valWals[i]
 		txhash := txhashes[i]
 		vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 		require.NoError(t, xerr)
 
-		sum := int64(0)
 		found := false
+		sum := int64(0)
 		for _, pc := range vpow.PowerChunks {
 			if bytes.Equal(txhash, pc.TxHash) {
+				require.False(t, found) // to check duplication
 				require.Equal(t, powers[i], pc.Power, vpow)
 				found = true
 			}
 			sum += pc.Power
 		}
-		require.Equal(t, sum, vpow.SumPower)
 		require.True(t, found)
-	}
-
-	fromCountOfDgtee := make(map[string]int)
-	sumPowerOfDgtee := make(map[string]int64)
-	xerr = ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		vpow, _ := item.(*VPower)
-		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
-		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), key)
-		require.EqualValues(t, key, vpow.key)
-
-		sum := int64(0)
-		for _, pc := range vpow.PowerChunks {
-			sum += pc.Power
-			if bytes.Equal(pc.TxHash, bytes2.ZeroBytes(32)) {
-				continue
-			}
-
-			found := false
-			for i, txhash := range txhashes {
-				if bytes.Equal(txhash, pc.TxHash) {
-					require.False(t, found) // it must be found only once.
-					from := fromWals[i].Address()
-					to := valWals[i].Address()
-					require.EqualValues(t, from, vpow.From)
-					require.EqualValues(t, to, vpow.to)
-					require.EqualValues(t, to, crypto.PubKeyBytes2Addr(vpow.PubKeyTo))
-					require.Equal(t, powers[i], pc.Power)
-					found = true
-				}
-			}
-			require.True(t, found, "power chunk txhash", pc.TxHash)
-		}
 		require.Equal(t, sum, vpow.SumPower)
-
-		fromCountOfDgtee[vpow.to.String()]++
-		sumPowerOfDgtee[vpow.to.String()] += vpow.SumPower
-		return nil
-	}, true)
-	require.NoError(t, xerr)
-
-	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		dgtee, _ := item.(*DelegateeV1)
-		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), key)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), dgtee.key)
-		require.EqualValues(t, key, dgtee.key)
-		require.Equal(t, fromCountOfDgtee[dgtee.addr.String()], len(dgtee.Delegators))
-		require.Equal(t, sumPowerOfDgtee[dgtee.addr.String()], dgtee.SumPower)
-		return nil
-	}, true)
-	require.NoError(t, xerr)
+	}
 
 	// 중복 제거
 	onceWals := removeDupWallets(valWals)
 	onceFroms := removeDupWallets(fromWals)
 
+	//
+	// test for all delegatee(validator) wallets
 	for _, valWal := range onceWals {
 		dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
 		require.NoError(t, xerr)
-		require.NotNil(t, dgtee)
 		require.EqualValues(t, valWal.Address(), dgtee.addr)
 
 		sumPower := int64(0)
+		fromCnt := 0
 		for _, fromWal := range onceFroms {
 			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 			if xerr != nil && xerr.Contains(xerrors.ErrNotFoundResult) {
-				continue // `fromWal` may not delegate to `valWal`. So, it may be not found.
+				continue // `fromWal` may not delegate to `valWal`.
 			}
 			require.NoError(t, xerr)
 
@@ -275,8 +231,9 @@ func Test_Bonding(t *testing.T) {
 			}
 			require.EqualValues(t, sum, vpow.SumPower)
 			sumPower += sum
-
+			fromCnt++
 		}
+		require.Equal(t, fromCnt+1, len(dgtee.Delegators)) // `fromCnt` dose not include self address.
 		require.EqualValues(t, sumPower, dgtee.SumPower-dgtee.SelfPower, func() string {
 			ret := ""
 			for _, d := range dgtee.Delegators {
@@ -512,7 +469,7 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 	var fromWals0 []*web3.Wallet
 	var valWals0 []*web3.Wallet
 	var powers0 []int64
-	var txhashes []bytes2.HexBytes
+	var txhashes0 []bytes2.HexBytes
 	addedPower0 := int64(0)
 
 	for i := 0; i < count; i++ {
@@ -530,66 +487,73 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 
 		fromWals0 = append(fromWals0, fromWallet)
 		valWals0 = append(valWals0, valWallet)
-		txhashes = append(txhashes, txctx0.TxHash)
+		txhashes0 = append(txhashes0, txctx0.TxHash)
 		powers0 = append(powers0, power)
 		addedPower0 += power
 	}
 
-	for i, fromWal := range fromWals0 {
-		valWal := valWals0[i]
-		txhash := txhashes[i]
-		vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
-		require.NoError(t, xerr)
+	fromAddrsOfDgtee := make(map[string][]types.Address)
+	sumPowerOfDgtee := make(map[string]int64)
 
-		found := false
+	// check all vpowers
+	xerr := ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		vpow, _ := item.(*VPower)
+		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
+		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), key)
+		require.EqualValues(t, key, vpow.key)
+
+		sum := int64(0)
 		for _, pc := range vpow.PowerChunks {
-			if bytes.Equal(txhash, pc.TxHash) {
-				require.False(t, found) // to check duplication
-				require.Equal(t, powers0[i], pc.Power, vpow)
-				found = true
+			sum += pc.Power
+			if bytes.Equal(pc.TxHash, bytes2.ZeroBytes(32)) {
+				// this power chunk was added by `InitLedger` not this function
+				continue
 			}
+
+			found := false
+			for i, txhash := range txhashes0 {
+				if bytes.Equal(txhash, pc.TxHash) {
+					require.False(t, found) // it must be found only once.
+					from := fromWals0[i].Address()
+					to := valWals0[i].Address()
+					require.EqualValues(t, from, vpow.From)
+					require.EqualValues(t, to, vpow.to)
+					require.EqualValues(t, to, crypto.PubKeyBytes2Addr(vpow.PubKeyTo))
+					require.Equal(t, powers0[i], pc.Power)
+					found = true
+				}
+			}
+			require.True(t, found, "power chunk txhash", pc.TxHash)
 		}
-		require.True(t, found)
-	}
+		require.Equal(t, sum, vpow.SumPower)
 
-	// 중복 제거
-	onceWals := removeDupWallets(valWals0)
-	onceFroms := removeDupWallets(fromWals0)
+		fromAddrsOfDgtee[vpow.to.String()] = append(fromAddrsOfDgtee[vpow.to.String()], vpow.From)
+		sumPowerOfDgtee[vpow.to.String()] += vpow.SumPower
+		return nil
+	}, true)
+	require.NoError(t, xerr)
 
-	for _, valWal := range onceWals {
-		dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
-		require.NoError(t, xerr)
-		require.EqualValues(t, valWal.Address(), dgtee.addr)
-
-		sumPower := int64(0)
-		fromCnt := 0
-		for _, fromWal := range onceFroms {
-			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
-			if xerr != nil && xerr.Contains(xerrors.ErrNotFoundResult) {
-				continue // `fromWal` may not delegate to `valWal`.
-			}
-			require.NoError(t, xerr)
-
-			sum := int64(0)
-			for _, pc := range vpow.PowerChunks {
-				sum += pc.Power
-				//fmt.Printf("from: %x, to: %x, power: %v, txhash:%x\n", fromWal.Address(), dgtee.addr, pc.Power, pc.TxHash)
-			}
-			require.EqualValues(t, sum, vpow.SumPower)
-			sumPower += sum
-			fromCnt++
+	// check delegatees
+	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		dgtee, _ := item.(*DelegateeV1)
+		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), key)
+		require.EqualValues(t, key, dgtee.key)
+		require.Equal(t, sumPowerOfDgtee[dgtee.addr.String()], dgtee.SumPower)
+		require.Equal(t, len(fromAddrsOfDgtee[dgtee.addr.String()]), len(dgtee.Delegators))
+		expectedAddrArray := fromAddrsOfDgtee[dgtee.addr.String()]
+		actualAddrArray := dgtee.Delegators
+		sort.Slice(expectedAddrArray, func(i, j int) bool { return bytes.Compare(expectedAddrArray[i], expectedAddrArray[j]) < 0 })
+		sort.Slice(actualAddrArray, func(i, j int) bool { return bytes.Compare(actualAddrArray[i], actualAddrArray[j]) < 0 })
+		for i, addr := range expectedAddrArray {
+			require.EqualValues(t, addr, dgtee.Delegators[i])
 		}
-		require.Equal(t, fromCnt+1, len(dgtee.Delegators)) // `fromCnt` dose not include self address.
-		require.EqualValues(t, sumPower, dgtee.SumPower-dgtee.SelfPower, func() string {
-			ret := ""
-			for _, d := range dgtee.Delegators {
-				ret += fmt.Sprintf("%x\n", d)
-			}
-			return fmt.Sprintf("validator:%v\ntotal:%v, self:%v, total-self:%v\ndelegators\n%s", dgtee.addr, dgtee.SumPower, dgtee.SelfPower, dgtee.SumPower-dgtee.SelfPower, ret)
-		}())
-	}
 
-	return fromWals0, valWals0, powers0, txhashes
+		return nil
+	}, true)
+	require.NoError(t, xerr)
+
+	return fromWals0, valWals0, powers0, txhashes0
 }
 
 func initCtrler(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {

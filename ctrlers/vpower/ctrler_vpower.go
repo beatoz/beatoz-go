@@ -131,7 +131,7 @@ func (ctrler *VPowerCtrler) _unfreezePowerChunk(refundHeight int64, acctHandler 
 			frozen, _ := item.(*FrozenVPower)
 			refundAmt := types2.PowerToAmount(frozen.RefundPower)
 
-			//height := key[1:9]
+			// key = prefix(1) | height(8) | from_address(20)
 			from := key[9:29]
 
 			xerr := acctHandler.Reward(from, refundAmt, true)
