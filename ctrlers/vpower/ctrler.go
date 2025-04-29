@@ -235,6 +235,10 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		pc := vpow.findPowerChunk(txhash)
 		if pc == nil {
+			//fmt.Printf("-------------------------------f:%x, t:%x, h:%x\n", vpow.From, vpow.to, txhash)
+			//for i, _pc := range vpow.PowerChunks {
+			//	fmt.Printf("-------------------------------[%d] %x\n", i, _pc.TxHash)
+			//}
 			return xerrors.ErrNotFoundStake
 		}
 

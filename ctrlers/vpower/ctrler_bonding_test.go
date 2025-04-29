@@ -2,21 +2,25 @@ package vpower
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/log"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -42,12 +46,13 @@ func init() {
 	})
 
 	govParams = ctrlertypes.DefaultGovParams()
+	govParams.SetLazyUnstakingBlocks(500)
 }
 
 func Test_InitLedger(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
+	ctrler, lastValUps, valWallets, xerr := initLedger(config)
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps), len(valWallets))
 
@@ -139,7 +144,7 @@ func Test_InitLedger(t *testing.T) {
 func Test_LoadLedger(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, lastValUps, _, xerr := initCtrler(config)
+	ctrler, lastValUps, _, xerr := initLedger(config)
 	require.NoError(t, xerr)
 
 	_, lastHeight, xerr := ctrler.Commit()
@@ -165,14 +170,14 @@ func Test_LoadLedger(t *testing.T) {
 func Test_Bonding(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
+	ctrler, lastValUps, valWallets, xerr := initLedger(config)
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps), len(valWallets))
 
 	_, lastHeight, xerr := ctrler.Commit()
 	require.NoError(t, xerr)
 
-	fromWals, valWals, powers, txhashes := testRandDelegating(t, 20000, ctrler, valWallets, lastHeight)
+	fromWals, valWals, powers, txhashes := testRandDelegate(t, 20000, ctrler, valWallets, lastHeight+1)
 
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
@@ -250,7 +255,7 @@ func Test_Bonding(t *testing.T) {
 func Test_Bonding_ToNotValidator(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
+	ctrler, lastValUps, valWallets, xerr := initLedger(config)
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps), len(valWallets))
 
@@ -262,6 +267,7 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 	power := bytes2.RandInt64N(1_000_000) + 4000
 
 	// not validator
+
 	txctx, xerr := makeBondingTrxCtx(fromWallet, types.RandAddress(), power, lastHeight+1)
 	require.NoError(t, xerr)
 	require.Error(t, xerrors.ErrNotFoundDelegatee, executeTransaction(ctrler, txctx))
@@ -309,38 +315,35 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 func Test_Unbonding(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, lastValUps, valWallets, xerr := initCtrler(config)
+	ctrler, lastValUps, valWallets, xerr := initLedger(config)
 	require.NoError(t, xerr)
 
 	_, lastHeight, xerr := ctrler.Commit()
 	require.NoError(t, xerr)
 	require.Equal(t, int64(1), lastHeight)
 
-	//
-	// delegate to a validator
-	fromWallet := acctMock.RandWallet()
-	valWallet := valWallets[rand.Intn(len(lastValUps))]
-	valAddr := valWallet.Address()
-	power := int64(5000)
+	valWal := valWallets[rand.Intn(len(lastValUps))]
 
-	txctx0, xerr := makeBondingTrxCtx(fromWallet, valAddr, power, lastHeight+1)
-	require.NoError(t, xerr)
-	require.Equal(t, valAddr, txctx0.Tx.To)
-
-	dgtee0, xerr := ctrler.readDelegatee(valAddr, txctx0.Exec)
+	dgtee0, xerr := ctrler.readDelegatee(valWal.Address(), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, dgtee0)
 
 	totalPower0 := dgtee0.SumPower
 	selfPower0 := dgtee0.SelfPower
 
-	// run tx
-	require.NoError(t, executeTransaction(ctrler, txctx0))
+	// delegate to `valWal` from `fromWal`
+	fromWal := acctMock.RandWallet()
+	power := int64(5000)
+	height0 := lastHeight + 1
+	txctx0, xerr := doDelegate(ctrler, fromWal, valWal.Address(), power, height0)
+	require.NoError(t, xerr)
+	txhash0 := txctx0.TxHash
 
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
+	require.Equal(t, height0, lastHeight)
 
-	dgtee1, xerr := ctrler.readDelegatee(valAddr, txctx0.Exec)
+	dgtee1, xerr := ctrler.readDelegatee(valWal.Address(), true)
 	require.NoError(t, xerr)
 	require.Equal(t, totalPower0+power, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
@@ -351,29 +354,25 @@ func Test_Unbonding(t *testing.T) {
 	//
 	// unbonding
 	// 1. wrong from
-	txctx1, xerr := makeUnbondingTrxCtx(acctMock.RandWallet(), valAddr, lastHeight+1, txctx0.TxHash)
-	require.NoError(t, xerr)
-	xerr = ctrler.ValidateTrx(txctx1)
+	txctx1, xerr := doUndelegate(ctrler, acctMock.RandWallet(), valWal.Address(), lastHeight+1, txhash0)
+	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundStake))
 	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	// 2. wrong to
-	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, types.RandAddress(), lastHeight+1, txctx0.TxHash)
-	require.NoError(t, xerr)
-	xerr = ctrler.ValidateTrx(txctx1)
+	txctx1, xerr = doUndelegate(ctrler, fromWal, types.RandAddress(), lastHeight+1, txhash0)
+	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundDelegatee))
 	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	// 3. wrong txhash
-	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, valAddr, lastHeight+1, bytes2.RandBytes(32))
-	require.NoError(t, xerr)
-	xerr = ctrler.ValidateTrx(txctx1)
+	txctx1, xerr = doUndelegate(ctrler, fromWal, valWal.Address(), lastHeight+1, bytes2.RandBytes(32))
+	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundStake))
 	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
-	//
 	// 4. all ok
-	txctx1, xerr = makeUnbondingTrxCtx(fromWallet, valAddr, lastHeight+1, txctx0.TxHash)
+	txctx1, xerr = doUndelegate(ctrler, fromWal, valWal.Address(), lastHeight+1, txhash0)
 	require.NoError(t, xerr)
-	require.NoError(t, executeTransaction(ctrler, txctx1))
 	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+
 	// commit
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
@@ -385,33 +384,33 @@ func Test_Unbonding(t *testing.T) {
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
 	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
 	refundHeight := lastHeight + govParams.LazyUnstakingBlocks()
-	frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromWallet.Address(), true)
+	frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozen)
 	require.Equal(t, power, frozen.RefundPower)
 	require.Equal(t, 1, len(frozen.PowerChunks))
 	require.Equal(t, power, frozen.PowerChunks[0].Power)
-	require.Equal(t, txctx0.Height, frozen.PowerChunks[0].Height)
-	require.EqualValues(t, txctx0.TxHash, frozen.PowerChunks[0].TxHash)
+	require.Equal(t, height0, frozen.PowerChunks[0].Height)
+	require.EqualValues(t, txhash0, frozen.PowerChunks[0].TxHash)
 
 	// nothing happens because refundHeight has not been reached.
 	xerr = ctrler._unfreezePowerChunk(refundHeight-1, acctMock)
 	require.NoError(t, xerr)
 	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
-	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWallet.Address(), true)
+	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozen)
 	require.Equal(t, power, frozen.RefundPower)
 	require.Equal(t, 1, len(frozen.PowerChunks))
 	require.Equal(t, power, frozen.PowerChunks[0].Power)
-	require.Equal(t, txctx0.Height, frozen.PowerChunks[0].Height)
-	require.EqualValues(t, txctx0.TxHash, frozen.PowerChunks[0].TxHash)
+	require.Equal(t, height0, frozen.PowerChunks[0].Height)
+	require.EqualValues(t, txhash0, frozen.PowerChunks[0].TxHash)
 
 	// frozen vpower has been removed because refundHeight has been reached.
 	xerr = ctrler._unfreezePowerChunk(refundHeight, acctMock)
 	require.NoError(t, xerr)
 	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
-	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWallet.Address(), true)
+	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.Error(t, xerr)
 	require.Nil(t, frozen)
 
@@ -425,13 +424,13 @@ func Test_Unbonding(t *testing.T) {
 func Test_Unbonding_AllSelfPower(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, _, valWallets, xerr := initCtrler(config)
+	ctrler, _, valWallets, xerr := initLedger(config)
 	require.NoError(t, xerr)
 
 	_, lastHeight, xerr := ctrler.Commit()
 	require.NoError(t, xerr)
 
-	froms, vals, _, _ := testRandDelegating(t, 1000, ctrler, valWallets, lastHeight)
+	froms, vals, _, _ := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
 
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
@@ -439,17 +438,15 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 	onceWals := removeDupWallets(vals)
 	for _, valWal := range onceWals {
 		// unbonding self power deposited at genesis with zero txhash
-		txctx, xerr := makeUnbondingTrxCtx(valWal, valWal.Address(), lastHeight+1, bytes2.ZeroBytes(32))
+		zeroHash := bytes2.ZeroBytes(32) // points to self voting power
+		_, xerr = doUndelegate(ctrler, valWal, valWal.Address(), lastHeight+1, zeroHash)
 		require.NoError(t, xerr)
-
-		require.NoError(t, executeTransaction(ctrler, txctx))
 
 		dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
 		require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 		require.Nil(t, dgtee)
-	}
 
-	for _, valWal := range onceWals {
+		// expected that all vpowers delegated to dgtee are removed
 		for _, fromWal := range froms {
 			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
 			require.Equal(t, xerrors.ErrNotFoundResult, xerr)
@@ -464,7 +461,204 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
-func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallets []*web3.Wallet, lastHeight int64) ([]*web3.Wallet, []*web3.Wallet, []int64, []bytes2.HexBytes) {
+func Test_Freezing(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	ctrler, _, valWallets, xerr := initLedger(config)
+	require.NoError(t, xerr)
+
+	powers0 := make(map[string]int64)
+	for _, v := range valWallets {
+		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address(), nil), true)
+		require.NoError(t, xerr)
+
+		dgtee, _ := item.(*DelegateeV1)
+		require.EqualValues(t, v.Address(), dgtee.addr)
+
+		powers0[dgtee.addr.String()] = dgtee.SumPower
+	}
+
+	_, lastHeight, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+	height := lastHeight + 1
+
+	froms, vals, powers, txhashes := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
+
+	fmt.Println("freeze ...")
+
+	frozenTxhashes := make(map[string]struct{})
+	frozenCntOf := make(map[string]int)
+	refundCntAt := make(map[int64]int)
+	minRefundHeight := int64(math.MaxInt64)
+	maxRefundHeight := int64(0)
+	for len(frozenTxhashes) < len(txhashes) {
+		var idx int
+		var txhash bytes2.HexBytes
+		for {
+			idx = rand.Int() % len(txhashes)
+			txhash = txhashes[idx]
+			if _, ok := frozenTxhashes[txhash.String()]; !ok {
+				frozenTxhashes[txhash.String()] = struct{}{}
+				frozenCntOf[fmt.Sprintf("%v|%v", height, froms[idx].Address())]++
+				if frozenCntOf[fmt.Sprintf("%v|%v", height, froms[idx].Address())] == 1 {
+					// newly frozen vpower, not power chunk
+					refundCntAt[height+govParams.LazyUnstakingBlocks()]++
+				}
+				minRefundHeight = libs.MinInt64(minRefundHeight, height+govParams.LazyUnstakingBlocks())
+				maxRefundHeight = libs.MaxInt64(maxRefundHeight, height+govParams.LazyUnstakingBlocks())
+				break
+			}
+		}
+		fromW := froms[idx]
+		valW := vals[idx]
+		power := powers[idx]
+
+		dgtee0, xerr := ctrler.readDelegatee(valW.Address(), true)
+		require.NoError(t, xerr)
+		sumPower0 := dgtee0.SumPower
+		selfPower0 := dgtee0.SelfPower
+
+		// freeze ...
+		_, xerr = doUndelegate(ctrler, fromW, valW.Address(), height, txhash)
+		require.NoError(t, xerr)
+
+		//fmt.Println("undelegated", txhash, "from", fromW.Address(), "to", valW.Address())
+
+		dgtee1, xerr := ctrler.readDelegatee(valW.Address(), true)
+		require.NoError(t, xerr, dgtee1.key)
+		require.Equal(t, sumPower0-power, dgtee1.SumPower)
+		require.Equal(t, selfPower0, dgtee1.SelfPower)
+
+		refundHeight := height + govParams.LazyUnstakingBlocks()
+		frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromW.Address(), true)
+		require.NoError(t, xerr)
+		require.NotNil(t, frozen)
+
+		sum := int64(0)
+		found := false
+		for _, pc := range frozen.PowerChunks {
+			if bytes.Equal(txhash, pc.TxHash) {
+				require.False(t, found)
+				require.Equal(t, power, pc.Power)
+				//require.Equal(t, height, pc.Height)
+				found = true
+			}
+			sum += pc.Power
+		}
+		require.Equal(t, sum, frozen.RefundPower)
+		require.Equal(t, frozenCntOf[fmt.Sprintf("%v|%v", height, fromW.Address())], len(frozen.PowerChunks), func() string {
+			ret := fmt.Sprintf("from: %v, refundPower: %v\n", fromW.Address(), frozen.RefundPower)
+			for i, pc := range frozen.PowerChunks {
+				ret += fmt.Sprintf("  [%d] power:%v, txhash:%X\n", i, pc.Power, pc.TxHash)
+			}
+			return ret
+		}())
+
+		//if frozenCntOf[fmt.Sprintf("%v|%v", height, fromW.Address())] >= 2 {
+		//	fmt.Println("freeze", frozenCntOf[fmt.Sprintf("%v|%v", height, fromW.Address())], "power chunks of", fromW.Address())
+		//}
+
+		if rand.Int()%10 == 0 {
+			_, lastHeight, xerr = ctrler.powersState.Commit()
+			require.NoError(t, xerr)
+			height = lastHeight + 1
+			//fmt.Println("Committed", "height", lastHeight)
+		}
+	}
+
+	_, lastHeight, xerr = ctrler.powersState.Commit()
+	require.NoError(t, xerr)
+	height = lastHeight + 1
+
+	fmt.Println("freezed all delegated vpowers - last committed height", lastHeight, "minRefundHeight", minRefundHeight, "maxRefundHeight", maxRefundHeight)
+	fmt.Println("unfreeze ...")
+
+	for h := height; h <= maxRefundHeight; h++ {
+		var expectedRefundAddrs []types.Address
+		var expectedRefundPower []int64
+		var expectedBalances []*uint256.Int
+		// frozen vpowers to be un-frozen (thawed) at height 'h'
+		xerr = ctrler.powersState.Seek(
+			v1.LedgerKeyFrozenVPower(h, nil),
+			true,
+			func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+				frozen, _ := item.(*FrozenVPower)
+				sum := int64(0)
+				for _, pc := range frozen.PowerChunks {
+					sum += pc.Power
+				}
+				require.Equal(t, sum, frozen.RefundPower)
+				expectedRefundPower = append(expectedRefundPower, frozen.RefundPower)
+
+				addr := key[9:]
+				expectedRefundAddrs = append(expectedRefundAddrs, addr)
+
+				acct := acctMock.FindAccount(addr, true)
+				require.NotNil(t, acct)
+
+				expectedBalances = append(expectedBalances,
+					new(uint256.Int).Add(acct.Balance, ctrlertypes.PowerToAmount(frozen.RefundPower)))
+
+				return nil
+			}, true)
+		require.NoError(t, xerr)
+		require.Equal(t, refundCntAt[h], len(expectedRefundPower))
+		require.Equal(t, len(expectedRefundAddrs), len(expectedRefundPower))
+		require.Equal(t, len(expectedBalances), len(expectedRefundPower))
+
+		xerr = ctrler._unfreezePowerChunk(h, acctMock)
+		require.NoError(t, xerr)
+
+		for idx, addr := range expectedRefundAddrs {
+			acct := acctMock.FindAccount(addr, true)
+			require.NotNil(t, acct)
+			require.Equal(t, expectedBalances[idx].String(), acct.Balance.String())
+		}
+
+		_, lastHeight, xerr = ctrler.powersState.Commit()
+		require.NoError(t, xerr)
+
+		for idx, addr := range expectedRefundAddrs {
+			acct := acctMock.FindAccount(addr, false)
+			require.NotNil(t, acct)
+			require.Equal(t, expectedBalances[idx].String(), acct.Balance.String())
+		}
+	}
+
+	ctrler.powersState.Seek(
+		v1.KeyPrefixFrozenVPower,
+		true,
+		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			frozen := item.(*FrozenVPower)
+			_h := key[1:9]
+			h := binary.BigEndian.Uint64(_h)
+			fmt.Println("maxRefundHeight", maxRefundHeight, "h", h, frozen)
+			return nil
+		},
+		true,
+	)
+	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+
+	// at now, all delegated power has been frozen.
+	// only initial vpowers are remained.
+	fmt.Println("return to initial vpowers - last committed height", lastHeight)
+
+	for _, v := range valWallets {
+		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address(), nil), true)
+		require.NoError(t, xerr)
+
+		dgtee, _ := item.(*DelegateeV1)
+		require.EqualValues(t, v.Address(), dgtee.addr)
+		require.Equal(t, powers0[dgtee.addr.String()], dgtee.SumPower)
+		require.Equal(t, powers0[dgtee.addr.String()], dgtee.SelfPower)
+		require.Equal(t, 1, len(dgtee.Delegators))
+	}
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets []*web3.Wallet, height int64) ([]*web3.Wallet, []*web3.Wallet, []int64, []bytes2.HexBytes) {
 
 	var fromWals0 []*web3.Wallet
 	var valWals0 []*web3.Wallet
@@ -473,21 +667,18 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 	addedPower0 := int64(0)
 
 	for i := 0; i < count; i++ {
-		// `fromWallet` delegates to `valWallet`
+		// `fromWal` delegates to `valWal`
 
-		fromWallet := acctMock.RandWallet()
-		valWallet := valWallets[rand.Intn(len(valWallets))]
+		fromWal := acctMock.RandWallet()
+		valWal := valWallets[rand.Intn(len(valWallets))]
 		power := bytes2.RandInt64N(1_000) + 4000
 
-		txctx0, xerr := makeBondingTrxCtx(fromWallet, valWallet.Address(), power, lastHeight+1)
+		txctx, xerr := doDelegate(ctrler, fromWal, valWal.Address(), power, height)
 		require.NoError(t, xerr)
-		require.EqualValues(t, valWallet.Address(), txctx0.Tx.To)
 
-		require.NoError(t, executeTransaction(ctrler, txctx0))
-
-		fromWals0 = append(fromWals0, fromWallet)
-		valWals0 = append(valWals0, valWallet)
-		txhashes0 = append(txhashes0, txctx0.TxHash)
+		fromWals0 = append(fromWals0, fromWal)
+		valWals0 = append(valWals0, valWal)
+		txhashes0 = append(txhashes0, txctx.TxHash)
 		powers0 = append(powers0, power)
 		addedPower0 += power
 	}
@@ -545,8 +736,8 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 		actualAddrArray := dgtee.Delegators
 		sort.Slice(expectedAddrArray, func(i, j int) bool { return bytes.Compare(expectedAddrArray[i], expectedAddrArray[j]) < 0 })
 		sort.Slice(actualAddrArray, func(i, j int) bool { return bytes.Compare(actualAddrArray[i], actualAddrArray[j]) < 0 })
-		for i, addr := range expectedAddrArray {
-			require.EqualValues(t, addr, dgtee.Delegators[i])
+		for i := 0; i < len(actualAddrArray); i++ {
+			require.EqualValues(t, expectedAddrArray[i], actualAddrArray[i])
 		}
 
 		return nil
@@ -556,7 +747,7 @@ func testRandDelegating(t *testing.T, count int, ctrler *VPowerCtrler, valWallet
 	return fromWals0, valWals0, powers0, txhashes0
 }
 
-func initCtrler(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {
+func initLedger(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {
 
 	ctrler, xerr := NewVPowerCtrler(cfg, 0, log.NewNopLogger())
 	if xerr != nil {
@@ -589,18 +780,6 @@ func initCtrler(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpda
 		return nil, nil, nil, xerr
 	}
 	return ctrler, vals, valWallets, nil
-}
-
-func checkExistDelegatee(dgt *DelegateeV1, vups []abcitypes.ValidatorUpdate) bool {
-	for _, vup := range vups {
-		if euqalDelegatee(dgt, vup) {
-			return true
-		}
-	}
-	return false
-}
-func euqalDelegatee(dgt *DelegateeV1, vup abcitypes.ValidatorUpdate) bool {
-	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.SumPower == vup.Power
 }
 
 func makeBondingTrxCtx(fromAcct *web3.Wallet, to types.Address, power int64, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
@@ -671,16 +850,26 @@ func makeUnbondingTrxCtx(fromAcct *web3.Wallet, to types.Address, height int64, 
 	return txCtx, nil
 }
 
-func removeDupWallets(walllets []*web3.Wallet) []*web3.Wallet {
-	_map := make(map[string]*web3.Wallet)
-	for _, v := range walllets {
-		_map[v.Address().String()] = v
+func doDelegate(ctrler *VPowerCtrler, fromWal *web3.Wallet, toAddr types.Address, power, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
+	txctx, xerr := makeBondingTrxCtx(fromWal, toAddr, power, height)
+	if xerr != nil {
+		return nil, xerr
 	}
-	var result []*web3.Wallet
-	for _, v := range _map {
-		result = append(result, v)
+	if xerr = executeTransaction(ctrler, txctx); xerr != nil {
+		return nil, xerr
 	}
-	return result
+	return txctx, nil
+}
+
+func doUndelegate(ctrler *VPowerCtrler, fromWal *web3.Wallet, toAddr types.Address, height int64, txhash bytes2.HexBytes) (*ctrlertypes.TrxContext, xerrors.XError) {
+	txctx, xerr := makeUnbondingTrxCtx(fromWal, toAddr, height, txhash)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if xerr = executeTransaction(ctrler, txctx); xerr != nil {
+		return nil, xerr
+	}
+	return txctx, nil
 }
 
 func executeTransaction(ctrler *VPowerCtrler, txctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -691,4 +880,28 @@ func executeTransaction(ctrler *VPowerCtrler, txctx *ctrlertypes.TrxContext) xer
 		return xerr
 	}
 	return nil
+}
+
+func checkExistDelegatee(dgt *DelegateeV1, vups []abcitypes.ValidatorUpdate) bool {
+	for _, vup := range vups {
+		if euqalDelegatee(dgt, vup) {
+			return true
+		}
+	}
+	return false
+}
+func euqalDelegatee(dgt *DelegateeV1, vup abcitypes.ValidatorUpdate) bool {
+	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.SumPower == vup.Power
+}
+
+func removeDupWallets(walllets []*web3.Wallet) []*web3.Wallet {
+	_map := make(map[string]*web3.Wallet)
+	for _, v := range walllets {
+		_map[v.Address().String()] = v
+	}
+	var result []*web3.Wallet
+	for _, v := range _map {
+		result = append(result, v)
+	}
+	return result
 }

@@ -313,10 +313,6 @@ func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
 	return ret, nil
 }
 
-//func (r *GovParams) Key() v1.LedgerKey {
-//	return LedgerKeyGovParams()
-//}
-
 func (r *GovParams) Decode(bz []byte) xerrors.XError {
 	pm := &GovParamsProto{}
 	if err := proto.Unmarshal(bz, pm); err != nil {
@@ -980,3 +976,13 @@ func MergeGovParams(oldParams, newParams *GovParams) {
 
 var _ v1.ILedgerItem = (*GovParams)(nil)
 var _ IGovParams = (*GovParams)(nil)
+
+// functions for test
+
+// DEPRECATED
+func (r *GovParams) SetLazyUnstakingBlocks(n int64) {
+	r.mtx.Lock()
+	defer r.mtx.Unlock()
+
+	r.lazyUnstakingBlocks = n
+}

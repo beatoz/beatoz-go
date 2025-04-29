@@ -11,7 +11,7 @@ import (
 
 type AcctHandlerMock struct {
 	wallets  []*web3.Wallet
-	accounts []*ctrlertypes.Account
+	accounts []*ctrlertypes.Account // has no private key
 }
 
 func NewAccountHandlerMock(walCnt int) *AcctHandlerMock {
