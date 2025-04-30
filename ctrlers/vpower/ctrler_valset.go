@@ -20,10 +20,18 @@ func (ctrler *VPowerCtrler) updateValidators(maxVals int) []abcitypes.ValidatorU
 	return upVals
 }
 
+func _updateValidators(all, lastValSet []*Delegatee, maxVals int) []abcitypes.ValidatorUpdate {
+
+	newValidators := selectValidators(all, maxVals)
+	upVals := validatorUpdates(lastValSet, newValidators)
+
+	return upVals
+}
+
 // selectValidators returns the top maxVals delegatees, sorted in descending order of power.
 // NOTE: The order of elements in `delegatees` are rearranged based on their power in descending order.
 func selectValidators(delegatees []*Delegatee, maxVals int) []*Delegatee {
-	sort.Sort(orderByPowerDelegateeV1(delegatees))
+	sort.Sort(orderByPowerDelegatee(delegatees))
 	ret := make([]*Delegatee, libs.MinInt(len(delegatees), maxVals))
 	copy(ret, delegatees[:len(ret)])
 	return ret
@@ -34,8 +42,8 @@ func selectValidators(delegatees []*Delegatee, maxVals int) []*Delegatee {
 func validatorUpdates(lastVals, newVals []*Delegatee) []abcitypes.ValidatorUpdate {
 	valUpdates := make(abcitypes.ValidatorUpdates, 0, len(lastVals)+len(newVals))
 
-	sort.Sort(orderByPubDelegateeV1(lastVals))
-	sort.Sort(orderByPubDelegateeV1(newVals))
+	sort.Sort(orderByPubDelegatee(lastVals))
+	sort.Sort(orderByPubDelegatee(newVals))
 
 	i, j := 0, 0
 	for i < len(lastVals) && j < len(newVals) {

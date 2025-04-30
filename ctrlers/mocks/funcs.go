@@ -1,38 +1,39 @@
 package mocks
 
 import (
+	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
 var lastBlockCtx *ctrlertypes.BlockContext
+var currBlockCtx *ctrlertypes.BlockContext
 
 func InitBlockCtxWith(h int64, a ctrlertypes.IAccountHandler, g ctrlertypes.IGovParams, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
 	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{}, g, a, s)
 	bctx.SetHeight(h)
 
-	lastBlockCtx = bctx
+	currBlockCtx = bctx
 	return bctx
 }
 
 func InitBlockCtx(bctx *ctrlertypes.BlockContext) {
-	lastBlockCtx = bctx
+	currBlockCtx = bctx
 }
 
-func NextBlockCtx() *ctrlertypes.BlockContext {
-	if lastBlockCtx == nil {
-		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
-	}
-	lastBlockCtx = InitBlockCtxWith(lastBlockCtx.Height()+1, lastBlockCtx.AcctHandler, lastBlockCtx.GovParams, lastBlockCtx.StakeHandler)
-	return lastBlockCtx
+func CurrBlockCtx() *ctrlertypes.BlockContext {
+	return currBlockCtx
 }
 
-func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
-	if lastBlockCtx == nil {
-		panic("lastBlockCtx is nil - Run InitBlockCtxWith")
+func CurrBlockHeight() int64 {
+	if currBlockCtx == nil {
+		return 0
 	}
-	lastBlockCtx = InitBlockCtxWith(bctx.Height()+1, bctx.AcctHandler, bctx.GovParams, bctx.StakeHandler)
-	return lastBlockCtx
+	return currBlockCtx.Height()
+}
+
+func SetCurrBlockCtx(bctx *ctrlertypes.BlockContext) {
+	currBlockCtx = bctx
 }
 
 func LastBlockCtx() *ctrlertypes.BlockContext {
@@ -46,14 +47,25 @@ func LastBlockHeight() int64 {
 	return lastBlockCtx.Height()
 }
 
+func SetLastBlockCtx(bctx *ctrlertypes.BlockContext) {
+	lastBlockCtx = bctx
+}
+
+func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
+	if bctx == nil {
+		bctx = lastBlockCtx
+	}
+	return InitBlockCtxWith(bctx.Height()+1, bctx.AcctHandler, bctx.GovParams, bctx.StakeHandler)
+}
+
 func DoBeginBlock(ctrler ctrlertypes.IBlockHandler) error {
-	bctx := LastBlockCtx() //mocks.NextBlockCtx()
+	bctx := CurrBlockCtx() //mocks.NextBlockCtx()
 	//fmt.Println("DoBeginBlock for", bctx.Height())
 	_, err := ctrler.BeginBlock(bctx)
 	return err
 }
 func DoEndBlock(ctrler ctrlertypes.IBlockHandler) error {
-	bctx := LastBlockCtx()
+	bctx := CurrBlockCtx()
 	//fmt.Println("DoEndBlock for", bctx.Height())
 	if _, err := ctrler.EndBlock(bctx); err != nil {
 		return err
@@ -63,8 +75,11 @@ func DoEndBlock(ctrler ctrlertypes.IBlockHandler) error {
 func DoCommitBlock(ctrler ctrlertypes.ILedgerHandler) error {
 	if _, v, err := ctrler.Commit(); err != nil {
 		return err
+	} else if v != currBlockCtx.Height() {
+		panic(fmt.Errorf("different height between ledger(%v) and currBlockCtx(%v)", v, currBlockCtx.Height()))
 	} else {
-		LastBlockCtx().SetHeight(v)
+		lastBlockCtx = currBlockCtx
+		currBlockCtx = NextBlockCtxOf(currBlockCtx)
 	}
 	return nil
 }

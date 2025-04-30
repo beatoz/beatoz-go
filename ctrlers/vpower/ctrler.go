@@ -53,6 +53,9 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRatio(), govParams.MaxUpdatableStakeRatio()),
 		logger:      lg,
 	}
+	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
+		return nil, xerr
+	}
 	return ret, nil
 }
 
@@ -67,13 +70,23 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 		return xerrors.ErrInitChain.Wrapf("wrong parameter: StakeCtrler::InitLedger() requires []*InitStake")
 	}
 
+	var dgtees []*Delegatee
+	var lastVals []*Delegatee
 	for _, v := range initValidators {
-		dgt := newDelegateeV1(v.PubKey.GetSecp256K1())
+		dgt := newDelegatee(v.PubKey.GetSecp256K1())
 		vpow := newVPower(dgt.addr, dgt.PubKey)
 		if xerr := ctrler.bondPowerChunk(dgt, vpow, v.Power, int64(1), bytes.ZeroBytes(32), true); xerr != nil {
 			return xerr
 		}
+		dgtees = append(dgtees, dgt)
 	}
+
+	if len(dgtees) > 0 {
+		// In `InitLedger`, all delegatees become the initial validator set.
+		lastVals = selectValidators(dgtees, len(dgtees))
+	}
+	ctrler.allDelegatees = dgtees
+	ctrler.lastValidators = lastVals
 
 	return nil
 }
@@ -104,25 +117,6 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	if bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
 		// calculate reward...
 	}
-
-	//
-	// read all validator list again.
-	// it will be used to calculate new validator set in EndBlock
-	//
-	// NOTE:
-	// loadDelegatees() returns delegatees, which are committed at previous block(which height is `blockCtx.Height() - 1`).
-	// (At `BeginBlock()`, the transactions in the current block is not applied to ledger yet.)
-	// So, if the bonding tx(including TrxPayloadStaking) is executed and the stake is saved(committed) at block height `N`,
-	//     the updated validators is notified to the consensus engine via EndBlock() at block height `N+1`,
-	//	   the consensus engine applies these accounts to the `ValidatorSet` at block height `(N+1)+2`.
-	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
-	// So, the accounts can start signing from block height `N+3`
-	// and the Beatoz can check the signatures through `lastVotes` in block height `N+4`.
-	dgtees, xerr := ctrler.loadDelegatees(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	ctrler.allDelegatees = dgtees
 
 	if bctx.Height()%bctx.GovParams.LazyUnstakingBlocks() == 0 {
 		//todo: signing check and reward
@@ -306,11 +300,11 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	dgtee := ctx.ValidateResult.(*bondingTrxOpt).dgtee
 	if dgtee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self bonding: add new delegatee
-		dgtee = newDelegateeV1(ctx.SenderPubKey)
+		dgtee = newDelegatee(ctx.SenderPubKey)
 	}
 
 	if dgtee == nil {
-		// `newDelegateeV1` does not fail, so this code is not reachable.
+		// `newDelegatee` does not fail, so this code is not reachable.
 		// there is no delegatee whose address is ctx.Tx.To
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
@@ -406,6 +400,25 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	if xerr := ctrler.unfreezePowerChunk(bctx); xerr != nil {
 		return nil, xerr
 	}
+
+	//
+	// read all delegatee list again.
+	// it will be used to calculate new validator
+	//
+	// NOTE:
+	// `loadDelegatees()` returns all delegatees, which are updated by the bonding txs in this block(`bctx.Height()`).
+	// (At `EndBlock()`, the transactions in the current block have been executed to ledger, but not committed yet.)
+	// So, if the bonding tx(including TrxPayloadStaking/TrxPayloadUnStaking) is executed and the stake is saved at block height `N`,
+	//     the updated validators is notified to the consensus engine via `EndBlock()` of block height `N`,
+	//	   the consensus engine applies these accounts to the ValidatorSet at block height `(N)+2`.
+	//	   (Refer to the comments in `updateState(...)` at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
+	// So, the accounts can start signing from block height `N+2`
+	// and the Beatoz can check the signatures through `lastVotes` from the block height `N+3`.
+	dgtees, xerr := ctrler.loadDelegatees(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+	ctrler.allDelegatees = dgtees
 
 	newValUps := ctrler.updateValidators(int(bctx.GovParams.MaxValidatorCnt()))
 	bctx.SetValUpdates(newValUps)

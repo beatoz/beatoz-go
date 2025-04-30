@@ -110,7 +110,7 @@ func TestTrxStakingToSelf(t *testing.T) {
 	sumAmt := uint256.NewInt(0)
 	sumPower := int64(0)
 
-	_ = mocks.InitBlockCtxWith(0, acctMock00, govParams00, nil)
+	_ = mocks.InitBlockCtxWith(1, acctMock00, govParams00, nil)
 	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 
 	for _, txctx := range stakingToSelfTrxCtxs {

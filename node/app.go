@@ -371,6 +371,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	// todo: Consider using block gas limit of lastBlockCtx
 	blockGasLimit := ctrlertypes.AdjustBlockGasLimit(
 		ctrler.lastBlockCtx.GetBlockGasLimit(),
 		ctrler.lastBlockCtx.GetBlockGasUsed(),

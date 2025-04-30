@@ -16,7 +16,7 @@ type Delegatee struct {
 	key  v1.LedgerKey
 }
 
-func newDelegateeV1(pubKey bytes.HexBytes) *Delegatee {
+func newDelegatee(pubKey bytes.HexBytes) *Delegatee {
 	ret := &Delegatee{
 		DelegateeProto: DelegateeProto{
 			PubKey: pubKey,
@@ -92,14 +92,14 @@ func (x *Delegatee) Clone() *Delegatee {
 	}
 }
 
-func copyDelegateeV1Array(src []*Delegatee) []*Delegatee {
+func copyDelegateeArray(src []*Delegatee) []*Delegatee {
 	dst := make([]*Delegatee, len(src))
 	for i, d := range src {
 		dst[i] = d.Clone()
 	}
 	return dst
 }
-func findDelegateeV1ByAddr(addr types.Address, dgtees []*Delegatee) *Delegatee {
+func findDelegateeByAddr(addr types.Address, dgtees []*Delegatee) *Delegatee {
 	for _, v := range dgtees {
 		if bytes.Equal(v.addr, addr) {
 			return v
@@ -108,7 +108,7 @@ func findDelegateeV1ByAddr(addr types.Address, dgtees []*Delegatee) *Delegatee {
 	return nil
 }
 
-func findDelegateeV1ByPubKey(pubKey bytes.HexBytes, dgtees []*Delegatee) *Delegatee {
+func findDelegateeByPubKey(pubKey bytes.HexBytes, dgtees []*Delegatee) *Delegatee {
 	for _, v := range dgtees {
 		if bytes.Equal(v.PubKey, pubKey) {
 			return v
@@ -117,45 +117,46 @@ func findDelegateeV1ByPubKey(pubKey bytes.HexBytes, dgtees []*Delegatee) *Delega
 	return nil
 }
 
-type orderByPowerDelegateeV1 []*Delegatee
+type orderByPowerDelegatee []*Delegatee
 
-func (dgtees orderByPowerDelegateeV1) Len() int {
+func (dgtees orderByPowerDelegatee) Len() int {
 	return len(dgtees)
 }
 
 // descending order by TotalPower
-func (dgtees orderByPowerDelegateeV1) Less(i, j int) bool {
+func (dgtees orderByPowerDelegatee) Less(i, j int) bool {
 	if dgtees[i].SumPower != dgtees[j].SumPower {
 		return dgtees[i].SumPower > dgtees[j].SumPower
 	}
 	if dgtees[i].SelfPower != dgtees[j].SelfPower {
 		return dgtees[i].SelfPower > dgtees[j].SelfPower
 	}
-	if bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) > 0 {
+	// when sorting by PubKey, ascending order is used
+	if bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) < 0 {
 		return true
 	}
 	return false
 }
 
-func (dgtees orderByPowerDelegateeV1) Swap(i, j int) {
+func (dgtees orderByPowerDelegatee) Swap(i, j int) {
 	dgtees[i], dgtees[j] = dgtees[j], dgtees[i]
 }
 
-var _ sort.Interface = (orderByPowerDelegateeV1)(nil)
+var _ sort.Interface = (orderByPowerDelegatee)(nil)
 
-type orderByPubDelegateeV1 []*Delegatee
+type orderByPubDelegatee []*Delegatee
 
-func (dgtees orderByPubDelegateeV1) Len() int {
+func (dgtees orderByPubDelegatee) Len() int {
 	return len(dgtees)
 }
 
 // ascending order by address
-func (dgtees orderByPubDelegateeV1) Less(i, j int) bool {
+func (dgtees orderByPubDelegatee) Less(i, j int) bool {
 	return bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) < 0
 }
 
-func (dgtees orderByPubDelegateeV1) Swap(i, j int) {
+func (dgtees orderByPubDelegatee) Swap(i, j int) {
 	dgtees[i], dgtees[j] = dgtees[j], dgtees[i]
 }
 
-var _ sort.Interface = (orderByPubDelegateeV1)(nil)
+var _ sort.Interface = (orderByPubDelegatee)(nil)

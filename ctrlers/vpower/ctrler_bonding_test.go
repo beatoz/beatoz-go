@@ -184,7 +184,7 @@ func Test_Bonding(t *testing.T) {
 
 	// close and re-open
 	require.NoError(t, ctrler.Close())
-	ctrler, xerr = NewVPowerCtrler(config, 0, log.NewNopLogger())
+	ctrler, xerr = NewVPowerCtrler(config, int(govParams.MaxValidatorCnt()), log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	//
@@ -749,7 +749,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 
 func initLedger(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {
 
-	ctrler, xerr := NewVPowerCtrler(cfg, 0, log.NewNopLogger())
+	ctrler, xerr := NewVPowerCtrler(cfg, int(govParams.MaxValidatorCnt()), log.NewNopLogger())
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
