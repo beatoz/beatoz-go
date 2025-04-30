@@ -20,8 +20,8 @@ import (
 type VPowerCtrler struct {
 	powersState v1.IStateLedger
 
-	allDelegatees  []*DelegateeV1
-	lastValidators []*DelegateeV1
+	allDelegatees  []*Delegatee
+	lastValidators []*Delegatee
 
 	vpowLimiter *VPowerLimiter
 
@@ -33,7 +33,7 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 	if bytes2.HasPrefix(key, v1.KeyPrefixVPower) {
 		return &VPower{}
 	} else if bytes2.HasPrefix(key, v1.KeyPrefixDelegatee) {
-		return &DelegateeV1{}
+		return &Delegatee{}
 	} else if bytes2.HasPrefix(key, v1.KeyPrefixFrozenVPower) {
 		return &FrozenVPower{}
 	}
@@ -52,9 +52,6 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 		powersState: powersState,
 		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRatio(), govParams.MaxUpdatableStakeRatio()),
 		logger:      lg,
-	}
-	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
-		return nil, xerr
 	}
 	return ret, nil
 }
@@ -85,12 +82,12 @@ func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	dgtees, xerr := ctrler.loadDelegatees()
+	dgtees, xerr := ctrler.loadDelegatees(true)
 	if xerr != nil {
 		return xerr
 	}
 
-	var lastVals []*DelegateeV1
+	var lastVals []*Delegatee
 	if dgtees != nil {
 		lastVals = selectValidators(dgtees, maxValCnt)
 	}
@@ -108,9 +105,30 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		// calculate reward...
 	}
 
-	//todo: all validator list 재구성
+	//
+	// read all validator list again.
+	// it will be used to calculate new validator set in EndBlock
+	//
+	// NOTE:
+	// loadDelegatees() returns delegatees, which are committed at previous block(which height is `blockCtx.Height() - 1`).
+	// (At `BeginBlock()`, the transactions in the current block is not applied to ledger yet.)
+	// So, if the bonding tx(including TrxPayloadStaking) is executed and the stake is saved(committed) at block height `N`,
+	//     the updated validators is notified to the consensus engine via EndBlock() at block height `N+1`,
+	//	   the consensus engine applies these accounts to the `ValidatorSet` at block height `(N+1)+2`.
+	//	   (Refer to the comments in updateState(...) at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
+	// So, the accounts can start signing from block height `N+3`
+	// and the Beatoz can check the signatures through `lastVotes` in block height `N+4`.
+	dgtees, xerr := ctrler.loadDelegatees(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+	ctrler.allDelegatees = dgtees
+
+	if bctx.Height()%bctx.GovParams.LazyUnstakingBlocks() == 0 {
+		//todo: signing check and reward
+	}
+
 	//todo: slashing
-	//todo: reward and signing check
 
 	//ctrler.vpowLimiter.Reset(
 	//	ctrler.allDelegatees,
@@ -121,7 +139,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 }
 
 type bondingTrxOpt struct {
-	dgtee   *DelegateeV1
+	dgtee   *Delegatee
 	vpow    *VPower
 	txPower int64
 }
@@ -198,9 +216,11 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrOverFlow.Wrapf("validator(%v) power overflow occurs.\ntx:%v", ctx.Tx.To, ctx.Tx)
 		}
 
-		//
-		// todo: Implement stake limiter
-		//
+		{
+			//
+			// todo: Implement stake limiter
+			//
+		}
 
 		// set the result of ValidateTrx
 		ctx.ValidateResult = &bondingTrxOpt{
@@ -210,7 +230,6 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		}
 
 	case ctrlertypes.TRX_UNSTAKING:
-		// todo: Resolve issue #34: check updatable stake ratio
 
 		// NOTE: Do not find from `allDelegatees`.
 		// `ctx.Tx.To` must already be a delegator (or validator), so it should be found in the `dgteesLedger`.
@@ -242,7 +261,12 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrNotFoundStake
 		}
 
-		// todo: implement checking updatable limitation.
+		{
+			//
+			// todo: implement checking updatable limitation.
+			// todo: Resolve issue #34: check updatable stake ratio
+			//
+		}
 
 		// set the result of ValidateTrx
 		ctx.ValidateResult = &bondingTrxOpt{
@@ -321,13 +345,13 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
-	// find delegatee
+	// found delegatee
 	dgtee := ctx.ValidateResult.(*bondingTrxOpt).dgtee
 	if dgtee == nil {
 		panic("not reachable")
 	}
 
-	// remove the voting power chunk from a delegatee
+	// the power chunk pointed by txhash will be frozen (removed from `dgtee`)
 	txhash := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadUnstaking).TxHash
 	if txhash == nil {
 		panic("not reachable")
@@ -350,7 +374,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	}
 
 	if dgtee.SelfPower == 0 {
-		// un-bonding all voting powers delegated to `dgteeProto`
+		// un-bonding all vpowers delegated to `dgtee`
 		for _, _from := range dgtee.Delegators {
 			_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, ctx.Exec)
 			if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
@@ -363,6 +387,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 				}
 
 				for _, _pc := range _vpow.PowerChunks {
+					// freeze all power chunks that the `_vpow` has
 					if xerr = ctrler.freezePowerChunk(_vpow.From, _pc, refundHeight, ctx.Exec); xerr != nil {
 						return xerr
 					}
@@ -378,6 +403,13 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 }
 
 func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	if xerr := ctrler.unfreezePowerChunk(bctx); xerr != nil {
+		return nil, xerr
+	}
+
+	newValUps := ctrler.updateValidators(int(bctx.GovParams.MaxValidatorCnt()))
+	bctx.SetValUpdates(newValUps)
+
 	return nil, nil
 }
 
