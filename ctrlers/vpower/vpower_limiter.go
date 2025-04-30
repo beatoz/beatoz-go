@@ -43,11 +43,11 @@ func (limiter *VPowerLimiter) reset(vals []*Delegatee, maxValCnt, indiLimitRatio
 	for i, v := range vals {
 		pobjs = append(pobjs, &powerObj{
 			Addr:  v.addr,
-			Power: v.totalPower,
+			Power: v.SumPower,
 		})
 
 		if int64(i) < maxValCnt {
-			_base += v.totalPower
+			_base += v.SumPower
 		}
 	}
 
@@ -78,12 +78,12 @@ func (limiter *VPowerLimiter) checkIndividualPowerLimit(val *Delegatee, diffPowe
 		return nil
 	}
 
-	individualRatio := (val.totalPower + diffPower) * int64(100) / (limiter.baseTotalPower + diffPower)
+	individualRatio := (val.SumPower + diffPower) * int64(100) / (limiter.baseTotalPower + diffPower)
 
 	if individualRatio > limiter.individualLimitRatio {
 		return xerrors.From(
 			fmt.Errorf("VPowerLimiter error: exceeding individual power limit - delegatee(%v), power(%v), diff:%v, base(%v), ratio(%v), limit(%v)",
-				val.addr, val.totalPower, diffPower, limiter.baseTotalPower, individualRatio, limiter.individualLimitRatio))
+				val.addr, val.SumPower, diffPower, limiter.baseTotalPower, individualRatio, limiter.individualLimitRatio))
 	}
 
 	return nil
@@ -98,7 +98,7 @@ func (limiter *VPowerLimiter) checkUpdatablePowerLimit(val *Delegatee, diffPower
 		// `delg` is new face
 		powObj = &powerObj{
 			Addr:  val.addr,
-			Power: val.totalPower,
+			Power: val.SumPower,
 		}
 		// when the val is new face, the added power should be ignored at this time.
 		//ridx = len(limiter.powerObjs)
@@ -107,9 +107,9 @@ func (limiter *VPowerLimiter) checkUpdatablePowerLimit(val *Delegatee, diffPower
 
 	updatedPower := limiter.updatedPower
 
-	if powObj.Power != val.totalPower {
+	if powObj.Power != val.SumPower {
 		return xerrors.From(fmt.Errorf("VPowerLimiter's power(%v) object is not equal to the power(%v) of validator(%v)",
-			powObj.Power, val.totalPower, val.addr))
+			powObj.Power, val.SumPower, val.addr))
 	}
 
 	if ridx >= 0 && ridx < int(limiter.maxValidatorCnt) && diffPower < 0 {

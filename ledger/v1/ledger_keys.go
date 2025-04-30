@@ -39,17 +39,17 @@ func LedgerKeyGovParams() LedgerKey {
 	return _key
 }
 
-func LedgerKeyVPower(k0, k1 []byte) LedgerKey {
-	k := make([]byte, len(KeyPrefixVPower)+len(k0)+len(k1))
+func LedgerKeyVPower(from, to []byte) LedgerKey {
+	k := make([]byte, len(KeyPrefixVPower)+len(from)+len(to))
 	copy(k, KeyPrefixVPower)
-	copy(k[len(KeyPrefixVPower):], append(k0, k1...))
+	copy(k[len(KeyPrefixVPower):], append(from, to...))
 	return k
 }
 
-func LedgerKeyDelegatee(k0, k1 []byte) LedgerKey {
-	k := make([]byte, len(KeyPrefixDelegatee)+len(k0)+len(k1))
+func LedgerKeyDelegatee(addr, from []byte) LedgerKey {
+	k := make([]byte, len(KeyPrefixDelegatee)+len(addr)+len(from))
 	copy(k, KeyPrefixDelegatee)
-	copy(k[len(KeyPrefixDelegatee):], append(k0, k1...))
+	copy(k[len(KeyPrefixDelegatee):], append(addr, from...))
 	return k
 }
 

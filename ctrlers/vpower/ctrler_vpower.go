@@ -8,24 +8,24 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
-func (ctrler *VPowerCtrler) loadDelegatees() ([]*DelegateeV1, xerrors.XError) {
-	var dgtees []*DelegateeV1
+func (ctrler *VPowerCtrler) loadDelegatees(exec bool) ([]*Delegatee, xerrors.XError) {
+	var dgtees []*Delegatee
 	xerr := ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		dgtee, _ := item.(*DelegateeV1)
+		dgtee, _ := item.(*Delegatee)
 		dgtees = append(dgtees, dgtee)
 		return nil
-	}, true)
+	}, exec)
 	if xerr != nil {
 		return nil, xerr
 	}
 	return dgtees, nil
 }
 
-func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*DelegateeV1, xerrors.XError) {
-	var ret *DelegateeV1
+func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*Delegatee, xerrors.XError) {
+	var ret *Delegatee
 	item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(addr, nil), exec)
 	if xerr == nil {
-		ret, _ = item.(*DelegateeV1)
+		ret, _ = item.(*Delegatee)
 	}
 	return ret, xerr
 }
@@ -48,7 +48,7 @@ func (ctrler *VPowerCtrler) delVPower(from, to types.Address, exec bool) xerrors
 }
 
 func (ctrler *VPowerCtrler) bondPowerChunk(
-	dgtee *DelegateeV1,
+	dgtee *Delegatee,
 	vpow *VPower,
 	power int64,
 	height int64,
@@ -69,7 +69,7 @@ func (ctrler *VPowerCtrler) bondPowerChunk(
 	return nil
 }
 
-func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *DelegateeV1, vpow *VPower, txhash bytes.HexBytes, exec bool) (*PowerChunkProto, xerrors.XError) {
+func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *Delegatee, vpow *VPower, txhash bytes.HexBytes, exec bool) (*PowerChunkProto, xerrors.XError) {
 	// delete the power chunk with `txhash`
 	var pc = vpow.delPowerWithTxHash(txhash)
 	if pc == nil {

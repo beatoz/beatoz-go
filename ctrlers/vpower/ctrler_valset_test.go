@@ -17,8 +17,8 @@ func Test_validatorUpdates(t *testing.T) {
 	maxValCnt := 5
 
 	for _i := 0; _i < 1000; _i++ {
-		var alls []*DelegateeV1
-		var lastVals []*DelegateeV1
+		var alls []*Delegatee
+		var lastVals []*Delegatee
 
 		topPow := int64(0)
 		bottomPow := int64(math.MaxInt64)
@@ -148,7 +148,7 @@ func Test_validatorUpdates(t *testing.T) {
 //	return ret
 //}
 
-func makeDelegateeOne(pow int64) *DelegateeV1 {
+func makeDelegateeOne(pow int64) *Delegatee {
 	_, pub := crypto.NewKeypairBytes()
 	dgtee := newDelegateeV1(pub)
 	dgtee.SumPower = pow

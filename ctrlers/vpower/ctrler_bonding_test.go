@@ -67,7 +67,7 @@ func Test_InitLedger(t *testing.T) {
 
 	totalPower1 := int64(0)
 	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		dgt, _ := item.(*DelegateeV1)
+		dgt, _ := item.(*Delegatee)
 		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr, nil), key)
 		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr, nil), dgt.key)
 
@@ -472,7 +472,7 @@ func Test_Freezing(t *testing.T) {
 		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address(), nil), true)
 		require.NoError(t, xerr)
 
-		dgtee, _ := item.(*DelegateeV1)
+		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, v.Address(), dgtee.addr)
 
 		powers0[dgtee.addr.String()] = dgtee.SumPower
@@ -647,7 +647,7 @@ func Test_Freezing(t *testing.T) {
 		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address(), nil), true)
 		require.NoError(t, xerr)
 
-		dgtee, _ := item.(*DelegateeV1)
+		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, v.Address(), dgtee.addr)
 		require.Equal(t, powers0[dgtee.addr.String()], dgtee.SumPower)
 		require.Equal(t, powers0[dgtee.addr.String()], dgtee.SelfPower)
@@ -726,7 +726,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 
 	// check delegatees
 	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		dgtee, _ := item.(*DelegateeV1)
+		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
 		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), key)
 		require.EqualValues(t, key, dgtee.key)
@@ -882,7 +882,7 @@ func executeTransaction(ctrler *VPowerCtrler, txctx *ctrlertypes.TrxContext) xer
 	return nil
 }
 
-func checkExistDelegatee(dgt *DelegateeV1, vups []abcitypes.ValidatorUpdate) bool {
+func checkExistDelegatee(dgt *Delegatee, vups []abcitypes.ValidatorUpdate) bool {
 	for _, vup := range vups {
 		if euqalDelegatee(dgt, vup) {
 			return true
@@ -890,7 +890,7 @@ func checkExistDelegatee(dgt *DelegateeV1, vups []abcitypes.ValidatorUpdate) boo
 	}
 	return false
 }
-func euqalDelegatee(dgt *DelegateeV1, vup abcitypes.ValidatorUpdate) bool {
+func euqalDelegatee(dgt *Delegatee, vup abcitypes.ValidatorUpdate) bool {
 	return bytes.Equal(dgt.PubKey, vup.PubKey.GetSecp256K1()) && dgt.SumPower == vup.Power
 }
 

@@ -1,8 +1,8 @@
 package vpower
 
 func (dgtee *Delegatee) DoSlash(ratio int64) int64 {
-	dgtee.mtx.Lock()
-	defer dgtee.mtx.Unlock()
+	//dgtee.mtx.Lock()
+	//defer dgtee.mtx.Unlock()
 
 	// to slash delegators too. issue #49
 	return dgtee.doSlashAll(ratio)

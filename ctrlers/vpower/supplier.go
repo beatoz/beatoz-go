@@ -44,7 +44,7 @@ func (supplier *Supplier) SetLastAdjustedHeight(h int64) {
 }
 
 // Issue returns the additional issued amount at the block height.
-func (supplier *Supplier) Issue(height int64, vpows []Delegatee, durPermil int) *uint256.Int {
+func (supplier *Supplier) Issue(height int64, vpows []*VPower, durPermil int) *uint256.Int {
 	// todo: Compute voting power weight `W` from `stakes`.
 
 	// todo: Compute total supply `totalSupply` at `height` and subtract `supplier.lastTotalSupply` from it.
