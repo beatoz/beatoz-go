@@ -44,6 +44,14 @@ func (x *Delegatee) Decode(d []byte) xerrors.XError {
 	return nil
 }
 
+func (x *Delegatee) Address() types.Address {
+	return x.addr
+}
+
+func (x *Delegatee) PublicKey() bytes.HexBytes {
+	return x.PubKey
+}
+
 func (x *Delegatee) addPower(from types.Address, pow int64) {
 	x.SumPower += pow
 	if bytes.Equal(from, x.addr) {
