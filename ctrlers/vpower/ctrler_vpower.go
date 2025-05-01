@@ -43,6 +43,10 @@ func (ctrler *VPowerCtrler) readVPower(from, to types.Address, exec bool) (*VPow
 	return ret, xerr
 }
 
+func (ctrler *VPowerCtrler) seekVPowersOf(from types.Address, cb v1.FuncIterate, exec bool) xerrors.XError {
+	return ctrler.powersState.Seek(v1.LedgerKeyVPower(from, nil), true, cb, exec)
+}
+
 func (ctrler *VPowerCtrler) delVPower(from, to types.Address, exec bool) xerrors.XError {
 	return ctrler.powersState.Del(v1.LedgerKeyVPower(from, to), exec)
 }

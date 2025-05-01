@@ -19,11 +19,13 @@ import (
 	"sync"
 )
 
+// DEPRECATED
 type InitStake struct {
 	PubKeys bytes.HexBytes
 	Stakes  []*Stake
 }
 
+// DEPRECATED
 type StakeCtrler struct {
 	rwdHashDB *ctrlertypes.MetaDB
 

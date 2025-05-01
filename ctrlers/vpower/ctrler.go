@@ -452,28 +452,80 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 }
 
 func (ctrler *VPowerCtrler) Validators() ([]*abcitypes.Validator, int64) {
-	//TODO implement me
-	panic("implement me")
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	totalPower := int64(0)
+	var ret []*abcitypes.Validator
+	for _, v := range ctrler.lastValidators {
+		totalPower += v.SumPower
+		ret = append(ret, &abcitypes.Validator{
+			Address: v.addr,
+			Power:   v.SumPower,
+		})
+	}
+
+	return ret, totalPower
 }
 
 func (ctrler *VPowerCtrler) IsValidator(addr types.Address) bool {
-	//TODO implement me
-	panic("implement me")
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	for _, v := range ctrler.lastValidators {
+		if bytes.Equal(v.addr, addr) {
+			return true
+		}
+	}
+	return false
 }
 
+func (ctrler *VPowerCtrler) SumPowerOf(addr types.Address) int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	for _, dgtee := range ctrler.allDelegatees {
+		if bytes.Equal(dgtee.addr, addr) {
+			return dgtee.SumPower
+		}
+	}
+	return 0
+}
+
+// DEPRECATED
 func (ctrler *VPowerCtrler) TotalPowerOf(addr types.Address) int64 {
-	//TODO implement me
-	panic("implement me")
+	return ctrler.SumPowerOf(addr)
 }
 
 func (ctrler *VPowerCtrler) SelfPowerOf(addr types.Address) int64 {
-	//TODO implement me
-	panic("implement me")
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	for _, dgtee := range ctrler.allDelegatees {
+		if bytes.Equal(dgtee.addr, addr) {
+			return dgtee.SelfPower
+		}
+	}
+	return 0
 }
 
+func (ctrler *VPowerCtrler) PowerOf(addr types.Address) int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	delegatePower := int64(0)
+	_ = ctrler.seekVPowersOf(addr, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		vpow, _ := item.(*VPower)
+		delegatePower += vpow.SumPower
+		return nil
+	}, true)
+
+	return delegatePower
+}
+
+// DEPRECATED
 func (ctrler *VPowerCtrler) DelegatedPowerOf(addr types.Address) int64 {
-	//TODO implement me
-	panic("implement me")
+	return ctrler.PowerOf(addr)
 }
 
 func (ctrler *VPowerCtrler) Query(query abcitypes.RequestQuery) ([]byte, xerrors.XError) {
