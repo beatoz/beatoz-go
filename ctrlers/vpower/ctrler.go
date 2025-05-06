@@ -114,16 +114,13 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
-		// calculate reward...
-	}
-
-	if bctx.Height()%bctx.GovParams.LazyUnstakingBlocks() == 0 {
-		//todo: signing check and reward
-	}
-
 	//todo: slashing
 
+	if bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
+
+	}
+
+	// todo: reset limiter
 	//ctrler.vpowLimiter.Reset(
 	//	ctrler.allDelegatees,
 	//	bctx.GovParams.MaxValidatorCnt(),

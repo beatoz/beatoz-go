@@ -60,91 +60,63 @@ func Test_Wi(t *testing.T) {
 	}
 }
 
-// Test_Wa_SumWi tests whether the difference between the result of Wa and the sum of Wi is the same to 6 decimal places.
-func Test_Wa_vs_SumWi(t *testing.T) {
-	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200 // 0.200
-
-	nOp := 1000
-	for n := 0; n < nOp; n++ {
-		var vpows, vdurs []int64
-		vpObjs := initTestObjs(int64(350_000_000))
-		// Sum Wi
-		sumWi0 := decimal.Zero
-		for _, vpobj := range vpObjs {
-			wi := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
-			sumWi0 = sumWi0.Add(wi)
-
-			// for computing Wa
-			vpows = append(vpows, vpobj.vpow)
-			vdurs = append(vdurs, vpobj.vdur)
-		}
-		sumWi0 = sumWi0.Truncate(6)
-		//fmt.Println("sum of Wi", sumWi0)
-
-		// Wa
-		sumWi1 := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
-		sumWi1 = sumWi1.Truncate(6)
-		//fmt.Println("Wa return", sumWi1)
-
-		require.True(t, sumWi0.LessThanOrEqual(decimalOne), "SumWi0", sumWi0, "nth", n)
-		require.True(t, sumWi1.LessThanOrEqual(decimalOne), "SumWi1", sumWi1, "nth", n)
-		errVal := sumWi1.Sub(sumWi0)
-		//fmt.Println("error value", errVal)
-		require.True(t, errVal.LessThanOrEqual(decimal.RequireFromString("0.000001")), fmt.Sprintf("SumWi0:%v, SumWi1:%v, errVal:%v, nth:%v", sumWi0, sumWi1, errVal, n))
-		require.True(t, sumWi0.Equal(sumWi1), fmt.Sprintf("SumWi0:%v, SumWi1:%v, errVal:%v, nth:%v", sumWi0, sumWi1, errVal, n))
-	}
-}
-
-// Test_Wa_SumWi tests whether the difference between the result of Wa and the sum of Wi is the same to 6 decimal places.
-func Test_Wa_vs_SumWi_vs_WaWeighted(t *testing.T) {
+func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
 	tau := 200 // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
 	dur1 := time.Duration(0)
 	dur2 := time.Duration(0)
+	dur3 := time.Duration(0)
 	for n := 0; n < nOp; n++ {
 		var vpows, vdurs []int64
 		vpObjs := initTestObjs(int64(350_000_000))
 
 		// Sum Wi
-		sumWi0 := decimal.Zero
+		w_sumwi := decimal.Zero
 		start := time.Now()
 		for _, vpobj := range vpObjs {
 			wi := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
-			sumWi0 = sumWi0.Add(wi)
+			w_sumwi = w_sumwi.Add(wi)
 
 			// for computing Wa
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		sumWi0 = sumWi0.Truncate(6)
+		w_sumwi = w_sumwi.Truncate(6)
 		dur0 += time.Since(start)
-		//fmt.Println("sum of Wi", sumWi0)
+		//fmt.Println("sum of Wi", Wa0)
 
 		// Wa
 		start = time.Now()
-		sumWi1 := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
-		sumWi1 = sumWi1.Truncate(6)
+		w_wa := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_wa = w_wa.Truncate(6)
 		dur1 += time.Since(start)
-		//fmt.Println("Wa return", sumWi1)
+		//fmt.Println("Wa return", w_wa)
 
-		// WaWeighted
+		// WaEx
 		start = time.Now()
-		sumWi2 := WaWeighted(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
-		sumWi2 = sumWi2.Truncate(6)
+		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_waex = w_waex.Truncate(6)
 		dur2 += time.Since(start)
 
-		require.True(t, sumWi0.LessThanOrEqual(decimalOne), "SumWi0", sumWi0, "nth", n)
-		require.True(t, sumWi1.LessThanOrEqual(decimalOne), "SumWi1", sumWi1, "nth", n)
-		require.True(t, sumWi2.LessThanOrEqual(decimalOne), "sumWi2", sumWi2, "nth", n)
+		// WaEx64
+		start = time.Now()
+		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, totalSupply, tau)
+		w_waex64 = w_waex64.Truncate(6)
+		dur3 += time.Since(start)
 
-		require.True(t, sumWi0.Equal(sumWi1), fmt.Sprintf("SumWi0:%v, SumWi1:%v, nth:%v", sumWi0, sumWi1, n))
-		require.True(t, sumWi1.Equal(sumWi2), fmt.Sprintf("SumWi1:%v, SumWi2:%v, nth:%v", sumWi1, sumWi2, n))
+		require.True(t, w_sumwi.LessThanOrEqual(decimalOne), "SumWi", w_sumwi, "nth", n)
+		require.True(t, w_wa.LessThanOrEqual(decimalOne), "Wa", w_wa, "nth", n)
+		require.True(t, w_waex.LessThanOrEqual(decimalOne), "WaEx", w_waex, "nth", n)
+		require.True(t, w_waex64.LessThanOrEqual(decimalOne), "WaEx64", w_waex64, "nth", n)
+
+		require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))
+		require.True(t, w_wa.Equal(w_waex), fmt.Sprintf("Wa:%v, WaEx:%v, nth:%v", w_wa, w_waex, n))
+		require.True(t, w_waex.Equal(w_waex64), fmt.Sprintf("WaEx:%v, WaEx64:%v, nth:%v", w_waex, w_waex64, n))
 	}
 
-	fmt.Println("SumWi", dur0/time.Duration(nOp), "Wa", dur1/time.Duration(nOp), "WaWeighted", dur2/time.Duration(nOp))
+	fmt.Println("SumWi", dur0/time.Duration(nOp), "Wa", dur1/time.Duration(nOp), "WaEx", dur2/time.Duration(nOp), "WaEx64", dur3/time.Duration(nOp))
 }
 
 func Benchmark_SumWi(b *testing.B) {
@@ -182,7 +154,7 @@ func Benchmark_Wa(b *testing.B) {
 	}
 }
 
-func Benchmark_WaWeighted(b *testing.B) {
+func Benchmark_WaEx(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
 	tau := 200
 
@@ -196,6 +168,24 @@ func Benchmark_WaWeighted(b *testing.B) {
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		_ = WaWeighted(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		_ = WaEx(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+	}
+}
+
+func Benchmark_WaEx64(b *testing.B) {
+	totalSupply := types.ToFons(uint64(350_000_000))
+	tau := 200
+
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		var vpows, vdurs []int64
+		vpObjs := initTestObjs(int64(100_000_000))
+		b.StartTimer()
+
+		for _, vpobj := range vpObjs {
+			vpows = append(vpows, vpobj.vpow)
+			vdurs = append(vdurs, vpobj.vdur)
+		}
+		_ = WaEx64(vpows, vdurs, powerRipeningCycle, totalSupply, tau)
 	}
 }

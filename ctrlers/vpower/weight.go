@@ -2,6 +2,7 @@ package vpower
 
 import (
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
 )
 
@@ -10,8 +11,8 @@ import (
 func Wa(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
 	sumTmW := decimal.Zero
 	sumPowAmt := decimal.Zero
-	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
+	_tau := decimal.New(int64(tau), -3) // tau is permil
+	_keppa := decimalOne.Sub(_tau)      // keppa = 1 - tau
 
 	for i, pow := range pows {
 		vpAmt := decimal.New(pow, int32(types.DECIMAL))
@@ -30,74 +31,18 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, 
 	return q
 }
 
-func WaWeighted(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
-
-	_maturedPower := int64(0)
-	weightedPower := decimal.Zero
-
-	for i, pow := range pows {
-		if vpdurs[i] >= ripeningCycle {
-			// mature power
-			_maturedPower += pow
-		} else {
-			decDur := decimal.NewFromInt(vpdurs[i]).Div(decimal.NewFromInt(ripeningCycle))
-			decCo := _tau.Mul(decDur).Add(_keppa)
-			decV := decimal.NewFromInt(pow)
-			weightedPower = weightedPower.Add(decCo.Mul(decV))
-		}
+func oldWi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+	decDur := decimalOne
+	if vdur < ripeningCycle {
+		decDur = decimal.NewFromInt(vdur).Div(decimal.NewFromInt(ripeningCycle))
 	}
+	decV := decimal.New(pow, int32(types.DECIMAL))
+	decTau := decimal.New(int64(tau), -3) // tau is permil
+	decKeppa := decimalOne.Sub(decTau)
 
-	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
-	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
-	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
-	return q
-}
-
-func WaWeightedWithPowerChunks(powChunks []*PowerChunkProto, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
-
-	_maturedPower := int64(0)
-	weightedPower := decimal.Zero
-
-	for _, pc := range powChunks {
-		dur := height - pc.Height
-		if dur >= ripeningCycle {
-			// mature power
-			_maturedPower += pc.Power
-		} else {
-			decDur := decimal.NewFromInt(dur).Div(decimal.NewFromInt(ripeningCycle))
-			decCo := _tau.Mul(decDur).Add(_keppa)
-			decV := decimal.NewFromInt(pc.Power)
-			weightedPower = weightedPower.Add(decCo.Mul(decV))
-		}
-	}
-
-	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
-	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
-	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
-	return q
-}
-
-func WaWeightedEx2(powChunks []*PowerChunkProto, maturePower, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
-
-	weightedPower := decimal.Zero
-
-	for _, pc := range powChunks {
-		dur := height - pc.Height
-		decDur := decimal.NewFromInt(dur).Div(decimal.NewFromInt(ripeningCycle))
-		decCo := _tau.Mul(decDur).Add(_keppa)
-		decV := decimal.NewFromInt(pc.Power)
-		weightedPower = weightedPower.Add(decCo.Mul(decV))
-	}
-
-	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
-	decPowerAmt := weightedPower.Add(decimal.New(maturePower, int32(types.DECIMAL)))
-	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
+	// Use `QuoRem` instead of `Div`.
+	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
+	q, _ := decTau.Mul(decDur).Add(decKeppa).Mul(decV).QuoRem(totalSupply, int32(types.DECIMAL))
 	return q
 }
 
@@ -123,20 +68,81 @@ func Wi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) de
 	return q
 }
 
-func oldWi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
-	decDur := decimalOne
-	if vdur < ripeningCycle {
-		decDur = decimal.NewFromInt(vdur).Div(decimal.NewFromInt(ripeningCycle))
-	}
-	decV := decimal.New(pow, int32(types.DECIMAL))
-	decTau := decimal.New(int64(tau), -3) // tau is permil
-	decKeppa := decimalOne.Sub(decTau)
+func WaEx(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := decimalOne.Sub(_tau)
 
-	// Use `QuoRem` instead of `Div`.
-	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := decTau.Mul(decDur).Add(decKeppa).Mul(decV).QuoRem(totalSupply, int32(types.DECIMAL))
+	_maturedPower := int64(0)
+	weightedPower := decimal.Zero
+
+	for i, pow := range pows {
+		if vpdurs[i] >= ripeningCycle {
+			// mature power
+			_maturedPower += pow
+		} else {
+			decDur := decimal.NewFromInt(vpdurs[i]).Div(decimal.NewFromInt(ripeningCycle)) // dur = vpdur / ripeningCycle
+			decCo := _tau.Mul(decDur).Add(_keppa)                                          // tau * (vpdur / ripeningCycle) + keppa
+			decV := decimal.NewFromInt(pow)
+			weightedPower = weightedPower.Add(decCo.Mul(decV))
+		}
+	}
+
+	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
+	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
+	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
 	return q
 }
+
+func WaEx64(pows, durs []int64, ripeningCycle int64, totalSupply *uint256.Int, tau int) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := decimalOne.Sub(_tau)
+
+	_maturedPower := int64(0)
+	risingPower := decimal.Zero
+
+	for i, pow := range pows {
+		if durs[i] >= ripeningCycle {
+			// mature power
+			_maturedPower += pow
+		} else {
+			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
+			decW := _tau.Mul(decimal.NewFromInt(durs[i])).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pow))
+			risingPower = risingPower.Add(decW) // risingPower += decW
+		}
+	}
+
+	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+
+	q, _ := decWightedPower.QuoRem(decTotalSupply, int32(types.DECIMAL))
+	return q
+}
+
+//func WaWithPowerChunks(powChunks []*PowerChunkProto, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+//	_tau := decimal.New(int64(tau), -3)
+//	_keppa := decimalOne.Sub(_tau)
+//
+//	_maturedPower := int64(0)
+//	weightedPower := decimal.Zero
+//
+//	for _, pc := range powChunks {
+//		dur := height - pc.Height
+//		if dur >= ripeningCycle {
+//			// mature power
+//			_maturedPower += pc.Power
+//		} else {
+//			decDur := decimal.NewFromInt(dur).Div(decimal.NewFromInt(ripeningCycle)) // dur / ripeningCycle
+//			decCo := _tau.Mul(decDur).Add(_keppa) // tau * (dur / ripeningCycle) + keppa
+//			decV := decimal.NewFromInt(pc.Power)
+//			weightedPower = weightedPower.Add(decCo.Mul(decV)) // weightedPower += (tau * dur / ripeningCycle + keppa) * power
+//		}
+//	}
+//
+//	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
+//	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
+//	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
+//	return q
+//}
 
 // H returns the normalized block time corresponding to the given block height.
 // It calculates how far along the blockchain is relative to a predefined reference period.

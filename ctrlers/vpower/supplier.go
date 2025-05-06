@@ -29,6 +29,14 @@ func NewSupplier() *Supplier {
 	return &Supplier{}
 }
 
+func NewSupplierWith(lastTotalSupply, lastAdjustedSupply *uint256.Int, lastAdjustedHeight int64) *Supplier {
+	return &Supplier{
+		lastTotalSupply:    decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0),
+		lastAdjustedSupply: decimal.NewFromBigInt(lastAdjustedSupply.ToBig(), 0),
+		lastAdjustedHeight: lastAdjustedHeight,
+	}
+}
+
 func (supplier *Supplier) SetLastAdjustedSupply(v *uint256.Int) {
 	supplier.mtx.Lock()
 	defer supplier.mtx.Unlock()
@@ -75,11 +83,11 @@ func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda 
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
-	decLambdaAddedOne := decimal.RequireFromString(lambda).Add(decimalOne)
+	decLambdaAddOne := decimal.RequireFromString(lambda).Add(decimalOne)
 	expWHid := wa.Mul(H(height-adjustedHeight, 1))
 
 	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
-	denom := decLambdaAddedOne.Pow(expWHid)
+	denom := decLambdaAddOne.Pow(expWHid)
 
 	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
 	return uint256.MustFromBig(decSmax.Sub(numer.Div(denom)).BigInt())
