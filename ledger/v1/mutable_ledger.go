@@ -70,7 +70,7 @@ func (ledger *MutableLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 		return nil, xerrors.ErrNotFoundResult
 	} else {
 		item := ledger.newItemFor(key)
-		if xerr := item.Decode(bz); xerr != nil {
+		if xerr := item.Decode(key, bz); xerr != nil {
 			return nil, xerr
 		}
 		return item, nil
@@ -85,7 +85,7 @@ func (ledger *MutableLedger) Iterate(cb FuncIterate) xerrors.XError {
 	var xerrStop xerrors.XError
 	stopped, err := ledger.tree.Iterate(func(key []byte, value []byte) bool {
 		item := ledger.newItemFor(key)
-		if xerr := item.Decode(value); xerr != nil {
+		if xerr := item.Decode(key, value); xerr != nil {
 			xerrStop = xerr
 			return true // stop
 		}
@@ -125,7 +125,7 @@ func (ledger *MutableLedger) Seek(prefix []byte, ascending bool, cb FuncIterate)
 		value := iter.Value()
 
 		item := ledger.newItemFor(key)
-		if xerr := item.Decode(value); xerr != nil {
+		if xerr := item.Decode(key, value); xerr != nil {
 			return xerr
 		}
 
@@ -213,7 +213,7 @@ func (ledger *MutableLedger) RevertToSnapshot(snap int) xerrors.XError {
 				return xerrors.From(err)
 			}
 			restoreItem := ledger.newItemFor(kv.key)
-			if xerr := restoreItem.Decode(kv.val); xerr != nil {
+			if xerr := restoreItem.Decode(kv.key, kv.val); xerr != nil {
 				return xerr
 			}
 			ledger.cachedObjs[unsafe.String(&kv.key[0], len(kv.key))] = restoreItem

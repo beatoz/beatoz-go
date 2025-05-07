@@ -55,7 +55,7 @@ func (ledger *MemLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 	}
 
 	item := ledger.newItemFor(key)
-	if xerr := item.Decode(bz); xerr != nil {
+	if xerr := item.Decode(key, bz); xerr != nil {
 		return nil, xerr
 	}
 	return item, nil
@@ -87,7 +87,7 @@ func (ledger *MemLedger) Iterate(cb FuncIterate) xerrors.XError {
 		var xerrStop xerrors.XError
 		stopped, err := ledger.immuTree.Iterate(func(key []byte, value []byte) bool {
 			item := ledger.newItemFor(key)
-			if xerr := item.Decode(value); xerr != nil {
+			if xerr := item.Decode(key, value); xerr != nil {
 				xerrStop = xerr
 				return true // stop
 			}
@@ -132,7 +132,7 @@ func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb FuncIterate) xer
 
 		value := iter.Value()
 		item := ledger.newItemFor(key)
-		if xerr := item.Decode(value); xerr != nil {
+		if xerr := item.Decode(key, value); xerr != nil {
 			return xerr
 		}
 

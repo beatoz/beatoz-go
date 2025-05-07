@@ -55,11 +55,11 @@ func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
+func (prop *GovProposal) Decode(k, v []byte) xerrors.XError {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
-	if err := json.Unmarshal(bz, prop); err != nil {
+	if err := json.Unmarshal(v, prop); err != nil {
 		return xerrors.From(err)
 	}
 	return nil

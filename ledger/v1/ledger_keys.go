@@ -6,13 +6,15 @@ import (
 )
 
 var (
-	KeyPrefixAccount      = []byte{0x00}
-	KeyPrefixGovParams    = []byte{0x10}
-	KeyPrefixProposal     = []byte{0x11}
-	KeyPrefixFrozenProp   = []byte{0x12}
-	KeyPrefixDelegatee    = []byte{0x20}
-	KeyPrefixVPower       = []byte{0x21}
-	KeyPrefixFrozenVPower = []byte{0x22}
+	KeyPrefixAccount        = []byte{0x00}
+	KeyPrefixGovParams      = []byte{0x10}
+	KeyPrefixProposal       = []byte{0x11}
+	KeyPrefixFrozenProp     = []byte{0x12}
+	KeyPrefixDelegatee      = []byte{0x20}
+	KeyPrefixVPower         = []byte{0x21}
+	KeyPrefixFrozenVPower   = []byte{0x22}
+	KeyPrefixTotalSupply    = []byte{0x30}
+	KeyPrefixAdjustedSupply = []byte{0x31}
 )
 
 func LedgerKeyProposal(txhash []byte) LedgerKey {
@@ -58,6 +60,19 @@ func LedgerKeyFrozenVPower(h int64, from []byte) LedgerKey {
 	copy(k, KeyPrefixFrozenVPower)
 	binary.BigEndian.PutUint64(k[len(KeyPrefixFrozenVPower):], uint64(h))
 	copy(k[len(KeyPrefixFrozenVPower)+8:], from)
+	return k
+}
+
+func LedgerKeyTotalSupply(h int64) LedgerKey {
+	k := make([]byte, len(KeyPrefixTotalSupply)+8)
+	copy(k, KeyPrefixTotalSupply)
+	binary.BigEndian.PutUint64(k[len(KeyPrefixTotalSupply):], uint64(h))
+	return k
+}
+func LedgerKeyAdjustedSupply(h int64) LedgerKey {
+	k := make([]byte, len(KeyPrefixAdjustedSupply)+8)
+	copy(k, KeyPrefixAdjustedSupply)
+	binary.BigEndian.PutUint64(k[len(KeyPrefixAdjustedSupply):], uint64(h))
 	return k
 }
 

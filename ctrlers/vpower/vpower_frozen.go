@@ -27,8 +27,8 @@ func (x *FrozenVPower) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (x *FrozenVPower) Decode(d []byte) xerrors.XError {
-	if err := proto.Unmarshal(d, x); err != nil {
+func (x *FrozenVPower) Decode(k, v []byte) xerrors.XError {
+	if err := proto.Unmarshal(v, x); err != nil {
 		return xerrors.From(err)
 	}
 	return nil

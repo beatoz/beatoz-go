@@ -305,17 +305,17 @@ func Test6GovParams_NoStakeLimiter() *GovParams {
 	}
 }
 
-func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
+func DecodeGovParams(v []byte) (*GovParams, xerrors.XError) {
 	ret := &GovParams{}
-	if xerr := ret.Decode(bz); xerr != nil {
+	if xerr := ret.Decode(nil, v); xerr != nil {
 		return nil, xerr
 	}
 	return ret, nil
 }
 
-func (r *GovParams) Decode(bz []byte) xerrors.XError {
+func (r *GovParams) Decode(k, v []byte) xerrors.XError {
 	pm := &GovParamsProto{}
-	if err := proto.Unmarshal(bz, pm); err != nil {
+	if err := proto.Unmarshal(v, pm); err != nil {
 		return xerrors.From(err)
 	}
 	r.fromProto(pm)

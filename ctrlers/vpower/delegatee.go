@@ -35,14 +35,16 @@ func (x *Delegatee) Encode() ([]byte, xerrors.XError) {
 	return d, nil
 }
 
-func (x *Delegatee) Decode(d []byte) xerrors.XError {
-	if err := proto.Unmarshal(d, x); err != nil {
+func (x *Delegatee) Decode(k, v []byte) xerrors.XError {
+	if err := proto.Unmarshal(v, x); err != nil {
 		return xerrors.From(err)
 	}
 	x.addr = crypto.PubKeyBytes2Addr(x.PubKey)
-	x.key = v1.LedgerKeyDelegatee(x.addr, nil)
+	x.key = k //v1.LedgerKeyDelegatee(x.addr, nil)
 	return nil
 }
+
+var _ v1.ILedgerItem = (*Delegatee)(nil)
 
 func (x *Delegatee) Address() types.Address {
 	return x.addr

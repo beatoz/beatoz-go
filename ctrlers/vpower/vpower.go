@@ -36,12 +36,12 @@ func (x *VPower) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (x *VPower) Decode(d []byte) xerrors.XError {
-	if err := proto.Unmarshal(d, x); err != nil {
+func (x *VPower) Decode(k, v []byte) xerrors.XError {
+	if err := proto.Unmarshal(v, x); err != nil {
 		return xerrors.From(err)
 	}
 	x.to = crypto.PubKeyBytes2Addr(x.PubKeyTo)
-	x.key = v1.LedgerKeyVPower(x.From, x.to)
+	x.key = k //v1.LedgerKeyVPower(x.From, x.to)
 	return nil
 }
 

@@ -58,7 +58,7 @@ type IStateLedger interface {
 type ILedgerItem interface {
 	//Key() LedgerKey
 	Encode() ([]byte, xerrors.XError)
-	Decode([]byte) xerrors.XError
+	Decode([]byte, []byte) xerrors.XError
 }
 
 type LedgerKey = []byte

@@ -215,9 +215,9 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (acct *Account) Decode(d []byte) xerrors.XError {
+func (acct *Account) Decode(k, v []byte) xerrors.XError {
 	pm := &AcctProto{}
-	if err := proto.Unmarshal(d, pm); err != nil {
+	if err := proto.Unmarshal(v, pm); err != nil {
 		return xerrors.From(err)
 	}
 

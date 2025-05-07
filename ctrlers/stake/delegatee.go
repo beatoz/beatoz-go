@@ -45,11 +45,11 @@ func (delegatee *Delegatee) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (delegatee *Delegatee) Decode(d []byte) xerrors.XError {
+func (delegatee *Delegatee) Decode(k, v []byte) xerrors.XError {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
-	if err := json.Unmarshal(d, delegatee); err != nil {
+	if err := json.Unmarshal(v, delegatee); err != nil {
 		return xerrors.From(err)
 	}
 	return nil
