@@ -22,9 +22,10 @@ type BlockContext struct {
 	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
-	GovParams    IGovParams
-	AcctHandler  IAccountHandler
-	StakeHandler IStakeHandler
+	GovParams     IGovParams
+	AcctHandler   IAccountHandler
+	StakeHandler  IStakeHandler
+	VPowerHandler IVPowerHandler
 
 	ValUpdates abcitypes.ValidatorUpdates
 

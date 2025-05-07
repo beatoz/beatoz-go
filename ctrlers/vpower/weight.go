@@ -118,36 +118,54 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, totalSupply *uint256.Int, t
 	return q
 }
 
-//func WaWithPowerChunks(powChunks []*PowerChunkProto, height int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
-//	_tau := decimal.New(int64(tau), -3)
-//	_keppa := decimalOne.Sub(_tau)
-//
-//	_maturedPower := int64(0)
-//	weightedPower := decimal.Zero
-//
-//	for _, pc := range powChunks {
-//		dur := height - pc.Height
-//		if dur >= ripeningCycle {
-//			// mature power
-//			_maturedPower += pc.Power
-//		} else {
-//			decDur := decimal.NewFromInt(dur).Div(decimal.NewFromInt(ripeningCycle)) // dur / ripeningCycle
-//			decCo := _tau.Mul(decDur).Add(_keppa) // tau * (dur / ripeningCycle) + keppa
-//			decV := decimal.NewFromInt(pc.Power)
-//			weightedPower = weightedPower.Add(decCo.Mul(decV)) // weightedPower += (tau * dur / ripeningCycle + keppa) * power
-//		}
-//	}
-//
-//	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
-//	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
-//	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
-//	return q
-//}
+func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, totalSupply *uint256.Int, tau int) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := decimalOne.Sub(_tau)
 
-// H returns the normalized block time corresponding to the given block height.
-// It calculates how far along the blockchain is relative to a predefined reference period.
-// For example, if the reference period is one year, a return value of 1.0 indicates that
-// exactly one reference period has elapsed.
-func H(height, blockIntvSec int64) decimal.Decimal {
-	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(oneYearSeconds))
+	_maturedPower := int64(0)
+	risingPower := decimal.Zero
+
+	for _, pc := range powerChunks {
+		dur := currHeight - pc.Height
+		if dur >= ripeningCycle {
+			// mature power
+			_maturedPower += pc.Power
+		} else {
+			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
+			decW := _tau.Mul(decimal.NewFromInt(dur)).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
+			risingPower = risingPower.Add(decW) // risingPower += decW
+		}
+	}
+
+	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+
+	q, _ := decWightedPower.QuoRem(decTotalSupply, int32(types.DECIMAL))
+	return q
+}
+
+func Weight64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int64) decimal.Decimal {
+	_tau := decimal.New(tau, -3)
+	_keppa := decimalOne.Sub(_tau)
+
+	_maturedPower := int64(0)
+	risingPower := decimal.Zero
+
+	for _, pc := range powerChunks {
+		dur := currHeight - pc.Height
+		if dur >= ripeningCycle {
+			// mature power
+			_maturedPower += pc.Power
+		} else {
+			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
+			decW := _tau.Mul(decimal.NewFromInt(dur)).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
+			risingPower = risingPower.Add(decW) // risingPower += decW
+		}
+	}
+
+	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+
+	//decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+	//q, _ := decWightedPower.QuoRem(decTotalSupply, int32(types.DECIMAL))
+	return decWightedPower
 }

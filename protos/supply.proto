@@ -1,0 +1,15 @@
+syntax = "proto3";
+package supply;
+option go_package = "github.com/beatoz/beatoz-go/ctrlers/supply";
+
+message SupplyProto {
+  int64 height = 1;
+  bytes _supply = 2;
+  bytes _change = 3;
+}
+
+message RewardProto {
+  int64 height = 1;
+  int64 reward = 2;
+  int64 change = 3;
+}

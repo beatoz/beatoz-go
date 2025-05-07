@@ -92,11 +92,18 @@ func (x *Delegatee) delDelegator(from types.Address) {
 }
 
 func (x *Delegatee) Clone() *Delegatee {
+	copiedDelegators := make([][]byte, len(x.Delegators))
+	for i, inner := range x.Delegators {
+		copiedDelegators[i] = make([]byte, len(inner))
+		copy(copiedDelegators[i], inner)
+	}
+
 	return &Delegatee{
 		DelegateeProto: DelegateeProto{
-			PubKey:    bytes.Copy(x.PubKey),
-			SumPower:  x.SumPower,
-			SelfPower: x.SelfPower,
+			PubKey:     bytes.Copy(x.PubKey),
+			Delegators: copiedDelegators,
+			SumPower:   x.SumPower,
+			SelfPower:  x.SelfPower,
 		},
 		addr: bytes.Copy(x.addr),
 	}

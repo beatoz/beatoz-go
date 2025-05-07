@@ -15,6 +15,7 @@ var (
 	KeyPrefixFrozenVPower   = []byte{0x22}
 	KeyPrefixTotalSupply    = []byte{0x30}
 	KeyPrefixAdjustedSupply = []byte{0x31}
+	KeyPrefixReward         = []byte{0x32}
 )
 
 func LedgerKeyProposal(txhash []byte) LedgerKey {
@@ -41,21 +42,21 @@ func LedgerKeyGovParams() LedgerKey {
 	return _key
 }
 
-func LedgerKeyVPower(from, to []byte) LedgerKey {
+func LedgerKeyVPower(from, to types.Address) LedgerKey {
 	k := make([]byte, len(KeyPrefixVPower)+len(from)+len(to))
 	copy(k, KeyPrefixVPower)
 	copy(k[len(KeyPrefixVPower):], append(from, to...))
 	return k
 }
 
-func LedgerKeyDelegatee(addr, from []byte) LedgerKey {
+func LedgerKeyDelegatee(addr, from types.Address) LedgerKey {
 	k := make([]byte, len(KeyPrefixDelegatee)+len(addr)+len(from))
 	copy(k, KeyPrefixDelegatee)
 	copy(k[len(KeyPrefixDelegatee):], append(addr, from...))
 	return k
 }
 
-func LedgerKeyFrozenVPower(h int64, from []byte) LedgerKey {
+func LedgerKeyFrozenVPower(h int64, from types.Address) LedgerKey {
 	k := make([]byte, len(KeyPrefixFrozenVPower)+8+len(from))
 	copy(k, KeyPrefixFrozenVPower)
 	binary.BigEndian.PutUint64(k[len(KeyPrefixFrozenVPower):], uint64(h))
@@ -63,17 +64,15 @@ func LedgerKeyFrozenVPower(h int64, from []byte) LedgerKey {
 	return k
 }
 
-func LedgerKeyTotalSupply(h int64) LedgerKey {
-	k := make([]byte, len(KeyPrefixTotalSupply)+8)
-	copy(k, KeyPrefixTotalSupply)
-	binary.BigEndian.PutUint64(k[len(KeyPrefixTotalSupply):], uint64(h))
-	return k
+func LedgerKeyTotalSupply() LedgerKey {
+	return append(KeyPrefixAdjustedSupply, []byte("total")...)
 }
-func LedgerKeyAdjustedSupply(h int64) LedgerKey {
-	k := make([]byte, len(KeyPrefixAdjustedSupply)+8)
-	copy(k, KeyPrefixAdjustedSupply)
-	binary.BigEndian.PutUint64(k[len(KeyPrefixAdjustedSupply):], uint64(h))
-	return k
+func LedgerKeyAdjustedSupply() LedgerKey {
+	return append(KeyPrefixAdjustedSupply, []byte("adjust")...)
+}
+
+func LedgerKeyReward(owner types.Address) LedgerKey {
+	return append(KeyPrefixAdjustedSupply, owner...)
 }
 
 func UnwrapKeyPrefix(key LedgerKey) []byte {

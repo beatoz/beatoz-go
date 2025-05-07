@@ -4,6 +4,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
+	"github.com/shopspring/decimal"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
@@ -79,8 +80,12 @@ type IStakeHandler interface {
 	DelegatedPowerOf(types.Address) int64
 }
 
-type IDelegatee interface {
-	GetAddress() types.Address
-	GetTotalPower() int64
-	GetSelfPower() int64
+type IVPowerHandler interface {
+	//Validators() ([]*vpower.Delegatee, int64)
+	IsValidator(types.Address) bool
+	//TotalPowerOf(types.Address) int64
+	//SelfPowerOf(types.Address) int64
+	//DelegatedPowerOf(types.Address) int64
+
+	ComputeWeight(int64, int64, int64, *uint256.Int) (decimal.Decimal, xerrors.XError)
 }

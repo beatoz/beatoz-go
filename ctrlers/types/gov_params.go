@@ -30,6 +30,7 @@ type GovParams struct {
 	minDelegatorPower int64
 
 	// DEPRECATED
+	// it will be removed when StakeCtrler is replaced with VPowerCtrler
 	rewardPerPower *uint256.Int
 
 	lazyUnstakingBlocks   int64

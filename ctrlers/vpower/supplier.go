@@ -92,3 +92,11 @@ func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda 
 	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
 	return uint256.MustFromBig(decSmax.Sub(numer.Div(denom)).BigInt())
 }
+
+// H returns the normalized block time corresponding to the given block height.
+// It calculates how far along the blockchain is relative to a predefined reference period.
+// For example, if the reference period is one year, a return value of 1.0 indicates that
+// exactly one reference period has elapsed.
+func H(height, blockIntvSec int64) decimal.Decimal {
+	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(oneYearSeconds))
+}

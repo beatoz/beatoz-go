@@ -441,7 +441,7 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 
 	if ctrler.powersState != nil {
 		if xerr := ctrler.powersState.Close(); xerr != nil {
-			ctrler.logger.Error("powersState.Close()", "error", xerr.Error())
+			ctrler.logger.Error("fail to close powerState", "error", xerr.Error())
 		}
 		ctrler.powersState = nil
 	}
@@ -453,13 +453,13 @@ func (ctrler *VPowerCtrler) Validators() ([]*abcitypes.Validator, int64) {
 	defer ctrler.mtx.RUnlock()
 
 	totalPower := int64(0)
-	var ret []*abcitypes.Validator
-	for _, v := range ctrler.lastValidators {
+	ret := make([]*abcitypes.Validator, len(ctrler.lastValidators))
+	for i, v := range ctrler.lastValidators {
 		totalPower += v.SumPower
-		ret = append(ret, &abcitypes.Validator{
-			Address: v.addr,
+		ret[i] = &abcitypes.Validator{
+			Address: v.Address(),
 			Power:   v.SumPower,
-		})
+		}
 	}
 
 	return ret, totalPower
@@ -489,11 +489,6 @@ func (ctrler *VPowerCtrler) SumPowerOf(addr types.Address) int64 {
 	return 0
 }
 
-// DEPRECATED
-func (ctrler *VPowerCtrler) TotalPowerOf(addr types.Address) int64 {
-	return ctrler.SumPowerOf(addr)
-}
-
 func (ctrler *VPowerCtrler) SelfPowerOf(addr types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
@@ -506,12 +501,18 @@ func (ctrler *VPowerCtrler) SelfPowerOf(addr types.Address) int64 {
 	return 0
 }
 
-func (ctrler *VPowerCtrler) PowerOf(addr types.Address) int64 {
+// DEPRECATED
+func (ctrler *VPowerCtrler) TotalPowerOf(addr types.Address) int64 {
+	return ctrler.SumPowerOf(addr)
+}
+
+// DEPRECATED
+func (ctrler *VPowerCtrler) PowerOf(from types.Address) int64 {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	delegatePower := int64(0)
-	_ = ctrler.seekVPowersOf(addr, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	_ = ctrler.seekVPowersOf(from, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		delegatePower += vpow.SumPower
 		return nil
@@ -525,6 +526,13 @@ func (ctrler *VPowerCtrler) DelegatedPowerOf(addr types.Address) int64 {
 	return ctrler.PowerOf(addr)
 }
 
+// DEPRECATED
+func (ctrler *VPowerCtrler) ImitableState(h int64) (v1.IImitable, xerrors.XError) {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.powersState.ImitableLedgerAt(h)
+}
 func (ctrler *VPowerCtrler) Query(query abcitypes.RequestQuery) ([]byte, xerrors.XError) {
 	//TODO implement me
 	panic("implement me")

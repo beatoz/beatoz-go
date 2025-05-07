@@ -6,6 +6,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -85,7 +86,7 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 		}
 		w_sumwi = w_sumwi.Truncate(6)
 		dur0 += time.Since(start)
-		//fmt.Println("sum of Wi", Wa0)
+		//fmt.Println("sum of Wi", w_sumwi)
 
 		// Wa
 		start = time.Now()
@@ -117,6 +118,126 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 	}
 
 	fmt.Println("SumWi", dur0/time.Duration(nOp), "Wa", dur1/time.Duration(nOp), "WaEx", dur2/time.Duration(nOp), "WaEx64", dur3/time.Duration(nOp))
+}
+
+func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
+	totalSupply := types.ToFons(uint64(350_000_000))
+	tau := 200 // 0.200
+	nOp := 1000
+	dur0 := time.Duration(0)
+	dur1 := time.Duration(0)
+	dur2 := time.Duration(0)
+	dur3 := time.Duration(0)
+	dur4 := time.Duration(0)
+	dur5 := time.Duration(0)
+	dur6 := time.Duration(0)
+
+	for n := 0; n < nOp; n++ {
+		currHeight := powerRipeningCycle * 2
+		maxPow := int64(350_000_000)
+		var vpows, vdurs []int64
+		var powChunks []*PowerChunkProto
+
+		// create random power chunks
+		for maxPow > 7000 {
+			pow := max(bytes.RandInt64N(1_000_000), 7000)
+			height := bytes.RandInt64N(currHeight)
+			powChunks = append(powChunks, &PowerChunkProto{
+				Power:  pow,
+				Height: height,
+				TxHash: nil,
+			})
+
+			vpows = append(vpows, pow)
+			vdurs = append(vdurs, currHeight-height)
+
+			maxPow -= pow
+		}
+
+		// Sum Wi
+		w_sumwi := decimal.Zero
+		start := time.Now()
+		for i, pow := range vpows {
+			dur := vdurs[i]
+			wi := Wi(pow, dur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+			w_sumwi = w_sumwi.Add(wi)
+		}
+		w_sumwi = w_sumwi.Truncate(6)
+		dur0 += time.Since(start)
+		//fmt.Println("sum of Wi", w_sumwi)
+
+		// Wa
+		start = time.Now()
+		w_wa := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_wa = w_wa.Truncate(6)
+		dur1 += time.Since(start)
+		//fmt.Println("Wa return", w_wa)
+
+		// WaEx
+		start = time.Now()
+		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_waex = w_waex.Truncate(6)
+		dur2 += time.Since(start)
+
+		// WaEx64
+		start = time.Now()
+		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, totalSupply, tau)
+		w_waex64 = w_waex64.Truncate(6)
+		dur3 += time.Since(start)
+		//fmt.Println("WaEx64 return", w_waex64)
+
+		// WaEx64ByPowerChunks
+		start = time.Now()
+		w_waex64pc := WaEx64ByPowerChunk(powChunks, currHeight, powerRipeningCycle, totalSupply, tau)
+		w_waex64pc = w_waex64pc.Truncate(6)
+		dur4 += time.Since(start)
+		//fmt.Println("WaEx64ByPowerChunk return", w_waex64pc)
+
+		// Weight64ByPowerChunks
+		start = time.Now()
+		w_w64pc := Weight64ByPowerChunk(powChunks, currHeight, powerRipeningCycle, tau)
+		_totalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+		w_w64pc, _ = w_w64pc.QuoRem(_totalSupply, int32(types.DECIMAL))
+		w_w64pc = w_w64pc.Truncate(6)
+		dur5 += time.Since(start)
+		//fmt.Println("Weight64ByPowerChunk return", w_w64pc)
+
+		// Weight64ByPowerChunks
+		rdx := rand.Intn(len(powChunks))
+		start = time.Now()
+		w_w64pc_patial0 := Weight64ByPowerChunk(powChunks[:rdx], currHeight, powerRipeningCycle, tau)
+		w_w64pc_patial1 := Weight64ByPowerChunk(powChunks[rdx:], currHeight, powerRipeningCycle, tau)
+		w_w64pc_patial := w_w64pc_patial0.Add(w_w64pc_patial1)
+		w_w64pc_patial, _ = w_w64pc_patial.QuoRem(_totalSupply, int32(types.DECIMAL))
+		w_w64pc_patial = w_w64pc_patial.Truncate(6)
+		dur6 += time.Since(start)
+		//fmt.Println("Weight64ByPowerChunk return", w_w64pc)
+
+		require.True(t, w_sumwi.LessThanOrEqual(decimalOne), "SumWi", w_sumwi, "nth", n)
+		require.True(t, w_wa.LessThanOrEqual(decimalOne), "Wa", w_wa, "nth", n)
+		require.True(t, w_waex.LessThanOrEqual(decimalOne), "WaEx", w_waex, "nth", n)
+		require.True(t, w_waex64.LessThanOrEqual(decimalOne), "WaEx64", w_waex64, "nth", n)
+		require.True(t, w_waex64pc.LessThanOrEqual(decimalOne), "WaEx64ByPowerChunk", w_waex64pc, "nth", n)
+		require.True(t, w_w64pc.LessThanOrEqual(decimalOne), "Weight64ByPowerChunk", w_w64pc, "nth", n)
+		require.True(t, w_w64pc_patial.LessThanOrEqual(decimalOne), "Weight64ByPowerChunkPartially", w_w64pc_patial, "nth", n)
+
+		require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))
+		require.True(t, w_wa.Equal(w_waex), fmt.Sprintf("Wa:%v, WaEx:%v, nth:%v", w_wa, w_waex, n))
+		require.True(t, w_waex.Equal(w_waex64), fmt.Sprintf("WaEx:%v, WaEx64:%v, nth:%v", w_waex, w_waex64, n))
+		require.True(t, w_waex64.Equal(w_waex64pc), fmt.Sprintf("WaEx64:%v, WaEx64Pc:%v, nth:%v", w_waex64, w_waex64pc, n))
+		require.True(t, w_waex64pc.Equal(w_w64pc), fmt.Sprintf("WaEx64Pc:%v, W64Pc:%v, nth:%v", w_waex64pc, w_w64pc, n))
+		require.True(t, w_w64pc.Equal(w_w64pc_patial), fmt.Sprintf("W64Pc:%v, W64PcPartial:%v, nth:%v", w_w64pc, w_w64pc_patial, n))
+	}
+
+	fmt.Println(
+		"SumWi", dur0/time.Duration(nOp),
+		"Wa", dur1/time.Duration(nOp),
+		"WaEx", dur2/time.Duration(nOp),
+		"WaEx64", dur3/time.Duration(nOp),
+		"WaEx64Pc", dur4/time.Duration(nOp),
+		"W64Pc", dur5/time.Duration(nOp),
+		"W64PcParital", dur6/time.Duration(nOp),
+	)
 }
 
 func Benchmark_SumWi(b *testing.B) {
