@@ -73,8 +73,8 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	var dgtees []*Delegatee
 	var lastVals []*Delegatee
 	for _, v := range initValidators {
-		dgt := newDelegatee(v.PubKey.GetSecp256K1())
-		vpow := newVPower(dgt.addr, dgt.PubKey)
+		dgt := NewDelegatee(v.PubKey.GetSecp256K1())
+		vpow := NewVPower(dgt.addr, dgt.PubKey)
 		if xerr := ctrler.bondPowerChunk(dgt, vpow, v.Power, int64(1), bytes.ZeroBytes(32), true); xerr != nil {
 			return xerr
 		}
@@ -117,7 +117,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	//todo: slashing
 
 	if bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
-
+		// todo: Start additional issuance and rewards
 	}
 
 	// todo: reset limiter
@@ -297,11 +297,11 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	dgtee := ctx.ValidateResult.(*bondingTrxOpt).dgtee
 	if dgtee == nil && bytes.Compare(ctx.Tx.From, ctx.Tx.To) == 0 {
 		// self bonding: add new delegatee
-		dgtee = newDelegatee(ctx.SenderPubKey)
+		dgtee = NewDelegatee(ctx.SenderPubKey)
 	}
 
 	if dgtee == nil {
-		// `newDelegatee` does not fail, so this code is not reachable.
+		// `NewDelegatee` does not fail, so this code is not reachable.
 		// there is no delegatee whose address is ctx.Tx.To
 		return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 	}
@@ -316,7 +316,7 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		}
 		vpow = _vpow
 	} else {
-		vpow = newVPower(ctx.Tx.From, dgtee.PubKey)
+		vpow = NewVPower(ctx.Tx.From, dgtee.PubKey)
 	}
 	if xerr := ctrler.bondPowerChunk(
 		dgtee, vpow,
@@ -405,7 +405,7 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	// NOTE:
 	// `loadDelegatees()` returns all delegatees, which are updated by the bonding txs in this block(`bctx.Height()`).
 	// (At `EndBlock()`, the transactions in the current block have been executed to ledger, but not committed yet.)
-	// So, if the bonding tx(including TrxPayloadStaking/TrxPayloadUnStaking) is executed and the stake is saved at block height `N`,
+	// So, if the bonding tx(including TrxPayloadStaking/TrxPayloadUnStaking) is executed at block height `N`,
 	//     the updated validators is notified to the consensus engine via `EndBlock()` of block height `N`,
 	//	   the consensus engine applies these accounts to the ValidatorSet at block height `(N)+2`.
 	//	   (Refer to the comments in `updateState(...)` at github.com/tendermint/tendermint@v0.34.20/state/execution.go)
@@ -417,8 +417,13 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	}
 	ctrler.allDelegatees = dgtees
 
-	newValUps := ctrler.updateValidators(int(bctx.GovParams.MaxValidatorCnt()))
+	newValUps, newValidators := ctrler.updateValidators(
+		ctrler.allDelegatees,
+		ctrler.lastValidators,
+		int(bctx.GovParams.MaxValidatorCnt()),
+	)
 	bctx.SetValUpdates(newValUps)
+	ctrler.lastValidators = newValidators
 
 	return nil, nil
 }

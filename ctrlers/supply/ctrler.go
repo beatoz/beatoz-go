@@ -186,7 +186,6 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqIssure, respCh chan *respIss
 	for {
 		req, ok := <-reqCh
 		if !ok {
-			// reqCh is closed
 			break
 		}
 

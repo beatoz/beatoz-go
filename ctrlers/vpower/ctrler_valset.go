@@ -10,22 +10,11 @@ import (
 // UpdateValidators is called after executing staking/unstaking txs and before committing the result of the executing.
 // `ctrler.allDelegatees` has delegatees committed at previous block.
 // It means that UpdateValidators consider the stakes updated at the previous block, not the current block.
-func (ctrler *VPowerCtrler) updateValidators(maxVals int) []abcitypes.ValidatorUpdate {
+func (ctrler *VPowerCtrler) updateValidators(allDelegatees, lastValidators []*Delegatee, maxVals int) ([]abcitypes.ValidatorUpdate, []*Delegatee) {
+	newValidators := selectValidators(allDelegatees, maxVals)
+	upVals := validatorUpdates(lastValidators, newValidators)
 
-	newValidators := selectValidators(ctrler.allDelegatees, maxVals)
-	upVals := validatorUpdates(ctrler.lastValidators, newValidators)
-
-	ctrler.lastValidators = newValidators
-
-	return upVals
-}
-
-func _updateValidators(all, lastValSet []*Delegatee, maxVals int) []abcitypes.ValidatorUpdate {
-
-	newValidators := selectValidators(all, maxVals)
-	upVals := validatorUpdates(lastValSet, newValidators)
-
-	return upVals
+	return upVals, newValidators
 }
 
 // selectValidators returns the top maxVals delegatees, sorted in descending order of power.

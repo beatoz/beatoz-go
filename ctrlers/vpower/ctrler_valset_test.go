@@ -135,7 +135,7 @@ func Test_validatorUpdates(t *testing.T) {
 
 func makeDelegateeOne(pow int64) *Delegatee {
 	_, pub := crypto.NewKeypairBytes()
-	dgtee := newDelegatee(pub)
+	dgtee := NewDelegatee(pub)
 	dgtee.SumPower = pow
 	return dgtee
 }

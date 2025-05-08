@@ -16,7 +16,7 @@ type Delegatee struct {
 	key  v1.LedgerKey
 }
 
-func newDelegatee(pubKey bytes.HexBytes) *Delegatee {
+func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
 	ret := &Delegatee{
 		DelegateeProto: DelegateeProto{
 			PubKey: pubKey,

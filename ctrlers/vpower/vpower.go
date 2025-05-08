@@ -16,7 +16,7 @@ type VPower struct {
 	key v1.LedgerKey
 }
 
-func newVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
+func NewVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
 	ret := &VPower{
 		VPowerProto: VPowerProto{
 			From:     from,

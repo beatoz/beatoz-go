@@ -5,6 +5,7 @@ import (
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/account"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	beatoztypes "github.com/beatoz/beatoz-go/types"
@@ -24,7 +25,7 @@ var (
 	config      = beatozcfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-test")
 	govParams00 = ctrlertypes.Test6GovParams_NoStakeLimiter() // `maxUpdatableStakeRatio = 100, maxIndividualStakeRatio = 10000000`
-	acctMock00  *mocks.AcctHandlerMock
+	acctMock00  *account.AcctHandlerMock
 	stakeCtrler *stake.StakeCtrler
 
 	DelegateeWallets     []*web3.Wallet
@@ -43,7 +44,7 @@ func TestMain(m *testing.M) {
 	config.DBPath = DBDIR
 	stakeCtrler, _ = stake.NewStakeCtrler(config, govParams00, tmlog.NewNopLogger())
 
-	acctMock00 = mocks.NewAccountHandlerMock(100 + int(govParams00.MaxValidatorCnt()))
+	acctMock00 = account.NewAccountHandlerMock(100 + int(govParams00.MaxValidatorCnt()))
 	acctMock00.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(beatoztypes.ToFons(1_000_000_000))
 		return true

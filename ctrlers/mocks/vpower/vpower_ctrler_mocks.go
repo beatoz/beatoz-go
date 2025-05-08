@@ -1,4 +1,4 @@
-package mocks
+package vpower
 
 //
 //import (
@@ -6,14 +6,52 @@ package mocks
 //	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 //	"github.com/beatoz/beatoz-go/types"
 //	"github.com/beatoz/beatoz-go/types/bytes"
+//	"github.com/beatoz/beatoz-go/types/crypto"
 //	"github.com/beatoz/beatoz-go/types/xerrors"
 //	"github.com/holiman/uint256"
+//	"github.com/shopspring/decimal"
 //	abcitypes "github.com/tendermint/tendermint/abci/types"
+//	"math/rand"
 //)
 //
 //type VPowerHandlerMock struct {
 //	valCnt     int
-//	delegatees []*vpower.Delegatee
+//	validators []*vpower.Delegatee
+//	vpows      map[string]*vpower.VPower
+//	totalPower int64 // key is from_address + to_address
+//}
+//
+//func NewVPowerHandlerMock(valCnt int) *VPowerHandlerMock {
+//	validators := make([]*vpower.Delegatee, valCnt)
+//	for i := 0; i < valCnt; i++ {
+//		_, pub := crypto.NewKeypairBytes()
+//		validators[i] = vpower.NewDelegatee(pub)
+//
+//		vpowCnt := rand.Intn(10000)
+//		for j := 0; j < vpowCnt; j++ {
+//			vpow := vpower.NewVPower(types.RandAddress(), pub)
+//			vpow.PowerChunks
+//		}
+//	}
+//}
+//
+//func (s *VPowerHandlerMock) ComputeWeight(height, ripeningBlocks, tau int64, totalSupply *uint256.Int) (decimal.Decimal, xerrors.XError) {
+//	var powChunks []*vpower.PowerChunkProto
+//	for _, val := range s.delegatees {
+//		for _, from := range val.Delegators {
+//			vpow, xerr := ctrler.readVPower(from, val.addr, true)
+//			if xerr != nil {
+//				return decimal.Zero, xerr
+//			}
+//			powChunks = append(powChunks, vpow.PowerChunks...)
+//		}
+//	}
+//
+//	wvpow := Weight64ByPowerChunk(powChunks, height, ripeningBlocks, int(tau))
+//
+//	_totalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+//	wa, _ := wvpow.QuoRem(_totalSupply, int32(types.DECIMAL))
+//	return wa, nil
 //}
 //
 //func (s *VPowerHandlerMock) Validators() ([]*abcitypes.Validator, int64) {
@@ -71,46 +109,4 @@ package mocks
 //	return s.delegatees[i].Address()
 //}
 //
-//var _ ctrlertypes.IStakeHandler = (*VPowerHandlerMock)(nil)
-//
-//type acctHelperMock struct {
-//	acctMap map[ctrlertypes.AcctKey]*ctrlertypes.Account
-//}
-//
-//func (a *acctHelperMock) FindOrNewAccount(addr types.Address, exec bool) *ctrlertypes.Account {
-//	acctKey := ctrlertypes.ToAcctKey(addr)
-//	if acct, ok := a.acctMap[acctKey]; ok {
-//		return acct
-//	} else {
-//		acct = ctrlertypes.NewAccount(addr)
-//		acct.AddBalance(uint256.NewInt(100000))
-//		a.acctMap[acctKey] = acct
-//		return acct
-//	}
-//}
-//
-//func (a *acctHelperMock) FindAccount(addr types.Address, exec bool) *ctrlertypes.Account {
-//	return a.FindOrNewAccount(addr, exec)
-//}
-//
-//func (a *acctHelperMock) Transfer(address types.Address, address2 types.Address, u *uint256.Int, b bool) xerrors.XError {
-//	panic("implement me")
-//}
-//
-//func (a *acctHelperMock) Reward(address types.Address, u *uint256.Int, b bool) xerrors.XError {
-//	panic("implement me")
-//}
-//
-//func (a *acctHelperMock) ImmutableAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-//	panic("implement me")
-//}
-//
-//func (a *acctHelperMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-//	panic("implement me")
-//}
-//
-//func (a *acctHelperMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
-//	panic("implement me")
-//}
-//
-//var _ ctrlertypes.IAccountHandler = (*acctHelperMock)(nil)
+//var _ ctrlertypes.IVPowerHandler = (*VPowerHandlerMock)(nil)

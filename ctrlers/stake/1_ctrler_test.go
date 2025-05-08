@@ -4,6 +4,7 @@ import (
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/account"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
@@ -18,7 +19,7 @@ import (
 )
 
 var (
-	acctMock01    *mocks.AcctHandlerMock
+	acctMock01    *account.AcctHandlerMock
 	govParams01   ctrlertypes.IGovParams
 	stakeCtrler01 *stake.StakeCtrler
 	validatorCnt  = 0
@@ -397,7 +398,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 }
 
 func resetTest(t *testing.T, valCnt int) {
-	acctMock01 = mocks.NewAccountHandlerMock(100)
+	acctMock01 = account.NewAccountHandlerMock(100)
 	acctMock01.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(types.ToFons(1_000_000_000))
 		return true

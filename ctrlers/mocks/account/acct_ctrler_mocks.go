@@ -1,4 +1,4 @@
-package mocks
+package account
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"

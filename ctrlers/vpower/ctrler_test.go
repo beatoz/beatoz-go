@@ -2,17 +2,43 @@ package vpower
 
 import (
 	"fmt"
+	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/account"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/rand"
 	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 )
+
+var (
+	config    *beatozcfg.Config
+	acctMock  *account.AcctHandlerMock
+	govParams *ctrlertypes.GovParams
+)
+
+func init() {
+	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
+	config = beatozcfg.DefaultConfig()
+	config.SetRoot(rootDir)
+	acctMock = account.NewAccountHandlerMock(1000)
+	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
+		w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
+		return true
+	})
+
+	govParams = ctrlertypes.DefaultGovParams()
+	govParams.SetLazyUnstakingBlocks(500)
+}
 
 func Test_NewValidatorSet(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
@@ -94,7 +120,7 @@ func randBonding(ctrler *VPowerCtrler) ([]types.ValidatorUpdate, xerrors.XError)
 	}
 
 	if dgt := findDelegateeByAddr(toAddr, allDgtees); dgt == nil {
-		dgt = newDelegatee(toPubKey)
+		dgt = NewDelegatee(toPubKey)
 		dgt.addPower(fromAddr, power)
 		dgt.addDelegator(fromAddr)
 		allDgtees = append(allDgtees, dgt)

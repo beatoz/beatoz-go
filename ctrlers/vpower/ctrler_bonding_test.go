@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
-	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
@@ -23,31 +22,10 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"sort"
 	"testing"
 	"time"
 )
-
-var (
-	config    *beatozcfg.Config
-	acctMock  *mocks.AcctHandlerMock
-	govParams *ctrlertypes.GovParams
-)
-
-func init() {
-	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
-	config = beatozcfg.DefaultConfig()
-	config.SetRoot(rootDir)
-	acctMock = mocks.NewAccountHandlerMock(1000)
-	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
-		w.GetAccount().SetBalance(types.ToFons(1_000_000_000))
-		return true
-	})
-
-	govParams = ctrlertypes.DefaultGovParams()
-	govParams.SetLazyUnstakingBlocks(500)
-}
 
 func Test_InitLedger(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
@@ -659,7 +637,6 @@ func Test_Freezing(t *testing.T) {
 }
 
 func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets []*web3.Wallet, height int64) ([]*web3.Wallet, []*web3.Wallet, []int64, []bytes2.HexBytes) {
-
 	var fromWals0 []*web3.Wallet
 	var valWals0 []*web3.Wallet
 	var powers0 []int64
@@ -687,6 +664,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 	sumPowerOfDgtee := make(map[string]int64)
 
 	// check all vpowers
+	var txhashes1 []bytes2.HexBytes
 	xerr := ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
@@ -701,20 +679,18 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 				continue
 			}
 
-			found := false
+			txhashes1 = append(txhashes1, pc.TxHash)
+
 			for i, txhash := range txhashes0 {
 				if bytes.Equal(txhash, pc.TxHash) {
-					require.False(t, found) // it must be found only once.
 					from := fromWals0[i].Address()
 					to := valWals0[i].Address()
 					require.EqualValues(t, from, vpow.From)
 					require.EqualValues(t, to, vpow.to)
 					require.EqualValues(t, to, crypto.PubKeyBytes2Addr(vpow.PubKeyTo))
 					require.Equal(t, powers0[i], pc.Power)
-					found = true
 				}
 			}
-			require.True(t, found, "power chunk txhash", pc.TxHash)
 		}
 		require.Equal(t, sum, vpow.SumPower)
 
@@ -723,6 +699,18 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 		return nil
 	}, true)
 	require.NoError(t, xerr)
+
+	// all in `txhashes0`( txs executed in this time) MUST be found only one time in `txhashes1`(txs on ledger).
+	for _, txhash0 := range txhashes0 {
+		found := false
+		for _, txhash1 := range txhashes1 {
+			if bytes.Equal(txhash0, txhash1) {
+				require.False(t, found) // it must be found only once.
+				found = true
+			}
+		}
+		require.True(t, found)
+	}
 
 	// check delegatees
 	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
