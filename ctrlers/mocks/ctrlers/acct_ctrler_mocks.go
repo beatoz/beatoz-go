@@ -1,4 +1,4 @@
-package account
+package ctrlers
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"

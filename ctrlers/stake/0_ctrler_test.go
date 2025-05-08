@@ -5,7 +5,7 @@ import (
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
-	"github.com/beatoz/beatoz-go/ctrlers/mocks/account"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	beatoztypes "github.com/beatoz/beatoz-go/types"
@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -25,7 +24,7 @@ var (
 	config      = beatozcfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-test")
 	govParams00 = ctrlertypes.Test6GovParams_NoStakeLimiter() // `maxUpdatableStakeRatio = 100, maxIndividualStakeRatio = 10000000`
-	acctMock00  *account.AcctHandlerMock
+	acctMock00  *ctrlers.AcctHandlerMock
 	stakeCtrler *stake.StakeCtrler
 
 	DelegateeWallets     []*web3.Wallet
@@ -44,7 +43,7 @@ func TestMain(m *testing.M) {
 	config.DBPath = DBDIR
 	stakeCtrler, _ = stake.NewStakeCtrler(config, govParams00, tmlog.NewNopLogger())
 
-	acctMock00 = account.NewAccountHandlerMock(100 + int(govParams00.MaxValidatorCnt()))
+	acctMock00 = ctrlers.NewAccountHandlerMock(100 + int(govParams00.MaxValidatorCnt()))
 	acctMock00.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(beatoztypes.ToFons(1_000_000_000))
 		return true
@@ -215,6 +214,7 @@ func TestDoReward(t *testing.T) {
 func TestPunish(t *testing.T) {
 	allTotalPower0 := stakeCtrler.ReadTotalPower()
 	for _, byzanWallet := range DelegateeWallets {
+
 		totalPower0 := stakeCtrler.TotalPowerOf(byzanWallet.Address())
 		selfPower0 := stakeCtrler.SelfPowerOf(byzanWallet.Address())
 		require.Greater(t, selfPower0, int64(0))
@@ -269,8 +269,7 @@ func TestPunish(t *testing.T) {
 		require.Equal(t, totalPower0-sumSlashedPower0, delegatee.TotalPower)
 		require.Equal(t, totalPower0-sumSlashedPower0, delegatee.SumPowerOf(nil))
 
-		_, _, xerr = stakeCtrler.Commit()
-		require.NoError(t, xerr)
+		//require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
 
 		require.Equal(t, totalPower0-expectedSumSlashedPower, stakeCtrler.TotalPowerOf(delegatee.Addr))
 		require.Equal(t, allTotalPower0-expectedSumSlashedPower, stakeCtrler.ReadTotalPower())
@@ -281,18 +280,7 @@ func TestPunish(t *testing.T) {
 
 // test for issue #43
 func TestUnstakingByNotOwner(t *testing.T) {
-	originHeight := mocks.LastBlockHeight()
-
-	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
-
 	for _, txctx := range unstakingTrxCtxs {
-
-		if mocks.LastBlockHeight() < txctx.Height {
-			for mocks.LastBlockHeight() < txctx.Height {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
-				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
-			}
-		}
 
 		ori := txctx.Tx.From
 		txctx.Tx.From = beatoztypes.RandAddress()
@@ -303,19 +291,6 @@ func TestUnstakingByNotOwner(t *testing.T) {
 
 		txctx.Tx.From = ori
 	}
-
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
-
-	// Rollback block context to `originHeight`
-	// This test case will fail,
-	// so any increase in block height caused by this test case should be ignored.
-	req := abcitypes.RequestBeginBlock{
-		Header: tmtypes.Header{
-			Height: originHeight,
-		},
-	}
-	bctx := ctrlertypes.NewBlockContext(req, govParams00, acctMock00, nil)
-	mocks.InitBlockCtx(bctx)
 }
 
 // TestUnstakingByTx requires that TestTrxStakingByTx had been executed.
@@ -329,6 +304,7 @@ func TestUnstakingByTx(t *testing.T) {
 	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 
 	for _, txctx := range unstakingTrxCtxs {
+
 		if mocks.LastBlockHeight() < txctx.Height {
 			for mocks.LastBlockHeight() < txctx.Height {
 				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))

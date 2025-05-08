@@ -255,8 +255,8 @@ func (i *Item) Encode() ([]byte, xerrors.XError) {
 	return []byte(fmt.Sprintf("key:%v,data:%v", i.key, i.data)), nil
 }
 
-func (i *Item) Decode(bz []byte) xerrors.XError {
-	toks := strings.Split(string(bz), ",")
+func (i *Item) Decode(k, v []byte) xerrors.XError {
+	toks := strings.Split(string(v), ",")
 	key, _ := strings.CutPrefix(toks[0], "key:")
 	data, _ := strings.CutPrefix(toks[1], "data:")
 
@@ -267,3 +267,5 @@ func (i *Item) Decode(bz []byte) xerrors.XError {
 	i.data = data
 	return nil
 }
+
+var _ ILedgerItem = (*Item)(nil)

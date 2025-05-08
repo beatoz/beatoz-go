@@ -57,7 +57,7 @@ func Test_BlockGasLimit(t *testing.T) {
 		abcitypes.RequestBeginBlock{Header: tmtypes.Header{Height: 1}},
 		govParams,
 		acctHandler,
-		nil)
+		nil, nil)
 	bctx.SetBlockGasLimit(blockGasLimit)
 	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
@@ -98,7 +98,7 @@ func Test_BlockGasLimit(t *testing.T) {
 		abcitypes.RequestBeginBlock{Header: tmtypes.Header{Height: 1}},
 		govParams,
 		acctHandler,
-		nil)
+		nil, nil)
 	bctx.SetBlockGasLimit(blockGasLimit)
 	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())

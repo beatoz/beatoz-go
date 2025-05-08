@@ -116,10 +116,6 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 
 	//todo: slashing
 
-	if bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
-		// todo: Start additional issuance and rewards
-	}
-
 	// todo: reset limiter
 	//ctrler.vpowLimiter.Reset(
 	//	ctrler.allDelegatees,

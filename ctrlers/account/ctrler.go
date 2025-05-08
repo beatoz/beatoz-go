@@ -46,7 +46,7 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 		addr := append(holder.Address, nil...)
 		acct := &btztypes.Account{
 			Address: addr,
-			Balance: holder.Balance.Clone(),
+			Balance: holder.Balance,
 		}
 		if xerr := ctrler.setAccount(acct, true); xerr != nil {
 			return xerr
@@ -110,6 +110,11 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 		// give fee to block proposer and burn automatically by BurnRatio().
 		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovParams.BurnRatio())))
 		burned = new(uint256.Int).Div(burned, uint256.NewInt(100))
+		// todo: apply `burned` to SupplyCtrler
+		//if xerr := bctx.SupplyHandler.Burn(burned, bctx.Height()); xerr != nil {
+		//	return nil, xerr
+		//}
+
 		reward := new(uint256.Int).Sub(sumFee, burned)
 
 		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,

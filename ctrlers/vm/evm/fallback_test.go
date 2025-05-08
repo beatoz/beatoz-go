@@ -51,7 +51,7 @@ func Test_Fallback(t *testing.T) {
 	to := types.ZeroAddress()
 
 	// BeginBlock
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, ctrlertypes.DefaultGovParams(), &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1}}, ctrlertypes.DefaultGovParams(), &acctHandler, nil, nil)
 	_, xerr := fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 

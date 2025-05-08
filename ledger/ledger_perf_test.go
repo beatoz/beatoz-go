@@ -212,8 +212,8 @@ func (i *TestItemV0) Encode() ([]byte, xerrors.XError) {
 	return []byte(fmt.Sprintf("key:%x,data:%v", i.key, i.data)), nil
 }
 
-func (i *TestItemV0) Decode(bz []byte) xerrors.XError {
-	toks := strings.Split(string(bz), ",")
+func (i *TestItemV0) Decode(v []byte) xerrors.XError {
+	toks := strings.Split(string(v), ",")
 	key, _ := strings.CutPrefix(toks[0], "key:")
 	data, _ := strings.CutPrefix(toks[1], "data:")
 
@@ -243,4 +243,16 @@ func emptyTestItemV1(key v1.LedgerKey) v1.ILedgerItem {
 
 func (i *TestItemV1) Key() v1.LedgerKey {
 	return i.key
+}
+func (i *TestItemV1) Decode(k, v []byte) xerrors.XError {
+	toks := strings.Split(string(v), ",")
+	key, _ := strings.CutPrefix(toks[0], "key:")
+	data, _ := strings.CutPrefix(toks[1], "data:")
+
+	var err error
+	if i.key, err = hex.DecodeString(key); err != nil {
+		return xerrors.From(err)
+	}
+	i.data = data
+	return nil
 }

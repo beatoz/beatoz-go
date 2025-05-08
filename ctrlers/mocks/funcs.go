@@ -10,7 +10,7 @@ var lastBlockCtx *ctrlertypes.BlockContext
 var currBlockCtx *ctrlertypes.BlockContext
 
 func InitBlockCtxWith(h int64, a ctrlertypes.IAccountHandler, g ctrlertypes.IGovParams, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{}, g, a, s)
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{}, g, a, s, nil)
 	bctx.SetHeight(h)
 
 	currBlockCtx = bctx
@@ -79,8 +79,9 @@ func DoCommitBlock(ctrler ctrlertypes.ILedgerHandler) error {
 		panic(fmt.Errorf("different height between ledger(%v) and currBlockCtx(%v)", v, currBlockCtx.Height()))
 	} else {
 		lastBlockCtx = currBlockCtx
-		currBlockCtx = NextBlockCtxOf(currBlockCtx)
+		currBlockCtx = NextBlockCtxOf(lastBlockCtx)
 	}
+	//fmt.Printf("DoCommitBlock - last: %v, curr: %v\n", lastBlockCtx.Height(), currBlockCtx.Height())
 	return nil
 }
 

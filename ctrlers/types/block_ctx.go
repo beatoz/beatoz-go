@@ -22,27 +22,31 @@ type BlockContext struct {
 	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
-	GovParams     IGovParams
-	AcctHandler   IAccountHandler
+	GovParams   IGovParams
+	AcctHandler IAccountHandler
+	// DEPRECATED
 	StakeHandler  IStakeHandler
 	VPowerHandler IVPowerHandler
+	SupplyHandler ISupplyHandler
 
 	ValUpdates abcitypes.ValidatorUpdates
 
 	mtx sync.RWMutex
 }
 
-func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovParams, a IAccountHandler, s IStakeHandler) *BlockContext {
+func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovParams, a IAccountHandler, s IStakeHandler, su ISupplyHandler) *BlockContext {
 	ret := &BlockContext{
-		blockInfo:    bi,
-		feeSum:       uint256.NewInt(0),
-		txsCnt:       0,
-		evmTxsCnt:    0,
-		appHash:      nil,
-		GovParams:    g,
-		AcctHandler:  a,
-		StakeHandler: s,
-		ValUpdates:   nil,
+		blockInfo:     bi,
+		feeSum:        uint256.NewInt(0),
+		txsCnt:        0,
+		evmTxsCnt:     0,
+		appHash:       nil,
+		GovParams:     g,
+		AcctHandler:   a,
+		StakeHandler:  s,
+		SupplyHandler: su,
+		VPowerHandler: s.(IVPowerHandler), // todo: perfectly implement temp code
+		ValUpdates:    nil,
 	}
 	if g != nil {
 		ret.setBlockGasLimit(g.MaxBlockGas())

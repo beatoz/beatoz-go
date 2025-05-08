@@ -89,3 +89,9 @@ type IVPowerHandler interface {
 
 	ComputeWeight(int64, int64, int64, *uint256.Int) (decimal.Decimal, xerrors.XError)
 }
+
+type ISupplyHandler interface {
+	IBlockHandler
+	Mint(bctx *BlockContext)
+	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError
+}

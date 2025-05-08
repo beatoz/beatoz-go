@@ -15,7 +15,7 @@ func TestBlockGasLimit(t *testing.T) {
 
 	for n := 0; n < 1000000; n++ {
 
-		blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil)
+		blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil, nil)
 		randBlockGasLimit := rand.Uint64N(_max)
 		blockCtx.SetBlockGasLimit(randBlockGasLimit)
 
@@ -49,7 +49,7 @@ func TestBlockGasLimit(t *testing.T) {
 
 func TestUseBlockGas(t *testing.T) {
 	initGasLimit := uint64(10000)
-	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil)
+	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil, nil)
 	blockCtx.SetBlockGasLimit(initGasLimit)
 
 	sumGasUsed := uint64(0)

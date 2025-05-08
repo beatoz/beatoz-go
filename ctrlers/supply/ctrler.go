@@ -6,7 +6,6 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
-	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
@@ -15,13 +14,13 @@ import (
 	"sync"
 )
 
-type reqIssure struct {
+type reqMint struct {
 	bctx               *types.BlockContext
 	lastTotalSupply    *uint256.Int
 	lastAdjustedSupply *uint256.Int
 	lastAdjustedHeight int64
 }
-type respIssure struct {
+type respMint struct {
 	xerr      xerrors.XError
 	newSupply *Supply
 }
@@ -33,8 +32,8 @@ type SupplyCtrler struct {
 	lastAdjustedSupply *uint256.Int
 	lastAdjustedHeight int64
 
-	reqCh  chan *reqIssure
-	respCh chan *respIssure
+	reqCh  chan *reqMint
+	respCh chan *respMint
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
@@ -49,31 +48,40 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 
 func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_SupplyCtrler")
-	ledger, xerr := v1.NewStateLedger("supply", config.DBDir(), 21*2048, defaultNewItem, nil)
+
+	ledger, xerr := v1.NewStateLedger("supply", config.DBDir(), 21*2048, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// load supply info from ledger
 	item, xerr := ledger.Get(v1.LedgerKeyTotalSupply(), true)
-	if xerr != nil {
+	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return nil, xerr
 	}
 	total, _ := item.(*Supply)
+	if total == nil {
+		total = &Supply{}
+	}
 
 	item, xerr = ledger.Get(v1.LedgerKeyAdjustedSupply(), true)
-	if xerr != nil {
+	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return nil, xerr
 	}
 	adjusted, _ := item.(*Supply)
+	if adjusted == nil {
+		adjusted = &Supply{}
+	}
+	reqCh, respCh := make(chan *reqMint, 1), make(chan *respMint, 1)
+	go computeIssuanceAndRewardRoutine(reqCh, respCh)
 
 	return &SupplyCtrler{
 		supplyState:        ledger,
 		lastTotalSupply:    new(uint256.Int).SetBytes(total.XSupply),
 		lastAdjustedSupply: new(uint256.Int).SetBytes(adjusted.XSupply),
 		lastAdjustedHeight: adjusted.Height,
-		reqCh:              make(chan *reqIssure, 1),
-		respCh:             make(chan *respIssure, 1),
+		reqCh:              reqCh,
+		respCh:             respCh,
 		logger:             lg,
 		mtx:                sync.RWMutex{},
 	}, nil
@@ -83,16 +91,17 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.lastTotalSupply = types2.ToFons(350_000_000)
-	ctrler.lastAdjustedSupply = types2.ToFons(350_000_000)
+	initTotalSupply := req.(*uint256.Int)
+	ctrler.lastTotalSupply = initTotalSupply
+	ctrler.lastAdjustedSupply = initTotalSupply
 	ctrler.lastAdjustedHeight = 1
 
 	// set initial total supply
 	initSupply := &Supply{
 		SupplyProto: SupplyProto{
 			Height:  1,
-			XChange: types2.ToFons(350_000_000).Bytes(),
-			XSupply: types2.ToFons(350_000_000).Bytes(),
+			XChange: initTotalSupply.Bytes(),
+			XSupply: initTotalSupply.Bytes(),
 		},
 		key: nil,
 	}
@@ -105,8 +114,6 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 		return xerr
 	}
 
-	go computeIssuanceAndRewardRoutine(ctrler.reqCh, ctrler.respCh)
-
 	return nil
 }
 func (ctrler *SupplyCtrler) BeginBlock(bctx *types.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -114,12 +121,7 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *types.BlockContext) ([]abcitypes.Ev
 	defer ctrler.mtx.Unlock()
 
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
-		ctrler.reqCh <- &reqIssure{
-			bctx:               bctx,
-			lastTotalSupply:    ctrler.lastTotalSupply.Clone(),
-			lastAdjustedSupply: ctrler.lastAdjustedSupply.Clone(),
-			lastAdjustedHeight: ctrler.lastAdjustedHeight,
-		}
+		ctrler.mint(bctx)
 	}
 	return nil, nil
 }
@@ -129,13 +131,8 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *types.BlockContext) ([]abcitypes.Even
 	defer ctrler.mtx.Unlock()
 
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
-		resp := <-ctrler.respCh
-		if resp.xerr != nil {
-			return nil, resp.xerr
-		}
-
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
-			ctrler.logger.Error("fail to set total supply", "error", xerr.Error())
+		if _, xerr := ctrler.waitMint(); xerr != nil {
+			ctrler.logger.Error("fail to mint", "error", xerr.Error())
 			return nil, xerr
 		}
 	}
@@ -180,8 +177,65 @@ func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	}
 	return nil
 }
+func (ctrler *SupplyCtrler) Mint(bctx *types.BlockContext) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 
-func computeIssuanceAndRewardRoutine(reqCh chan *reqIssure, respCh chan *respIssure) {
+	ctrler.mint(bctx)
+}
+
+func (ctrler *SupplyCtrler) mint(bctx *types.BlockContext) {
+	ctrler.reqCh <- &reqMint{
+		bctx:               bctx,
+		lastTotalSupply:    ctrler.lastTotalSupply.Clone(),
+		lastAdjustedSupply: ctrler.lastAdjustedSupply.Clone(),
+		lastAdjustedHeight: ctrler.lastAdjustedHeight,
+	}
+}
+
+func (ctrler *SupplyCtrler) waitMint() (*respMint, xerrors.XError) {
+	resp, _ := <-ctrler.respCh
+	if resp == nil {
+		return nil, xerrors.ErrNotFoundResult.Wrapf("no minting result")
+	}
+	if resp.xerr != nil {
+		return nil, resp.xerr
+	}
+	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
+		return nil, xerr
+	}
+	ctrler.lastTotalSupply = new(uint256.Int).SetBytes(resp.newSupply.XSupply)
+	return resp, nil
+}
+
+func (ctrler *SupplyCtrler) Burn(bctx *types.BlockContext, amt *uint256.Int) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	return ctrler.burn(amt, bctx.Height())
+}
+
+func (ctrler *SupplyCtrler) burn(amt *uint256.Int, height int64) xerrors.XError {
+	adjusted := new(uint256.Int).Sub(ctrler.lastTotalSupply, amt)
+	burn := &Supply{
+		SupplyProto: SupplyProto{
+			Height:  height,
+			XSupply: adjusted.Bytes(),
+			XChange: amt.Bytes(),
+		},
+	}
+	if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), burn, true); xerr != nil {
+		ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
+		return xerr
+	}
+
+	ctrler.lastTotalSupply = adjusted
+	ctrler.lastAdjustedSupply = adjusted
+	ctrler.lastAdjustedHeight = height
+	return nil
+}
+
+func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint) {
 
 	for {
 		req, ok := <-reqCh
@@ -202,20 +256,23 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqIssure, respCh chan *respIss
 			lastTotalSupply,
 		)
 		if xerr != nil {
-			respCh <- &respIssure{
+			respCh <- &respMint{
 				xerr:      xerr,
 				newSupply: nil,
 			}
 			continue
 		}
+		wa = wa.Truncate(6)
 		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovParams.MaxTotalSupply(), bctx.GovParams.InflationWeightPermil(), wa)
 		additionalIssuance := new(uint256.Int).Sub(totalSupply, lastTotalSupply)
+
+		//fmt.Println("compute", "wa", wa.String(), "adjustedSupply", lastAdjustedSupply, "adjustedHeight", lastAdjustedHeight, "max", bctx.GovParams.MaxTotalSupply(), "lamda", bctx.GovParams.InflationWeightPermil(), "t1", totalSupply, "t0", lastTotalSupply)
 
 		//
 		// 2. reward ...
 		//todo: implement reward
 
-		respCh <- &respIssure{
+		respCh <- &respMint{
 			xerr: nil,
 			newSupply: &Supply{
 				SupplyProto: SupplyProto{
@@ -256,5 +313,6 @@ func H(height, blockIntvSec int64) decimal.Decimal {
 	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(oneYearSeconds))
 }
 
+var _ types.ISupplyHandler = (*SupplyCtrler)(nil)
 var _ types.IBlockHandler = (*SupplyCtrler)(nil)
 var _ types.ILedgerHandler = (*SupplyCtrler)(nil)

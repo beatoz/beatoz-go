@@ -51,6 +51,20 @@ func (ctrler *VPowerCtrler) delVPower(from, to types.Address, exec bool) xerrors
 	return ctrler.powersState.Del(v1.LedgerKeyVPower(from, to), exec)
 }
 
+func (ctrler *VPowerCtrler) BondPowerChunk(
+	dgtee *Delegatee,
+	vpow *VPower,
+	power int64,
+	height int64,
+	txhash bytes.HexBytes,
+	exec bool) xerrors.XError {
+
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	return ctrler.bondPowerChunk(dgtee, vpow, power, height, txhash, exec)
+}
+
 func (ctrler *VPowerCtrler) bondPowerChunk(
 	dgtee *Delegatee,
 	vpow *VPower,
@@ -73,6 +87,12 @@ func (ctrler *VPowerCtrler) bondPowerChunk(
 	return nil
 }
 
+func (ctrler *VPowerCtrler) UnbondPowerChunk(dgtee *Delegatee, vpow *VPower, txhash bytes.HexBytes, exec bool) (*PowerChunkProto, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	return ctrler.unbondPowerChunk(dgtee, vpow, txhash, exec)
+}
 func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *Delegatee, vpow *VPower, txhash bytes.HexBytes, exec bool) (*PowerChunkProto, xerrors.XError) {
 	// delete the power chunk with `txhash`
 	var pc = vpow.delPowerWithTxHash(txhash)

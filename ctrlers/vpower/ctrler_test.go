@@ -1,10 +1,9 @@
 package vpower
 
 import (
-	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
-	"github.com/beatoz/beatoz-go/ctrlers/mocks/account"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -22,7 +21,7 @@ import (
 
 var (
 	config    *beatozcfg.Config
-	acctMock  *account.AcctHandlerMock
+	acctMock  *ctrlers.AcctHandlerMock
 	govParams *ctrlertypes.GovParams
 )
 
@@ -30,7 +29,7 @@ func init() {
 	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
 	config = beatozcfg.DefaultConfig()
 	config.SetRoot(rootDir)
-	acctMock = account.NewAccountHandlerMock(1000)
+	acctMock = ctrlers.NewAccountHandlerMock(1000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
 		return true
@@ -52,7 +51,7 @@ func Test_NewValidatorSet(t *testing.T) {
 	var expectedValUps []types.ValidatorUpdate
 
 	for mocks.LastBlockHeight() < 100 {
-		fmt.Println("--------- height:", mocks.CurrBlockHeight())
+		//fmt.Println("--------- height:", mocks.CurrBlockHeight())
 		require.NoError(t, mocks.DoBeginBlock(ctrler))
 		require.NotNil(t, ctrler.allDelegatees)
 
@@ -67,12 +66,12 @@ func Test_NewValidatorSet(t *testing.T) {
 
 		// bctx.ValUpdates should equal to expectedValUps
 		bctx := mocks.CurrBlockCtx()
-		for i, v := range expectedValUps {
-			fmt.Printf("expectedValUps[%d]: %X, power: %v\n", i, v.PubKey.GetSecp256K1(), v.Power)
-		}
-		for i, v := range bctx.ValUpdates {
-			fmt.Printf("bctx.ValUpdates[%d]: %X, power: %v\n", i, v.PubKey.GetSecp256K1(), v.Power)
-		}
+		//for i, v := range expectedValUps {
+		//	fmt.Printf("expectedValUps[%d]: %X, power: %v\n", i, v.PubKey.GetSecp256K1(), v.Power)
+		//}
+		//for i, v := range bctx.ValUpdates {
+		//	fmt.Printf("bctx.ValUpdates[%d]: %X, power: %v\n", i, v.PubKey.GetSecp256K1(), v.Power)
+		//}
 
 		require.Equal(t, len(expectedValUps), len(bctx.ValUpdates), "height", bctx.Height())
 		for _, vup := range expectedValUps {
@@ -80,7 +79,7 @@ func Test_NewValidatorSet(t *testing.T) {
 			require.Equal(t, 1, cnt)
 			require.Equal(t, vup.Power, _vup.Power)
 		}
-		fmt.Printf("%d validators are changed, all delegatees are %v\n", len(bctx.ValUpdates), len(ctrler.allDelegatees))
+		//fmt.Printf("%d validators are changed, all delegatees are %v\n", len(bctx.ValUpdates), len(ctrler.allDelegatees))
 
 		require.NoError(t, mocks.DoCommitBlock(ctrler))
 
@@ -97,7 +96,8 @@ func Test_NewValidatorSet(t *testing.T) {
 		//for i, v := range ctrler.lastValidators {
 		//	fmt.Printf("last validator[%d]: %X, power: %v\n", i, v.PubKey, v.SumPower)
 		//}
-		fmt.Println("---------")
+
+		//fmt.Println("---------")
 
 	}
 }

@@ -92,10 +92,10 @@ func newGovParamsWith(interval int) *GovParams {
 		signedBlocksWindow:        10_000,                                                 // 10000 blocks
 		minSignedBlocks:           500,                                                    // 500 blocks
 		maxTotalSupply:            uint256.MustFromDecimal("700000000000000000000000000"), // 700,000,000 BEATOZ
-		inflationWeightPermil:     290,                                                    // 0.290
+		inflationWeightPermil:     390,                                                    // 0.390
 		inflationCycleBlocks:      2 * secondsPerWeek / int64(interval),                   // 2weeks
 		minBondingBlocks:          2 * secondsPerWeek / int64(interval),                   // 2weeks
-		bondingBlocksWeightPermil: 2,                                                      // 0.002
+		bondingBlocksWeightPermil: 500,                                                    // 0.500
 		rewardPoolAddress:         types.ZeroAddress(),
 		burnAddress:               types.ZeroAddress(), // 0x0000...0000
 		burnRatio:                 10,                  // 10%

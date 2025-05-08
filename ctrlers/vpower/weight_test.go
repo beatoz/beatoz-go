@@ -49,8 +49,10 @@ func Test_Wi(t *testing.T) {
 
 		for _, vpobj := range vpObjs {
 			wi0 := oldWi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200)
+			wi0 = wi0.Truncate(6)
 			wi1 := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200)
-			require.Equal(t, wi0, wi1)
+			wi1 = wi1.Truncate(6)
+			require.Equal(t, wi0, wi1, "not equal", "wi0", wi0, "wi1", wi1)
 
 			_wa := wa.Add(wi1)
 

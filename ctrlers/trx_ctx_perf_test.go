@@ -2,7 +2,7 @@ package ctrlers
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/ctrlers/mocks/account"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -18,13 +18,13 @@ import (
 
 var (
 	txbzs       [][]byte
-	acctHandler *account.AcctHandlerMock
+	acctHandler *ctrlers.AcctHandlerMock
 	govParams   types2.IGovParams
 )
 
 func init() {
 	govParams = types2.DefaultGovParams()
-	acctHandler = account.NewAccountHandlerMock(20000)
+	acctHandler = ctrlers.NewAccountHandlerMock(20000)
 	wals := acctHandler.GetAllWallets()
 	for _, w0 := range wals {
 		tx := web3.NewTrxTransfer(w0.Address(), types.RandAddress(), rand.Uint64(), govParams.MinTrxGas(), govParams.GasPrice(), bytes.RandU256IntN(uint256.NewInt(1_000_000_000_000_000)))
