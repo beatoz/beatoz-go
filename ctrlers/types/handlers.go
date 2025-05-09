@@ -68,6 +68,7 @@ type IAccountHandler interface {
 	FindOrNewAccount(types.Address, bool) *Account
 	FindAccount(types.Address, bool) *Account
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
+	// DEPRECATED: Add `AddBlance` and replace it.
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
 	SimuAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
 }
@@ -87,7 +88,7 @@ type IVPowerHandler interface {
 	//SelfPowerOf(types.Address) int64
 	//DelegatedPowerOf(types.Address) int64
 
-	ComputeWeight(int64, int64, int64, *uint256.Int) (decimal.Decimal, xerrors.XError)
+	ComputeWeight(int64, int64, int64, *uint256.Int) (decimal.Decimal, []decimal.Decimal, []types.Address, xerrors.XError)
 }
 
 type ISupplyHandler interface {

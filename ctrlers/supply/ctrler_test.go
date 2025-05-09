@@ -4,10 +4,10 @@ import (
 	"fmt"
 	btzcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	ctrlermocks "github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -22,6 +22,7 @@ import (
 var (
 	config    *btzcfg.Config
 	govParams *types.GovParams
+	acctMock  *ctrlermocks.AcctHandlerMock
 )
 
 func init() {
@@ -30,6 +31,11 @@ func init() {
 	config.SetRoot(rootDir)
 
 	govParams = types.DefaultGovParams()
+	acctMock = ctrlermocks.NewAccountHandlerMock(1000)
+	//acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
+	//	w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
+	//	return true
+	//})
 }
 
 func Test_InitLedger(t *testing.T) {
@@ -67,8 +73,9 @@ func Test_Mint(t *testing.T) {
 	vpowCtrler, xerr := vpower.NewVPowerCtrler(config, int(govParams.MaxValidatorCnt()), log.NewNopLogger())
 	require.NoError(t, xerr)
 
-	_, pub := crypto.NewKeypairBytes()
-	dgtee := vpower.NewDelegatee(pub)
+	wal := acctMock.RandWallet()
+	dgtee := vpower.NewDelegatee(wal.GetPubKey())
+
 	vpow := vpower.NewVPower(dgtee.Address(), dgtee.PubKey) // self power
 	xerr = vpowCtrler.BondPowerChunk(dgtee, vpow, 70_000_000, 1, bytes.RandBytes(32), true)
 	require.NoError(t, xerr)
@@ -81,7 +88,7 @@ func Test_Mint(t *testing.T) {
 	// before vpowCtrler.EndBlock. (vpowCtrler.lastValidators is nil)
 	// expect 0 minting
 	ctrler.mint(bctx)
-	result, xerr := ctrler.waitMint()
+	result, xerr := ctrler.waitMint(bctx)
 	require.NoError(t, xerr)
 	supplyHeight := result.newSupply.Height
 	totalSupply := new(uint256.Int).SetBytes(result.newSupply.XSupply)
@@ -100,15 +107,16 @@ func Test_Mint(t *testing.T) {
 		wa := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, currHeight, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
 		wa = wa.Truncate(6)
 
-		expectedTotalSupply := Si(currHeight, 1, adjustedSupply, govParams.MaxTotalSupply(), govParams.InflationWeightPermil(), wa)
+		si := Si(currHeight, 1, adjustedSupply, govParams.MaxTotalSupply(), govParams.InflationWeightPermil(), wa)
+		expectedTotalSupply := uint256.MustFromBig(si.BigInt())
 		expectedChange := new(uint256.Int).Sub(expectedTotalSupply, totalSupply)
 		fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedSupply", adjustedSupply, "adjustedHeight", 1, "max", govParams.MaxTotalSupply(), "lamda", govParams.InflationWeightPermil(), "t1", expectedTotalSupply, "t0", totalSupply)
 
 		bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{
 			Header: tmproto.Header{Height: currHeight},
-		}, govParams, nil, vpowCtrler, nil)
+		}, govParams, acctMock, vpowCtrler, nil)
 		ctrler.mint(bctx)
-		result, xerr = ctrler.waitMint()
+		result, xerr = ctrler.waitMint(bctx)
 		require.NoError(t, xerr)
 		supplyHeight = result.newSupply.Height
 		totalSupply = new(uint256.Int).SetBytes(result.newSupply.XSupply)
@@ -116,9 +124,14 @@ func Test_Mint(t *testing.T) {
 
 		require.Equal(t, currHeight, supplyHeight)
 		require.NotEqual(t, expectedTotalSupply.Dec(), initSupply.Dec())
-		require.Equal(t, expectedTotalSupply.Dec(), totalSupply.Dec(), "height", currHeight)
 		require.NotEqual(t, "0", changeSupply.Dec())
+		require.Equal(t, expectedTotalSupply.Dec(), totalSupply.Dec(), "height", currHeight)
 		require.Equal(t, expectedChange.Dec(), changeSupply.Dec())
+		sumReward := uint256.NewInt(0)
+		for _, rwd := range result.rewards {
+			_ = sumReward.Add(sumReward, rwd.amt)
+		}
+		require.Equal(t, sumReward.String(), expectedChange.String())
 	}
 
 	require.NoError(t, ctrler.Close())

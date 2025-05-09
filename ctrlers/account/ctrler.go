@@ -272,6 +272,7 @@ func (ctrler *AcctCtrler) setDoc(acct *btztypes.Account, name, url string) {
 	acct.SetDocURL(url)
 }
 
+// DEPRECATED: Add `AddBlance` and replace it.
 func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()

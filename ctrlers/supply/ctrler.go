@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
-	"github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
@@ -15,7 +16,7 @@ import (
 )
 
 type reqMint struct {
-	bctx               *types.BlockContext
+	bctx               *ctrlertypes.BlockContext
 	lastTotalSupply    *uint256.Int
 	lastAdjustedSupply *uint256.Int
 	lastAdjustedHeight int64
@@ -23,6 +24,10 @@ type reqMint struct {
 type respMint struct {
 	xerr      xerrors.XError
 	newSupply *Supply
+	rewards   []*struct {
+		addr btztypes.Address
+		amt  *uint256.Int
+	}
 }
 
 type SupplyCtrler struct {
@@ -116,7 +121,7 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 
 	return nil
 }
-func (ctrler *SupplyCtrler) BeginBlock(bctx *types.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -126,12 +131,12 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *types.BlockContext) ([]abcitypes.Ev
 	return nil, nil
 }
 
-func (ctrler *SupplyCtrler) EndBlock(bctx *types.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
-		if _, xerr := ctrler.waitMint(); xerr != nil {
+		if _, xerr := ctrler.waitMint(bctx); xerr != nil {
 			ctrler.logger.Error("fail to mint", "error", xerr.Error())
 			return nil, xerr
 		}
@@ -177,14 +182,14 @@ func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	}
 	return nil
 }
-func (ctrler *SupplyCtrler) Mint(bctx *types.BlockContext) {
+func (ctrler *SupplyCtrler) Mint(bctx *ctrlertypes.BlockContext) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	ctrler.mint(bctx)
 }
 
-func (ctrler *SupplyCtrler) mint(bctx *types.BlockContext) {
+func (ctrler *SupplyCtrler) mint(bctx *ctrlertypes.BlockContext) {
 	ctrler.reqCh <- &reqMint{
 		bctx:               bctx,
 		lastTotalSupply:    ctrler.lastTotalSupply.Clone(),
@@ -193,13 +198,20 @@ func (ctrler *SupplyCtrler) mint(bctx *types.BlockContext) {
 	}
 }
 
-func (ctrler *SupplyCtrler) waitMint() (*respMint, xerrors.XError) {
+func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint, xerrors.XError) {
 	resp, _ := <-ctrler.respCh
 	if resp == nil {
 		return nil, xerrors.ErrNotFoundResult.Wrapf("no minting result")
 	}
 	if resp.xerr != nil {
 		return nil, resp.xerr
+	}
+
+	// distribute rewards
+	for _, rwd := range resp.rewards {
+		if xerr := bctx.AcctHandler.Reward(rwd.addr, rwd.amt, true); xerr != nil {
+			return nil, xerr
+		}
 	}
 	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
 		return nil, xerr
@@ -208,7 +220,7 @@ func (ctrler *SupplyCtrler) waitMint() (*respMint, xerrors.XError) {
 	return resp, nil
 }
 
-func (ctrler *SupplyCtrler) Burn(bctx *types.BlockContext, amt *uint256.Int) xerrors.XError {
+func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.Int) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -249,7 +261,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		lastAdjustedHeight := req.lastAdjustedHeight
 
 		// 1. compute voting power weight
-		wa, xerr := bctx.VPowerHandler.ComputeWeight(
+		wa, wis, benefs, xerr := bctx.VPowerHandler.ComputeWeight(
 			bctx.Height(),
 			bctx.GovParams.RipeningBlocks(),
 			bctx.GovParams.BondingBlocksWeightPermil(),
@@ -263,31 +275,78 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			continue
 		}
 		wa = wa.Truncate(6)
-		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovParams.MaxTotalSupply(), bctx.GovParams.InflationWeightPermil(), wa)
-		additionalIssuance := new(uint256.Int).Sub(totalSupply, lastTotalSupply)
+
+		//{
+		//	//
+		//	// for debugging
+		//	//
+		//	sumWi := decimal.Zero
+		//	for _, wi := range wis {
+		//		sumWi = sumWi.Add(wi)
+		//	}
+		//	sumWi = sumWi.Truncate(6)
+		//	if !sumWi.Equal(wa) {
+		//		panic(fmt.Errorf("weight has error - wa:%v, sumOfWi:%v", wa, sumWi))
+		//	}
+		//}
+
+		si := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovParams.MaxTotalSupply(), bctx.GovParams.InflationWeightPermil(), wa)
+		sd := si.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
 
 		//fmt.Println("compute", "wa", wa.String(), "adjustedSupply", lastAdjustedSupply, "adjustedHeight", lastAdjustedHeight, "max", bctx.GovParams.MaxTotalSupply(), "lamda", bctx.GovParams.InflationWeightPermil(), "t1", totalSupply, "t0", lastTotalSupply)
 
 		//
 		// 2. reward ...
-		//todo: implement reward
+		//todo: calculate reward
+		// how to know who is validator???
 
-		respCh <- &respMint{
-			xerr: nil,
-			newSupply: &Supply{
-				SupplyProto: SupplyProto{
-					Height:  bctx.Height(),
-					XSupply: totalSupply.Bytes(),
-					XChange: additionalIssuance.Bytes(),
-				},
-			},
+		sumWi := decimal.Zero
+		rewards := make([]*struct {
+			addr btztypes.Address
+			amt  *uint256.Int
+		}, len(benefs))
+		for i, addr := range benefs {
+			sumWi = sumWi.Add(wis[i])
+
+			wi := wis[i].Truncate(6)
+			rd := sd.Mul(wi.Div(wa))
+			// give `rd` to `b`
+			rewards[i] = &struct {
+				addr btztypes.Address
+				amt  *uint256.Int
+			}{
+				addr: addr,
+				amt:  uint256.MustFromBig(rd.BigInt()),
+			}
 		}
+		sumWi = sumWi.Truncate(6)
+
+		var _resp *respMint
+		if !wa.Equal(sumWi) {
+			_resp = &respMint{
+				xerr: xerrors.ErrInvalidWeight,
+			}
+		} else {
+			_resp = &respMint{
+				xerr: nil,
+				newSupply: &Supply{
+					SupplyProto: SupplyProto{
+						Height:  bctx.Height(),
+						XSupply: uint256.MustFromBig(si.BigInt()).Bytes(),
+						XChange: uint256.MustFromBig(sd.BigInt()).Bytes(),
+					},
+				},
+				rewards: rewards,
+			}
+		}
+
+		respCh <- _resp
 	}
 
 }
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int64, wa decimal.Decimal) *uint256.Int {
+func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int64, wa decimal.Decimal) decimal.Decimal {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
@@ -299,7 +358,7 @@ func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda 
 	denom := decLambdaAddOne.Pow(expWHid)
 
 	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
-	return uint256.MustFromBig(decSmax.Sub(numer.Div(denom)).BigInt())
+	return decSmax.Sub(numer.Div(denom))
 }
 
 // H returns the normalized block time corresponding to the given block height.
@@ -313,6 +372,6 @@ func H(height, blockIntvSec int64) decimal.Decimal {
 	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(oneYearSeconds))
 }
 
-var _ types.ISupplyHandler = (*SupplyCtrler)(nil)
-var _ types.IBlockHandler = (*SupplyCtrler)(nil)
-var _ types.ILedgerHandler = (*SupplyCtrler)(nil)
+var _ ctrlertypes.ISupplyHandler = (*SupplyCtrler)(nil)
+var _ ctrlertypes.IBlockHandler = (*SupplyCtrler)(nil)
+var _ ctrlertypes.ILedgerHandler = (*SupplyCtrler)(nil)

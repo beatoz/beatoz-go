@@ -80,6 +80,7 @@ var (
 	ErrNoRight               = NewOrdinary("no right")
 	ErrNotVotingPeriod       = NewOrdinary("not voting period")
 	ErrDuplicatedKey         = NewOrdinary("already existed key")
+	ErrInvalidWeight         = NewOrdinary("invalid weight")
 )
 
 type XError interface {

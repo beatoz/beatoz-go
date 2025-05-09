@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 	"math/rand"
 	"os"
@@ -54,10 +55,17 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		//fmt.Println("WaEx64ByPowerChunk return", w_waex64pc)
 
 		// ComputeWeight
-		w_computed, xerr := ctrler.ComputeWeight(h, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
+		w_computed, w_inds, _, xerr := ctrler.ComputeWeight(h, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
 		require.NoError(t, xerr)
 		w_computed = w_computed.Truncate(6)
 
+		sumIndW := decimal.Zero
+		for _, _w := range w_inds {
+			sumIndW = sumIndW.Add(_w)
+		}
+		sumIndW = sumIndW.Truncate(6)
+
+		require.Equal(t, w_computed.String(), sumIndW.String())
 		require.True(t, w_waex64pc.LessThanOrEqual(decimalOne), "WaEx64ByPowerChunks", w_waex64pc, "height", h)
 		require.True(t, w_computed.LessThanOrEqual(decimalOne), "ComputeWeight", w_computed, "height", h)
 		require.True(t, w_waex64pc.Equal(w_computed), fmt.Sprintf("WaEx64ByPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, h))
