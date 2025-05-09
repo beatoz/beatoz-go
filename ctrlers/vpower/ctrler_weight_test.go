@@ -49,7 +49,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 
 		// compute weight
 		// WaEx64ByPowerChunks
-		w_waex64pc := WaEx64ByPowerChunk(powChunks0, h, powerRipeningCycle, totalSupply, int(govParams.BondingBlocksWeightPermil()))
+		w_waex64pc := WaEx64ByPowerChunk(powChunks0, h, powerRipeningCycle, govParams.BondingBlocksWeightPermil(), totalSupply)
 		w_waex64pc = w_waex64pc.Truncate(6)
 		//fmt.Println("WaEx64ByPowerChunk return", w_waex64pc)
 

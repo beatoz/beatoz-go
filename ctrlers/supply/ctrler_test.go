@@ -97,7 +97,7 @@ func Test_Mint(t *testing.T) {
 	for currHeight := int64(2); currHeight < oneYearSeconds*30; currHeight += govParams.InflationCycleBlocks() {
 		// expect x minting
 
-		wa := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, currHeight, govParams.RipeningBlocks(), totalSupply, int(govParams.BondingBlocksWeightPermil()))
+		wa := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, currHeight, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
 		wa = wa.Truncate(6)
 
 		expectedTotalSupply := Si(currHeight, 1, adjustedSupply, govParams.MaxTotalSupply(), govParams.InflationWeightPermil(), wa)

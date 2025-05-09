@@ -8,11 +8,11 @@ import (
 
 // Wa calculates the total voting power weight of all validators and delegators.
 // The result may differ from the sum of Wi due to floating-point error.
-func Wa(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+func Wa(pows, vpdurs []int64, ripeningCycle, tau int64, totalSupply decimal.Decimal) decimal.Decimal {
 	sumTmV := decimal.Zero
 	sumPowAmt := decimal.Zero
-	_tau := decimal.New(int64(tau), -3) // tau is permil
-	_keppa := decimalOne.Sub(_tau)      // keppa = 1 - tau
+	_tau := decimal.New(tau, -3)   // tau is permil
+	_keppa := decimalOne.Sub(_tau) // keppa = 1 - tau
 
 	for i, pow := range pows {
 		vpAmt := decimal.New(pow, int32(types.DECIMAL))
@@ -31,13 +31,13 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, 
 	return q
 }
 
-func oldWi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+func oldWi(pow, vdur, ripeningCycle, tau int64, totalSupply decimal.Decimal) decimal.Decimal {
 	decDur := decimalOne
 	if vdur < ripeningCycle {
 		decDur = decimal.NewFromInt(vdur).Div(decimal.NewFromInt(ripeningCycle))
 	}
 	decV := decimal.New(pow, int32(types.DECIMAL))
-	decTau := decimal.New(int64(tau), -3) // tau is permil
+	decTau := decimal.New(tau, -3) // tau is permil
 	decKeppa := decimalOne.Sub(decTau)
 
 	// Use `QuoRem` instead of `Div`.
@@ -48,12 +48,12 @@ func oldWi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int)
 
 // Wi calculates the voting power weight `W_i` of a validator and delegator like the below.
 // `W_i = (tau * min(StakeDurationInSecond/RipeningCycle, 1) + keppa) * Stake_i / S_i`
-func Wi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
+func Wi(pow, vdur, ripeningCycle, tau int64, totalSupply decimal.Decimal) decimal.Decimal {
 	if vdur == 0 {
 		return decimal.Zero
 	}
 
-	decTau := decimal.New(int64(tau), -3) // tau is permil
+	decTau := decimal.New(tau, -3) // tau is permil
 	decKeppa := decimalOne.Sub(decTau)
 	decCo := decimalOne
 	if vdur < ripeningCycle {
@@ -69,8 +69,8 @@ func Wi(pow, vdur, ripeningCycle int64, totalSupply decimal.Decimal, tau int) de
 	return q
 }
 
-func WaEx(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
+func WaEx(pows, vpdurs []int64, ripeningCycle, tau int64, totalSupply decimal.Decimal) decimal.Decimal {
+	_tau := decimal.New(tau, -3)
 	_keppa := decimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
@@ -94,8 +94,8 @@ func WaEx(pows, vpdurs []int64, ripeningCycle int64, totalSupply decimal.Decimal
 	return q
 }
 
-func WaEx64(pows, durs []int64, ripeningCycle int64, totalSupply *uint256.Int, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
+func WaEx64(pows, durs []int64, ripeningCycle, tau int64, totalSupply *uint256.Int) decimal.Decimal {
+	_tau := decimal.New(tau, -3)
 	_keppa := decimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
@@ -119,8 +119,8 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, totalSupply *uint256.Int, t
 	return q
 }
 
-func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, totalSupply *uint256.Int, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
+func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle, tau int64, totalSupply *uint256.Int) decimal.Decimal {
+	_tau := decimal.New(tau, -3)
 	_keppa := decimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
@@ -146,8 +146,8 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 	return q
 }
 
-func Weight64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int) decimal.Decimal {
-	_tau := decimal.New(int64(tau), -3)
+func Weight64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle, tau int64) decimal.Decimal {
+	_tau := decimal.New(tau, -3)
 	_keppa := decimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)

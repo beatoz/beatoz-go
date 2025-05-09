@@ -48,9 +48,9 @@ func Test_Wi(t *testing.T) {
 		wa := decimal.NewFromInt(0)
 
 		for _, vpobj := range vpObjs {
-			wi0 := oldWi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200)
+			wi0 := oldWi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			wi0 = wi0.Truncate(6)
-			wi1 := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200)
+			wi1 := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			wi1 = wi1.Truncate(6)
 			require.Equal(t, wi0, wi1, "not equal", "wi0", wi0, "wi1", wi1)
 
@@ -65,7 +65,7 @@ func Test_Wi(t *testing.T) {
 
 func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200 // 0.200
+	tau := int64(200) // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
 	dur1 := time.Duration(0)
@@ -79,7 +79,7 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 		w_sumwi := decimal.Zero
 		start := time.Now()
 		for _, vpobj := range vpObjs {
-			wi := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+			wi := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			w_sumwi = w_sumwi.Add(wi)
 
 			// for computing Wa
@@ -92,20 +92,20 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 
 		// Wa
 		start = time.Now()
-		w_wa := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_wa := Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 		w_wa = w_wa.Truncate(6)
 		dur1 += time.Since(start)
 		//fmt.Println("Wa return", w_wa)
 
 		// WaEx
 		start = time.Now()
-		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 		w_waex = w_waex.Truncate(6)
 		dur2 += time.Since(start)
 
 		// WaEx64
 		start = time.Now()
-		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, totalSupply, tau)
+		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
 		w_waex64 = w_waex64.Truncate(6)
 		dur3 += time.Since(start)
 
@@ -124,7 +124,7 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 
 func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200 // 0.200
+	tau := int64(200) // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
 	dur1 := time.Duration(0)
@@ -161,7 +161,7 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 		start := time.Now()
 		for i, pow := range vpows {
 			dur := vdurs[i]
-			wi := Wi(pow, dur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+			wi := Wi(pow, dur, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			w_sumwi = w_sumwi.Add(wi)
 		}
 		w_sumwi = w_sumwi.Truncate(6)
@@ -170,27 +170,27 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 
 		// Wa
 		start = time.Now()
-		w_wa := Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_wa := Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 		w_wa = w_wa.Truncate(6)
 		dur1 += time.Since(start)
 		//fmt.Println("Wa return", w_wa)
 
 		// WaEx
 		start = time.Now()
-		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 		w_waex = w_waex.Truncate(6)
 		dur2 += time.Since(start)
 
 		// WaEx64
 		start = time.Now()
-		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, totalSupply, tau)
+		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
 		w_waex64 = w_waex64.Truncate(6)
 		dur3 += time.Since(start)
 		//fmt.Println("WaEx64 return", w_waex64)
 
 		// WaEx64ByPowerChunks
 		start = time.Now()
-		w_waex64pc := WaEx64ByPowerChunk(powChunks, currHeight, powerRipeningCycle, totalSupply, tau)
+		w_waex64pc := WaEx64ByPowerChunk(powChunks, currHeight, powerRipeningCycle, tau, totalSupply)
 		w_waex64pc = w_waex64pc.Truncate(6)
 		dur4 += time.Since(start)
 		//fmt.Println("WaEx64ByPowerChunk return", w_waex64pc)
@@ -245,7 +245,7 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 
 func Benchmark_SumWi(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200 // 0.200
+	tau := int64(200) // 0.200
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -254,7 +254,7 @@ func Benchmark_SumWi(b *testing.B) {
 		b.StartTimer()
 
 		for _, vpobj := range vpObjs {
-			wi := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+			wi := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			sumWi = sumWi.Add(wi)
 		}
 	}
@@ -262,7 +262,7 @@ func Benchmark_SumWi(b *testing.B) {
 
 func Benchmark_Wa(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200
+	tau := int64(200)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -274,13 +274,13 @@ func Benchmark_Wa(b *testing.B) {
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		_ = Wa(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		_ = Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 	}
 }
 
 func Benchmark_WaEx(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200
+	tau := int64(200)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -292,13 +292,13 @@ func Benchmark_WaEx(b *testing.B) {
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		_ = WaEx(vpows, vdurs, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), tau)
+		_ = WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 	}
 }
 
 func Benchmark_WaEx64(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := 200
+	tau := int64(200)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -310,6 +310,6 @@ func Benchmark_WaEx64(b *testing.B) {
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		_ = WaEx64(vpows, vdurs, powerRipeningCycle, totalSupply, tau)
+		_ = WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
 	}
 }

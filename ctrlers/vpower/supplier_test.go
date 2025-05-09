@@ -53,7 +53,7 @@ func Test_AnnualSd(t *testing.T) {
 		preWall := Wall
 
 		w0.vdur = i
-		Wall = Wi(w0.vpow, w0.vdur, powerRipeningCycle, decimal.NewFromBigInt(totalSupply.ToBig(), 0), 200).Truncate(3)
+		Wall = Wi(w0.vpow, w0.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0)).Truncate(3)
 		require.True(t, Wall.LessThanOrEqual(decimalOne))
 
 		sd := Sd(i, inflationCyle, adjustedHeight, adjustedSupply, maxSupply, "0.3", Wall, preWall)
