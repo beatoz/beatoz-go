@@ -5,7 +5,7 @@ option go_package = "github.com/beatoz/beatoz-go/ctrlers/types";
 message AcctProto {
   bytes address = 1;
   string name = 2;
-  uint64 nonce = 3;
+  int64 nonce = 3;
   bytes _balance = 4;
   bytes _code = 5;
   string doc_url = 6;

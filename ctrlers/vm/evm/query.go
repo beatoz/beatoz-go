@@ -41,7 +41,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		retData = nil
 	}
 	vmCallRet := &ctrlertypes.VMCallResult{
-		UsedGas:    execRet.UsedGas,
+		UsedGas:    int64(execRet.UsedGas),
 		ReturnData: retData,
 	}
 	if execRet.Err != nil {

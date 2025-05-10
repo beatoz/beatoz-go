@@ -23,10 +23,10 @@ var (
 	acctHelper  *acctHelperMock
 	govParams0  = ctrlertypes.DefaultGovParams()
 	govParams1  = ctrlertypes.Test1GovParams()
-	govParams2  = ctrlertypes.Test2GovParams()
-	govParams3  = ctrlertypes.Test3GovParams()
-	govParams4  = ctrlertypes.Test4GovParams()
-	govParams5  = ctrlertypes.Test5GovParams()
+	//govParams2  = ctrlertypes.Test2GovParams()
+	govParams3 = ctrlertypes.Test3GovParams()
+	//govParams4  = ctrlertypes.Test4GovParams()
+	//govParams5  = ctrlertypes.Test5GovParams()
 	defMinGas   = govParams0.MinTrxGas()
 	defGasPrice = govParams0.GasPrice()
 

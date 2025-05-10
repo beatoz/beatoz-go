@@ -29,7 +29,7 @@ func GetHash(h uint64) common.Hash {
 	return common.Hash{}
 }
 
-func evmBlockContext(coinbase common.Address, bn int64, tm int64, gasLimit uint64) vm.BlockContext {
+func evmBlockContext(coinbase common.Address, bn int64, tm int64, gasLimit int64) vm.BlockContext {
 	return vm.BlockContext{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -39,17 +39,17 @@ func evmBlockContext(coinbase common.Address, bn int64, tm int64, gasLimit uint6
 		Time:        big.NewInt(tm),
 		Difficulty:  big.NewInt(1),
 		BaseFee:     big.NewInt(0),
-		GasLimit:    gasLimit, // issue #44
+		GasLimit:    uint64(gasLimit), // issue #44
 	}
 }
 
-func evmMessage(_from common.Address, _to *common.Address, nonce, gasLimit uint64, gasPrice, amt *uint256.Int, data []byte, isFake bool) types.Message {
+func evmMessage(_from common.Address, _to *common.Address, nonce, gasLimit int64, gasPrice, amt *uint256.Int, data []byte, isFake bool) types.Message {
 	return types.NewMessage(
 		_from,
 		_to,
-		nonce,
+		uint64(nonce),
 		amt.ToBig(),
-		gasLimit,         // gas limit
+		uint64(gasLimit), // gas limit
 		gasPrice.ToBig(), // gas price
 		gasFeeCap.ToBig(),
 		gasTipCap.ToBig(),

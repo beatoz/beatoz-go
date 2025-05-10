@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -70,8 +71,8 @@ func TestWithdraw(t *testing.T) {
 
 	// check balance of val0
 	oriBal := val0.GetBalance()
-	usedFee := gasToFee(defGas, defGasPrice)
-	rwdFee := new(uint256.Int).Mul(usedFee, uint256.NewInt(uint64(100-defGovParams.BurnRatio())))
+	usedFee := types.GasToFee(defGas, defGasPrice)
+	rwdFee := new(uint256.Int).Mul(usedFee, uint256.NewInt(uint64(100-defGovParams.BurnRate())))
 	rwdFee = rwdFee.Div(rwdFee, uint256.NewInt(uint64(100)))
 	expectedBal := new(uint256.Int).Add(oriBal, reqAmt)
 	expectedBal = expectedBal.Sub(expectedBal, usedFee)

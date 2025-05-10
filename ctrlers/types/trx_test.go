@@ -19,11 +19,11 @@ func TestTrxEncode(t *testing.T) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     types.RandAddress(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Type:     types2.TRX_TRANSFER,
 	}
@@ -51,11 +51,11 @@ func TestTrxDecodeWithMaliciousPayload(t *testing.T) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     types.RandAddress(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Type:     types2.TRX_TRANSFER,
 		Payload: &maliciousPayload{
@@ -79,11 +79,11 @@ func TestRLP_TrxPayloadContract(t *testing.T) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     w.Address(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Type:     types2.TRX_CONTRACT,
 		Payload: &types2.TrxPayloadContract{
@@ -120,11 +120,11 @@ func TestRLP_TrxPayloadSetDoc(t *testing.T) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     w.Address(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Type:     types2.TRX_SETDOC,
 		Payload: &types2.TrxPayloadSetDoc{
@@ -166,11 +166,11 @@ func TestRLP_TrxPayloadProposal(t *testing.T) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     w.Address(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Type:     types2.TRX_PROPOSAL,
 		Payload: &types2.TrxPayloadProposal{
@@ -207,11 +207,11 @@ func BenchmarkTrxEncode(b *testing.B) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     types.RandAddress(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Payload:  &types2.TrxPayloadAssetTransfer{},
 	}
@@ -228,11 +228,11 @@ func BenchmarkTrxDecode(b *testing.B) {
 	tx0 := &types2.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
-		Nonce:    rand.Uint64(),
+		Nonce:    rand.Int63(),
 		From:     types.RandAddress(),
 		To:       types.RandAddress(),
 		Amount:   bytes.RandU256Int(),
-		Gas:      rand.Uint64(),
+		Gas:      rand.Int63(),
 		GasPrice: uint256.NewInt(rand.Uint64()),
 		Payload:  &types2.TrxPayloadAssetTransfer{},
 	}

@@ -23,7 +23,7 @@ import (
 var (
 	config      = beatozcfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-test")
-	govParams00 = ctrlertypes.Test6GovParams_NoStakeLimiter() // `maxUpdatableStakeRatio = 100, maxIndividualStakeRatio = 10000000`
+	govParams00 ctrlertypes.IGovParams
 	acctMock00  *ctrlers.AcctHandlerMock
 	stakeCtrler *stake.StakeCtrler
 
@@ -32,13 +32,22 @@ var (
 	stakingTrxCtxs       []*ctrlertypes.TrxContext
 	unstakingTrxCtxs     []*ctrlertypes.TrxContext
 
-	dummyGas      = uint64(0)
+	dummyGas      = int64(0)
 	dummyGasPrice = uint256.NewInt(0)
-	dummyNonce    = uint64(0)
+	dummyNonce    = int64(0)
 )
 
 func TestMain(m *testing.M) {
 	os.RemoveAll(DBDIR)
+
+	// `maxUpdatableStakeRatio = 100, maxIndividualStakeRatio = 10000000`
+	govParams00 = ctrlertypes.DefaultGovParams()
+	values := govParams00.(*ctrlertypes.GovParams).GetValues()
+	values.MinValidatorPower = 5
+	values.MinDelegatorPower = 0
+	values.MaxUpdatableStakeRate = 100
+	values.MaxIndividualStakeRate = 10000000
+	values.LazyUnstakingBlocks = 30
 
 	config.DBPath = DBDIR
 	stakeCtrler, _ = stake.NewStakeCtrler(config, govParams00, tmlog.NewNopLogger())
@@ -220,7 +229,7 @@ func TestPunish(t *testing.T) {
 		require.Greater(t, selfPower0, int64(0))
 
 		_slashed := uint256.NewInt(uint64(selfPower0))
-		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govParams00.SlashRatio())))
+		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govParams00.SlashRate())))
 		_ = _slashed.Div(_slashed, uint256.NewInt(uint64(100)))
 		expectedSlashed := int64(_slashed.Uint64())
 		require.Greater(t, expectedSlashed, int64(0))
@@ -238,14 +247,14 @@ func TestPunish(t *testing.T) {
 				Address: byzanWallet.Address(),
 				Power:   totalPower0,
 			},
-		}, govParams00.SlashRatio())
+		}, govParams00.SlashRate())
 		require.NoError(t, xerr)
 
 		delegatee = stakeCtrler.Delegatee(byzanWallet.Address())
 
 		expectedSumSlashedPower := int64(0)
 		for _, s0 := range oriStakes {
-			slashedPower := (s0.Power * govParams00.SlashRatio()) / int64(100)
+			slashedPower := (s0.Power * int64(govParams00.SlashRate())) / 100
 			if slashedPower < 1 {
 				slashedPower = s0.Power
 			}

@@ -26,41 +26,40 @@ type ITrxHandler interface {
 }
 
 type IGovParams interface {
-	Version() int64
-	MaxValidatorCnt() int64
+	Version() int32
+	MaxValidatorCnt() int32
 	MinValidatorPower() int64
 	MinDelegatorPower() int64
-	// DEPRECATED
-	RewardPerPower() *uint256.Int
+	MaxValidatorsOfDelegator() int32
+	MaxDelegatorsOfValidator() int32
+	MinSelfStakeRate() int32
+	MaxUpdatableStakeRate() int32
+	MaxIndividualStakeRate() int32
+	MinBondingBlocks() int64
 	LazyUnstakingBlocks() int64
-	LazyApplyingBlocks() int64
-	GasPrice() *uint256.Int
-	MinTrxGas() uint64
-	MinTrxFee() *uint256.Int
-	MaxTrxGas() uint64
-	MaxTrxFee() *uint256.Int
-	MaxBlockGas() uint64
-	MinVotingPeriodBlocks() int64
-	MaxVotingPeriodBlocks() int64
-	MinSelfStakeRatio() int64
-	MaxUpdatableStakeRatio() int64
-	MaxIndividualStakeRatio() int64
-	SlashRatio() int64
+	MaxTotalSupply() *uint256.Int
+	InflationWeightPermil() int32
+	InflationCycleBlocks() int64
+	BondingBlocksWeightPermil() int32
+	RipeningBlocks() int64
+	RewardPoolAddress() types.Address
+	ValidatorRewardRate() int32
+	BurnAddress() types.Address
+	BurnRate() int32
+	SlashRate() int32
 	SignedBlocksWindow() int64
 	MinSignedBlocks() int64
+	GasPrice() *uint256.Int
+	MinTrxFee() *uint256.Int
+	MinTrxGas() int64
+	MaxTrxGas() int64
+	MaxBlockGas() int64
+	MaxVotingPeriodBlocks() int64
+	MinVotingPeriodBlocks() int64
+	LazyApplyingBlocks() int64
 
-	MaxTotalSupply() *uint256.Int
-	InflationWeightPermil() int64
-	InflationCycleBlocks() int64
-	MinBondingBlocks() int64
-	BondingBlocksWeightPermil() int64
-	RewardPoolAddress() types.Address
-	BurnAddress() types.Address
-	BurnRatio() int64
-
-	RipeningBlocks() int64
-	MaxValidatorsOfDelegator() int64
-	MaxDelegatorsOfValidator() int64
+	// deprecated
+	RewardPerPower() *uint256.Int
 }
 
 type IAccountHandler interface {
@@ -88,7 +87,7 @@ type IVPowerHandler interface {
 	//SelfPowerOf(types.Address) int64
 	//DelegatedPowerOf(types.Address) int64
 
-	ComputeWeight(int64, int64, int64, *uint256.Int) (decimal.Decimal, []decimal.Decimal, []types.Address, xerrors.XError)
+	ComputeWeight(int64, int64, int32, *uint256.Int) (decimal.Decimal, []decimal.Decimal, []types.Address, xerrors.XError)
 }
 
 type ISupplyHandler interface {

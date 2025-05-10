@@ -24,7 +24,7 @@ func TestTransferFrom(t *testing.T) {
 	// deploy
 
 	retTx, err := contract.ExecCommit("", []interface{}{},
-		deployer, deployer.GetNonce(), contractGas*2, defGasPrice, uint256.NewInt(0), bzweb3)
+		deployer, deployer.GetNonce(), int64(contractGas*2), defGasPrice, uint256.NewInt(0), bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)

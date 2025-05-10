@@ -33,9 +33,9 @@ var (
 	defGas           = defGovParams.MinTrxGas()
 	bigGas           = defGas * 10
 	smallGas         = defGas - 1
-	contractGas      = uint64(3_000_000)
+	contractGas      = int64(3_000_000)
 	defGasPrice      = defGovParams.GasPrice()
-	baseFee          = new(uint256.Int).Mul(uint256.NewInt(defGas), defGasPrice)
+	baseFee          = ctrlertypes.GasToFee(defGas, defGasPrice)
 	//smallFee         = uint256.NewInt(999_999_999_999_999)
 	defaultRpcNode *PeerMock
 )
@@ -265,10 +265,6 @@ func randCommonWallet() *btzweb3.Wallet {
 func saveWallet(w *btzweb3.Wallet) error {
 	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
-}
-
-func gasToFee(gas uint64, gasPrice *uint256.Int) *uint256.Int {
-	return new(uint256.Int).Mul(gasPrice, uint256.NewInt(gas))
 }
 
 func transferFrom(sender *btzweb3.Wallet, receiver btztypes.Address, _amt *uint256.Int, bzweb3 *btzweb3.BeatozWeb3) error {

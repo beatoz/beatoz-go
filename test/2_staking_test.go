@@ -23,102 +23,6 @@ import (
 func TestQueryValidators(t *testing.T) {
 	require.NoError(t, checkValidatorSet(1))
 }
-
-func checkDelegatee(localValAddr rtypes0.Address, expectedTotalPower, expectedSelfPower int64) error {
-	bzweb3 := randBeatozWeb3()
-
-	val, err := bzweb3.GetDelegatee(localValAddr)
-	if err != nil {
-		return err
-	}
-	if expectedTotalPower != val.TotalPower {
-		return errors.New("total power is mismatch")
-	}
-	if expectedSelfPower != val.SelfPower {
-		return errors.New("self power is mismatch")
-	}
-	return nil
-}
-
-func checkStake(addr rtypes0.Address, expectedPower int64, txhash []byte) error {
-	bzweb3 := randBeatozWeb3()
-	stakes, err := bzweb3.GetStakes(addr)
-	if err != nil {
-		return err
-	}
-
-	found := false
-	for _, s0 := range stakes {
-		if bytes.Compare(s0.TxHash, txhash) == 0 {
-			if found {
-				return errors.New("already found stake in stakes")
-			}
-			if expectedPower != s0.Power {
-				return errors.New("power is mismatch")
-			}
-			found = true
-		}
-	}
-	if !found {
-		return errors.New("stake not found in stakes")
-	}
-	return nil
-}
-
-func checkValidator(valAddr rtypes0.Address, expectedPower, height int64) error {
-	bzweb3 := randBeatozWeb3()
-	ret, err := queryValidators(height, bzweb3)
-	if err != nil {
-		return err
-	}
-
-	found := false
-	for _, val := range ret.Validators {
-		if bytes.Equal(val.Address, valAddr) {
-			if found {
-				return errors.New("already found validator")
-			}
-			if expectedPower >= 0 && expectedPower != val.VotingPower {
-				return errors.New("power is mismatch")
-			}
-			found = true
-		}
-	}
-	if !found {
-		return errors.New("validator not found")
-	}
-	return nil
-}
-
-func checkValidatorSet(height int64) error {
-	bzweb3 := randBeatozWeb3()
-	ret, err := queryValidators(height, bzweb3)
-	if err != nil {
-		return err
-	}
-
-	if len(validatorWallets) != len(ret.Validators) {
-		return errors.New("validators length mismatch")
-	}
-	for _, localVal := range validatorWallets {
-		found := false
-		for _, val := range ret.Validators {
-			if bytes.Equal(val.Address, localVal.Address()) {
-				if found {
-					return errors.New("validator is duplicated")
-				}
-				found = true
-
-				fmt.Println("checkValidators", "Validator", val.Address, "power", val.VotingPower)
-			}
-		}
-		if !found {
-			return errors.New("validator not found")
-		}
-	}
-	return nil
-}
-
 func TestStaking(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
 
@@ -227,7 +131,7 @@ func TestDelegating(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 	txHash := ret.Hash
 
-	require.Equal(t, defGas, uint64(ret.DeliverTx.GasUsed))
+	require.Equal(t, defGas, ret.DeliverTx.GasUsed)
 
 	// check stakes
 	require.NoError(t, checkStake(delegator.Address(), stakePower, txHash))
@@ -276,7 +180,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 
 	//
 	// max...
-	maxAllowedPower := valStakes.SelfPower * int64(100) / govParams.MinSelfStakeRatio()
+	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfStakeRate())
 	maxAllowedPower = maxAllowedPower - valStakes.TotalPower
 	maxAllowedAmt := ctrlertypes.PowerToAmount(maxAllowedPower)
 
@@ -294,4 +198,99 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
 
+}
+
+func checkDelegatee(localValAddr rtypes0.Address, expectedTotalPower, expectedSelfPower int64) error {
+	bzweb3 := randBeatozWeb3()
+
+	val, err := bzweb3.GetDelegatee(localValAddr)
+	if err != nil {
+		return err
+	}
+	if expectedTotalPower != val.TotalPower {
+		return errors.New("total power is mismatch")
+	}
+	if expectedSelfPower != val.SelfPower {
+		return errors.New("self power is mismatch")
+	}
+	return nil
+}
+
+func checkStake(addr rtypes0.Address, expectedPower int64, txhash []byte) error {
+	bzweb3 := randBeatozWeb3()
+	stakes, err := bzweb3.GetStakes(addr)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, s0 := range stakes {
+		if bytes.Compare(s0.TxHash, txhash) == 0 {
+			if found {
+				return errors.New("already found stake in stakes")
+			}
+			if expectedPower != s0.Power {
+				return errors.New("power is mismatch")
+			}
+			found = true
+		}
+	}
+	if !found {
+		return errors.New("stake not found in stakes")
+	}
+	return nil
+}
+
+func checkValidator(valAddr rtypes0.Address, expectedPower, height int64) error {
+	bzweb3 := randBeatozWeb3()
+	ret, err := queryValidators(height, bzweb3)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, val := range ret.Validators {
+		if bytes.Equal(val.Address, valAddr) {
+			if found {
+				return errors.New("already found validator")
+			}
+			if expectedPower >= 0 && expectedPower != val.VotingPower {
+				return errors.New("power is mismatch")
+			}
+			found = true
+		}
+	}
+	if !found {
+		return errors.New("validator not found")
+	}
+	return nil
+}
+
+func checkValidatorSet(height int64) error {
+	bzweb3 := randBeatozWeb3()
+	ret, err := queryValidators(height, bzweb3)
+	if err != nil {
+		return err
+	}
+
+	if len(validatorWallets) != len(ret.Validators) {
+		return fmt.Errorf("validators length mismatch - wallet:%v, validators:%v", len(validatorWallets), len(ret.Validators))
+	}
+	for _, localVal := range validatorWallets {
+		found := false
+		for _, val := range ret.Validators {
+			if bytes.Equal(val.Address, localVal.Address()) {
+				if found {
+					return errors.New("validator is duplicated")
+				}
+				found = true
+
+				fmt.Println("checkValidators", "Validator", val.Address, "power", val.VotingPower)
+			}
+		}
+		if !found {
+			return errors.New("validator not found")
+		}
+	}
+	return nil
 }

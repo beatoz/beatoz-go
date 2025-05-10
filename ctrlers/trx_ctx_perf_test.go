@@ -27,7 +27,7 @@ func init() {
 	acctHandler = ctrlers.NewAccountHandlerMock(20000)
 	wals := acctHandler.GetAllWallets()
 	for _, w0 := range wals {
-		tx := web3.NewTrxTransfer(w0.Address(), types.RandAddress(), rand.Uint64(), govParams.MinTrxGas(), govParams.GasPrice(), bytes.RandU256IntN(uint256.NewInt(1_000_000_000_000_000)))
+		tx := web3.NewTrxTransfer(w0.Address(), types.RandAddress(), rand.Int63(), govParams.MinTrxGas(), govParams.GasPrice(), bytes.RandU256IntN(uint256.NewInt(1_000_000_000_000_000)))
 		if bz, _, err := w0.SignTrxRLP(tx, "test_chain_id"); err != nil {
 			panic(err)
 		} else if tx.Sig = bz; tx.Sig == nil {

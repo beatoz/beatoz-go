@@ -9,7 +9,7 @@ import (
 )
 
 func (ctrler *VPowerCtrler) ComputeWeight(
-	height, ripeningBlocks, tau int64,
+	height, ripeningBlocks int64, tau int32,
 	totalSupply *uint256.Int) (decimal.Decimal, []decimal.Decimal, []types.Address, xerrors.XError) {
 
 	var allPowChunks []*PowerChunkProto

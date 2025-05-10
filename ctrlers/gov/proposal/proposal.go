@@ -108,7 +108,7 @@ func (prop *GovProposal) doVote(voter *Voter, choice int32) {
 	}
 }
 
-func (prop *GovProposal) DoPunish(addr types.Address, ratio int64) (int64, xerrors.XError) {
+func (prop *GovProposal) DoPunish(addr types.Address, rate int32) (int64, xerrors.XError) {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
@@ -124,7 +124,7 @@ func (prop *GovProposal) DoPunish(addr types.Address, ratio int64) (int64, xerro
 	}
 
 	_p0 := uint256.NewInt(uint64(voter.Power))
-	_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
+	_ = _p0.Mul(_p0, uint256.NewInt(uint64(rate)))
 	_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
 	slashingPower := int64(_p0.Uint64())
 

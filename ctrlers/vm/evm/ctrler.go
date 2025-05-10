@@ -137,13 +137,13 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		return xerrors.From(err)
 	}
 
-	if ctx.Tx.Gas < gas {
+	if uint64(ctx.Tx.Gas) < gas {
 		return xerrors.ErrInvalidGas
 	}
 
 	if ctx.Exec == false {
 		// `GasUsed` will be used to simulate in `ExecuteTrx`.
-		ctx.GasUsed = gas
+		ctx.GasUsed = int64(gas)
 	}
 
 	return nil
@@ -155,7 +155,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// and in the 'CheckTx' phase it is minimally executed.
 
 		// update balance
-		feeAmt := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(ctx.GasUsed))
+		feeAmt := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.GasUsed)))
 		needAmt := new(uint256.Int).Add(feeAmt, ctx.Tx.Amount)
 		if xerr := ctx.Sender.SubBalance(needAmt); xerr != nil {
 			return xerr
@@ -223,7 +223,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	// Gas is already applied to accounts and gas pool by buyGas and refundGas in EVM
 	// the `EVM` handles nonce, amount and gas.
-	ctx.GasUsed = evmResult.UsedGas
+	ctx.GasUsed = int64(evmResult.UsedGas)
 	ctx.RetData = evmResult.ReturnData
 
 	//
@@ -232,7 +232,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 
 	if ctx.Tx.To == nil || types.IsZeroAddress(ctx.Tx.To) {
 		// When the new contract is created.
-		createdAddr := ethcrypto.CreateAddress(ctx.Tx.From.Array20(), ctx.Tx.Nonce)
+		createdAddr := ethcrypto.CreateAddress(ctx.Tx.From.Array20(), uint64(ctx.Tx.Nonce))
 		ctrler.logger.Debug("Create contract", "address", createdAddr)
 
 		// Account.Code 에 현재 Tx(Contract 생성) 의 Hash 를 기록.
@@ -271,7 +271,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, data []byte, exec bool) (*ethcore.ExecutionResult, xerrors.XError) {
+func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas int64, gasPrice, amt *uint256.Int, data []byte, exec bool) (*ethcore.ExecutionResult, xerrors.XError) {
 	var toAddr *common.Address
 	if to != nil && !types.IsZeroAddress(to) {
 		toAddr = new(common.Address)

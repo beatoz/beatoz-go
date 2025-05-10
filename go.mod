@@ -3,7 +3,7 @@ module github.com/beatoz/beatoz-go
 go 1.22.5
 
 require (
-	github.com/beatoz/beatoz-sdk-go v0.1.2
+	github.com/beatoz/beatoz-sdk-go v0.1.5
 	github.com/beatoz/sfeeder v0.0.1
 	github.com/containerd/continuity v0.3.0
 	github.com/cosmos/iavl v1.3.0

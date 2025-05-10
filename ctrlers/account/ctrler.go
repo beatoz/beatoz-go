@@ -107,8 +107,8 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 	sumFee := bctx.SumFee()
 	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
 
-		// give fee to block proposer and burn automatically by BurnRatio().
-		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovParams.BurnRatio())))
+		// give fee to block proposer and burn automatically by BurnRate().
+		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovParams.BurnRate())))
 		burned = new(uint256.Int).Div(burned, uint256.NewInt(100))
 		// todo: apply `burned` to SupplyCtrler
 		//if xerr := bctx.SupplyHandler.Burn(burned, bctx.Height()); xerr != nil {

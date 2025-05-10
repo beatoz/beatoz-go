@@ -140,7 +140,7 @@ func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XErro
 			if bytes.Compare(v.Addr, targetAddr) == 0 {
 				// the voting power of `targetAddr` will be slashed and
 				// the vote of `targetAddr` will be canceled.
-				slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRatio())
+				slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRate())
 				slashedPower += slashed
 
 				if xerr := ctrler.proposalState.Set(v1.LedgerKeyProposal(prop.TxHash), prop, true); xerr != nil {

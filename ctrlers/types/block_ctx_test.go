@@ -16,16 +16,16 @@ func TestBlockGasLimit(t *testing.T) {
 	for n := 0; n < 1000000; n++ {
 
 		blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil, nil)
-		randBlockGasLimit := rand.Uint64N(_max)
+		randBlockGasLimit := rand.Int64N(_max)
 		blockCtx.SetBlockGasLimit(randBlockGasLimit)
 
-		randGasUsed := uint64(0) //rand.Uint64N(randBlockGasLimit)
+		randGasUsed := int64(0) //rand.Uint64N(randBlockGasLimit)
 		threshold0 := randBlockGasLimit - randBlockGasLimit/10
 		threshold1 := randBlockGasLimit / 100
 
 		adjusted := types.AdjustBlockGasLimit(randBlockGasLimit, randGasUsed, _min, _max)
 
-		expected := uint64(0)
+		expected := int64(0)
 		if randGasUsed > threshold0 {
 			// expect gas limit increasing.
 			expected = randBlockGasLimit + randBlockGasLimit/10
@@ -48,13 +48,13 @@ func TestBlockGasLimit(t *testing.T) {
 }
 
 func TestUseBlockGas(t *testing.T) {
-	initGasLimit := uint64(10000)
+	initGasLimit := int64(10000)
 	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil, nil)
 	blockCtx.SetBlockGasLimit(initGasLimit)
 
-	sumGasUsed := uint64(0)
+	sumGasUsed := int64(0)
 	for {
-		gas := rand.Uint64N(initGasLimit)
+		gas := rand.Int64N(initGasLimit)
 		xerr := blockCtx.UseBlockGas(gas)
 
 		if sumGasUsed+gas > initGasLimit {

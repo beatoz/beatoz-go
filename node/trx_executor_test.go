@@ -48,8 +48,8 @@ func Test_BlockGasLimit(t *testing.T) {
 	w0 := web3.NewWallet(nil)
 	w1 := web3.NewWallet(nil)
 
-	blockGasLimit := uint64(5_000_000)
-	blockGasUsed := uint64(0)
+	blockGasLimit := int64(5_000_000)
+	blockGasUsed := int64(0)
 	upper := blockGasLimit - (blockGasLimit / 10)
 	//lower := blockGasLimit / 100
 
@@ -64,7 +64,7 @@ func Test_BlockGasLimit(t *testing.T) {
 
 	for {
 
-		rnGas := rand.Uint64N(100_000) + govParams.MinTrxGas()
+		rnGas := rand.Int64N(100_000) + govParams.MinTrxGas()
 		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, rnGas, govParams.GasPrice(), uint256.NewInt(1))
 		_, _, xerr := w0.SignTrxRLP(tx, chainId)
 		require.NoError(t, xerr)
@@ -91,7 +91,7 @@ func Test_BlockGasLimit(t *testing.T) {
 	require.Equal(t, expected, adjusted)
 
 	blockGasLimit = adjusted
-	blockGasUsed = uint64(0)
+	blockGasUsed = int64(0)
 	lower := blockGasLimit / 100
 
 	bctx = ctrlertypes.NewBlockContext(

@@ -65,7 +65,7 @@ func Test_Wi(t *testing.T) {
 
 func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := int64(200) // 0.200
+	tau := int32(200) // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
 	dur1 := time.Duration(0)
@@ -124,7 +124,7 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 
 func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := int64(200) // 0.200
+	tau := int32(200) // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
 	dur1 := time.Duration(0)
@@ -245,7 +245,7 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 
 func Benchmark_SumWi(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := int64(200) // 0.200
+	tau := int32(200) // 0.200
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -262,7 +262,7 @@ func Benchmark_SumWi(b *testing.B) {
 
 func Benchmark_Wa(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := int64(200)
+	tau := int32(200)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -280,7 +280,7 @@ func Benchmark_Wa(b *testing.B) {
 
 func Benchmark_WaEx(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := int64(200)
+	tau := int32(200)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -298,7 +298,7 @@ func Benchmark_WaEx(b *testing.B) {
 
 func Benchmark_WaEx64(b *testing.B) {
 	totalSupply := types.ToFons(uint64(350_000_000))
-	tau := int64(200)
+	tau := int32(200)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()

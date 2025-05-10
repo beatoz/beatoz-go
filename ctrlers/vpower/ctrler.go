@@ -50,7 +50,7 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 
 	ret := &VPowerCtrler{
 		powersState: powersState,
-		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRatio(), govParams.MaxUpdatableStakeRatio()),
+		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRate(), govParams.MaxUpdatableStakeRate()),
 		logger:      lg,
 	}
 	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
@@ -120,8 +120,8 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	//ctrler.vpowLimiter.Reset(
 	//	ctrler.allDelegatees,
 	//	bctx.GovParams.MaxValidatorCnt(),
-	//	bctx.GovParams.MaxIndividualStakeRatio(),
-	//	bctx.GovParams.MaxUpdatableStakeRatio())
+	//	bctx.GovParams.MaxIndividualStakeRate(),
+	//	bctx.GovParams.MaxUpdatableStakeRate())
 	return nil, nil
 }
 
@@ -186,8 +186,8 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			}
 
 			// it's delegating. check minSelfStakeRatio
-			selfatio := dgtee.SelfPower * int64(100) / (dgtee.SumPower + txPower)
-			if selfatio < ctx.GovParams.MinSelfStakeRatio() {
+			selfrate := dgtee.SelfPower * int64(100) / (dgtee.SumPower + txPower)
+			if selfrate < int64(ctx.GovParams.MinSelfStakeRate()) {
 				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.SumPower, txPower))
 			}
 
@@ -543,3 +543,4 @@ var _ ctrlertypes.ILedgerHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IStakeHandler = (*VPowerCtrler)(nil)
+var _ ctrlertypes.IVPowerHandler = (*VPowerCtrler)(nil)

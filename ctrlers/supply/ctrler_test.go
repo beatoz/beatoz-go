@@ -1,7 +1,6 @@
 package supply
 
 import (
-	"fmt"
 	btzcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlermocks "github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
@@ -110,7 +109,7 @@ func Test_Mint(t *testing.T) {
 		si := Si(currHeight, 1, adjustedSupply, govParams.MaxTotalSupply(), govParams.InflationWeightPermil(), wa)
 		expectedTotalSupply := uint256.MustFromBig(si.BigInt())
 		expectedChange := new(uint256.Int).Sub(expectedTotalSupply, totalSupply)
-		fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedSupply", adjustedSupply, "adjustedHeight", 1, "max", govParams.MaxTotalSupply(), "lamda", govParams.InflationWeightPermil(), "t1", expectedTotalSupply, "t0", totalSupply)
+		//fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedSupply", adjustedSupply, "adjustedHeight", 1, "max", govParams.MaxTotalSupply(), "lamda", govParams.InflationWeightPermil(), "t1", expectedTotalSupply, "t0", totalSupply)
 
 		bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{
 			Header: tmproto.Header{Height: currHeight},

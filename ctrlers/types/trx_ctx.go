@@ -19,7 +19,7 @@ type TrxContext struct {
 	SenderPubKey []byte
 	Sender       *Account
 	Receiver     *Account
-	GasUsed      uint64
+	GasUsed      int64
 	RetData      []byte
 	Events       []abcitypes.Event
 

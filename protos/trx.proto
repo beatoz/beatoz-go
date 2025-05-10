@@ -3,13 +3,13 @@ package types;
 option go_package = "github.com/beatoz/beatoz-go/ctrlers/types";
 
 message TrxProto {
-  uint32 version = 1;
+  int32 version = 1;
   int64 time = 2;
-  uint64 nonce = 3;
+  int64 nonce = 3;
   bytes from = 4;
   bytes to = 5;
   bytes _amount = 6;
-  uint64 gas = 7;
+  int64 gas = 7;
   bytes _gasPrice = 8;
   int32 type = 9;
   bytes _payload = 10;

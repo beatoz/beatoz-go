@@ -21,7 +21,7 @@ const (
 type Account struct {
 	Address types.Address `json:"address"`
 	Name    string        `json:"name,omitempty"`
-	Nonce   uint64        `json:"nonce,string"`
+	Nonce   int64         `json:"nonce,string"`
 	Balance *uint256.Int  `json:"balance"`
 	Code    []byte        `json:"code,omitempty"`
 	DocURL  string        `json:"docURL,omitempty"`
@@ -99,21 +99,21 @@ func (acct *Account) AddNonce() {
 	acct.Nonce++
 }
 
-func (acct *Account) SetNonce(n uint64) {
+func (acct *Account) SetNonce(n int64) {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
 	acct.Nonce = n
 }
 
-func (acct *Account) GetNonce() uint64 {
+func (acct *Account) GetNonce() int64 {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
 	return acct.Nonce
 }
 
-func (acct *Account) CheckNonce(n uint64) xerrors.XError {
+func (acct *Account) CheckNonce(n int64) xerrors.XError {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 

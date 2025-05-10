@@ -165,6 +165,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 		//
 		// new validator
 		// the power 10_000_000 is excluded by the following tx.
+		// the sum of excluded power will be `10_000_000 * (i+1)`
 		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000_001)))
 		_, _, err := w.SignTrxRLP(tx, "test-chain")
 		require.NoError(t, err)
@@ -187,6 +188,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 	w := acctMock01.GetWallet(validatorCnt + 4)
 	//
 	// the power 10_000_000 is excluded by the following tx.
+	// the sum of excluded power will be 40_000_000, which it is over the updatable limit
 	tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000_001)))
 	_, _, err := w.SignTrxRLP(tx, "test-chain")
 	require.NoError(t, err)
@@ -323,7 +325,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 
 	// staking...
 	var trxCtxs []*ctrlertypes.TrxContext
-	for i := validatorCnt; int64(i) < govParams01.MaxValidatorCnt(); i++ {
+	for i := validatorCnt; int32(i) < govParams01.MaxValidatorCnt(); i++ {
 		w := acctMock01.GetWallet(i)
 
 		tx := web3.NewTrxStaking(w.Address(), w.Address(), w.GetNonce(), govParams01.MinTrxGas(), govParams01.GasPrice(), types.ToFons(uint64(10_000_000)))
@@ -409,7 +411,12 @@ func resetTest(t *testing.T, valCnt int) {
 	cfg.DBPath = filepath.Join(os.TempDir(), "stake-limiter-test")
 	os.RemoveAll(cfg.DBPath)
 
-	govParams01 = ctrlertypes.Test1GovParams()
+	govParams01 = ctrlertypes.DefaultGovParams() //ctrlertypes.Test1GovParams()
+	values := govParams01.(*ctrlertypes.GovParams).GetValues()
+	values.MinValidatorPower = 1
+	values.MinDelegatorPower = 1
+	values.MaxValidatorCnt = 10
+	values.LazyUnstakingBlocks = 10
 
 	ctrler, xerr := stake.NewStakeCtrler(cfg, govParams01, tmlog.NewNopLogger())
 	require.NoError(t, xerr)

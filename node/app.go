@@ -254,7 +254,7 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 
 	// set initial block gas limit
 	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
-	ctrler.lastBlockCtx.SetBlockGasLimit(uint64(req.ConsensusParams.Block.MaxGas))
+	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
 
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{
@@ -334,7 +334,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 		}
 
 		// check balance
-		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
 		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
 		if xerr := sender.CheckBalance(needAmt); xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
@@ -666,13 +666,6 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	}
 	beginBlockEvents = append(beginBlockEvents, evts...)
 
-	evts, xerr = ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
-	if xerr != nil {
-		ctrler.logger.Error("fail to execute EndBlock of stakeCtrler", "error", xerr)
-		panic(xerr)
-	}
-	beginBlockEvents = append(beginBlockEvents, evts...)
-
 	//
 	// NOTE:
 	// supplyCtrler.EncBlock should be called before vpowCtrler.EndBlock
@@ -696,6 +689,13 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	evts, xerr = ctrler.vmCtrler.EndBlock(ctrler.currBlockCtx)
 	if xerr != nil {
 		ctrler.logger.Error("fail to execute EndBlock of vmCtrler", "error", xerr)
+		panic(xerr)
+	}
+	beginBlockEvents = append(beginBlockEvents, evts...)
+
+	evts, xerr = ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+	if xerr != nil {
+		ctrler.logger.Error("fail to execute EndBlock of stakeCtrler", "error", xerr)
 		panic(xerr)
 	}
 	beginBlockEvents = append(beginBlockEvents, evts...)

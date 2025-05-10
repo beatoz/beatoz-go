@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -144,7 +145,7 @@ func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 	require.NoError(t, err, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 
-	addr0 := ethcrypto.CreateAddress(creator.Address().Array20(), creator.GetNonce())
+	addr0 := ethcrypto.CreateAddress(creator.Address().Array20(), uint64(creator.GetNonce()))
 	require.EqualValues(t, addr0[:], txRet.TxResult.Data)
 	require.EqualValues(t, addr0[:], contract.GetAddress())
 	for _, evt := range txRet.TxResult.Events {
@@ -164,7 +165,7 @@ func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 
 	// check balance - changed by gas
 	usedGas := new(uint256.Int).Sub(beforeBalance1, afterBalance)
-	require.Equal(t, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice), usedGas)
+	require.Equal(t, ctrlertypes.GasToFee(txRet.TxResult.GasUsed, defGasPrice), usedGas)
 }
 
 func testQuery(t *testing.T) {
@@ -189,7 +190,7 @@ func testEstimateGas(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)
-	require.Equal(t, estimatedGas, uint64(retTx.DeliverTx.GasUsed))
+	require.Equal(t, estimatedGas, retTx.DeliverTx.GasUsed)
 }
 
 func testNonceDup(t *testing.T) {
@@ -239,7 +240,7 @@ func testPayable(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 
-	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), gasToFee(uint64(ret.DeliverTx.GasUsed), defGasPrice))
+	expectedAmt := new(uint256.Int).Sub(sender.GetBalance(), ctrlertypes.GasToFee(ret.DeliverTx.GasUsed, defGasPrice))
 	_ = expectedAmt.Sub(expectedAmt, randAmt)
 	require.NotEqual(t, sender.GetBalance(), expectedAmt)
 	require.NoError(t, sender.SyncAccount(bzweb3))
@@ -269,7 +270,7 @@ func testPayable(t *testing.T) {
 	fmt.Println("giveMeAsset", "usedGas", ret.DeliverTx.GasUsed)
 
 	expectedAmt = new(uint256.Int).Add(sender.GetBalance(), refundAmt)
-	_ = expectedAmt.Sub(expectedAmt, gasToFee(uint64(ret.DeliverTx.GasUsed), defGasPrice))
+	_ = expectedAmt.Sub(expectedAmt, ctrlertypes.GasToFee(ret.DeliverTx.GasUsed, defGasPrice))
 	require.NoError(t, sender.SyncAccount(bzweb3))
 	require.Equal(t, expectedAmt, sender.GetBalance())
 

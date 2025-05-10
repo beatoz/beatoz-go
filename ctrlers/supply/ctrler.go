@@ -346,7 +346,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 }
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int64, wa decimal.Decimal) decimal.Decimal {
+func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}

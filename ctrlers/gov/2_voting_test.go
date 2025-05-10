@@ -224,7 +224,7 @@ func TestFreezingProposal(t *testing.T) {
 
 func TestApplyingProposal(t *testing.T) {
 	oriParams := govCtrler.GovParams
-	require.Equal(t, ctrlertypes.DefaultGovParams(), &oriParams)
+	require.True(t, ctrlertypes.DefaultGovParams().Equal(&oriParams))
 
 	txProposalPayload, ok := trxCtxProposal.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 	require.True(t, ok)
@@ -276,5 +276,5 @@ func TestApplyingProposal(t *testing.T) {
 	require.Nil(t, frozenProp)
 
 	require.NotEqual(t, oriParams, govCtrler.GovParams)
-	require.Equal(t, govParams1, &govCtrler.GovParams)
+	require.True(t, govParams1.Equal(&govCtrler.GovParams))
 }

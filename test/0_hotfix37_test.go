@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"github.com/beatoz/beatoz-go/ctrlers/types"
 	types3 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -32,7 +33,7 @@ func TestTransfer0(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.CheckTx.Code, txRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.DeliverTx.Code, txRet.DeliverTx.Log)
 
-	senderBalance.Sub(senderBalance, gasToFee(defGas, defGasPrice))
+	senderBalance.Sub(senderBalance, types.GasToFee(defGas, defGasPrice))
 	senderBalance.Sub(senderBalance, types3.ToFons(1))
 	receiverBalance.Add(receiverBalance, types3.ToFons(1))
 
@@ -64,8 +65,8 @@ func TestTransfer0(t *testing.T) {
 	require.NoError(t, sender.SyncAccount(bzweb3))
 	require.NoError(t, val0.SyncAccount(bzweb3))
 
-	_rwd := gasToFee(defGas, defGasPrice)
-	_rwd = _rwd.Mul(_rwd, uint256.NewInt(uint64(100-defGovParams.BurnRatio())))
+	_rwd := types.GasToFee(defGas, defGasPrice)
+	_rwd = _rwd.Mul(_rwd, uint256.NewInt(uint64(100-defGovParams.BurnRate())))
 	_rwd = _rwd.Div(_rwd, uint256.NewInt(uint64(100)))
 	_amt.Add(_amt, validatorBalance)
 	_amt.Add(_amt, _rwd)

@@ -78,7 +78,7 @@ func Test_Fallback(t *testing.T) {
 
 	// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
 	// Calculate an expected address with `fromAcct.Nonce-1`.
-	addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), fromAcct.Nonce-1)
+	addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce-1))
 	require.Equal(t, addr0[:], contAddr)
 
 	// EndBlock and Commit
@@ -122,7 +122,7 @@ func Test_Fallback(t *testing.T) {
 	_, _, xerr = fallbackEVM.Commit()
 	require.NoError(t, xerr)
 
-	gasAmt := new(uint256.Int).Mul(uint256.NewInt(txctx.GasUsed), govParams.GasPrice())
+	gasAmt := ctrlertypes.GasToFee(txctx.GasUsed, govParams.GasPrice())
 
 	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToFons(100))
 	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToFons(100))

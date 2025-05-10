@@ -78,7 +78,7 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovParams, logge
 		rewardLedger:      rewardLedger,
 		rwdLedgUpInterval: int64(10),
 		lastRwdHash:       rwdHashDB.LastRewardHash(),
-		stakeLimiter:      NewStakeLimiter(nil, govHandler.MaxValidatorCnt(), govHandler.MaxIndividualStakeRatio(), govHandler.MaxUpdatableStakeRatio()),
+		stakeLimiter:      NewStakeLimiter(nil, govHandler.MaxValidatorCnt(), govHandler.MaxIndividualStakeRate(), govHandler.MaxUpdatableStakeRate()),
 		govParams:         govHandler,
 		logger:            lg,
 	}
@@ -145,7 +145,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	sort.Sort(PowerOrderDelegatees(ctrler.allDelegatees)) // sort by power
 
 	ctrler.stakeLimiter.Reset(PowerOrderDelegatees(ctrler.allDelegatees),
-		ctrler.govParams.MaxValidatorCnt(), ctrler.govParams.MaxIndividualStakeRatio(), ctrler.govParams.MaxUpdatableStakeRatio())
+		ctrler.govParams.MaxValidatorCnt(), ctrler.govParams.MaxIndividualStakeRate(), ctrler.govParams.MaxUpdatableStakeRate())
 
 	//
 	// End of code from EndBlock
@@ -159,7 +159,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		ctrler.logger.Info("StakeCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(
-				&evi, blockCtx.GovParams.SlashRatio()); xerr != nil {
+				&evi, blockCtx.GovParams.SlashRate()); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
@@ -283,7 +283,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 }
 
 // DoPunish is only used to test
-func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
+func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int32) (int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -291,7 +291,7 @@ func (ctrler *StakeCtrler) DoPunish(evi *abcitypes.Evidence, slashRatio int64) (
 }
 
 // doPunish is executed at BeginBlock
-func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int64) (int64, xerrors.XError) {
+func (ctrler *StakeCtrler) doPunish(evi *abcitypes.Evidence, slashRatio int32) (int64, xerrors.XError) {
 	item, xerr := ctrler.delegateeLedger.Get(evi.Validator.Address, true)
 	if xerr != nil {
 		return 0, xerr
@@ -440,7 +440,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 			// it's delegating. check minSelfStakeRatio
 			selfRatio := delegatee.SelfStakeRatio(txPower)
-			if selfRatio < ctx.GovParams.MinSelfStakeRatio() {
+			if selfRatio < int64(ctx.GovParams.MinSelfStakeRate()) {
 				return xerrors.From(fmt.Errorf("not enough self power - validator: %v, self power: %v, total power: %v", delegatee.Addr, delegatee.GetSelfPower(), delegatee.GetTotalPower()))
 			}
 

@@ -243,7 +243,7 @@ func (delegatee *Delegatee) GetNotSignedBlockCount(h0, h1 int64) int {
 	return delegatee.NotSignedHeights.CountInWindow(h0, h1, true)
 }
 
-func (delegatee *Delegatee) DoSlash(ratio int64) int64 {
+func (delegatee *Delegatee) DoSlash(ratio int32) int64 {
 	delegatee.mtx.Lock()
 	defer delegatee.mtx.Unlock()
 
@@ -251,12 +251,12 @@ func (delegatee *Delegatee) DoSlash(ratio int64) int64 {
 	return delegatee.doSlashAll(ratio)
 }
 
-func (delegatee *Delegatee) doSlashAll(ratio int64) int64 {
+func (delegatee *Delegatee) doSlashAll(ratio int32) int64 {
 	sumSlashedPower := int64(0)
 
 	var removingStakes []*Stake
 	for _, s0 := range delegatee.Stakes {
-		slashedPower := (s0.Power * ratio) / int64(100)
+		slashedPower := (s0.Power * int64(ratio)) / int64(100)
 		if slashedPower < 1 {
 			removingStakes = append(removingStakes, s0)
 			slashedPower = s0.Power

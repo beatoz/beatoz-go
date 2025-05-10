@@ -2,7 +2,10 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/stretchr/testify/require"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	"google.golang.org/protobuf/proto"
 	"testing"
 )
 
@@ -11,10 +14,12 @@ func TestProtoCodec(t *testing.T) {
 	bz, err := params0.Encode()
 	require.NoError(t, err)
 
-	params1, err := DecodeGovParams(bz)
+	params1 := emptyGovParams()
+
+	err = params1.Decode(nil, bz)
 	require.NoError(t, err)
 
-	require.Equal(t, params0, params1)
+	require.True(t, proto.Equal(&params0._v, &params1._v))
 
 }
 
@@ -22,19 +27,15 @@ func TestJsonCodec(t *testing.T) {
 	params0 := DefaultGovParams()
 	bz, err := json.Marshal(params0)
 	require.NoError(t, err)
+	fmt.Println("json", string(bz))
 
-	params1 := &GovParams{}
+	bz1, err := tmjson.Marshal(params0)
+	require.NoError(t, err)
+	fmt.Println("tmjson", string(bz1))
+
+	params1 := emptyGovParams()
 	err = json.Unmarshal(bz, params1)
 	require.NoError(t, err)
 
-	require.Equal(t, params0, params1)
-}
-
-func TestNewGovParams(t *testing.T) {
-	govParams := newGovParamsWith(1)
-	require.EqualValues(t, 2*7*24*60*60, govParams.lazyUnstakingBlocks)  // 2weeks
-	require.EqualValues(t, 1*24*60*60, govParams.lazyApplyingBlocks)     // 1day
-	require.EqualValues(t, 1*24*60*60, govParams.minVotingPeriodBlocks)  // 1day
-	require.EqualValues(t, 30*24*60*60, govParams.maxVotingPeriodBlocks) // 30day
-
+	require.True(t, proto.Equal(&params0._v, &params1._v))
 }

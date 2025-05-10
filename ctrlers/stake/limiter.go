@@ -11,9 +11,9 @@ import (
 
 // StakeLimiter limits the amount of stake changes in one block.
 type StakeLimiter struct {
-	individualLimitRatio int64
-	updatableLimitRatio  int64
-	maxValidatorCnt      int64
+	individualLimitRatio int32
+	updatableLimitRatio  int32
+	maxValidatorCnt      int32
 
 	powerObjs      []*powerObj
 	baseTotalPower int64
@@ -24,20 +24,20 @@ type StakeLimiter struct {
 	mtx sync.RWMutex
 }
 
-func NewStakeLimiter(vals PowerOrderDelegatees, maxValCnt, indiLimitRatio, upLimitRatio int64) *StakeLimiter {
+func NewStakeLimiter(vals PowerOrderDelegatees, maxValCnt, indiLimitRatio, upLimitRatio int32) *StakeLimiter {
 	ret := &StakeLimiter{}
 	ret.Reset(vals, maxValCnt, indiLimitRatio, upLimitRatio)
 	return ret
 }
 
-func (sl *StakeLimiter) Reset(vals PowerOrderDelegatees, maxValCnt, indiLimitRatio, upLimitRatio int64) {
+func (sl *StakeLimiter) Reset(vals PowerOrderDelegatees, maxValCnt, indiLimitRatio, upLimitRatio int32) {
 	sl.mtx.Lock()
 	defer sl.mtx.Unlock()
 
 	sl.reset(vals, maxValCnt, indiLimitRatio, upLimitRatio)
 }
 
-func (sl *StakeLimiter) reset(delgs PowerOrderDelegatees, maxValCnt, indiLimitRatio, upLimitRatio int64) {
+func (sl *StakeLimiter) reset(delgs PowerOrderDelegatees, maxValCnt, indiLimitRatio, upLimitRatio int32) {
 	_base := int64(0)
 	var pobjs []*powerObj
 	for i, d := range delgs {
@@ -46,7 +46,7 @@ func (sl *StakeLimiter) reset(delgs PowerOrderDelegatees, maxValCnt, indiLimitRa
 			Power: d.TotalPower,
 		})
 
-		if int64(i) < maxValCnt {
+		if int32(i) < maxValCnt {
 			_base += d.TotalPower
 		}
 	}
@@ -77,7 +77,7 @@ func (sl *StakeLimiter) checkIndividualPowerLimit(delg *Delegatee, diffPower int
 
 	individualRatio := (delg.TotalPower + diffPower) * int64(100) / (sl.baseTotalPower + diffPower)
 
-	if individualRatio > sl.individualLimitRatio {
+	if individualRatio > int64(sl.individualLimitRatio) {
 		return xerrors.From(
 			fmt.Errorf("StakeLimiter error: exceeding individual power limit - delegatee(%v), power(%v), diff:%v, base(%v), ratio(%v), limit(%v)",
 				delg.Addr, delg.TotalPower, diffPower, sl.baseTotalPower, individualRatio, sl.individualLimitRatio))
@@ -134,7 +134,7 @@ func (sl *StakeLimiter) checkUpdatablePowerLimit(delg *Delegatee, diffPower int6
 	}
 
 	_ratio := updatedPower * int64(100) / sl.baseTotalPower
-	if sl.updatableLimitRatio < _ratio {
+	if int64(sl.updatableLimitRatio) < _ratio {
 		// reject
 		return xerrors.From(
 			fmt.Errorf("StakeLimiter error: Exceeding the updatable power limit. updated(%v), base(%v), ratio(%v), limit(%v)",

@@ -231,7 +231,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 
 			// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
 			// Calculate an expected address with `fromAcct.Nonce-1`.
-			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), fromAcct.Nonce-1)
+			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce-1))
 			require.EqualValues(t, addr0[:], _addr)
 			require.EqualValues(t, addr0[:], txctx.RetData)
 
@@ -246,7 +246,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 	return contAddr, txctx
 }
 
-func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiObj.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)

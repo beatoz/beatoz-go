@@ -39,7 +39,7 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	//
 	tx := ctx.Tx
 
-	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
 	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
 	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
 		return xerr

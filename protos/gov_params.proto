@@ -6,14 +6,14 @@ message GovParamsProto {
   int32   version = 1;
 
   int32   max_validator_cnt = 2;
-  int64   min_bonding_blocks = 3;
-  int32   max_validators_of_delegator = 4;
-  int32   max_delegators_of_validator = 5;
-  int32   min_self_stake_rate = 6;
-  int32   max_updatable_stake_rate = 7;
-  int32   max_individual_stake_rate = 8;
-  int64   _min_validator_power = 9;
-  int64   _min_delegator_power = 10;
+  int64   min_validator_power = 3;
+  int64   min_delegator_power = 4;
+  int32   max_validators_of_delegator = 5;
+  int32   max_delegators_of_validator = 6;
+  int32   min_self_stake_rate = 7;
+  int32   max_updatable_stake_rate = 8;
+  int32   max_individual_stake_rate = 9;
+  int64   min_bonding_blocks = 10;
   int64   lazy_unstaking_blocks = 11;
 
   bytes   _max_total_supply = 12;
@@ -31,14 +31,14 @@ message GovParamsProto {
   int64   min_signed_blocks = 23;
 
   bytes   _gas_price = 24;
-  uint64  min_trx_gas = 25;
-  uint64  max_trx_gas = 26;
-  uint64  max_block_gas = 27;
+  int64   min_trx_gas = 25;
+  int64   max_trx_gas = 26;
+  int64   max_block_gas = 27;
 
-  int64   max_voting_period_blocks = 28;
-  int64   min_voting_period_blocks = 29;
+  int64   min_voting_period_blocks = 28;
+  int64   max_voting_period_blocks = 29;
   int64   lazy_applying_blocks = 30;
 
   // deprecated
-  bytes   _reward_per_power = 31;
+  bytes   _reward_per_stake = 31;
 }

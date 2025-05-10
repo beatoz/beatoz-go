@@ -59,20 +59,20 @@ type ITrxPayload interface {
 }
 
 type Trx struct {
-	Version  uint32         `json:"version,omitempty"`
+	Version  int32          `json:"version,omitempty"`
 	Time     int64          `json:"time"`
-	Nonce    uint64         `json:"nonce"`
+	Nonce    int64          `json:"nonce"`
 	From     types.Address  `json:"from"`
 	To       types.Address  `json:"to"`
 	Amount   *uint256.Int   `json:"amount"`
-	Gas      uint64         `json:"gas"`
+	Gas      int64          `json:"gas"`
 	GasPrice *uint256.Int   `json:"gasPrice"`
 	Type     int32          `json:"type"`
 	Payload  ITrxPayload    `json:"payload,omitempty"`
 	Sig      bytes.HexBytes `json:"sig"`
 }
 
-func NewTrx(ver uint32, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, payload ITrxPayload) *Trx {
+func NewTrx(ver int32, from, to types.Address, nonce, gas int64, gasPrice, amt *uint256.Int, payload ITrxPayload) *Trx {
 	return &Trx{
 		Version:  ver,
 		Time:     time.Now().Round(0).UTC().UnixNano(),
@@ -143,7 +143,7 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 	tmpTx := &trxRPL{
 		Version:  uint64(tx.Version),
 		Time:     uint64(tx.Time),
-		Nonce:    tx.Nonce,
+		Nonce:    uint64(tx.Nonce),
 		From:     tx.From,
 		To:       tx.To,
 		Amount:   tx.Amount.Bytes(),
@@ -163,13 +163,13 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 
-	tx.Version = uint32(rtx.Version)
+	tx.Version = int32(rtx.Version)
 	tx.Time = int64(rtx.Time)
-	tx.Nonce = rtx.Nonce
+	tx.Nonce = int64(rtx.Nonce)
 	tx.From = rtx.From
 	tx.To = rtx.To
 	tx.Amount = new(uint256.Int).SetBytes(rtx.Amount)
-	tx.Gas = rtx.Gas
+	tx.Gas = int64(rtx.Gas)
 	tx.GasPrice = new(uint256.Int).SetBytes(rtx.GasPrice)
 	tx.Type = int32(rtx.Type)
 	tx.Sig = rtx.Sig
