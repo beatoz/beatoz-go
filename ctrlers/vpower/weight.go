@@ -136,7 +136,7 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 			decW := _tau.Mul(decimal.NewFromInt(dur)).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
-		//fmt.Println("WaEx64ByPowerChunk", "power", pc.Power, "height", pc.Height, "dur", dur)
+		//fmt.Println("WaEx64ByPowerChunk", "currHeight", currHeight, "pc.Height", pc.Height, "dur", dur, "Power", pc.Power, "txHash", bytes.HexBytes(pc.TxHash))
 	}
 
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))

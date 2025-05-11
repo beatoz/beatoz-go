@@ -261,8 +261,6 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			vpow:    vpow,
 			txPower: pc.Power,
 		}
-	case ctrlertypes.TRX_WITHDRAW:
-		// todo: implement withdraw reward
 
 	default:
 		return xerrors.ErrUnknownTrxType
@@ -280,8 +278,6 @@ func (ctrler *VPowerCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		return ctrler.execBonding(ctx)
 	case ctrlertypes.TRX_UNSTAKING:
 		return ctrler.exeUnbonding(ctx)
-	//case ctrlertypes.TRX_WITHDRAW:
-	//	return ctrler.exeWithdraw(ctx)
 	default:
 		return xerrors.ErrUnknownTrxType
 	}

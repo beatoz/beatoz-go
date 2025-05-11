@@ -12,7 +12,7 @@ type Weight struct {
 }
 
 func NewWeight() *Weight {
-	return &Weight{sumWeight: decimal.Zero}
+	return &Weight{sumWeight: decimal.Zero, valsWeight: decimal.Zero}
 }
 
 func (w *Weight) SumWeight() decimal.Decimal {

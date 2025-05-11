@@ -128,6 +128,52 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	return nil, nil
 }
 
+func (ctrler *SupplyCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_WITHDRAW:
+		if ctx.Tx.Amount.Sign() != 0 {
+			return xerrors.ErrInvalidTrx.Wrapf("amount must be 0")
+		}
+		txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadWithdraw)
+		if !ok {
+			return xerrors.ErrInvalidTrxPayloadType
+		}
+
+		item, xerr := ctrler.supplyState.Get(v1.LedgerKeyReward(ctx.Tx.From), ctx.Exec)
+		if xerr != nil {
+			return xerr
+		}
+
+		rwd, _ := item.(*Reward)
+		if txpayload.ReqAmt.Cmp(rwd.amt) > 0 {
+			return xerrors.ErrInvalidTrx.Wrapf("insufficient reward")
+		}
+
+		ctx.ValidateResult = rwd
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
+	return nil
+}
+
+func (ctrler *SupplyCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	switch ctx.Tx.GetType() {
+	case ctrlertypes.TRX_WITHDRAW:
+		return ctrler.withdrawReward(
+			ctx.ValidateResult.(*Reward),
+			ctx.Tx.Payload.(*ctrlertypes.TrxPayloadWithdraw).ReqAmt,
+			ctx.AcctHandler,
+			ctx.Exec)
+	default:
+		return xerrors.ErrUnknownTrxType
+	}
+}
 func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -205,7 +251,7 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 	}
 
 	// distribute rewards
-	if xerr := ctrler.reward(resp.rewards, bctx.GovParams.RewardPoolAddress()); xerr != nil {
+	if xerr := ctrler.addReward(resp.rewards, bctx.GovParams.RewardPoolAddress()); xerr != nil {
 		return nil, xerr
 	}
 
@@ -244,5 +290,6 @@ func (ctrler *SupplyCtrler) burn(amt *uint256.Int, height int64) xerrors.XError 
 }
 
 var _ ctrlertypes.ISupplyHandler = (*SupplyCtrler)(nil)
+var _ ctrlertypes.ITrxHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.ILedgerHandler = (*SupplyCtrler)(nil)
