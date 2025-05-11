@@ -4,7 +4,6 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
-	"github.com/shopspring/decimal"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
@@ -87,11 +86,11 @@ type IVPowerHandler interface {
 	//SelfPowerOf(types.Address) int64
 	//DelegatedPowerOf(types.Address) int64
 
-	ComputeWeight(int64, int64, int32, *uint256.Int) (decimal.Decimal, []decimal.Decimal, []types.Address, xerrors.XError)
+	ComputeWeight(int64, int64, int32, *uint256.Int) (*Weight, xerrors.XError)
 }
 
 type ISupplyHandler interface {
 	IBlockHandler
-	Mint(bctx *BlockContext)
+	RequestMint(bctx *BlockContext)
 	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError
 }

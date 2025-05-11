@@ -72,7 +72,7 @@ func LedgerKeyAdjustedSupply() LedgerKey {
 }
 
 func LedgerKeyReward(owner types.Address) LedgerKey {
-	return append(KeyPrefixAdjustedSupply, owner...)
+	return append(KeyPrefixReward, owner...)
 }
 
 func UnwrapKeyPrefix(key LedgerKey) []byte {

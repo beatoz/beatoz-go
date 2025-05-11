@@ -1,6 +1,7 @@
 package vpower
 
 import (
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -10,41 +11,56 @@ import (
 
 func (ctrler *VPowerCtrler) ComputeWeight(
 	height, ripeningBlocks int64, tau int32,
-	totalSupply *uint256.Int) (decimal.Decimal, []decimal.Decimal, []types.Address, xerrors.XError) {
+	totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
 
 	var allPowChunks []*PowerChunkProto
-	var benefs []types.Address
-	var mapPowChunks = make(map[string][]*PowerChunkProto)
+	var benefAddrs []types.Address
+	var mapBenefPowChunks = make(map[string]struct {
+		val bool
+		pcs []*PowerChunkProto
+	})
 	for _, val := range ctrler.lastValidators {
 		for _, from := range val.Delegators {
 			vpow, xerr := ctrler.readVPower(from, val.addr, true)
 			if xerr != nil {
-				return decimal.Zero, nil, nil, xerr
+				return nil, xerr
 			}
 
 			_mapKey := bytes.HexBytes(from).String()
-			pcs, ok := mapPowChunks[_mapKey]
+			b, ok := mapBenefPowChunks[_mapKey]
 			if !ok {
-				benefs = append(benefs, from)
-				mapPowChunks[_mapKey] = vpow.PowerChunks
+				benefAddrs = append(benefAddrs, from)
+				mapBenefPowChunks[_mapKey] = struct {
+					val bool
+					pcs []*PowerChunkProto
+				}{
+					val: bytes.Equal(from, val.addr),
+					pcs: vpow.PowerChunks,
+				}
 			} else {
-				mapPowChunks[_mapKey] = append(pcs, vpow.PowerChunks...)
+				b.pcs = append(b.pcs, vpow.PowerChunks...)
 			}
 
 			allPowChunks = append(allPowChunks, vpow.PowerChunks...)
 		}
 	}
 
-	benefWeights := make([]decimal.Decimal, len(benefs))
-	for i, addr := range benefs {
-		benefWeights[i] = WaEx64ByPowerChunk(
-			mapPowChunks[addr.String()],
+	weightInfo := ctrlertypes.NewWeight()
+	for _, addr := range benefAddrs {
+		benefW := WaEx64ByPowerChunk(
+			mapBenefPowChunks[addr.String()].pcs,
 			height, ripeningBlocks, tau, totalSupply)
-	}
-	wvpow := Weight64ByPowerChunk(allPowChunks, height, ripeningBlocks, tau)
 
-	_totalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
-	wa, _ := wvpow.QuoRem(_totalSupply, int32(types.DECIMAL))
-	// wa = wa.Truncate(6)
-	return wa, benefWeights, benefs, nil
+		weightInfo.Add(addr, benefW, mapBenefPowChunks[addr.String()].val)
+	}
+
+	totalSupplyPower := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+	vpowW := Scaled64PowerChunk(allPowChunks, height, ripeningBlocks, tau)
+	vpowW, _ = vpowW.QuoRem(totalSupplyPower, int32(types.DECIMAL))
+	// vpowW = vpowW.Truncate(6)
+
+	// NOTE:
+	// weightInfo.SumWeight is equal to vpowW
+
+	return weightInfo, nil
 }

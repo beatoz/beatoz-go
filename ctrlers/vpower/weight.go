@@ -146,7 +146,7 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 	return q
 }
 
-func Weight64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
+func Scaled64PowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := decimalOne.Sub(_tau)
 
@@ -163,7 +163,7 @@ func Weight64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCy
 			decW := _tau.Mul(decimal.NewFromInt(dur)).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
-		//fmt.Println("Weight64ByPowerChunk", "power", pc.Power, "height", pc.Height, "dur", dur)
+		//fmt.Println("Scaled64PowerChunk", "power", pc.Power, "height", pc.Height, "dur", dur)
 	}
 
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))

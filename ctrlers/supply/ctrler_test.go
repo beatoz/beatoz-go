@@ -86,7 +86,7 @@ func Test_Mint(t *testing.T) {
 
 	// before vpowCtrler.EndBlock. (vpowCtrler.lastValidators is nil)
 	// expect 0 minting
-	ctrler.mint(bctx)
+	ctrler.requestMint(bctx)
 	result, xerr := ctrler.waitMint(bctx)
 	require.NoError(t, xerr)
 	supplyHeight := result.newSupply.Height
@@ -97,9 +97,12 @@ func Test_Mint(t *testing.T) {
 	require.Equal(t, initSupply.String(), totalSupply.String())
 	require.Equal(t, "0", changeSupply.String())
 
+	// reset vpowCtrler.lastValidators
+	// this value is used to compute voting power weight .
 	_, xerr = vpowCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
+	preRewards := make(map[string]*uint256.Int)
 	for currHeight := int64(2); currHeight < oneYearSeconds*30; currHeight += govParams.InflationCycleBlocks() {
 		// expect x minting
 
@@ -114,7 +117,7 @@ func Test_Mint(t *testing.T) {
 		bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{
 			Header: tmproto.Header{Height: currHeight},
 		}, govParams, acctMock, vpowCtrler, nil)
-		ctrler.mint(bctx)
+		ctrler.requestMint(bctx)
 		result, xerr = ctrler.waitMint(bctx)
 		require.NoError(t, xerr)
 		supplyHeight = result.newSupply.Height
@@ -126,11 +129,31 @@ func Test_Mint(t *testing.T) {
 		require.NotEqual(t, "0", changeSupply.Dec())
 		require.Equal(t, expectedTotalSupply.Dec(), totalSupply.Dec(), "height", currHeight)
 		require.Equal(t, expectedChange.Dec(), changeSupply.Dec())
-		sumReward := uint256.NewInt(0)
-		for _, rwd := range result.rewards {
-			_ = sumReward.Add(sumReward, rwd.amt)
+
+		sumMint := uint256.NewInt(0)
+		for _, mintRwd := range result.rewards {
+			_ = sumMint.Add(sumMint, mintRwd.amt)
+
+			//
+			// check reward amount of beneficiary
+			accumRwd, xerr := ctrler.readReward(mintRwd.addr)
+			require.NoError(t, xerr)
+
+			_preAmt, ok := preRewards[mintRwd.addr.String()]
+			if !ok {
+				preRewards[mintRwd.addr.String()] = accumRwd.amt.Clone()
+			} else {
+				require.Equal(t, _preAmt.Add(_preAmt, mintRwd.amt).Dec(), accumRwd.amt.Dec())
+				preRewards[mintRwd.addr.String()] = _preAmt
+			}
 		}
-		require.Equal(t, sumReward.String(), expectedChange.String())
+		require.Equal(t, sumMint.Dec(), expectedChange.Dec())
+
+		//fmt.Println("---")
+		//fmt.Println("height", currHeight, "totalSupply", totalSupply.Dec(), "changeSupply", changeSupply.Dec())
+		//for _, rwd := range result.rewards {
+		//	fmt.Println("height", currHeight, "beneficary", rwd.addr, "reward", rwd.amt.Dec())
+		//}
 	}
 
 	require.NoError(t, ctrler.Close())
