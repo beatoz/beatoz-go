@@ -7,6 +7,7 @@ import (
 
 type Weight struct {
 	sumWeight     decimal.Decimal
+	valsWeight    decimal.Decimal
 	beneficiaries []*beneficiary
 }
 
@@ -18,8 +19,15 @@ func (w *Weight) SumWeight() decimal.Decimal {
 	return w.sumWeight
 }
 
+func (w *Weight) ValWeight() decimal.Decimal {
+	return w.valsWeight
+}
+
 func (w *Weight) Add(addr types.Address, weight decimal.Decimal, isVal bool) {
 	w.sumWeight = w.sumWeight.Add(weight)
+	if isVal {
+		w.valsWeight = w.valsWeight.Add(weight)
+	}
 	w.beneficiaries = append(w.beneficiaries, &beneficiary{addr, weight, isVal})
 }
 

@@ -41,6 +41,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			}
 			continue
 		}
+		valsW := retWeight.ValWeight().Truncate(6)
 
 		//{
 		//	//
@@ -59,16 +60,23 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		si := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovParams.MaxTotalSupply(), bctx.GovParams.InflationWeightPermil(), wa)
 		sd := si.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
 
+		valRate := decimal.NewFromInt(int64(bctx.GovParams.ValidatorRewardRate())).Div(decimal.NewFromInt(100))
+		sd_vals := sd.Mul(valRate)
+		sd_comm := sd.Sub(sd_vals)
+
 		//fmt.Println("compute", "wa", wa.String(), "adjustedSupply", lastAdjustedSupply, "adjustedHeight", lastAdjustedHeight, "max", bctx.GovParams.MaxTotalSupply(), "lamda", bctx.GovParams.InflationWeightPermil(), "t1", totalSupply, "t0", lastTotalSupply)
 
 		//
-		// 2. reward ...
-		//todo: calculate reward
+		// 2. calculate rewards ...
+		// 2.1. for validators
 		beneficiaries := retWeight.Beneficiaries()
 		rewards := make([]*Reward, len(beneficiaries))
 		for i, benef := range retWeight.Beneficiaries() {
 			wi := benef.Weight().Truncate(6)
-			rwd := sd.Mul(wi.Div(wa))
+			rwd := sd_comm.Mul(wi).Div(wa)
+			if benef.IsValidator() {
+				rwd = rwd.Add(sd_vals.Mul(wi).Div(valsW))
+			}
 			// give `rd` to `b`
 			rewards[i] = &Reward{
 				addr: benef.Address(),
