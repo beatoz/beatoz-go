@@ -9,8 +9,8 @@ message SupplyProto {
   bool is_mint = 4;
 }
 
-message RewardProto {
-  int64 height = 1;
-  int64 reward = 2;
-  int64 change = 3;
-}
+//message RewardProto {
+//  int64 height = 1;
+//  int64 reward = 2;
+//  int64 change = 3;
+//}

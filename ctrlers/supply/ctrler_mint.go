@@ -1,10 +1,52 @@
 package supply
 
 import (
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
 )
 
+// requestMint makes reqMint object and send it via the channel reqCh.
+// it is called from BeginBlock.
+func (ctrler *SupplyCtrler) requestMint(bctx *ctrlertypes.BlockContext) {
+	ctrler.reqCh <- &reqMint{
+		bctx:               bctx,
+		lastTotalSupply:    ctrler.lastTotalSupply.Clone(),
+		lastAdjustedSupply: ctrler.lastAdjustedSupply.Clone(),
+		lastAdjustedHeight: ctrler.lastAdjustedHeight,
+	}
+}
+
+// waitMint updates supplyState of ctrler.
+// it is called from EndBlock.
+func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint, xerrors.XError) {
+	resp, _ := <-ctrler.respCh
+	if resp == nil {
+		return nil, xerrors.ErrNotFoundResult.Wrapf("no minting result")
+	}
+	if resp.xerr != nil {
+		return nil, resp.xerr
+	}
+
+	// distribute rewards
+	if xerr := ctrler.addReward(resp.rewards, bctx.Height(), bctx.GovParams.RewardPoolAddress()); xerr != nil {
+		return nil, xerr
+	}
+
+	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
+		return nil, xerr
+	}
+	ctrler.lastTotalSupply = new(uint256.Int).SetBytes(resp.newSupply.XSupply)
+	return resp, nil
+}
+
+// computeIssuanceAndRewardRoutine calculates additional issuance and reward amount based on voting power weights.
+// And it returns the result through the response channel `respCh` because this is executed in goroutine context.
+// NOTE: DO NOT ACCESS `supplyState` of SupplyCtrler in any way from this goroutine.
+// The supplyState of SupplyCtrler may be updated while computeIssuanceAndRewardRoutine is executed.
+// If `supplyState` is updated in this goroutine, the writing order may be not deterministic.
 func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint) {
 
 	for {
@@ -43,7 +85,25 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		//
 		// 2. calculate rewards ...
-		rewards := calculateRewards(retWeight, mintedAlls, mintedVals)
+		waVals := retWeight.ValWeight().Truncate(6)
+
+		beneficiaries := retWeight.Beneficiaries()
+		rewards := make([]*mintedReward, len(beneficiaries))
+		for i, benef := range beneficiaries {
+			wi := benef.Weight().Truncate(6)
+
+			// for all delegators
+			rwd := mintedAlls.Mul(wi).Div(wa)
+			if benef.IsValidator() {
+				// for only validators
+				rwd = rwd.Add(mintedVals.Mul(wi).Div(waVals))
+			}
+			// give `rwd` to `benef.Address()``
+			rewards[i] = &mintedReward{
+				addr: benef.Address(),
+				amt:  uint256.MustFromBig(rwd.BigInt()),
+			}
+		}
 
 		respCh <- &respMint{
 			xerr: nil,

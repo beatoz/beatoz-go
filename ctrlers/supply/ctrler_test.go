@@ -141,9 +141,9 @@ func Test_Mint(t *testing.T) {
 
 			_preAmt, ok := preRewards[mintRwd.addr.String()]
 			if !ok {
-				preRewards[mintRwd.addr.String()] = accumRwd.amt.Clone()
+				preRewards[mintRwd.addr.String()] = accumRwd.CumulatedAmount()
 			} else {
-				require.Equal(t, _preAmt.Add(_preAmt, mintRwd.amt).Dec(), accumRwd.amt.Dec())
+				require.Equal(t, _preAmt.Add(_preAmt, mintRwd.amt).Dec(), accumRwd.CumulatedAmount().Dec())
 				preRewards[mintRwd.addr.String()] = _preAmt
 			}
 		}

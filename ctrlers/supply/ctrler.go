@@ -6,6 +6,7 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -13,6 +14,10 @@ import (
 	"sync"
 )
 
+type mintedReward struct {
+	addr btztypes.Address
+	amt  *uint256.Int
+}
 type reqMint struct {
 	bctx               *ctrlertypes.BlockContext
 	lastTotalSupply    *uint256.Int
@@ -22,7 +27,7 @@ type reqMint struct {
 type respMint struct {
 	xerr      xerrors.XError
 	newSupply *Supply
-	rewards   []*Reward
+	rewards   []*mintedReward
 }
 
 type SupplyCtrler struct {
@@ -148,7 +153,7 @@ func (ctrler *SupplyCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		}
 
 		rwd, _ := item.(*Reward)
-		if txpayload.ReqAmt.Cmp(rwd.amt) > 0 {
+		if txpayload.ReqAmt.Cmp(rwd.CumulatedAmount()) > 0 {
 			return xerrors.ErrInvalidTrx.Wrapf("insufficient reward")
 		}
 
@@ -168,6 +173,7 @@ func (ctrler *SupplyCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		return ctrler.withdrawReward(
 			ctx.ValidateResult.(*Reward),
 			ctx.Tx.Payload.(*ctrlertypes.TrxPayloadWithdraw).ReqAmt,
+			ctx.Height,
 			ctx.AcctHandler,
 			ctx.Exec)
 	default:
@@ -200,11 +206,6 @@ func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	return h, v, nil
 }
 
-func (ctrler *SupplyCtrler) Query(qry abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	//TODO implement me
-	return nil, nil
-}
-
 func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -230,36 +231,6 @@ func (ctrler *SupplyCtrler) RequestMint(bctx *ctrlertypes.BlockContext) {
 	defer ctrler.mtx.Unlock()
 
 	ctrler.requestMint(bctx)
-}
-
-func (ctrler *SupplyCtrler) requestMint(bctx *ctrlertypes.BlockContext) {
-	ctrler.reqCh <- &reqMint{
-		bctx:               bctx,
-		lastTotalSupply:    ctrler.lastTotalSupply.Clone(),
-		lastAdjustedSupply: ctrler.lastAdjustedSupply.Clone(),
-		lastAdjustedHeight: ctrler.lastAdjustedHeight,
-	}
-}
-
-func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint, xerrors.XError) {
-	resp, _ := <-ctrler.respCh
-	if resp == nil {
-		return nil, xerrors.ErrNotFoundResult.Wrapf("no minting result")
-	}
-	if resp.xerr != nil {
-		return nil, resp.xerr
-	}
-
-	// distribute rewards
-	if xerr := ctrler.addReward(resp.rewards, bctx.GovParams.RewardPoolAddress()); xerr != nil {
-		return nil, xerr
-	}
-
-	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
-		return nil, xerr
-	}
-	ctrler.lastTotalSupply = new(uint256.Int).SetBytes(resp.newSupply.XSupply)
-	return resp, nil
 }
 
 func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.Int) xerrors.XError {
