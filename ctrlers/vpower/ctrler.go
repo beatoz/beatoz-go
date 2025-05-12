@@ -119,9 +119,9 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	// todo: reset limiter
 	//ctrler.vpowLimiter.Reset(
 	//	ctrler.allDelegatees,
-	//	bctx.GovParams.MaxValidatorCnt(),
-	//	bctx.GovParams.MaxIndividualStakeRate(),
-	//	bctx.GovParams.MaxUpdatableStakeRate())
+	//	bctx.GovHandler.MaxValidatorCnt(),
+	//	bctx.GovHandler.MaxIndividualStakeRate(),
+	//	bctx.GovHandler.MaxUpdatableStakeRate())
 	return nil, nil
 }
 
@@ -171,8 +171,8 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				totalPower = dgtee.SumPower
 			}
 
-			if selfPower < ctx.GovParams.MinValidatorPower() {
-				return xerrors.ErrInvalidTrx.Wrapf("too small power to become validator: %v < %v(minimum)", txPower, ctx.GovParams.MinValidatorPower())
+			if selfPower < ctx.GovHandler.MinValidatorPower() {
+				return xerrors.ErrInvalidTrx.Wrapf("too small power to become validator: %v < %v(minimum)", txPower, ctx.GovHandler.MinValidatorPower())
 			}
 		} else {
 			if dgtee == nil {
@@ -180,14 +180,14 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			}
 
 			// RG-78: check minDelegatorPower
-			minDelegatorPower := ctx.GovParams.MinDelegatorPower()
+			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {
 				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", txPower, minDelegatorPower)
 			}
 
 			// it's delegating. check minSelfStakeRatio
 			selfrate := dgtee.SelfPower * int64(100) / (dgtee.SumPower + txPower)
-			if selfrate < int64(ctx.GovParams.MinSelfStakeRate()) {
+			if selfrate < int64(ctx.GovHandler.MinSelfStakeRate()) {
 				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.SumPower, txPower))
 			}
 
@@ -312,7 +312,7 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	}
 	if xerr := ctrler.bondPowerChunk(
 		dgtee, vpow,
-		power, ctx.Height, ctx.TxHash,
+		power, ctx.Height(), ctx.TxHash,
 		ctx.Exec); xerr != nil {
 		return xerr
 	}
@@ -344,7 +344,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 		panic("not reachable")
 	}
 
-	refundHeight := ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
+	refundHeight := ctx.Height() + ctx.GovHandler.LazyUnstakingBlocks()
 
 	//
 	// Remove power
@@ -412,7 +412,7 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	newValUps, newValidators := ctrler.updateValidators(
 		ctrler.allDelegatees,
 		ctrler.lastValidators,
-		int(bctx.GovParams.MaxValidatorCnt()),
+		int(bctx.GovHandler.MaxValidatorCnt()),
 	)
 	bctx.SetValUpdates(newValUps)
 	ctrler.lastValidators = newValidators
@@ -538,5 +538,4 @@ func (ctrler *VPowerCtrler) Query(query abcitypes.RequestQuery) ([]byte, xerrors
 var _ ctrlertypes.ILedgerHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*VPowerCtrler)(nil)
-var _ ctrlertypes.IStakeHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IVPowerHandler = (*VPowerCtrler)(nil)

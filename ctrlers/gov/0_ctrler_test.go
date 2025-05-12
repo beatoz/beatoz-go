@@ -1,12 +1,14 @@
 package gov
 
 import (
-	"bytes"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	mockacct "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
+	mockstake "github.com/beatoz/beatoz-go/ctrlers/mocks/stake"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
+	"github.com/holiman/uint256"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/rand"
 	"os"
@@ -19,24 +21,19 @@ import (
 var (
 	config      = cfg.DefaultConfig()
 	govCtrler   *GovCtrler
-	stakeHelper *stakeHandlerMock
-	acctHelper  *acctHelperMock
+	acctMock    *mockacct.AcctHandlerMock
+	stakeHelper *mockstake.StakeHandlerMock
 	govParams0  = ctrlertypes.DefaultGovParams()
 	govParams1  = ctrlertypes.Test1GovParams()
-	//govParams2  = ctrlertypes.Test2GovParams()
-	govParams3 = ctrlertypes.Test3GovParams()
-	//govParams4  = ctrlertypes.Test4GovParams()
-	//govParams5  = ctrlertypes.Test5GovParams()
+	govParams3  = ctrlertypes.Test3GovParams()
 	defMinGas   = govParams0.MinTrxGas()
 	defGasPrice = govParams0.GasPrice()
-
-	wallets []*web3.Wallet
 )
 
 func init() {
 	config.DBPath = filepath.Join(os.TempDir(), "gov-ctrler-test")
-	os.RemoveAll(config.DBPath)
-	os.MkdirAll(config.DBPath, 0700)
+	_ = os.RemoveAll(config.DBPath)
+	_ = os.MkdirAll(config.DBPath, 0700)
 
 	var err error
 	if govCtrler, err = NewGovCtrler(config, tmlog.NewNopLogger()); err != nil {
@@ -46,24 +43,25 @@ func init() {
 
 	rand.Seed(time.Now().UnixNano())
 
+	acctMock = mockacct.NewAccountHandlerMock(1000)
+	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
+		w.GetAccount().SetBalance(uint256.NewInt(100_000))
+		return true
+	})
+
 	var delegatees []*stake.Delegatee
 	for i := 0; i < 14; i++ {
-		w := web3.NewWallet(nil)
-		wallets = append(wallets, w)
-
-		d := &stake.Delegatee{Addr: w.Address(), TotalPower: rand.Int63n(1000000)}
+		w := acctMock.GetWallet(i)
+		d := &stake.Delegatee{Addr: w.Address(), TotalPower: rand.Int63n(1_000_000)}
 		delegatees = append(delegatees, d)
 	}
 
-	stakeHelper = &stakeHandlerMock{
-		valCnt:     5, // 5 delegatees is only validator.
-		delegatees: delegatees,
-	}
-	sort.Sort(stake.PowerOrderDelegatees(stakeHelper.delegatees))
+	stakeHelper = mockstake.NewStakeHandlerMock(
+		5, // 5 delegatees is only validator.
+		delegatees,
+	)
+	sort.Sort(stake.PowerOrderDelegatees(stakeHelper.Delegatees))
 
-	acctHelper = &acctHelperMock{
-		acctMap: make(map[ctrlertypes.AcctKey]*ctrlertypes.Account),
-	}
 }
 
 func TestMain(m *testing.M) {
@@ -76,15 +74,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func findWallet(address types.Address) *web3.Wallet {
-	for _, w := range wallets {
-		if bytes.Compare(w.Address(), address) == 0 {
-			return w
-		}
-	}
-	return nil
-}
 func signTrx(tx *ctrlertypes.Trx, signerAddr types.Address, chainId string) error {
-	_, _, err := findWallet(signerAddr).SignTrxRLP(tx, chainId)
+	_, _, err := acctMock.FindWallet(signerAddr).SignTrxRLP(tx, chainId)
 	return err
 }

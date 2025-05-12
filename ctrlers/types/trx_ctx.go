@@ -9,12 +9,12 @@ import (
 )
 
 type TrxContext struct {
-	Height    int64
-	BlockTime int64
-	TxHash    bytes2.HexBytes
-	Tx        *Trx
-	TxIdx     int
-	Exec      bool
+	*BlockContext
+
+	Tx     *Trx
+	TxIdx  int
+	TxHash bytes2.HexBytes
+	Exec   bool
 
 	SenderPubKey []byte
 	Sender       *Account
@@ -23,23 +23,13 @@ type TrxContext struct {
 	RetData      []byte
 	Events       []abcitypes.Event
 
-	TrxGovHandler   ITrxHandler
-	TrxAcctHandler  ITrxHandler
-	TrxStakeHandler ITrxHandler
-	TrxEVMHandler   ITrxHandler
-
-	GovParams    IGovParams
-	AcctHandler  IAccountHandler
-	StakeHandler IStakeHandler
-	ChainID      string
-
 	ValidateResult interface{}
 	Callback       func(*TrxContext, xerrors.XError)
 }
 
 type NewTrxContextCb func(*TrxContext) xerrors.XError
 
-func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxContextCb) (*TrxContext, xerrors.XError) {
+func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xerrors.XError) {
 	tx := &Trx{}
 	if xerr := tx.Decode(txbz); xerr != nil {
 		return nil, xerr
@@ -49,40 +39,38 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 	}
 
 	txctx := &TrxContext{
-		Tx:        tx,
-		TxHash:    tmtypes.Tx(txbz).Hash(),
-		Height:    height,
-		BlockTime: btime,
-		Exec:      exec,
-		GasUsed:   0,
-	}
-	for _, fn := range cbfns {
-		if err := fn(txctx); err != nil {
-			return nil, err
-		}
+		BlockContext: bctx,
+		Tx:           tx,
+		TxIdx:        bctx.TxsCnt(),
+		TxHash:       tmtypes.Tx(txbz).Hash(),
+		Exec:         exec,
+		GasUsed:      0,
 	}
 
 	//
-	// validation gas and signature.
-	if tx.Gas < txctx.GovParams.MinTrxGas() {
-		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too small gas (min: %v)", txctx.GovParams.MinTrxGas())
-	} else if tx.Gas > txctx.GovParams.MaxTrxGas() {
-		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too much gas (max: %d)", txctx.GovParams.MaxTrxGas())
+	// validation gas.
+	if tx.Gas < txctx.BlockContext.GovHandler.MinTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too small gas (min: %v)", txctx.GovHandler.MinTrxGas())
+	} else if tx.Gas > txctx.BlockContext.GovHandler.MaxTrxGas() {
+		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too much gas (max: %d)", txctx.GovHandler.MaxTrxGas())
 	}
 
-	if tx.GasPrice.Cmp(txctx.GovParams.GasPrice()) != 0 {
+	if tx.GasPrice.Cmp(txctx.BlockContext.GovHandler.GasPrice()) != 0 {
 		return nil, xerrors.ErrInvalidGasPrice
 	}
 
-	_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.ChainID)
+	//
+	// validation signature.
+	_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.BlockContext.ChainID())
 	if xerr != nil {
 		return nil, xerr
 	}
 	txctx.SenderPubKey = pubKeyBytes
+
 	//
 	//
 
-	txctx.Sender = txctx.AcctHandler.FindAccount(tx.From, txctx.Exec)
+	txctx.Sender = txctx.BlockContext.AcctHandler.FindAccount(tx.From, txctx.Exec)
 	if txctx.Sender == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From)
 	}
@@ -92,7 +80,7 @@ func NewTrxContext(txbz []byte, height, btime int64, exec bool, cbfns ...NewTrxC
 		// `toAddr` may be `nil` when the tx type is `TRX_CONTRACT`.
 		toAddr = types.ZeroAddress()
 	}
-	txctx.Receiver = txctx.AcctHandler.FindOrNewAccount(toAddr, txctx.Exec)
+	txctx.Receiver = txctx.BlockContext.AcctHandler.FindOrNewAccount(toAddr, txctx.Exec)
 	if txctx.Receiver == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
 	}

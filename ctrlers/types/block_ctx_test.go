@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ func TestBlockGasLimit(t *testing.T) {
 
 	for n := 0; n < 1000000; n++ {
 
-		blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil, nil)
+		blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, govmock.NewGovHandlerMock(types.DefaultGovParams()), nil, nil, nil, nil)
 		randBlockGasLimit := rand.Int64N(_max)
 		blockCtx.SetBlockGasLimit(randBlockGasLimit)
 
@@ -49,7 +50,7 @@ func TestBlockGasLimit(t *testing.T) {
 
 func TestUseBlockGas(t *testing.T) {
 	initGasLimit := int64(10000)
-	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, types.DefaultGovParams(), nil, nil, nil)
+	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, govmock.NewGovHandlerMock(types.DefaultGovParams()), nil, nil, nil, nil)
 	blockCtx.SetBlockGasLimit(initGasLimit)
 
 	sumGasUsed := int64(0)

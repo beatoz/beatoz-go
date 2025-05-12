@@ -20,7 +20,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(1, acctMock, govParams, ctrler)
+	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, nil, ctrler)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockCommit(ctrler))
 
@@ -34,7 +34,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 			Height: 1,
 		})
 	}
-	for h := int64(2); h <= govParams.RipeningBlocks()*5; h += govParams.InflationCycleBlocks() {
+	for h := int64(2); h <= govMock.RipeningBlocks()*5; h += govMock.InflationCycleBlocks() {
 
 		require.NoError(t, mocks.DoBeginBlock(ctrler))
 
@@ -60,12 +60,12 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 
 		// compute weight
 		// WaEx64ByPowerChunks
-		w_waex64pc := WaEx64ByPowerChunk(powChunks0, h, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
+		w_waex64pc := WaEx64ByPowerChunk(powChunks0, h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		//fmt.Println("--- WaEx64ByPowerChunk return", w_waex64pc)
 		w_waex64pc = w_waex64pc.Truncate(6)
 
 		// ComputeWeight
-		weightComputed, xerr := ctrler.ComputeWeight(h, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
+		weightComputed, xerr := ctrler.ComputeWeight(h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		require.NoError(t, xerr)
 		//fmt.Println("--- ComputeWeight return", weightComputed.SumWeight())
 		w_computed := weightComputed.SumWeight().Truncate(6)

@@ -167,7 +167,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check right
-		if ctx.StakeHandler.IsValidator(ctx.Tx.From) == false {
+		if ctx.VPowerHandler.IsValidator(ctx.Tx.From) == false {
 			return xerrors.ErrNoRight
 		}
 
@@ -186,7 +186,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check start height
-		if txpayload.StartVotingHeight <= ctx.Height {
+		if txpayload.StartVotingHeight <= ctx.Height() {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
 		// check voting period
@@ -246,8 +246,8 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check end height
-		if ctx.Height > prop.EndVotingHeight ||
-			ctx.Height < prop.StartVotingHeight {
+		if ctx.Height() > prop.EndVotingHeight ||
+			ctx.Height() < prop.StartVotingHeight {
 			return xerrors.ErrNotVotingPeriod
 		}
 	default:
@@ -275,7 +275,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 
 	voters := make(map[string]*proposal.Voter)
-	vals, totalVotingPower := ctx.StakeHandler.Validators()
+	vals, totalVotingPower := ctx.VPowerHandler.Validators()
 	for _, v := range vals {
 		voters[types.Address(v.Address).String()] = &proposal.Voter{
 			Addr:   v.Address,

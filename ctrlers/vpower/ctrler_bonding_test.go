@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
@@ -129,10 +130,10 @@ func Test_LoadLedger(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, int64(1), lastHeight)
 
-	require.NoError(t, ctrler.LoadDelegatees(int(govParams.MaxValidatorCnt())))
+	require.NoError(t, ctrler.LoadDelegatees(int(govMock.MaxValidatorCnt())))
 
 	require.Len(t, ctrler.allDelegatees, len(lastValUps))
-	require.LessOrEqual(t, len(ctrler.lastValidators), int(govParams.MaxValidatorCnt()))
+	require.LessOrEqual(t, len(ctrler.lastValidators), int(govMock.MaxValidatorCnt()))
 
 	for _, dgt := range ctrler.allDelegatees {
 		require.True(t, checkExistDelegatee(dgt, lastValUps))
@@ -162,7 +163,7 @@ func Test_Bonding(t *testing.T) {
 
 	// close and re-open
 	require.NoError(t, ctrler.Close())
-	ctrler, xerr = NewVPowerCtrler(config, int(govParams.MaxValidatorCnt()), log.NewNopLogger())
+	ctrler, xerr = NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	//
@@ -252,7 +253,7 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 
 	//
 	// to not validator (self bonding)
-	power = govParams.MinValidatorPower()
+	power = govMock.MinValidatorPower()
 	txctx, xerr = makeBondingTrxCtx(fromWallet, nil, power, lastHeight+1)
 	require.NoError(t, xerr)
 	require.Equal(t, fromWallet.Address(), txctx.Tx.From)
@@ -361,7 +362,7 @@ func Test_Unbonding(t *testing.T) {
 	require.Equal(t, totalPower0, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
 	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
-	refundHeight := lastHeight + govParams.LazyUnstakingBlocks()
+	refundHeight := lastHeight + govMock.LazyUnstakingBlocks()
 	frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozen)
@@ -480,10 +481,10 @@ func Test_Freezing(t *testing.T) {
 				frozenCntOf[fmt.Sprintf("%v|%v", height, froms[idx].Address())]++
 				if frozenCntOf[fmt.Sprintf("%v|%v", height, froms[idx].Address())] == 1 {
 					// newly frozen vpower, not power chunk
-					refundCntAt[height+govParams.LazyUnstakingBlocks()]++
+					refundCntAt[height+govMock.LazyUnstakingBlocks()]++
 				}
-				minRefundHeight = libs.MinInt64(minRefundHeight, height+govParams.LazyUnstakingBlocks())
-				maxRefundHeight = libs.MaxInt64(maxRefundHeight, height+govParams.LazyUnstakingBlocks())
+				minRefundHeight = libs.MinInt64(minRefundHeight, height+govMock.LazyUnstakingBlocks())
+				maxRefundHeight = libs.MaxInt64(maxRefundHeight, height+govMock.LazyUnstakingBlocks())
 				break
 			}
 		}
@@ -507,7 +508,7 @@ func Test_Freezing(t *testing.T) {
 		require.Equal(t, sumPower0-power, dgtee1.SumPower)
 		require.Equal(t, selfPower0, dgtee1.SelfPower)
 
-		refundHeight := height + govParams.LazyUnstakingBlocks()
+		refundHeight := height + govMock.LazyUnstakingBlocks()
 		frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromW.Address(), true)
 		require.NoError(t, xerr)
 		require.NotNil(t, frozen)
@@ -737,7 +738,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 
 func initLedger(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {
 
-	ctrler, xerr := NewVPowerCtrler(cfg, int(govParams.MaxValidatorCnt()), log.NewNopLogger())
+	ctrler, xerr := NewVPowerCtrler(cfg, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
@@ -778,26 +779,14 @@ func makeBondingTrxCtx(fromAcct *web3.Wallet, to types.Address, power int64, hei
 		fromAcct.Address(),
 		to,
 		fromAcct.GetNonce(),
-		govParams.MinTrxGas(), govParams.GasPrice(),
+		govMock.MinTrxGas(), govMock.GasPrice(),
 		types.ToFons(uint64(power)),
 	)
 	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainID); err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	bz, xerr := tx.Encode()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	txCtx, xerr := ctrlertypes.NewTrxContext(bz, height, time.Now().Unix(), true,
-		func(_ctx *ctrlertypes.TrxContext) xerrors.XError {
-			_ctx.ChainID = config.ChainID
-			_ctx.AcctHandler = acctMock
-			_ctx.GovParams = govParams
-			return nil
-		},
-	)
+	txCtx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainID, height, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -812,26 +801,14 @@ func makeUnbondingTrxCtx(fromAcct *web3.Wallet, to types.Address, height int64, 
 		fromAcct.Address(),
 		to,
 		fromAcct.GetNonce(),
-		govParams.MinTrxGas(), govParams.GasPrice(),
+		govMock.MinTrxGas(), govMock.GasPrice(),
 		txhash,
 	)
 	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainID); err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	bz, xerr := tx.Encode()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	txCtx, xerr := ctrlertypes.NewTrxContext(bz, height, time.Now().Unix(), true,
-		func(_ctx *ctrlertypes.TrxContext) xerrors.XError {
-			_ctx.ChainID = config.ChainID
-			_ctx.AcctHandler = acctMock
-			_ctx.GovParams = govParams
-			return nil
-		},
-	)
+	txCtx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainID, height, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	if xerr != nil {
 		return nil, xerr
 	}

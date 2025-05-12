@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"math"
+	"reflect"
 	"sync"
 	"unicode"
 )
@@ -646,7 +647,30 @@ func GasToFee(gas int64, price *uint256.Int) *uint256.Int {
 }
 
 func MergeGovParams(oldParams, newParams *GovParams) {
+	refT := reflect.TypeOf(GovParamsProto{})
+	refVOld := reflect.ValueOf(oldParams.GetValues()).Elem()
+	refVNew := reflect.ValueOf(newParams.GetValues()).Elem()
 
+	for i := 0; i < refT.NumField(); i++ {
+		field0 := refT.Field(i)
+		fieldName := field0.Name
+		fieldType := field0.Type
+
+		newVal := refVNew.FieldByName(fieldName)
+		if !newVal.IsValid() || !newVal.CanSet() {
+			//fmt.Printf("skip %v\n", fieldName)
+			continue
+		}
+
+		zeroInf := reflect.Zero(fieldType).Interface()
+
+		newInf := newVal.Interface()
+		if reflect.DeepEqual(newInf, zeroInf) {
+			oldVal := refVOld.FieldByName(fieldName)
+			newVal.Set(oldVal)
+			//fmt.Printf("%-10s | %-20s | %#v -> %#v\n", fieldName, fieldType, newInf, newVal.Interface())
+		}
+	}
 }
 
 var _ v1.ILedgerItem = (*GovParams)(nil)

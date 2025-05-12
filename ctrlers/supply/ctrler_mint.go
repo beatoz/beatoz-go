@@ -31,7 +31,7 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 	}
 
 	// distribute rewards
-	if xerr := ctrler.addReward(resp.rewards, bctx.Height(), bctx.GovParams.RewardPoolAddress()); xerr != nil {
+	if xerr := ctrler.addReward(resp.rewards, bctx.Height(), bctx.GovHandler.RewardPoolAddress()); xerr != nil {
 		return nil, xerr
 	}
 
@@ -63,8 +63,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		// 1. compute voting power weight
 		retWeight, xerr := bctx.VPowerHandler.ComputeWeight(
 			bctx.Height(),
-			bctx.GovParams.RipeningBlocks(),
-			bctx.GovParams.BondingBlocksWeightPermil(),
+			bctx.GovHandler.RipeningBlocks(),
+			bctx.GovHandler.BondingBlocksWeightPermil(),
 			lastTotalSupply,
 		)
 		if xerr != nil {
@@ -76,10 +76,10 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		}
 
 		wa := retWeight.SumWeight().Truncate(6)
-		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovParams.MaxTotalSupply(), bctx.GovParams.InflationWeightPermil(), wa)
+		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), wa)
 		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
 
-		valRate := decimal.NewFromInt(int64(bctx.GovParams.ValidatorRewardRate())).Div(decimal.NewFromInt(100))
+		valRate := decimal.NewFromInt(int64(bctx.GovHandler.ValidatorRewardRate())).Div(decimal.NewFromInt(100))
 		mintedVals := addedSupply.Mul(valRate)
 		mintedAlls := addedSupply.Sub(mintedVals)
 

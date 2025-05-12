@@ -3,18 +3,22 @@ package stake_test
 import (
 	"bytes"
 	"errors"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-sdk-go/web3"
+	"github.com/tendermint/tendermint/abci/types"
+	types3 "github.com/tendermint/tendermint/proto/tendermint/types"
 	"math/rand"
+	"time"
 )
 
 func randMakeStakingToSelfTrxContext(txHeight int64) (*ctrlertypes.TrxContext, error) {
 	from := acctMock00.RandWallet()
 	to := from
 
-	power := govParams00.MinValidatorPower() + rand.Int63n(10000)
+	power := govMock00.MinValidatorPower() + rand.Int63n(10000)
 	if txCtx, err := makeStakingTrxContext(from, to, power, txHeight); err != nil {
 		return nil, err
 	} else {
@@ -38,7 +42,7 @@ func randMakeStakingTrxContext(txHeight int64) (*ctrlertypes.TrxContext, error) 
 func makeStakingTrxContext(from, to *web3.Wallet, power, txHeight int64) (*ctrlertypes.TrxContext, error) {
 	amt := ctrlertypes.PowerToAmount(power)
 
-	tx := web3.NewTrxStaking(from.Address(), to.Address(), dummyNonce, dummyGas, dummyGasPrice, amt)
+	tx := web3.NewTrxStaking(from.Address(), to.Address(), dummyNonce, defGas, defGasPrice, amt)
 	bz, err := tx.Encode()
 	if err != nil {
 		return nil, err
@@ -48,14 +52,22 @@ func makeStakingTrxContext(from, to *web3.Wallet, power, txHeight int64) (*ctrle
 		Exec:         true,
 		Tx:           tx,
 		TxHash:       crypto.DefaultHash(bz),
-		Height:       txHeight,
 		SenderPubKey: from.GetPubKey(),
 		Sender:       from.GetAccount(),
 		Receiver:     to.GetAccount(),
 		GasUsed:      0,
-		GovParams:    govParams00,
-		AcctHandler:  acctMock00,
+		BlockContext: ctrlertypes.NewBlockContext(
+			types.RequestBeginBlock{
+				Header: types3.Header{Height: txHeight},
+			},
+			govMock00, acctMock00, nil, nil, nil,
+		),
 	}, nil
+	//_, _, err := from.SignTrxRLP(tx, "stake_test_chain")
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return mocks.MakeTrxCtxWithTrx(tx, "", txHeight, time.Now(), true, govMock00, acctMock00, nil, nil, nil)
 }
 
 func findStakingTxCtx(txhash bytes2.HexBytes) *ctrlertypes.TrxContext {
@@ -85,20 +97,41 @@ func randMakeUnstakingTrxContext(txHeight int64) (*ctrlertypes.TrxContext, error
 
 func makeUnstakingTrxContext(from, to *web3.Wallet, txhash bytes2.HexBytes, txHeight int64) (*ctrlertypes.TrxContext, error) {
 
-	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, dummyGas, dummyGasPrice, txhash)
-	tzbz, _, err := from.SignTrxRLP(tx, "stake_test_chain")
+	tx := web3.NewTrxUnstaking(from.Address(), to.Address(), dummyNonce, defGas, defGasPrice, txhash)
+	//tzbz, _, err := from.SignTrxRLP(tx, "stake_test_chain")
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//return &ctrlertypes.TrxContext{
+	//	Exec:         true,
+	//	Tx:           tx,
+	//	TxHash:       crypto.DefaultHash(tzbz),
+	//	Height:       txHeight,
+	//	SenderPubKey: from.GetPubKey(),
+	//	Sender:       from.GetAccount(),
+	//	Receiver:     to.GetAccount(),
+	//	GovParams:    govParams00,
+	//}, nil
+
+	//return &ctrlertypes.TrxContext{
+	//	Exec:         true,
+	//	Tx:           tx,
+	//	TxHash:       crypto.DefaultHash(tzbz),
+	//	SenderPubKey: from.GetPubKey(),
+	//	Sender:       from.GetAccount(),
+	//	Receiver:     to.GetAccount(),
+	//	BlockContext: ctrlertypes.NewBlockContext(
+	//		types.RequestBeginBlock{
+	//			Header: types3.Header{Height: txHeight},
+	//		},
+	//		govMock00, nil, nil, nil, nil,
+	//	),
+	//}, nil
+
+	_, _, err := from.SignTrxRLP(tx, "stake_test_chain")
 	if err != nil {
 		return nil, err
 	}
-
-	return &ctrlertypes.TrxContext{
-		Exec:         true,
-		Tx:           tx,
-		TxHash:       crypto.DefaultHash(tzbz),
-		Height:       txHeight,
-		SenderPubKey: from.GetPubKey(),
-		Sender:       from.GetAccount(),
-		Receiver:     to.GetAccount(),
-		GovParams:    govParams00,
-	}, nil
+	return mocks.MakeTrxCtxWithTrx(tx, "stake_test_chain", txHeight, time.Now(), true, govMock00, acctMock00, nil, nil, nil)
 }

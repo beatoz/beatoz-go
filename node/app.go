@@ -154,7 +154,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 					Time:   tmtime.Canonical(time.Now()),
 				},
 			},
-			nil, nil, nil, nil)
+			nil, nil, nil, nil, nil)
 		ctrler.lastBlockCtx.SetAppHash(appHash)
 	} else {
 		lastHeight = ctrler.lastBlockCtx.Height()
@@ -268,21 +268,12 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-			ctrler.lastBlockCtx.Height()+int64(1), // issue #39: set block number expected to include current tx.
-			ctrler.lastBlockCtx.ExpectedNextBlockTimeSeconds(ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval), // issue #39: set block time expected to be executed.
+		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval)
+		txctx, xerr := ctrlertypes.NewTrxContext(
+			req.Tx,
+			_bctx,
 			false,
-			func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-				_txctx.TrxGovHandler = ctrler.govCtrler
-				_txctx.TrxAcctHandler = ctrler.acctCtrler
-				_txctx.TrxStakeHandler = ctrler.stakeCtrler
-				_txctx.TrxEVMHandler = ctrler.vmCtrler
-				_txctx.GovParams = ctrler.govCtrler
-				_txctx.AcctHandler = ctrler.acctCtrler
-				_txctx.StakeHandler = ctrler.stakeCtrler
-				_txctx.ChainID = ctrler.rootConfig.ChainID
-				return nil
-			})
+		)
 		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("CheckTx", "error", xerr)
@@ -399,10 +390,17 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	blockGasLimit := ctrlertypes.AdjustBlockGasLimit(
 		ctrler.lastBlockCtx.GetBlockGasLimit(),
 		ctrler.lastBlockCtx.GetBlockGasUsed(),
-		ctrler.govCtrler.MaxTrxGas(), // minimum block gas limit
+		ctrler.govCtrler.MaxTrxGas(), // it means minimum block gas limit
 		ctrler.govCtrler.MaxBlockGas(),
 	)
-	ctrler.currBlockCtx = ctrlertypes.NewBlockContext(req, ctrler.govCtrler, ctrler.acctCtrler, ctrler.stakeCtrler, ctrler.supplyCtrler)
+	ctrler.currBlockCtx = ctrlertypes.NewBlockContext(
+		req,
+		ctrler.govCtrler,
+		ctrler.acctCtrler,
+		ctrler.vmCtrler,
+		ctrler.supplyCtrler,
+		ctrler.stakeCtrler, // todo: replace stakeCtrler with vpowCtrler
+	)
 	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
 	ctrler.currBlockCtx.SetBlockGasLimit(blockGasLimit)
 
@@ -458,21 +456,8 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeSeconds(),
-		true,
-		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			_txctx.TxIdx = ctrler.currBlockCtx.TxsCnt()
-			_txctx.TrxGovHandler = ctrler.govCtrler
-			_txctx.TrxAcctHandler = ctrler.acctCtrler
-			_txctx.TrxStakeHandler = ctrler.stakeCtrler
-			_txctx.TrxEVMHandler = ctrler.vmCtrler
-			_txctx.GovParams = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
-			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.ChainID = ctrler.rootConfig.ChainID
-			return nil
-		})
+		ctrler.currBlockCtx,
+		true)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
@@ -539,8 +524,8 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 
 		return abcitypes.ResponseDeliverTx{
 			Code:      abcitypes.CodeTypeOK,
-			GasWanted: int64(txctx.Tx.Gas),
-			GasUsed:   int64(txctx.GasUsed),
+			GasWanted: txctx.Tx.Gas,
+			GasUsed:   txctx.GasUsed,
 			Data:      txctx.RetData,
 			Events:    txctx.Events,
 		}
@@ -557,23 +542,8 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 // asyncPrepareTrxContext is called in TrxPreparer
 func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx.Height(),
-		ctrler.currBlockCtx.TimeSeconds(),
-		true,
-		func(_txctx *ctrlertypes.TrxContext) xerrors.XError {
-			// `idx` may be not equal to `ctrler.currBlockCtx.TxsCnt()`
-			// because the order of calling `asyncPrepareTrxContext` is not sequential.
-			_txctx.TxIdx = idx
-			_txctx.TrxGovHandler = ctrler.govCtrler
-			_txctx.TrxAcctHandler = ctrler.acctCtrler
-			_txctx.TrxStakeHandler = ctrler.stakeCtrler
-			_txctx.TrxEVMHandler = ctrler.vmCtrler
-			_txctx.GovParams = ctrler.govCtrler
-			_txctx.AcctHandler = ctrler.acctCtrler
-			_txctx.StakeHandler = ctrler.stakeCtrler
-			_txctx.ChainID = ctrler.rootConfig.ChainID
-			return nil
-		})
+		ctrler.currBlockCtx,
+		true)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)

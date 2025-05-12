@@ -131,7 +131,7 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	}
 
 	// Check intrinsic gas if everything is correct
-	bn := big.NewInt(ctx.Height)
+	bn := big.NewInt(ctx.Height())
 	gas, err := ethcore.IntrinsicGas(inputData, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
 	if err != nil {
 		return xerrors.From(err)
@@ -193,7 +193,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
 		ctx.Tx.Gas,
-		ctx.GovParams.GasPrice(),
+		ctx.GovHandler.GasPrice(),
 		ctx.Tx.Amount,
 		inputData,
 		ctx.Exec,
@@ -214,7 +214,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	ctrler.stateDBWrapper.Finish()
 
 	// Update the state with pending changes.
-	blockNumber := uint256.NewInt(uint64(ctx.Height)).ToBig()
+	blockNumber := uint256.NewInt(uint64(ctx.Height())).ToBig()
 	if ctrler.ethChainConfig.IsByzantium(blockNumber) {
 		ctrler.stateDBWrapper.Finalise(true)
 	} else {

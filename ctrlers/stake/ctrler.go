@@ -159,7 +159,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 		ctrler.logger.Info("StakeCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(
-				&evi, blockCtx.GovParams.SlashRate()); xerr != nil {
+				&evi, blockCtx.GovHandler.SlashRate()); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
@@ -433,14 +433,14 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 			}
 
 			// RG-78: check minDelegatorStake
-			minDelegatorPower := ctx.GovParams.MinDelegatorPower()
+			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {
 				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: a minimum is %v", minDelegatorPower)
 			}
 
 			// it's delegating. check minSelfStakeRatio
 			selfRatio := delegatee.SelfStakeRatio(txPower)
-			if selfRatio < int64(ctx.GovParams.MinSelfStakeRate()) {
+			if selfRatio < int64(ctx.GovHandler.MinSelfStakeRate()) {
 				return xerrors.From(fmt.Errorf("not enough self power - validator: %v, self power: %v, total power: %v", delegatee.Addr, delegatee.GetSelfPower(), delegatee.GetTotalPower()))
 			}
 
@@ -574,7 +574,7 @@ func (ctrler *StakeCtrler) exeStaking(ctx *ctrlertypes.TrxContext) xerrors.XErro
 	if xerr != nil {
 		return xerr
 	}
-	s0 := NewStakeWithPower(ctx.Tx.From, ctx.Tx.To, power, ctx.Height+1, ctx.TxHash)
+	s0 := NewStakeWithPower(ctx.Tx.From, ctx.Tx.To, power, ctx.Height()+1, ctx.TxHash)
 
 	delegatee, _ := item.(*Delegatee)
 	if xerr := delegatee.AddStake(s0); xerr != nil {
@@ -614,13 +614,13 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 	_ = delegatee.DelStake(txhash)
 
-	s0.RefundHeight = ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
+	s0.RefundHeight = ctx.Height() + ctx.GovHandler.LazyUnstakingBlocks()
 	_ = ctrler.frozenLedger.Set(s0.Key(), s0, ctx.Exec) // add s0 to frozen ledger
 
 	if delegatee.SelfPower == 0 {
 		stakes := delegatee.DelAllStakes()
 		for _, _s0 := range stakes {
-			_s0.RefundHeight = ctx.Height + ctx.GovParams.LazyUnstakingBlocks()
+			_s0.RefundHeight = ctx.Height() + ctx.GovHandler.LazyUnstakingBlocks()
 			_ = ctrler.frozenLedger.Set(_s0.Key(), _s0, ctx.Exec) // add s0 to frozen ledger
 		}
 	}
@@ -664,7 +664,7 @@ func (ctrler *StakeCtrler) exeWithdraw(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	}
 
 	rwd, _ := item.(*Reward)
-	xerr = rwd.Withdraw(txpayload.ReqAmt, ctx.Height)
+	xerr = rwd.Withdraw(txpayload.ReqAmt, ctx.Height())
 	if xerr != nil {
 		return xerr
 	}
@@ -692,7 +692,7 @@ func (ctrler *StakeCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.
 		return nil, xerr
 	}
 
-	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovParams.MaxValidatorCnt())))
+	ctx.SetValUpdates(ctrler.updateValidators(int(ctx.GovHandler.MaxValidatorCnt())))
 
 	return nil, nil
 }
@@ -1003,6 +1003,10 @@ func (ctrler *StakeCtrler) readRewardOf(addr types.Address) *Reward {
 
 	rwd, _ := item.(*Reward)
 	return rwd
+}
+
+func (s *StakeCtrler) ComputeWeight(height, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
+	return nil, nil
 }
 
 var _ ctrlertypes.ILedgerHandler = (*StakeCtrler)(nil)

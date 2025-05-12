@@ -9,8 +9,12 @@ message SupplyProto {
   bool is_mint = 4;
 }
 
-//message RewardProto {
-//  int64 height = 1;
-//  int64 reward = 2;
-//  int64 change = 3;
-//}
+
+message RewardProto {
+  bytes address = 1;
+  bytes _issued = 2;
+  bytes _withdrawn = 3;
+  bytes _slashed = 4;
+  bytes _cumulated = 5;
+  int64 height = 6;
+}

@@ -108,7 +108,7 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
 
 		// give fee to block proposer and burn automatically by BurnRate().
-		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovParams.BurnRate())))
+		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.BurnRate())))
 		burned = new(uint256.Int).Div(burned, uint256.NewInt(100))
 		// todo: apply `burned` to SupplyCtrler
 		//if xerr := bctx.SupplyHandler.Burn(burned, bctx.Height()); xerr != nil {
@@ -123,9 +123,9 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 		if proposer == nil {
 			proposer = btztypes.NewAccount(header.GetProposerAddress())
 		}
-		burnAcct := ctrler.findAccount(bctx.GovParams.BurnAddress(), true)
+		burnAcct := ctrler.findAccount(bctx.GovHandler.BurnAddress(), true)
 		if burnAcct == nil {
-			burnAcct = btztypes.NewAccount(bctx.GovParams.BurnAddress())
+			burnAcct = btztypes.NewAccount(bctx.GovHandler.BurnAddress())
 			ctrler.logger.Debug("Burn tx fee", "total tx fee", sumFee.Dec(), "reward", reward.Dec(), "burned", burned.Dec(), "burn address", burnAcct.Address)
 		}
 
@@ -371,6 +371,26 @@ func (memCtrler *SimuAcctCtrler) Reward(to types.Address, amt *uint256.Int, exec
 
 func (memCtrler *SimuAcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
 	panic("SimuAcctCtrler can not create ImmutableAcctCtrlerAt")
+}
+
+func (memCtrler *SimuAcctCtrler) ValidateTrx(context *btztypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) ExecuteTrx(context *btztypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) BeginBlock(context *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) EndBlock(context *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
 }
 
 var _ btztypes.IAccountHandler = (*SimuAcctCtrler)(nil)

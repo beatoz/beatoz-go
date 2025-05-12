@@ -3,7 +3,8 @@ package vpower
 import (
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
-	"github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -20,23 +21,23 @@ import (
 )
 
 var (
-	config    *beatozcfg.Config
-	acctMock  *ctrlers.AcctHandlerMock
-	govParams *ctrlertypes.GovParams
+	config   *beatozcfg.Config
+	govMock  *gov.GovHandlerMock
+	acctMock *acct.AcctHandlerMock
 )
 
 func init() {
 	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
 	config = beatozcfg.DefaultConfig()
 	config.SetRoot(rootDir)
-	acctMock = ctrlers.NewAccountHandlerMock(1000)
+	acctMock = acct.NewAccountHandlerMock(1000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
 		return true
 	})
 
-	govParams = ctrlertypes.DefaultGovParams()
-	govParams.SetLazyUnstakingBlocks(500)
+	govMock = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
+	govMock.GetValues().LazyUnstakingBlocks = 500
 }
 
 func Test_NewValidatorSet(t *testing.T) {
@@ -46,7 +47,7 @@ func Test_NewValidatorSet(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(1, acctMock, govParams, ctrler)
+	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, nil, ctrler)
 
 	var expectedValUps []types.ValidatorUpdate
 
@@ -113,7 +114,7 @@ func randBonding(ctrler *VPowerCtrler) ([]types.ValidatorUpdate, xerrors.XError)
 	toPubKey := fromW.GetPubKey()
 	toAddr := crypto.PubKeyBytes2Addr(toPubKey)
 
-	power := rand.Int63n(lastVals[0].SumPower) + govParams.MinValidatorPower()
+	power := rand.Int63n(lastVals[0].SumPower) + govMock.MinValidatorPower()
 
 	if _, xerr := doDelegate(ctrler, fromW, toAddr, power, mocks.CurrBlockHeight()); xerr != nil {
 		return nil, xerr
@@ -130,7 +131,7 @@ func randBonding(ctrler *VPowerCtrler) ([]types.ValidatorUpdate, xerrors.XError)
 		dgt.addDelegator(fromAddr)
 	}
 	sort.Sort(orderByPowerDelegatee(allDgtees))
-	newLastVals := allDgtees[:govParams.MaxValidatorCnt()]
+	newLastVals := allDgtees[:govMock.MaxValidatorCnt()]
 	sort.Sort(orderByPowerDelegatee(lastVals))
 	sort.Sort(orderByPowerDelegatee(newLastVals))
 

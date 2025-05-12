@@ -8,6 +8,7 @@ import (
 	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	"sync"
 	"time"
 )
@@ -22,31 +23,44 @@ type BlockContext struct {
 	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
-	GovParams   IGovParams
+	GovHandler  IGovHandler
 	AcctHandler IAccountHandler
+	EVMHandler  IEVMHandler
+
 	// DEPRECATED
-	StakeHandler  IStakeHandler
-	VPowerHandler IVPowerHandler
+	//StakeHandler  IStakeHandler
+
 	SupplyHandler ISupplyHandler
+	VPowerHandler IVPowerHandler
 
 	ValUpdates abcitypes.ValidatorUpdates
 
 	mtx sync.RWMutex
 }
 
-func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovParams, a IAccountHandler, s IStakeHandler, su ISupplyHandler) *BlockContext {
-	vpowctrler, _ := s.(IVPowerHandler)
+func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler) *BlockContext {
+
+	// all handlers should implement ITrxHandler and IBlockHandler
+	for _, handler := range []interface{}{g, a, e, su, vp} {
+		if handler != nil {
+			_ = handler.(ITrxHandler)
+			_ = handler.(IBlockHandler)
+		}
+
+	}
+
 	ret := &BlockContext{
-		blockInfo:     bi,
-		feeSum:        uint256.NewInt(0),
-		txsCnt:        0,
-		evmTxsCnt:     0,
-		appHash:       nil,
-		GovParams:     g,
-		AcctHandler:   a,
-		StakeHandler:  s,
+		blockInfo:   bi,
+		feeSum:      uint256.NewInt(0),
+		txsCnt:      0,
+		evmTxsCnt:   0,
+		appHash:     nil,
+		GovHandler:  g,
+		AcctHandler: a,
+		EVMHandler:  e,
+		//StakeHandler:  s,
 		SupplyHandler: su,
-		VPowerHandler: vpowctrler, // todo: perfectly implement temp code
+		VPowerHandler: vp, // todo: perfectly implement temp code
 		ValUpdates:    nil,
 	}
 	if g != nil {
@@ -55,11 +69,51 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovParams, a IAccountHan
 	return ret
 }
 
+func TempBlockContext(chainId string, height int64, btime time.Time, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler) *BlockContext {
+	next := NewBlockContext(
+		abcitypes.RequestBeginBlock{
+			Header: tmprototypes.Header{
+				ChainID: chainId,
+				Height:  height,
+				Time:    btime,
+			},
+		},
+		g, a, e, su, vp,
+	)
+	return next
+}
+
+func ExpectNextBlockContext(last *BlockContext, blockIntval time.Duration) *BlockContext {
+	tm := last.BlockInfo().Header.Time.Add(blockIntval * time.Second)
+	next := NewBlockContext(
+		abcitypes.RequestBeginBlock{
+			Header: tmprototypes.Header{
+				ChainID: last.ChainID(),
+				Height:  last.Height() + 1,
+				Time:    tm,
+			},
+		},
+		last.GovHandler,
+		last.AcctHandler,
+		last.EVMHandler,
+		last.SupplyHandler,
+		last.VPowerHandler,
+	)
+	return next
+}
+
 func (bctx *BlockContext) BlockInfo() abcitypes.RequestBeginBlock {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
 	return bctx.blockInfo
+}
+
+func (bctx *BlockContext) ChainID() string {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	return bctx.blockInfo.Header.ChainID
 }
 
 func (bctx *BlockContext) SetHeight(h int64) {

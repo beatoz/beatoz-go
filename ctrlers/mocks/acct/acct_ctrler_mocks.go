@@ -1,4 +1,4 @@
-package ctrlers
+package acct
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -6,6 +6,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/rand"
 )
 
@@ -108,7 +109,28 @@ func (mock *AcctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec boo
 func (mock *AcctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &AcctHandlerMock{}, nil
 }
-func (mock *AcctHandlerMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
+func (mock *AcctHandlerMock) SetAccount(acct *ctrlertypes.Account, b bool) xerrors.XError {
+	return nil
+}
+
+func (mock *AcctHandlerMock) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	_ = ctx.Sender.AddBalance(ctx.Tx.Amount)
+	_ = ctx.Receiver.SubBalance(ctx.Tx.Amount)
 	return nil
 }
 

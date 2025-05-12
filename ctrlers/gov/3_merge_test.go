@@ -7,6 +7,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -34,7 +35,7 @@ func init() {
 	}
 
 	var txs []*ctrlertypes.Trx
-	for i := 1; i < stakeHelper.valCnt; i++ {
+	for i := 1; i < stakeHelper.ValCnt; i++ {
 		addr := stakeHelper.PickAddress(i)
 		choice := int32(0)
 		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
@@ -52,13 +53,30 @@ func init() {
 }
 
 func TestMergeGovParams(t *testing.T) {
-	oriParams := govCtrler.GovParams
-	newParams := ctrlertypes.DefaultGovParams()
+	oriParams := ctrlertypes.DefaultGovParams()
 
-	ctrlertypes.MergeGovParams(&oriParams, newParams)
+	newParams := &ctrlertypes.GovParams{}
+	ctrlertypes.MergeGovParams(oriParams, newParams)
 	if !reflect.DeepEqual(newParams, ctrlertypes.DefaultGovParams()) {
 		t.Errorf("unexpected GovParams: %v", newParams)
 	}
+
+	newParams = ctrlertypes.DefaultGovParams()
+	v0 := rand.Int63()
+	v1 := types.RandAddress()
+
+	rawVals := newParams.GetValues()
+	rawVals.RipeningBlocks = v0
+	rawVals.XBurnAddress = v1
+
+	ctrlertypes.MergeGovParams(oriParams, newParams)
+	require.Equal(t, v0, newParams.RipeningBlocks())
+	require.Equal(t, v1, newParams.BurnAddress())
+	require.False(t, reflect.DeepEqual(newParams, ctrlertypes.DefaultGovParams()))
+
+	rawVals.RipeningBlocks = ctrlertypes.DefaultGovParams().RipeningBlocks()
+	rawVals.XBurnAddress = ctrlertypes.DefaultGovParams().BurnAddress()
+	require.True(t, reflect.DeepEqual(newParams, ctrlertypes.DefaultGovParams()))
 }
 
 func TestApplyMergeProposal(t *testing.T) {

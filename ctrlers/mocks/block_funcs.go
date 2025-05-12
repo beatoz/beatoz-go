@@ -9,8 +9,8 @@ import (
 var lastBlockCtx *ctrlertypes.BlockContext
 var currBlockCtx *ctrlertypes.BlockContext
 
-func InitBlockCtxWith(h int64, a ctrlertypes.IAccountHandler, g ctrlertypes.IGovParams, s ctrlertypes.IStakeHandler) *ctrlertypes.BlockContext {
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{}, g, a, s, nil)
+func InitBlockCtxWith(h int64, g ctrlertypes.IGovHandler, a ctrlertypes.IAccountHandler, e ctrlertypes.IEVMHandler, su ctrlertypes.ISupplyHandler, vp ctrlertypes.IVPowerHandler) *ctrlertypes.BlockContext {
+	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{}, g, a, e, su, vp)
 	bctx.SetHeight(h)
 
 	currBlockCtx = bctx
@@ -55,7 +55,7 @@ func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
 	if bctx == nil {
 		bctx = lastBlockCtx
 	}
-	return InitBlockCtxWith(bctx.Height()+1, bctx.AcctHandler, bctx.GovParams, bctx.StakeHandler)
+	return InitBlockCtxWith(bctx.Height()+1, bctx.GovHandler, bctx.AcctHandler, bctx.EVMHandler, bctx.SupplyHandler, bctx.VPowerHandler)
 }
 
 func DoBeginBlock(ctrler ctrlertypes.IBlockHandler) error {

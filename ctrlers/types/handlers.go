@@ -61,7 +61,15 @@ type IGovParams interface {
 	RewardPerPower() *uint256.Int
 }
 
+type IGovHandler interface {
+	IGovParams
+	ITrxHandler
+	IBlockHandler
+}
+
 type IAccountHandler interface {
+	ITrxHandler
+	IBlockHandler
 	SetAccount(*Account, bool) xerrors.XError
 	FindOrNewAccount(types.Address, bool) *Account
 	FindAccount(types.Address, bool) *Account
@@ -72,6 +80,8 @@ type IAccountHandler interface {
 }
 
 type IStakeHandler interface {
+	ITrxHandler
+	IBlockHandler
 	Validators() ([]*abcitypes.Validator, int64)
 	IsValidator(types.Address) bool
 	TotalPowerOf(types.Address) int64
@@ -79,17 +89,25 @@ type IStakeHandler interface {
 	DelegatedPowerOf(types.Address) int64
 }
 
+type IEVMHandler interface {
+	ITrxHandler
+	IBlockHandler
+}
+
 type IVPowerHandler interface {
+	IStakeHandler
+	ITrxHandler
+	IBlockHandler
 	//Validators() ([]*vpower.Delegatee, int64)
-	IsValidator(types.Address) bool
+	//IsValidator(types.Address) bool
 	//TotalPowerOf(types.Address) int64
 	//SelfPowerOf(types.Address) int64
 	//DelegatedPowerOf(types.Address) int64
-
 	ComputeWeight(int64, int64, int32, *uint256.Int) (*Weight, xerrors.XError)
 }
 
 type ISupplyHandler interface {
+	ITrxHandler
 	IBlockHandler
 	RequestMint(bctx *BlockContext)
 	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError

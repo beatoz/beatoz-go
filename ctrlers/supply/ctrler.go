@@ -127,7 +127,7 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if bctx.Height() > 0 && bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
+	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		ctrler.requestMint(bctx)
 	}
 	return nil, nil
@@ -173,7 +173,7 @@ func (ctrler *SupplyCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		return ctrler.withdrawReward(
 			ctx.ValidateResult.(*Reward),
 			ctx.Tx.Payload.(*ctrlertypes.TrxPayloadWithdraw).ReqAmt,
-			ctx.Height,
+			ctx.Height(),
 			ctx.AcctHandler,
 			ctx.Exec)
 	default:
@@ -184,7 +184,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if bctx.Height() > 0 && bctx.Height()%bctx.GovParams.InflationCycleBlocks() == 0 {
+	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		if _, xerr := ctrler.waitMint(bctx); xerr != nil {
 			ctrler.logger.Error("fail to requestMint", "error", xerr.Error())
 			return nil, xerr

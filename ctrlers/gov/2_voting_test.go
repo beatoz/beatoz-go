@@ -42,9 +42,9 @@ func init() {
 		trxCtxProposal.TxHash, 0)
 	_ = signTrx(tx0, stakeHelper.PickAddress(0), "")
 	// no right
-	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.ValCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.valCnt), "")
+	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.ValCnt), "")
 
 	// invalid payload params : wrong choice
 	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
@@ -72,7 +72,7 @@ func init() {
 
 	// txs of validators except stakeHelper.delegatees[0]
 	var txs []*ctrlertypes.Trx
-	for i := 1; i < stakeHelper.valCnt; i++ {
+	for i := 1; i < stakeHelper.ValCnt; i++ {
 		addr := stakeHelper.PickAddress(i)
 		choice := int32(0)
 		//rn := int(bytes.RandInt63n(int64(len(stakeHelper.delegatees))))

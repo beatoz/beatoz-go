@@ -17,7 +17,7 @@ func (ctrler *SupplyCtrler) Query(qry abcitypes.RequestQuery) ([]byte, xerrors.X
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		item, xerr := atledger.Get(v1.LedgerKeyReward(qry.Data))
+		item, xerr := atledger.Get(v1.LedgerKeyReward(qry.Data)) // qry.Data has address
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}

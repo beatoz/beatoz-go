@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
@@ -27,7 +28,7 @@ import (
 )
 
 var (
-	govParams   = ctrlertypes.DefaultGovParams()
+	govMock     = govmock.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	acctHandler acctHandlerMock
 	dbPath      = filepath.Join(os.TempDir(), "beatoz-evm-test")
 )
@@ -87,7 +88,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 
 	contAddr, txctx := testDeployContract(t, deployInput)
 	fromAcct := txctx.Sender
-	height := txctx.Height
+	height := txctx.Height()
 	erc20ContAddr = contAddr
 
 	fmt.Println("TestDeploy", "contract address", erc20ContAddr)
@@ -132,11 +133,16 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil, nil)
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
+		govMock, &acctHandler, nil, nil, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
-	ret, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
+	ret, xerr = execMethod(
+		abiERC20Contract,
+		fromAcct.Address, erc20ContAddr,
+		fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -158,7 +164,10 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println(" (AFTER) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil, nil)
+	bctx = ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
+		govMock, &acctHandler, nil, nil, nil)
+
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -183,7 +192,9 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(REOPEN) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil, nil)
+	bctx = ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
+		govMock, &acctHandler, nil, nil, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -199,22 +210,22 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil, nil)
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1, Time: time.Now()}},
+		govMock, &acctHandler, nil, nil, nil)
+
 	_, xerr := erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
 	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.Height(),
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    nil,
-		GasUsed:     0,
-		GovParams:   govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		TxHash:       bytes2.RandBytes(32),
+		Tx:           web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
+		TxIdx:        1,
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     nil,
+		GasUsed:      0,
 	}
 
 	xerr = erc20EVM.ExecuteTrx(txctx)
@@ -241,12 +252,12 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 
 	_, height, xerr := erc20EVM.Commit()
 	require.NoError(t, xerr)
-	require.Equal(t, txctx.Height, height)
+	require.Equal(t, txctx.Height(), height)
 
 	return contAddr, txctx
 }
 
-func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPrice, amt *uint256.Int, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiObj.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -254,18 +265,20 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPri
 
 	fromAcct := acctHandler.FindAccount(from, true)
 	toAcct := acctHandler.FindAccount(to, true)
+
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: 1, Time: time.Now()}},
+		govMock, &acctHandler, nil, nil, nil)
+
 	txctx := &ctrlertypes.TrxContext{
-		Height:      1,
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    toAcct,
-		GasUsed:     0,
-		GovParams:   govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		Tx:           web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
+		TxIdx:        1,
+		TxHash:       bytes2.RandBytes(32),
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     toAcct,
+		GasUsed:      0,
 	}
 	xerr := erc20EVM.ExecuteTrx(txctx)
 	if xerr != nil {
@@ -388,4 +401,26 @@ func (handler *acctHandlerMock) SetAccount(acct *ctrlertypes.Account, exec bool)
 	return nil
 }
 
+func (handler *acctHandlerMock) BeginBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (handler *acctHandlerMock) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (handler *acctHandlerMock) ValidateTrx(context *ctrlertypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (handler *acctHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
 var _ ctrlertypes.IAccountHandler = (*acctHandlerMock)(nil)
+var _ ctrlertypes.ITrxHandler = (*acctHandlerMock)(nil)
+var _ ctrlertypes.IBlockHandler = (*acctHandlerMock)(nil)

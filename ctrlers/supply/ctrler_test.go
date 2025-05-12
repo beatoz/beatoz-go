@@ -3,7 +3,8 @@ package supply
 import (
 	btzcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
-	ctrlermocks "github.com/beatoz/beatoz-go/ctrlers/mocks/ctrlers"
+	acctmock "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
+	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -19,9 +20,9 @@ import (
 )
 
 var (
-	config    *btzcfg.Config
-	govParams *types.GovParams
-	acctMock  *ctrlermocks.AcctHandlerMock
+	config   *btzcfg.Config
+	govMock  *govmock.GovHandlerMock
+	acctMock *acctmock.AcctHandlerMock
 )
 
 func init() {
@@ -29,8 +30,8 @@ func init() {
 	config = btzcfg.DefaultConfig()
 	config.SetRoot(rootDir)
 
-	govParams = types.DefaultGovParams()
-	acctMock = ctrlermocks.NewAccountHandlerMock(1000)
+	govMock = govmock.NewGovHandlerMock(types.DefaultGovParams())
+	acctMock = acctmock.NewAccountHandlerMock(1000)
 	//acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 	//	w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
 	//	return true
@@ -47,7 +48,7 @@ func Test_InitLedger(t *testing.T) {
 	require.Equal(t, intiSupply.Dec(), ctrler.lastAdjustedSupply.Dec())
 	require.Equal(t, int64(1), ctrler.lastAdjustedHeight)
 
-	_ = mocks.InitBlockCtxWith(1, nil, govParams, nil)
+	_ = mocks.InitBlockCtxWith(1, govMock, nil, nil, nil, nil)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoCommitBlock(ctrler))
 	require.NoError(t, ctrler.Close())
@@ -69,7 +70,7 @@ func Test_Mint(t *testing.T) {
 	adjustedSupply := initSupply.Clone()
 	ctrler, xerr := initLedger(initSupply)
 
-	vpowCtrler, xerr := vpower.NewVPowerCtrler(config, int(govParams.MaxValidatorCnt()), log.NewNopLogger())
+	vpowCtrler, xerr := vpower.NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	wal := acctMock.RandWallet()
@@ -79,10 +80,10 @@ func Test_Mint(t *testing.T) {
 	xerr = vpowCtrler.BondPowerChunk(dgtee, vpow, 70_000_000, 1, bytes.RandBytes(32), true)
 	require.NoError(t, xerr)
 
-	height0 := govParams.InflationCycleBlocks()
+	height0 := govMock.InflationCycleBlocks()
 	bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{
 		Header: tmproto.Header{Height: height0},
-	}, govParams, nil, vpowCtrler, nil)
+	}, govMock, nil, nil, nil, vpowCtrler)
 
 	// before vpowCtrler.EndBlock. (vpowCtrler.lastValidators is nil)
 	// expect 0 minting
@@ -103,20 +104,20 @@ func Test_Mint(t *testing.T) {
 	require.NoError(t, xerr)
 
 	preRewards := make(map[string]*uint256.Int)
-	for currHeight := int64(2); currHeight < oneYearSeconds*30; currHeight += govParams.InflationCycleBlocks() {
+	for currHeight := int64(2); currHeight < oneYearSeconds*30; currHeight += govMock.InflationCycleBlocks() {
 		// expect x minting
 
-		wa := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, currHeight, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
+		wa := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, currHeight, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		wa = wa.Truncate(6)
 
-		si := Si(currHeight, 1, adjustedSupply, govParams.MaxTotalSupply(), govParams.InflationWeightPermil(), wa)
+		si := Si(currHeight, 1, adjustedSupply, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa)
 		expectedTotalSupply := uint256.MustFromBig(si.BigInt())
 		expectedChange := new(uint256.Int).Sub(expectedTotalSupply, totalSupply)
-		//fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedSupply", adjustedSupply, "adjustedHeight", 1, "max", govParams.MaxTotalSupply(), "lamda", govParams.InflationWeightPermil(), "t1", expectedTotalSupply, "t0", totalSupply)
+		//fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedSupply", adjustedSupply, "adjustedHeight", 1, "max", govMock.MaxTotalSupply(), "lamda", govMock.InflationWeightPermil(), "t1", expectedTotalSupply, "t0", totalSupply)
 
 		bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{
 			Header: tmproto.Header{Height: currHeight},
-		}, govParams, acctMock, vpowCtrler, nil)
+		}, govMock, acctMock, nil, nil, vpowCtrler)
 		ctrler.requestMint(bctx)
 		result, xerr = ctrler.waitMint(bctx)
 		require.NoError(t, xerr)
