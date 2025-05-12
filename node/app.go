@@ -399,7 +399,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 		ctrler.acctCtrler,
 		ctrler.vmCtrler,
 		ctrler.supplyCtrler,
-		ctrler.stakeCtrler, // todo: replace stakeCtrler with vpowCtrler
+		ctrler.vpowCtrler, //ctrler.stakeCtrler, // todo: replace stakeCtrler with vpowCtrler
 	)
 	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
 	ctrler.currBlockCtx.SetBlockGasLimit(blockGasLimit)
@@ -708,45 +708,42 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.Height())
+	ctrler.logger.Debug("Try BeatozApp Commit", "height", ctrler.currBlockCtx.Height())
 
-	appHash0, ver0, err := ctrler.govCtrler.Commit()
-	if err != nil {
-		panic(err)
-	}
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver0, "appHash0", bytes.HexBytes(appHash0))
-
-	appHash1, ver1, err := ctrler.acctCtrler.Commit()
-	if err != nil {
-		panic(err)
-	}
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver1, "appHash1", bytes.HexBytes(appHash1))
-
-	appHash2, ver2, err := ctrler.stakeCtrler.Commit()
-	if err != nil {
-		panic(err)
-	}
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver2, "appHash2", bytes.HexBytes(appHash2))
-
-	appHash3, ver3, err := ctrler.vmCtrler.Commit()
-	if err != nil {
-		panic(err)
-	}
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ver3, "appHash3", bytes.HexBytes(appHash3))
-
-	if ver0 != ver1 || ver1 != ver2 || ver2 != ver3 {
-		panic(fmt.Sprintf("Not same versions: gov: %v, account:%v, stake:%v, vm:%v", ver0, ver1, ver2, ver3))
+	ver0 := int64(0)
+	hasher := crypto.DefaultHasher()
+	ctrlers := []ctrlertypes.ILedgerHandler{
+		ctrler.govCtrler,
+		ctrler.acctCtrler,
+		ctrler.stakeCtrler,
+		ctrler.supplyCtrler,
+		ctrler.vpowCtrler,
+		ctrler.vmCtrler,
 	}
 
-	appHash := crypto.DefaultHash(appHash0, appHash1, appHash2, appHash3)
+	for _, ctr := range ctrlers {
+		hash, ver, xerr := ctr.Commit()
+		if xerr != nil {
+			panic(xerr)
+		}
+		if ver0 == 0 {
+			ver0 = ver
+		} else if ver != ver0 {
+			panic(fmt.Sprintf("Not same versions: expected: %v, actual: %v", ver0, ver))
+		}
+		_, _ = hasher.Write(hash)
+	}
+
+	appHash := hasher.Sum(nil)
+
 	ctrler.currBlockCtx.SetAppHash(appHash)
-	ctrler.logger.Debug("BeatozApp::Commit",
+	ctrler.logger.Debug("Finish BeatozApp Commit",
 		"height", ver0,
 		"txs", ctrler.currBlockCtx.TxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash())
 
-	ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
-	ctrler.metaDB.PutLastBlockHeight(ver0)
+	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
+	_ = ctrler.metaDB.PutLastBlockHeight(ver0)
 
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil

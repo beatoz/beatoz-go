@@ -68,19 +68,19 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			return xerr
 		}
 
-	// todo: Handle TRX_WITHDROW by SupplyHandler and TRX_(UN)STAKING by VPowerHandler
-	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
-		if xerr := ctx.VPowerHandler.ValidateTrx(ctx); xerr != nil {
-			return xerr
-		}
-	//case ctrlertypes.TRX_WITHDRAW:
-	//	if xerr := ctx.SupplyHandler.ValidateTrx(ctx); xerr != nil {
-	//		return xerr
-	//	}
-	//case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
+	//// todo: Handle TRX_WITHDROW by SupplyHandler and TRX_(UN)STAKING by VPowerHandler
+	//case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
 	//	if xerr := ctx.VPowerHandler.ValidateTrx(ctx); xerr != nil {
 	//		return xerr
 	//	}
+	case ctrlertypes.TRX_WITHDRAW:
+		if xerr := ctx.SupplyHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
+		if xerr := ctx.VPowerHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
 	case ctrlertypes.TRX_CONTRACT:
 		if xerr := ctx.EVMHandler.ValidateTrx(ctx); xerr != nil {
 			return xerr
@@ -127,19 +127,19 @@ func runTrx(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors
 			return xerr
 		}
 
-	// todo: Handle TRX_WITHDROW by SupplyHandler and TRX_(UN)STAKING by VPowerHandler
-	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
-		if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
-			return xerr
-		}
-	//case ctrlertypes.TRX_WITHDRAW:
-	//	if xerr = ctx.SupplyHandler.ExecuteTrx(ctx); xerr != nil {
-	//		return xerr
-	//	}
-	//case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
+	//// todo: Handle TRX_WITHDROW by SupplyHandler and TRX_(UN)STAKING by VPowerHandler
+	//case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
 	//	if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
 	//		return xerr
 	//	}
+	case ctrlertypes.TRX_WITHDRAW:
+		if xerr = ctx.SupplyHandler.ExecuteTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
+		if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
+			return xerr
+		}
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
