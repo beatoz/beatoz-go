@@ -60,6 +60,7 @@ func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunkProto {
 	return nil
 }
 
+// DEPRECATED
 func (x *VPower) addPowerChunk(pow, height int64) *PowerChunkProto {
 	added := &PowerChunkProto{Power: pow, Height: height}
 	x.PowerChunks = append(x.PowerChunks, added)
@@ -67,6 +68,7 @@ func (x *VPower) addPowerChunk(pow, height int64) *PowerChunkProto {
 	return added
 }
 
+// DEPRECATED
 func (x *VPower) delPowerChunk(idx int) *PowerChunkProto {
 	removed := x.PowerChunks[idx]
 	x.PowerChunks = append(x.PowerChunks[:idx], x.PowerChunks[idx+1:]...)
@@ -74,11 +76,19 @@ func (x *VPower) delPowerChunk(idx int) *PowerChunkProto {
 	return removed
 }
 
+func (x *VPower) AddPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunkProto {
+	return x.addPowerWithTxHash(pow, height, txhash)
+}
+
 func (x *VPower) addPowerWithTxHash(pow, height int64, txhash []byte) *PowerChunkProto {
 	added := &PowerChunkProto{Power: pow, Height: height, TxHash: txhash}
 	x.PowerChunks = append(x.PowerChunks, added)
 	x.SumPower += added.Power
 	return added
+}
+
+func (x *VPower) DelPowerWithTxHash(txhash []byte) *PowerChunkProto {
+	return x.delPowerWithTxHash(txhash)
 }
 
 func (x *VPower) delPowerWithTxHash(txhash []byte) *PowerChunkProto {

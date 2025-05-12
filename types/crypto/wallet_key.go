@@ -105,7 +105,7 @@ func NewWalletKeyWith(keyBytes, pass []byte) *WalletKey {
 			Algo: SymmAlgo,
 			Text: keyBytes, // plaintext
 		}
-		_prvKey = append(keyBytes, []byte(nil)...)
+		_prvKey = append(keyBytes[:0:0], keyBytes...)
 	}
 	_pubKey = tmsecp256k1.PrivKey(keyBytes).PubKey().Bytes()
 

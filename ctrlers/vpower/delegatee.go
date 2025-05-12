@@ -54,13 +54,18 @@ func (x *Delegatee) PublicKey() bytes.HexBytes {
 	return x.PubKey
 }
 
+func (x *Delegatee) AddPower(from types.Address, pow int64) {
+	x.addPower(from, pow)
+}
 func (x *Delegatee) addPower(from types.Address, pow int64) {
 	x.SumPower += pow
 	if bytes.Equal(from, x.addr) {
 		x.SelfPower += pow
 	}
 }
-
+func (x *Delegatee) DelPower(from types.Address, pow int64) {
+	x.delPower(from, pow)
+}
 func (x *Delegatee) delPower(from types.Address, pow int64) {
 	x.SumPower -= pow
 	if bytes.Equal(from, x.addr) {
@@ -76,10 +81,17 @@ func (x *Delegatee) hasDelegator(from types.Address) bool {
 	}
 	return false
 }
+func (x *Delegatee) AddDelegator(from types.Address) {
+	x.addDelegator(from)
+}
 func (x *Delegatee) addDelegator(from types.Address) {
 	if !x.hasDelegator(from) {
 		x.Delegators = append(x.Delegators, from)
 	}
+}
+
+func (x *Delegatee) DelDelegator(from types.Address) {
+	x.delDelegator(from)
 }
 func (x *Delegatee) delDelegator(from types.Address) {
 	for i := len(x.Delegators) - 1; i >= 0; i-- {
