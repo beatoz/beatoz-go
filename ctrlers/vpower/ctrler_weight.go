@@ -52,7 +52,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			mapBenefPowChunks[addr.String()].pcs,
 			height, ripeningBlocks, tau, totalSupply)
 
-		weightInfo.Add(addr, benefW, mapBenefPowChunks[addr.String()].val)
+		weightInfo.Add(addr, benefW.Truncate(6), mapBenefPowChunks[addr.String()].val)
 	}
 
 	//totalSupplyPower := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))

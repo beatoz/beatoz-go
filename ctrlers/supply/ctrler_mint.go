@@ -48,7 +48,6 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 // The supplyState of SupplyCtrler may be updated while computeIssuanceAndRewardRoutine is executed.
 // If `supplyState` is updated in this goroutine, the writing order may be not deterministic.
 func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint) {
-
 	for {
 		req, ok := <-reqCh
 		if !ok {
@@ -75,33 +74,62 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			continue
 		}
 
-		wa := retWeight.SumWeight().Truncate(6)
-		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), wa)
-		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
+		//{
+		//	// for debugging
+		//	expectedSumWeights, expectedValsSumWeights := decimal.Zero, decimal.Zero
+		//	for _, benef := range retWeight.Beneficiaries() {
+		//		expectedSumWeights = expectedSumWeights.Add(benef.Weight())
+		//		if benef.IsValidator() {
+		//			expectedValsSumWeights = expectedValsSumWeights.Add(benef.Weight())
+		//		}
+		//	}
+		//	if !expectedSumWeights.Equal(retWeight.SumWeight()) {
+		//		panic("wrong sum weight")
+		//	}
+		//	if !expectedValsSumWeights.Equal(retWeight.ValWeight()) {
+		//		panic("wrong val weight")
+		//	}
+		//	fmt.Println("sumWeight", retWeight.SumWeight(), "valsWeight", retWeight.ValWeight())
+		//}
 
 		valRate := decimal.NewFromInt(int64(bctx.GovHandler.ValidatorRewardRate())).Div(decimal.NewFromInt(100))
-		mintedVals := addedSupply.Mul(valRate)
-		mintedAlls := addedSupply.Sub(mintedVals)
+		waAll := retWeight.SumWeight()  //.Truncate(precision)
+		waVals := retWeight.ValWeight() //.Truncate(precision)
+
+		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
+		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
+		rwdToVals := addedSupply.Mul(valRate).Floor()
+		rwdToAll := addedSupply.Sub(rwdToVals)
 
 		//
 		// 2. calculate rewards ...
-		waVals := retWeight.ValWeight().Truncate(6)
 
 		beneficiaries := retWeight.Beneficiaries()
 		rewards := make([]*mintedReward, len(beneficiaries))
-		for i, benef := range beneficiaries {
-			wi := benef.Weight().Truncate(6)
 
-			// for all delegators
-			rwd := mintedAlls.Mul(wi).Div(wa)
-			if benef.IsValidator() {
+		{
+			remainder := decimal.Zero
+			precision := int32(6)
+
+			for i, benef := range beneficiaries {
+				wi := benef.Weight() //.Truncate(precision) // Truncate is too expensive.
+
+				// for all delegators
+				rwd, _ := rwdToAll.Mul(wi).QuoRem(waAll, precision)
 				// for only validators
-				rwd = rwd.Add(mintedVals.Mul(wi).Div(waVals))
-			}
-			// give `rwd` to `benef.Address()``
-			rewards[i] = &mintedReward{
-				addr: benef.Address(),
-				amt:  uint256.MustFromBig(rwd.BigInt()),
+				if benef.IsValidator() {
+					_rwd, _ := rwdToVals.Mul(wi).QuoRem(waVals, precision)
+					rwd = rwd.Add(_rwd)
+				}
+
+				//give `rwd` + `remainder` to `benef.Address()``
+				rwd = rwd.Add(remainder)
+
+				rewards[i] = &mintedReward{
+					addr: benef.Address(),
+					amt:  uint256.MustFromBig(rwd.BigInt()),
+				}
+				remainder = rwd.Sub(rwd.Floor())
 			}
 		}
 

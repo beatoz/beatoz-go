@@ -67,6 +67,17 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		// ComputeWeight
 		weightComputed, xerr := ctrler.ComputeWeight(h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		require.NoError(t, xerr)
+
+		expectedSumWeights, expectedValsSumWeights := decimal.Zero, decimal.Zero
+		for _, benef := range weightComputed.Beneficiaries() {
+			expectedSumWeights = expectedSumWeights.Add(benef.Weight())
+			if benef.IsValidator() {
+				expectedValsSumWeights = expectedValsSumWeights.Add(benef.Weight())
+			}
+		}
+		require.Equal(t, expectedSumWeights, weightComputed.SumWeight())
+		require.Equal(t, expectedValsSumWeights, weightComputed.ValWeight())
+
 		//fmt.Println("--- ComputeWeight return", weightComputed.SumWeight())
 		w_computed := weightComputed.SumWeight().Truncate(6)
 

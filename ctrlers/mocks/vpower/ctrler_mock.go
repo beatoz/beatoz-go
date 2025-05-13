@@ -32,11 +32,11 @@ func NewVPowerHandlerMock(valWals []*web3.Wallet) *VPowerHandlerMock {
 		dgtee := vpower.NewDelegatee(w.GetPubKey())
 		delegatees[i] = dgtee
 
-		pow := rand.Int63n(1_000_000) + 100_000
+		pow := rand.Int63n(1_000_000) + 1_000_000
 		vpow := vpower.NewVPower(w.Address(), w.GetPubKey()) // self bonding
 		vpow.AddPowerWithTxHash(pow, 1, bytes.ZeroBytes(32))
-		mapVPowers[w.Address().String()] = vpow
 
+		mapVPowers[w.Address().String()+dgtee.Address().String()] = vpow
 		dgtee.AddPower(w.Address(), pow)
 		dgtee.AddDelegator(w.Address())
 
@@ -98,11 +98,11 @@ func (mock *VPowerHandlerMock) TotalPowerOf(addr types.Address) int64 {
 }
 
 func (mock *VPowerHandlerMock) SelfPowerOf(addr types.Address) int64 {
-	return 0
+	panic("implement me")
 }
 
 func (mock *VPowerHandlerMock) DelegatedPowerOf(addr types.Address) int64 {
-	return 0
+	panic("implement me")
 }
 
 func (mock *VPowerHandlerMock) PickAddress(i int) types.Address {
@@ -116,25 +116,39 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, ripeningBlocks int64, tau i
 	})
 
 	for k, vpow := range mock.mapVPowers {
+		fromAddrStr := k[:40]
+		toAddrStr := k[40:]
+		toAddr, _ := hex.DecodeString(toAddrStr)
+		isVal := false
+		for _, val := range mock.validators {
+			if bytes.Equal(val.Address(), toAddr) {
+				isVal = true
+				break
+			}
+		}
+		if !isVal {
+			// toAddr is not validator
+			continue
+		}
 		_w := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, height, ripeningBlocks, tau, totalSupply)
-		wobj, ok := mapWeightObjs[k]
+		wobj, ok := mapWeightObjs[fromAddrStr]
 		if !ok {
 			wobj = &struct {
 				isval bool
 				w     decimal.Decimal
 			}{
-				isval: true,
+				isval: fromAddrStr == toAddrStr, // reach at here when toAddrStr is validator
 				w:     _w,
 			}
 		}
 		wobj.w = wobj.w.Add(_w)
-		mapWeightObjs[k] = wobj
+		mapWeightObjs[fromAddrStr] = wobj
 	}
 
 	weightInfo := ctrlertypes.NewWeight()
 	for k, wo := range mapWeightObjs {
 		addr, _ := hex.DecodeString(k)
-		weightInfo.Add(addr, wo.w, wo.isval)
+		weightInfo.Add(addr, wo.w.Truncate(6), wo.isval)
 	}
 
 	return weightInfo, nil
@@ -151,12 +165,10 @@ func (mock *VPowerHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerro
 }
 
 func (mock *VPowerHandlerMock) BeginBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (mock *VPowerHandlerMock) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	//TODO implement me
 	panic("implement me")
 }
 
