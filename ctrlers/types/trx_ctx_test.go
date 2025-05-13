@@ -17,7 +17,7 @@ import (
 var (
 	chainId  = "test_trx_ctx_chain"
 	govMock  = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
-	acctMock = acct.NewAccountHandlerMock(1000)
+	acctMock = acct.NewAcctHandlerMock(1000)
 )
 
 func init() {

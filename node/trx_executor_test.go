@@ -19,7 +19,7 @@ import (
 var (
 	chainId  = "test-trx-executor-chain"
 	govMock  = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
-	acctMock = acct.NewAccountHandlerMock(1000)
+	acctMock = acct.NewAcctHandlerMock(1000)
 	balance  = uint64(10_000_000_000_000_000_000)
 )
 

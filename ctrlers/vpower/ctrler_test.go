@@ -30,7 +30,7 @@ func init() {
 	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
 	config = beatozcfg.DefaultConfig()
 	config.SetRoot(rootDir)
-	acctMock = acct.NewAccountHandlerMock(1000)
+	acctMock = acct.NewAcctHandlerMock(1000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
 		return true

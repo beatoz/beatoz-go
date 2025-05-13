@@ -15,7 +15,7 @@ type AcctHandlerMock struct {
 	accounts []*ctrlertypes.Account // has no private key
 }
 
-func NewAccountHandlerMock(walCnt int) *AcctHandlerMock {
+func NewAcctHandlerMock(walCnt int) *AcctHandlerMock {
 	var wals []*web3.Wallet
 	for i := 0; i < walCnt; i++ {
 		w := web3.NewWallet(nil)

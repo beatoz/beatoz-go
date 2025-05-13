@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 	config.DBPath = DBDIR
 	stakeCtrler, _ = stake.NewStakeCtrler(config, govMock00, tmlog.NewNopLogger())
 
-	acctMock00 = acct.NewAccountHandlerMock(100 + int(govMock00.MaxValidatorCnt()))
+	acctMock00 = acct.NewAcctHandlerMock(100 + int(govMock00.MaxValidatorCnt()))
 	acctMock00.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(beatoztypes.ToFons(1_000_000_000))
 		return true

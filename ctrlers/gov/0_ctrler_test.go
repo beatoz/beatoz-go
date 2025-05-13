@@ -43,7 +43,7 @@ func init() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	acctMock = mockacct.NewAccountHandlerMock(1000)
+	acctMock = mockacct.NewAcctHandlerMock(1000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(uint256.NewInt(100_000))
 		return true

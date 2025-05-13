@@ -31,7 +31,7 @@ func init() {
 	config.SetRoot(rootDir)
 
 	govMock = govmock.NewGovHandlerMock(types.DefaultGovParams())
-	acctMock = acctmock.NewAccountHandlerMock(1000)
+	acctMock = acctmock.NewAcctHandlerMock(1000)
 	//acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 	//	w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
 	//	return true

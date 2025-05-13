@@ -313,7 +313,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 }
 
 func resetTest(t *testing.T, valCnt int) {
-	acctMock01 = acct.NewAccountHandlerMock(100)
+	acctMock01 = acct.NewAcctHandlerMock(100)
 	acctMock01.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(types.ToFons(1_000_000_000))
 		return true

@@ -24,7 +24,7 @@ var (
 
 func init() {
 	govHandler = gov.NewGovHandlerMock(types2.DefaultGovParams())
-	acctHandler = acct.NewAccountHandlerMock(20000)
+	acctHandler = acct.NewAcctHandlerMock(20000)
 	wals := acctHandler.GetAllWallets()
 	for _, w0 := range wals {
 		tx := web3.NewTrxTransfer(w0.Address(), types.RandAddress(), rand.Int63(), govHandler.MinTrxGas(), govHandler.GasPrice(), bytes.RandU256IntN(uint256.NewInt(1_000_000_000_000_000)))
