@@ -5,26 +5,22 @@ import (
 	"github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"google.golang.org/protobuf/proto"
 )
 
 type VPower struct {
 	VPowerProto
-	to  types.Address
-	key v1.LedgerKey
+	from types.Address
+	to   types.Address
+	key  v1.LedgerKey
 }
 
-func NewVPower(from types.Address, pubKey bytes.HexBytes) *VPower {
-	ret := &VPower{
-		VPowerProto: VPowerProto{
-			From:     from,
-			PubKeyTo: pubKey,
-		},
-	}
-	ret.to = crypto.PubKeyBytes2Addr(pubKey)
-	ret.key = v1.LedgerKeyVPower(ret.From, ret.to)
+func NewVPower(from types.Address, to types.Address) *VPower {
+	ret := &VPower{}
+	ret.from = from
+	ret.to = to
+	ret.key = v1.LedgerKeyVPower(ret.from, ret.to)
 	return ret
 }
 
@@ -40,15 +36,18 @@ func (x *VPower) Decode(k, v []byte) xerrors.XError {
 	if err := proto.Unmarshal(v, x); err != nil {
 		return xerrors.From(err)
 	}
-	x.to = crypto.PubKeyBytes2Addr(x.PubKeyTo)
-	x.key = k //v1.LedgerKeyVPower(x.From, x.to)
+	// k is `prefix + from_address + to_address`
+	from_to := v1.UnwrapKeyPrefix(k)
+	x.from = from_to[:20]
+	x.to = from_to[20:]
+	x.key = k
 	return nil
 }
 
 var _ v1.ILedgerItem = (*VPower)(nil)
 
 func (x *VPower) IsSelfPower() bool {
-	return bytes.Equal(x.From, x.to)
+	return bytes.Equal(x.from, x.to)
 }
 
 func (x *VPower) findPowerChunk(txhash bytes.HexBytes) *PowerChunkProto {
@@ -116,8 +115,6 @@ func (x *VPower) Clone() *VPower {
 	}
 	return &VPower{
 		VPowerProto: VPowerProto{
-			From:        bytes.Copy(x.From),
-			PubKeyTo:    bytes.Copy(x.PubKeyTo),
 			SumPower:    x.SumPower,
 			PowerChunks: copiedChunks,
 		},
@@ -130,5 +127,5 @@ func (x *VPower) String() string {
 	for _, pc := range x.PowerChunks {
 		pcstr += fmt.Sprintf("[power:%v, height:%v, txhash:%x]", pc.Power, pc.Height, pc.TxHash)
 	}
-	return fmt.Sprintf("from:%v, to:%v, powerChunks: %v", x.From, x.to, pcstr)
+	return fmt.Sprintf("from:%v, to:%v, powerChunks: %v", x.from, x.to, pcstr)
 }

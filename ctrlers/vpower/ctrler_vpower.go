@@ -79,8 +79,8 @@ func (ctrler *VPowerCtrler) bondPowerChunk(
 		return xerr
 	}
 
-	dgtee.addPower(vpow.From, power)
-	dgtee.addDelegator(vpow.From)
+	dgtee.addPower(vpow.from, power)
+	dgtee.addDelegator(vpow.from)
 
 	if xerr := ctrler.powersState.Set(dgtee.key, dgtee, exec); xerr != nil {
 		return xerr
@@ -98,13 +98,13 @@ func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *Delegatee, vpow *VPower, txh
 	// delete the power chunk with `txhash`
 	var pc = vpow.delPowerWithTxHash(txhash)
 	if pc == nil {
-		return nil, xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no power chunk(txhash:%v) from %v", dgtee.addr, txhash, vpow.From)
+		return nil, xerrors.ErrNotFoundStake.Wrapf("validator(%v) has no power chunk(txhash:%v) from %v", dgtee.addr, txhash, vpow.from)
 	}
 	// decrease the power of `dgteeProto` by `pc.Power`
-	dgtee.delPower(vpow.From, pc.Power)
+	dgtee.delPower(vpow.from, pc.Power)
 
 	if len(vpow.PowerChunks) == 0 {
-		dgtee.delDelegator(vpow.From)
+		dgtee.delDelegator(vpow.from)
 		if xerr := ctrler.powersState.Del(vpow.key, exec); xerr != nil {
 			return nil, xerr
 		}

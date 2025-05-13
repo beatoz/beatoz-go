@@ -22,6 +22,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 
 	// todo: Compute weights for only validators who has signed during the last inflation cycle.
 	//  and reward them based on their signing ratio during the last inflation
+
 	for _, val := range ctrler.lastValidators {
 		for _, from := range val.Delegators {
 			vpow, xerr := ctrler.readVPower(from, val.addr, true)
@@ -54,7 +55,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			mapBenefPowChunks[addr.String()].pcs,
 			height, ripeningBlocks, tau, totalSupply)
 
-		weightInfo.Add(addr, benefW.Truncate(6), mapBenefPowChunks[addr.String()].val)
+		weightInfo.Add(addr, benefW, mapBenefPowChunks[addr.String()].val)
 	}
 
 	//totalSupplyPower := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))

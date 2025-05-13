@@ -79,13 +79,13 @@ func Test_InitLedger(t *testing.T) {
 	totalPower2 := int64(0)
 	xerr = ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
-		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), key)
-		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), vpow.key)
+		require.EqualValues(t, v1.LedgerKeyVPower(vpow.from, vpow.to), key)
+		require.EqualValues(t, key, vpow.key)
 
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
 		for i, vup := range lastValUps {
-			if bytes.Equal(vup.PubKey.GetSecp256K1(), vpow.PubKeyTo) {
+			if bytes.Equal(crypto.PubKeyBytes2Addr(vup.PubKey.GetSecp256K1()), vpow.to) {
 				require.Nil(t, valUp)
 				require.Nil(t, wallet)
 				valUp = &lastValUps[i]
@@ -667,8 +667,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 	var txhashes1 []bytes2.HexBytes
 	xerr := ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
-		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
-		require.EqualValues(t, v1.LedgerKeyVPower(vpow.From, vpow.to), key)
+		require.EqualValues(t, v1.LedgerKeyVPower(vpow.from, vpow.to), key)
 		require.EqualValues(t, key, vpow.key)
 
 		sum := int64(0)
@@ -685,16 +684,15 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 				if bytes.Equal(txhash, pc.TxHash) {
 					from := fromWals0[i].Address()
 					to := valWals0[i].Address()
-					require.EqualValues(t, from, vpow.From)
+					require.EqualValues(t, from, vpow.from)
 					require.EqualValues(t, to, vpow.to)
-					require.EqualValues(t, to, crypto.PubKeyBytes2Addr(vpow.PubKeyTo))
 					require.Equal(t, powers0[i], pc.Power)
 				}
 			}
 		}
 		require.Equal(t, sum, vpow.SumPower)
 
-		fromAddrsOfDgtee[vpow.to.String()] = append(fromAddrsOfDgtee[vpow.to.String()], vpow.From)
+		fromAddrsOfDgtee[vpow.to.String()] = append(fromAddrsOfDgtee[vpow.to.String()], vpow.from)
 		sumPowerOfDgtee[vpow.to.String()] += vpow.SumPower
 		return nil
 	}, true)

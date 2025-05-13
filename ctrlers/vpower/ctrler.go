@@ -76,7 +76,7 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	var lastVals []*Delegatee
 	for _, v := range initValidators {
 		dgt := NewDelegatee(v.PubKey.GetSecp256K1())
-		vpow := NewVPower(dgt.addr, dgt.PubKey)
+		vpow := NewVPower(dgt.addr, dgt.addr)
 		if xerr := ctrler.bondPowerChunk(dgt, vpow, v.Power, int64(1), bytes.ZeroBytes(32), true); xerr != nil {
 			return xerr
 		}
@@ -323,7 +323,7 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		}
 		vpow = _vpow
 	} else {
-		vpow = NewVPower(ctx.Tx.From, dgtee.PubKey)
+		vpow = NewVPower(ctx.Tx.From, dgtee.addr)
 	}
 	if xerr := ctrler.bondPowerChunk(
 		dgtee, vpow,
@@ -367,7 +367,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 
 	if pc, xerr := ctrler.unbondPowerChunk(dgtee, vpow, txhash, ctx.Exec); xerr != nil {
 		return xerr
-	} else if xerr = ctrler.freezePowerChunk(vpow.From, pc, refundHeight, ctx.Exec); xerr != nil {
+	} else if xerr = ctrler.freezePowerChunk(vpow.from, pc, refundHeight, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -380,13 +380,13 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 			}
 
 			if _vpow != nil {
-				if xerr := ctrler.delVPower(_vpow.From, _vpow.to, ctx.Exec); xerr != nil {
+				if xerr := ctrler.delVPower(_vpow.from, _vpow.to, ctx.Exec); xerr != nil {
 					return xerr
 				}
 
 				for _, _pc := range _vpow.PowerChunks {
 					// freeze all power chunks that the `_vpow` has
-					if xerr = ctrler.freezePowerChunk(_vpow.From, _pc, refundHeight, ctx.Exec); xerr != nil {
+					if xerr = ctrler.freezePowerChunk(_vpow.from, _pc, refundHeight, ctx.Exec); xerr != nil {
 						return xerr
 					}
 				}

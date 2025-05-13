@@ -33,7 +33,7 @@ func NewVPowerHandlerMock(valWals []*web3.Wallet) *VPowerHandlerMock {
 		delegatees[i] = dgtee
 
 		pow := rand.Int63n(1_000_000) + 1_000_000
-		vpow := vpower.NewVPower(w.Address(), w.GetPubKey()) // self bonding
+		vpow := vpower.NewVPower(w.Address(), w.Address()) // self bonding
 		vpow.AddPowerWithTxHash(pow, 1, bytes.ZeroBytes(32))
 
 		mapVPowers[w.Address().String()+dgtee.Address().String()] = vpow
@@ -148,7 +148,7 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, ripeningBlocks int64, tau i
 	weightInfo := ctrlertypes.NewWeight()
 	for k, wo := range mapWeightObjs {
 		addr, _ := hex.DecodeString(k)
-		weightInfo.Add(addr, wo.w.Truncate(6), wo.isval)
+		weightInfo.Add(addr, wo.w, wo.isval)
 	}
 
 	return weightInfo, nil

@@ -8,6 +8,7 @@ import (
 	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -73,51 +74,51 @@ func Test_Mint(t *testing.T) {
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
 
-	//
-	// Use VPowerHandlerMock
-	valsCnt := min(acctMock.WalletLen(), 10)
-	valWals := make([]*web3.Wallet, valsCnt)
-	for i := 0; i < valsCnt; i++ {
-		valWals[i] = acctMock.GetWallet(i)
-	}
-	vpowMock := vpowmock.NewVPowerHandlerMock(valWals)
-	totalSupply := initSupply.Clone()
-	changeSupply := uint256.NewInt(0)
-	fmt.Println("Test Mint using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
+	////
+	//// Use VPowerHandlerMock
+	//valsCnt := min(acctMock.WalletLen(), 10)
+	//valWals := make([]*web3.Wallet, valsCnt)
+	//for i := 0; i < valsCnt; i++ {
+	//	valWals[i] = acctMock.GetWallet(i)
+	//}
+	//vpowMock := vpowmock.NewVPowerHandlerMock(valWals)
+	//totalSupply := initSupply.Clone()
+	//changeSupply := uint256.NewInt(0)
+	//fmt.Println("Test Mint using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
 
-	////
-	////Use VPowerCtrler
-	//fmt.Println("Test using VPowerCtrler")
-	//vpowMock, xerr := vpower.NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
-	//require.NoError(t, xerr)
 	//
-	//wal := acctMock.RandWallet()
-	//dgtee := vpower.NewDelegatee(wal.GetPubKey())
+	//Use VPowerCtrler
+	fmt.Println("Test using VPowerCtrler")
+	vpowMock, xerr := vpower.NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	wal := acctMock.RandWallet()
+	dgtee := vpower.NewDelegatee(wal.GetPubKey())
+
+	vpow := vpower.NewVPower(dgtee.Address(), dgtee.Address()) // self power
+	xerr = vpowMock.BondPowerChunk(dgtee, vpow, 70_000_000, 1, bytes.RandBytes(32), true)
+	require.NoError(t, xerr)
+
+	height0 := govMock.InflationCycleBlocks()
+	bctx := types.TempBlockContext("mint-test-chain", height0, time.Now(), govMock, acctMock, nil, nil, vpowMock)
+
+	// before vpowCtrler.EndBlock. (vpowCtrler.lastValidators is nil)
+	// expect 0 minting
+	ctrler.requestMint(bctx)
+	result, xerr := ctrler.waitMint(bctx)
+	require.NoError(t, xerr)
+	supplyHeight := result.newSupply.Height
+	totalSupply := new(uint256.Int).SetBytes(result.newSupply.XSupply)
+	changeSupply := new(uint256.Int).SetBytes(result.newSupply.XChange)
+
+	require.Equal(t, height0, supplyHeight)
+	require.Equal(t, initSupply.String(), totalSupply.String())
+	require.Equal(t, "0", changeSupply.String())
+
+	_, xerr = vpowMock.EndBlock(bctx)
+	require.NoError(t, xerr)
+	// End of Use VPowerCtrler
 	//
-	//vpow := vpower.NewVPower(dgtee.Address(), dgtee.PubKey) // self power
-	//xerr = vpowMock.BondPowerChunk(dgtee, vpow, 70_000_000, 1, bytes.RandBytes(32), true)
-	//require.NoError(t, xerr)
-	//
-	//height0 := govMock.InflationCycleBlocks()
-	//bctx := types.TempBlockContext("mint-test-chain", height0, time.Now(), govMock, acctMock, nil, nil, vpowMock)
-	//
-	//// before vpowCtrler.EndBlock. (vpowCtrler.lastValidators is nil)
-	//// expect 0 minting
-	//ctrler.requestMint(bctx)
-	//result, xerr := ctrler.waitMint(bctx)
-	//require.NoError(t, xerr)
-	//supplyHeight := result.newSupply.Height
-	//totalSupply := new(uint256.Int).SetBytes(result.newSupply.XSupply)
-	//changeSupply := new(uint256.Int).SetBytes(result.newSupply.XChange)
-	//
-	//require.Equal(t, height0, supplyHeight)
-	//require.Equal(t, initSupply.String(), totalSupply.String())
-	//require.Equal(t, "0", changeSupply.String())
-	//
-	//_, xerr = vpowMock.EndBlock(bctx)
-	//require.NoError(t, xerr)
-	//// End of Use VPowerCtrler
-	////
 
 	preRewards := make(map[string]*uint256.Int)
 	for currHeight := int64(2); currHeight < oneYearSeconds*30; currHeight += govMock.InflationCycleBlocks() {
