@@ -13,6 +13,7 @@ var (
 	KeyPrefixDelegatee      = []byte{0x20}
 	KeyPrefixVPower         = []byte{0x21}
 	KeyPrefixFrozenVPower   = []byte{0x22}
+	KeyPrefixSignBlocks     = []byte{0x23}
 	KeyPrefixTotalSupply    = []byte{0x30}
 	KeyPrefixAdjustedSupply = []byte{0x31}
 	KeyPrefixReward         = []byte{0x32}
@@ -61,6 +62,13 @@ func LedgerKeyFrozenVPower(h int64, from types.Address) LedgerKey {
 	copy(k, KeyPrefixFrozenVPower)
 	binary.BigEndian.PutUint64(k[len(KeyPrefixFrozenVPower):], uint64(h))
 	copy(k[len(KeyPrefixFrozenVPower)+8:], from)
+	return k
+}
+
+func LedgerKeySignBlocks(signer types.Address) LedgerKey {
+	k := make([]byte, len(KeyPrefixSignBlocks)+len(signer))
+	copy(k, KeyPrefixFrozenVPower)
+	copy(k[len(KeyPrefixFrozenVPower):], signer)
 	return k
 }
 

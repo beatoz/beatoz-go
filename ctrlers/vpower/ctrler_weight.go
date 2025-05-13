@@ -20,6 +20,8 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 		pcs []*PowerChunkProto
 	})
 
+	// todo: Compute weights for only validators who has signed during the last inflation cycle.
+	//  and reward them based on their signing ratio during the last inflation
 	for _, val := range ctrler.lastValidators {
 		for _, from := range val.Delegators {
 			vpow, xerr := ctrler.readVPower(from, val.addr, true)

@@ -94,8 +94,7 @@ func Test_InitLedger(t *testing.T) {
 		}
 		require.NotNil(t, valUp)
 		require.NotNil(t, wallet)
-		require.EqualValues(t, valUp.PubKey.GetSecp256K1(), vpow.PubKeyTo)
-		require.EqualValues(t, crypto.PubKeyBytes2Addr(vpow.PubKeyTo), vpow.to)
+		require.EqualValues(t, crypto.PubKeyBytes2Addr(valUp.PubKey.GetSecp256K1()), vpow.to)
 		require.EqualValues(t, wallet.Address(), vpow.to)
 		require.EqualValues(t, valUp.Power, vpow.SumPower)
 		require.Equal(t, 1, len(vpow.PowerChunks))

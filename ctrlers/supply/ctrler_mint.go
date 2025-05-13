@@ -59,6 +59,17 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		lastAdjustedSupply := req.lastAdjustedSupply
 		lastAdjustedHeight := req.lastAdjustedHeight
 
+		// todo: Calculate the number of blocks signed by each validator during the recent inflation cycle.
+		// how can we know how many blocks each validator has signed?
+		//
+		//lastVotes := bctx.BlockInfo().LastCommitInfo.Votes
+		//var validatorAddrs []types.Address
+		//for _, vote := range bctx.BlockInfo().LastCommitInfo.Votes {
+		//	if vote.SignedLastBlock {
+		//		validatorAddrs = append(validatorAddrs, vote.Validator.Address)
+		//	}
+		//}
+
 		// 1. compute voting power weight
 		retWeight, xerr := bctx.VPowerHandler.ComputeWeight(
 			bctx.Height(),
@@ -74,26 +85,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			continue
 		}
 
-		//{
-		//	// for debugging
-		//	expectedSumWeights, expectedValsSumWeights := decimal.Zero, decimal.Zero
-		//	for _, benef := range retWeight.Beneficiaries() {
-		//		expectedSumWeights = expectedSumWeights.Add(benef.Weight())
-		//		if benef.IsValidator() {
-		//			expectedValsSumWeights = expectedValsSumWeights.Add(benef.Weight())
-		//		}
-		//	}
-		//	if !expectedSumWeights.Equal(retWeight.SumWeight()) {
-		//		panic("wrong sum weight")
-		//	}
-		//	if !expectedValsSumWeights.Equal(retWeight.ValWeight()) {
-		//		panic("wrong val weight")
-		//	}
-		//	fmt.Println("sumWeight", retWeight.SumWeight(), "valsWeight", retWeight.ValWeight())
-		//}
-
 		valRate := decimal.NewFromInt(int64(bctx.GovHandler.ValidatorRewardRate())).Div(decimal.NewFromInt(100))
-		waAll := retWeight.SumWeight()  //.Truncate(precision)
+		waAll := retWeight.SumWeight()  //.Truncate(precision) // is too expensive
 		waVals := retWeight.ValWeight() //.Truncate(precision)
 
 		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()

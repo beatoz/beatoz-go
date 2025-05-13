@@ -1,6 +1,7 @@
 package vpower
 
 import (
+	"encoding/binary"
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
@@ -188,4 +189,45 @@ func (ctrler *VPowerCtrler) countOf(keyPrefix []byte, exec bool) int {
 		return nil
 	}, exec)
 	return ret
+}
+
+type BlockCount int64
+
+func (s *BlockCount) Encode() ([]byte, xerrors.XError) {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(*s))
+	return b, nil
+}
+
+func (s *BlockCount) Decode(k, v []byte) xerrors.XError {
+	*s = BlockCount(int64(binary.BigEndian.Uint64(v)))
+	return nil
+}
+
+var _ v1.ILedgerItem = (*BlockCount)(nil)
+
+func (ctrler *VPowerCtrler) getMissedBlockCount(signer types.Address, exec bool) (BlockCount, xerrors.XError) {
+	key := v1.LedgerKeySignBlocks(signer)
+	d, xerr := ctrler.powersState.Get(key, exec)
+	if xerr != nil {
+		return 0, xerr
+	}
+	c, _ := d.(*BlockCount)
+	return *c, nil
+}
+
+func (ctrler *VPowerCtrler) setMissedBlockCount(signer types.Address, c BlockCount, exec bool) xerrors.XError {
+	key := v1.LedgerKeySignBlocks(signer)
+	return ctrler.powersState.Set(key, &c, exec)
+}
+
+func (ctrler *VPowerCtrler) addMissedBlockCount(signer types.Address, exec bool) (BlockCount, xerrors.XError) {
+	c, xerr := ctrler.getMissedBlockCount(signer, true)
+	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
+		return 0, xerr
+	}
+	// c is `0` when xerr is xerrors.ErrNotFoundResult
+
+	c = c + 1
+	return c, ctrler.setMissedBlockCount(signer, c, exec)
 }

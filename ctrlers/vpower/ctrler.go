@@ -36,6 +36,8 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 		return &Delegatee{}
 	} else if bytes2.HasPrefix(key, v1.KeyPrefixFrozenVPower) {
 		return &FrozenVPower{}
+	} else if bytes2.HasPrefix(key, v1.KeyPrefixSignBlocks) {
+		return new(BlockCount)
 	}
 	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
 }
@@ -113,6 +115,19 @@ func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int) xerrors.XError {
 func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
+
+	// set not sign count
+	votes := bctx.BlockInfo().LastCommitInfo.Votes
+	for _, vote := range votes {
+		if !vote.SignedLastBlock {
+			if c, xerr := ctrler.addMissedBlockCount(vote.Validator.Address, true); xerr != nil {
+				return nil, xerr
+			} else if int64(c) > bctx.GovHandler.SignedBlocksWindow()-bctx.GovHandler.MinSignedBlocks() {
+				// todo: slashing....
+			}
+
+		}
+	}
 
 	//todo: slashing
 
