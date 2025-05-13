@@ -65,7 +65,12 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		w_waex64pc = w_waex64pc.Truncate(6)
 
 		// ComputeWeight
-		weightComputed, xerr := ctrler.ComputeWeight(h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
+		weightComputed, xerr := ctrler.ComputeWeight(
+			h,
+			govMock.InflationCycleBlocks(),
+			govMock.RipeningBlocks(),
+			govMock.BondingBlocksWeightPermil(),
+			totalSupply)
 		require.NoError(t, xerr)
 
 		expectedSumWeights, expectedValsSumWeights := decimal.Zero, decimal.Zero

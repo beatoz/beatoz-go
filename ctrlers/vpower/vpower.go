@@ -11,9 +11,9 @@ import (
 
 type VPower struct {
 	VPowerProto
+	key  v1.LedgerKey
 	from types.Address
 	to   types.Address
-	key  v1.LedgerKey
 }
 
 func NewVPower(from types.Address, to types.Address) *VPower {
@@ -37,10 +37,10 @@ func (x *VPower) Decode(k, v []byte) xerrors.XError {
 		return xerrors.From(err)
 	}
 	// k is `prefix + from_address + to_address`
+	x.key = k
 	from_to := v1.UnwrapKeyPrefix(k)
 	x.from = from_to[:20]
 	x.to = from_to[20:]
-	x.key = k
 	return nil
 }
 
@@ -118,7 +118,9 @@ func (x *VPower) Clone() *VPower {
 			SumPower:    x.SumPower,
 			PowerChunks: copiedChunks,
 		},
-		to: bytes.Copy(x.to),
+		key:  bytes.Copy(x.key),
+		from: bytes.Copy(x.from),
+		to:   bytes.Copy(x.to),
 	}
 }
 

@@ -109,7 +109,7 @@ func (mock *VPowerHandlerMock) PickAddress(i int) types.Address {
 	return mock.delegatees[i].Address()
 }
 
-func (mock *VPowerHandlerMock) ComputeWeight(height, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
+func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
 	mapWeightObjs := make(map[string]*struct {
 		isval bool
 		w     decimal.Decimal
@@ -148,7 +148,7 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, ripeningBlocks int64, tau i
 	weightInfo := ctrlertypes.NewWeight()
 	for k, wo := range mapWeightObjs {
 		addr, _ := hex.DecodeString(k)
-		weightInfo.Add(addr, wo.w, wo.isval)
+		weightInfo.Add(addr, wo.w, decimal.NewFromInt(1), wo.isval)
 	}
 
 	return weightInfo, nil

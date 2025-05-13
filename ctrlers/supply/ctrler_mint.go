@@ -59,20 +59,10 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		lastAdjustedSupply := req.lastAdjustedSupply
 		lastAdjustedHeight := req.lastAdjustedHeight
 
-		// todo: Calculate the number of blocks signed by each validator during the recent inflation cycle.
-		// how can we know how many blocks each validator has signed?
-		//
-		//lastVotes := bctx.BlockInfo().LastCommitInfo.Votes
-		//var validatorAddrs []types.Address
-		//for _, vote := range bctx.BlockInfo().LastCommitInfo.Votes {
-		//	if vote.SignedLastBlock {
-		//		validatorAddrs = append(validatorAddrs, vote.Validator.Address)
-		//	}
-		//}
-
 		// 1. compute voting power weight
 		retWeight, xerr := bctx.VPowerHandler.ComputeWeight(
 			bctx.Height(),
+			bctx.GovHandler.InflationCycleBlocks(),
 			bctx.GovHandler.RipeningBlocks(),
 			bctx.GovHandler.BondingBlocksWeightPermil(),
 			lastTotalSupply,
@@ -117,6 +107,9 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 				//give `rwd` + `remainder` to `benef.Address()``
 				rwd = rwd.Add(remainder)
+
+				// todo: Apply `benef.singW` to `rwd`
+				rwd = rwd.Mul(benef.SignRate())
 
 				rewards[i] = &mintedReward{
 					addr: benef.Address(),

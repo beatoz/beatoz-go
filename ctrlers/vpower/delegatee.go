@@ -12,8 +12,8 @@ import (
 
 type Delegatee struct {
 	DelegateeProto
-	addr types.Address
 	key  v1.LedgerKey
+	addr types.Address
 }
 
 func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
@@ -39,8 +39,8 @@ func (x *Delegatee) Decode(k, v []byte) xerrors.XError {
 	if err := proto.Unmarshal(v, x); err != nil {
 		return xerrors.From(err)
 	}
+	x.key = k
 	x.addr = crypto.PubKeyBytes2Addr(x.PubKey)
-	x.key = k //v1.LedgerKeyDelegatee(x.addr, nil)
 	return nil
 }
 
@@ -117,6 +117,7 @@ func (x *Delegatee) Clone() *Delegatee {
 			SumPower:   x.SumPower,
 			SelfPower:  x.SelfPower,
 		},
+		key:  bytes.Copy(x.key),
 		addr: bytes.Copy(x.addr),
 	}
 }

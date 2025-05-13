@@ -23,12 +23,12 @@ func (w *Weight) ValWeight() decimal.Decimal {
 	return w.valsWeight
 }
 
-func (w *Weight) Add(addr types.Address, weight decimal.Decimal, isVal bool) {
+func (w *Weight) Add(addr types.Address, weight, signWeight decimal.Decimal, isVal bool) {
 	w.sumWeight = w.sumWeight.Add(weight)
 	if isVal {
 		w.valsWeight = w.valsWeight.Add(weight)
 	}
-	w.beneficiaries = append(w.beneficiaries, &beneficiary{addr, weight, isVal})
+	w.beneficiaries = append(w.beneficiaries, &beneficiary{addr, weight, signWeight, isVal})
 }
 
 func (w *Weight) Beneficiaries() []*beneficiary {
@@ -36,9 +36,10 @@ func (w *Weight) Beneficiaries() []*beneficiary {
 }
 
 type beneficiary struct {
-	addr   types.Address
-	weight decimal.Decimal
-	isVal  bool
+	addr        types.Address
+	weight      decimal.Decimal
+	signingRate decimal.Decimal
+	isVal       bool
 }
 
 func (b *beneficiary) Address() types.Address {
@@ -47,6 +48,10 @@ func (b *beneficiary) Address() types.Address {
 
 func (b *beneficiary) Weight() decimal.Decimal {
 	return b.weight
+}
+
+func (b *beneficiary) SignRate() decimal.Decimal {
+	return b.signingRate
 }
 
 func (b *beneficiary) IsValidator() bool {

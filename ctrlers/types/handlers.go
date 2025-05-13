@@ -103,7 +103,7 @@ type IVPowerHandler interface {
 	//TotalPowerOf(types.Address) int64
 	//SelfPowerOf(types.Address) int64
 	//DelegatedPowerOf(types.Address) int64
-	ComputeWeight(int64, int64, int32, *uint256.Int) (*Weight, xerrors.XError)
+	ComputeWeight(int64, int64, int64, int32, *uint256.Int) (*Weight, xerrors.XError)
 }
 
 type ISupplyHandler interface {
