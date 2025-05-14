@@ -226,19 +226,25 @@ func (ctrler *VPowerCtrler) setMissedBlockCount(signer types.Address, c BlockCou
 }
 
 func (ctrler *VPowerCtrler) addMissedBlockCount(signer types.Address, exec bool) (BlockCount, xerrors.XError) {
-	c, xerr := ctrler.getMissedBlockCount(signer, true)
+	c, xerr := ctrler.getMissedBlockCount(signer, exec)
 	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 		return 0, xerr
 	}
-	// c is `0` when xerr is xerrors.ErrNotFoundResult
 
+	// c is `0` when xerr is xerrors.ErrNotFoundResult
 	c = c + 1
 	return c, ctrler.setMissedBlockCount(signer, c, exec)
 }
 
 func (ctrler *VPowerCtrler) resetAllMissedBlockCount(exec bool) xerrors.XError {
+	var rmKeys []v1.LedgerKey
+	defer func() {
+		for _, rmKey := range rmKeys {
+			_ = ctrler.powersState.Del(rmKey, exec)
+		}
+	}()
 	return ctrler.powersState.Seek(v1.KeyPrefixMissedBlockCount, true, func(key v1.LedgerKey, value v1.ILedgerItem) xerrors.XError {
-		_key := bytes.Copy(key)
-		return ctrler.powersState.Del(_key, exec)
+		rmKeys = append(rmKeys, key)
+		return nil
 	}, exec)
 }

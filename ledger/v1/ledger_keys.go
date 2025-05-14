@@ -67,8 +67,8 @@ func LedgerKeyFrozenVPower(h int64, from types.Address) LedgerKey {
 
 func LedgerKeyMissedBlockCount(signer types.Address) LedgerKey {
 	k := make([]byte, len(KeyPrefixMissedBlockCount)+len(signer))
-	copy(k, KeyPrefixFrozenVPower)
-	copy(k[len(KeyPrefixFrozenVPower):], signer)
+	copy(k, KeyPrefixMissedBlockCount)
+	copy(k[len(KeyPrefixMissedBlockCount):], signer)
 	return k
 }
 
