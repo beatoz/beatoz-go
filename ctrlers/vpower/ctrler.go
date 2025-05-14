@@ -470,10 +470,6 @@ func (ctrler *VPowerCtrler) ImitableState(h int64) (v1.IImitable, xerrors.XError
 
 	return ctrler.powersState.ImitableLedgerAt(h)
 }
-func (ctrler *VPowerCtrler) Query(query abcitypes.RequestQuery) ([]byte, xerrors.XError) {
-	//TODO implement me
-	panic("implement me")
-}
 
 var _ ctrlertypes.ILedgerHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*VPowerCtrler)(nil)
