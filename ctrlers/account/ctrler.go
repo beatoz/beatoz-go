@@ -234,6 +234,57 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 
 	return nil
 }
+func (ctrler *AcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(addr, exec)
+	if acct == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("AddBalance - address: %v", addr)
+	}
+
+	if xerr := acct.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) SubBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(addr, exec)
+	if acct == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("SubBalance - address: %v", addr)
+	}
+
+	if xerr := acct.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) SetBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(addr, exec)
+	if acct == nil {
+		acct = btztypes.NewAccount(addr)
+	}
+	acct.SetBalance(amt)
+
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
 
 func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
@@ -310,6 +361,20 @@ func (memCtrler *SimuAcctCtrler) Transfer(from types.Address, to types.Address, 
 
 func (memCtrler *SimuAcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	panic("SimuAcctCtrler can not have this method")
+}
+func (memCtrler *SimuAcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) SubBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) SetBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (memCtrler *SimuAcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {

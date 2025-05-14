@@ -78,6 +78,9 @@ type IAccountHandler interface {
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
 	// DEPRECATED: Add `AddBlance` and replace it.
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
+	AddBalance(types.Address, *uint256.Int, bool) xerrors.XError
+	SubBalance(types.Address, *uint256.Int, bool) xerrors.XError
+	SetBalance(types.Address, *uint256.Int, bool) xerrors.XError
 	SimuAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
 }
 

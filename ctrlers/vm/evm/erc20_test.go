@@ -353,10 +353,10 @@ func (handler *acctHandlerMock) FindAccount(addr types.Address, exec bool) *ctrl
 	}
 	return nil
 }
-func (a *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if sender := a.FindAccount(from, exec); sender == nil {
+func (handler *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if sender := handler.FindAccount(from, exec); sender == nil {
 		return xerrors.ErrNotFoundAccount
-	} else if receiver := a.FindAccount(to, exec); receiver == nil {
+	} else if receiver := handler.FindAccount(to, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := sender.SubBalance(amt); xerr != nil {
 		return xerr
@@ -365,12 +365,36 @@ func (a *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exe
 	}
 	return nil
 }
-func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if receiver := a.FindAccount(to, exec); receiver == nil {
+func (handler *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := handler.FindAccount(to, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := receiver.AddBalance(amt); xerr != nil {
 		return xerr
 	}
+	return nil
+}
+
+func (handler *acctHandlerMock) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := handler.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (handler *acctHandlerMock) SubBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := handler.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (handler *acctHandlerMock) SetBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	receiver := handler.FindOrNewAccount(addr, exec)
+	receiver.SetBalance(amt)
 	return nil
 }
 

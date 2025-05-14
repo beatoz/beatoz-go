@@ -106,6 +106,31 @@ func (mock *AcctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec boo
 	}
 	return nil
 }
+
+func (mock *AcctHandlerMock) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := mock.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (mock *AcctHandlerMock) SubBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := mock.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (mock *AcctHandlerMock) SetBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	receiver := mock.FindOrNewAccount(addr, exec)
+	receiver.SetBalance(amt)
+	return nil
+}
+
 func (mock *AcctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &AcctHandlerMock{}, nil
 }
