@@ -36,8 +36,8 @@ type SupplyCtrler struct {
 	lastAdjustedSupply *uint256.Int
 	lastAdjustedHeight int64
 
-	mintedSupply []*Supply
-	burnedSupply []*Supply
+	mintedSupply *Supply
+	burnedSupply *Supply
 
 	reqCh  chan *reqMint
 	respCh chan *respMint

@@ -65,30 +65,31 @@ func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if len(ctrler.burnedSupply) > 0 {
-		newTotalSupply := ctrler.lastTotalSupply.Clone()
-		adjustedHeight := ctrler.lastAdjustedHeight
-		burnAmt := uint256.NewInt(0)
-		for _, burn := range ctrler.burnedSupply {
-			adjustedHeight = burn.Height()
-			_ = burnAmt.Add(burnAmt, burn.change)
-			_ = newTotalSupply.Sub(newTotalSupply, burn.change)
+	// todo: Improve how to save minted and burned info. at Commit.
+	//  Consider change Supply type.
+	if ctrler.mintedSupply != nil || ctrler.burnedSupply != nil {
+		newSupply := NewSupply(ctrler.burnedSupply.Height(), ctrler.lastTotalSupply, uint256.NewInt(0))
+		if ctrler.mintedSupply != nil {
+			newSupply.Mint(ctrler.mintedSupply.Change())
+			ctrler.mintedSupply = nil
 		}
-		newSupply := NewSupply(
-			adjustedHeight,
-			newTotalSupply,
-			burnAmt, // change
-		)
+		if ctrler.burnedSupply != nil {
+			newSupply.Burn(ctrler.burnedSupply.Change())
+			if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), newSupply, true); xerr != nil {
+				ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
+				return nil, 0, xerr
+			}
+			ctrler.burnedSupply = nil
+		}
 		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), newSupply, true); xerr != nil {
 			ctrler.logger.Error("fail to set total supply", "error", xerr.Error())
 			return nil, 0, xerr
 		}
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), newSupply, true); xerr != nil {
-			ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
-			return nil, 0, xerr
-		}
-	}
 
+		ctrler.lastTotalSupply = newSupply.supply
+		ctrler.lastAdjustedSupply = newSupply.supply
+		ctrler.lastAdjustedHeight = newSupply.Height()
+	}
 	h, v, xerr := ctrler.supplyState.Commit()
 	if xerr != nil {
 		return nil, 0, xerr

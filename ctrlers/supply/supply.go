@@ -57,26 +57,36 @@ func (s *Supply) Decode(k, v []byte) xerrors.XError {
 	return nil
 }
 
-func (rwd *Supply) fromProto() {
-	rwd.supply = new(uint256.Int).SetBytes(rwd._proto.XSupply)
-	rwd.change = new(uint256.Int).SetBytes(rwd._proto.XChange)
+func (s *Supply) fromProto() {
+	s.supply = new(uint256.Int).SetBytes(s._proto.XSupply)
+	s.change = new(uint256.Int).SetBytes(s._proto.XChange)
 }
 
-func (rwd *Supply) toProto() {
-	rwd._proto.XSupply = rwd.supply.Bytes()
-	rwd._proto.XChange = rwd.change.Bytes()
+func (s *Supply) toProto() {
+	s._proto.XSupply = s.supply.Bytes()
+	s._proto.XChange = s.change.Bytes()
 }
 
-func (rwd *Supply) Supply() *uint256.Int {
-	return rwd.supply.Clone()
+func (s *Supply) Supply() *uint256.Int {
+	return s.supply.Clone()
 }
 
-func (rwd *Supply) Change() *uint256.Int {
-	return rwd.change.Clone()
+func (s *Supply) Change() *uint256.Int {
+	return s.change.Clone()
 }
 
-func (rwd *Supply) Height() int64 {
-	return rwd._proto.Height
+func (s *Supply) Height() int64 {
+	return s._proto.Height
+}
+
+func (s *Supply) Mint(amt *uint256.Int) {
+	_ = s.supply.Add(s.supply, amt)
+	_ = s.change.Add(s.change, amt)
+}
+
+func (s *Supply) Burn(amt *uint256.Int) {
+	_ = s.supply.Sub(s.supply, amt)
+	_ = s.change.Add(s.change, amt)
 }
 
 var _ v1.ILedgerItem = (*Supply)(nil)

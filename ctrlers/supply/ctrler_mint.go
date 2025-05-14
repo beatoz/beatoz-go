@@ -2,7 +2,6 @@ package supply
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
@@ -42,10 +41,14 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 		return nil, xerr
 	}
 
-	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
-		return nil, xerr
+	if ctrler.mintedSupply == nil {
+		ctrler.mintedSupply = NewSupply(bctx.Height(), uint256.NewInt(0), uint256.NewInt(0))
 	}
-	ctrler.lastTotalSupply = resp.newSupply.Supply()
+	ctrler.mintedSupply.Mint(resp.newSupply.Change())
+	//if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
+	//	return nil, xerr
+	//}
+	//ctrler.lastTotalSupply = resp.newSupply.Supply()
 	return resp, nil
 }
 
@@ -96,7 +99,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		beneficiaries := retWeight.Beneficiaries()
 		rewards := make([]*mintedReward, len(beneficiaries))
-
+		mintedSupply := uint256.NewInt(0)
 		{
 			remainder := decimal.Zero
 			precision := int32(6)
@@ -122,6 +125,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 					addr: benef.Address(),
 					amt:  uint256.MustFromBig(rwd.BigInt()),
 				}
+				_ = mintedSupply.Add(mintedSupply, rewards[i].amt)
+
 				remainder = rwd.Sub(rwd.Floor())
 			}
 		}
@@ -130,8 +135,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			xerr: nil,
 			newSupply: NewSupply(
 				bctx.Height(),
-				uint256.MustFromBig(totalSupply.BigInt()),
-				uint256.MustFromBig(addedSupply.BigInt()),
+				nil,
+				mintedSupply,
 			),
 			rewards: rewards,
 		}
