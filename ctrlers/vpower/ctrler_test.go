@@ -38,6 +38,8 @@ func init() {
 
 	govMock = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	govMock.GetValues().LazyUnstakingBlocks = 500
+	govMock.GetValues().InflationCycleBlocks = 10
+	govMock.GetValues().RipeningBlocks = 100
 }
 
 func Test_NewValidatorSet(t *testing.T) {
@@ -101,6 +103,8 @@ func Test_NewValidatorSet(t *testing.T) {
 		//fmt.Println("---------")
 
 	}
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
 func randBonding(ctrler *VPowerCtrler) ([]types.ValidatorUpdate, xerrors.XError) {

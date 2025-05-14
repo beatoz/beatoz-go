@@ -34,11 +34,12 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 			Height: 1,
 		})
 	}
-	for h := int64(2); h <= govMock.RipeningBlocks()*5; h += govMock.InflationCycleBlocks() {
+	for h := int64(2); h <= govMock.RipeningBlocks()*5; h++ {
 
 		require.NoError(t, mocks.DoBeginBlock(ctrler))
 
-		cnt := rand.Intn(10) + 21
+		// processing random staking(delegating) txs
+		cnt := rand.Intn(100)
 		if cnt > 0 {
 			froms, tos, powers, txhashes := testRandDelegate(t, cnt, ctrler, valWallets0, h)
 			require.Equal(t, len(froms), len(tos), "len(froms)", len(froms), "len(tos)", len(tos))
@@ -126,5 +127,6 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 
 		//fmt.Printf("Block[%v] the %v delegate txs are executed and the weight is %v <> %v\n", h, cnt, w_waex64pc, w_computed)
 	}
-
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
 }

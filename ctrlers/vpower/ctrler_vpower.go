@@ -193,15 +193,19 @@ func (ctrler *VPowerCtrler) countOf(keyPrefix []byte, exec bool) int {
 
 type BlockCount int64
 
-func (s *BlockCount) Encode() ([]byte, xerrors.XError) {
+func (c *BlockCount) Encode() ([]byte, xerrors.XError) {
 	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(*s))
+	binary.BigEndian.PutUint64(b, uint64(*c))
 	return b, nil
 }
 
-func (s *BlockCount) Decode(k, v []byte) xerrors.XError {
-	*s = BlockCount(int64(binary.BigEndian.Uint64(v)))
+func (c *BlockCount) Decode(k, v []byte) xerrors.XError {
+	*c = BlockCount(int64(binary.BigEndian.Uint64(v)))
 	return nil
+}
+
+func (c *BlockCount) Add() {
+	*c++
 }
 
 var _ v1.ILedgerItem = (*BlockCount)(nil)

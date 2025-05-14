@@ -1,7 +1,6 @@
 package vpower
 
 import (
-	"fmt"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
@@ -15,14 +14,12 @@ func Test_SignBlocks(t *testing.T) {
 	bz, xerr := a0.Encode()
 	require.NoError(t, xerr)
 
-	fmt.Printf("%x\n", bz)
+	//fmt.Printf("%x\n", bz)
 
 	var a1 BlockCount
 	xerr = a1.Decode(nil, bz)
 	require.NoError(t, xerr)
-
-	fmt.Println(a0, a1)
-
+	//fmt.Println(a0, a1)
 }
 
 func Test_SignBlocks_Ledger(t *testing.T) {
@@ -43,4 +40,6 @@ func Test_SignBlocks_Ledger(t *testing.T) {
 	require.NoError(t, xerr)
 	require.EqualValues(t, count, n)
 
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
