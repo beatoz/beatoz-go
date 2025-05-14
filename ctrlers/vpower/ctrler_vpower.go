@@ -207,7 +207,7 @@ func (s *BlockCount) Decode(k, v []byte) xerrors.XError {
 var _ v1.ILedgerItem = (*BlockCount)(nil)
 
 func (ctrler *VPowerCtrler) getMissedBlockCount(signer types.Address, exec bool) (BlockCount, xerrors.XError) {
-	key := v1.LedgerKeySignBlocks(signer)
+	key := v1.LedgerKeyMissedBlockCount(signer)
 	d, xerr := ctrler.powersState.Get(key, exec)
 	if xerr != nil {
 		return 0, xerr
@@ -217,7 +217,7 @@ func (ctrler *VPowerCtrler) getMissedBlockCount(signer types.Address, exec bool)
 }
 
 func (ctrler *VPowerCtrler) setMissedBlockCount(signer types.Address, c BlockCount, exec bool) xerrors.XError {
-	key := v1.LedgerKeySignBlocks(signer)
+	key := v1.LedgerKeyMissedBlockCount(signer)
 	return ctrler.powersState.Set(key, &c, exec)
 }
 
@@ -230,4 +230,11 @@ func (ctrler *VPowerCtrler) addMissedBlockCount(signer types.Address, exec bool)
 
 	c = c + 1
 	return c, ctrler.setMissedBlockCount(signer, c, exec)
+}
+
+func (ctrler *VPowerCtrler) resetAllMissedBlockCount(exec bool) xerrors.XError {
+	return ctrler.powersState.Seek(v1.KeyPrefixMissedBlockCount, true, func(key v1.LedgerKey, value v1.ILedgerItem) xerrors.XError {
+		_key := bytes.Copy(key)
+		return ctrler.powersState.Del(_key, exec)
+	}, exec)
 }

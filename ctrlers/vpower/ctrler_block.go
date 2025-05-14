@@ -22,6 +22,9 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 
 		}
 	}
+	if xerr := ctrler.resetAllMissedBlockCount(true); xerr != nil {
+		return nil, xerr
+	}
 
 	//todo: slashing
 
