@@ -347,24 +347,18 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 		// un-bonding all vpowers delegated to `dgtee`
 		for _, _from := range dgtee.Delegators {
 			_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, ctx.Exec)
-			if xerr != nil && !errors.Is(xerr, xerrors.ErrNotFoundResult) {
+			if xerr != nil {
+				return xerr
+			}
+			if xerr := ctrler.freezePowerChunkList(_vpow.from, _vpow.PowerChunks, refundHeight, ctx.Exec); xerr != nil {
+				return xerr
+			}
+			if xerr := ctrler.removeVPower(_vpow.from, _vpow.to, ctx.Exec); xerr != nil {
 				return xerr
 			}
 
-			if _vpow != nil {
-				if xerr := ctrler.delVPower(_vpow.from, _vpow.to, ctx.Exec); xerr != nil {
-					return xerr
-				}
-
-				for _, _pc := range _vpow.PowerChunks {
-					// freeze all power chunks that the `_vpow` has
-					if xerr = ctrler.freezePowerChunk(_vpow.from, _pc, refundHeight, ctx.Exec); xerr != nil {
-						return xerr
-					}
-				}
-			}
 		}
-		if xerr := ctrler.delDelegatee(dgtee.addr, ctx.Exec); xerr != nil {
+		if xerr := ctrler.removeDelegatee(dgtee.addr, ctx.Exec); xerr != nil {
 			return xerr
 		}
 	}

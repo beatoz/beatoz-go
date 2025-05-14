@@ -11,6 +11,8 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	//
+	// issue additional supply & reward
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		ctrler.requestMint(bctx)
 	}

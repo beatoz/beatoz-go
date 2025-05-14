@@ -14,22 +14,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 
 	var evts []abcitypes.Event
 
-	// set not sign count
-	votes := bctx.BlockInfo().LastCommitInfo.Votes
-	for _, vote := range votes {
-		if !vote.SignedLastBlock {
-			if c, xerr := ctrler.addMissedBlockCount(vote.Validator.Address, true); xerr != nil {
-				return nil, xerr
-			} else if int64(c) > bctx.GovHandler.SignedBlocksWindow()-bctx.GovHandler.MinSignedBlocks() {
-				// todo: slashing....
-			}
-
-		}
-	}
-	if xerr := ctrler.resetAllMissedBlockCount(true); xerr != nil {
-		return nil, xerr
-	}
-
+	//
 	// Punish ByzantineValidators
 	byzantines := bctx.BlockInfo().ByzantineValidators
 	if byzantines != nil && len(byzantines) > 0 {
@@ -50,6 +35,48 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
 					},
 				})
+			}
+		}
+	}
+
+	//
+	// Punish missing blocks
+	if len(bctx.BlockInfo().LastCommitInfo.Votes) <= 0 {
+		return evts, nil
+	}
+	for _, vote := range bctx.BlockInfo().LastCommitInfo.Votes {
+		if !vote.SignedLastBlock {
+			missedCnt, xerr := ctrler.addMissedBlockCount(vote.Validator.Address, true)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if int64(missedCnt) >= bctx.GovHandler.SignedBlocksWindow()-bctx.GovHandler.MinSignedBlocks() {
+				// un-bonding all voting power of validators
+
+				refundHeight := bctx.Height() + bctx.GovHandler.LazyUnstakingBlocks()
+
+				dgtee, xerr := ctrler.readDelegatee(vote.Validator.Address, true)
+				if xerr != nil {
+					return nil, xerr
+				}
+				// un-bonding all vpowers delegated to `dgtee`
+				for _, _from := range dgtee.Delegators {
+					_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, true)
+					if xerr != nil {
+						return nil, xerr
+					}
+
+					if xerr := ctrler.freezePowerChunkList(_vpow.from, _vpow.PowerChunks, refundHeight, true); xerr != nil {
+						return nil, xerr
+					}
+					if xerr := ctrler.removeVPower(_vpow.from, _vpow.to, true); xerr != nil {
+						return nil, xerr
+					}
+				}
+				if xerr := ctrler.removeDelegatee(dgtee.addr, true); xerr != nil {
+					return nil, xerr
+				}
 			}
 		}
 	}
