@@ -16,19 +16,20 @@ import (
 )
 
 type VPowerHandlerMock struct {
-	delegatees []*vpower.Delegatee
+	ValCnt     int
+	Delegatees []*vpower.Delegatee
 	validators []*vpower.Delegatee
 	mapVPowers map[string]*vpower.VPower
 	totalPower int64 // key is from_address + to_address
 }
 
-func NewVPowerHandlerMock(valWals []*web3.Wallet) *VPowerHandlerMock {
-	valsCnt := len(valWals)
-	delegatees := make([]*vpower.Delegatee, valsCnt)
+func NewVPowerHandlerMock(dgteeWals []*web3.Wallet, valCnt int) *VPowerHandlerMock {
+	valsCnt := valCnt
+	delegatees := make([]*vpower.Delegatee, len(dgteeWals))
 	mapVPowers := make(map[string]*vpower.VPower)
 
 	sumPower := int64(0)
-	for i, w := range valWals {
+	for i, w := range dgteeWals {
 		dgtee := vpower.NewDelegatee(w.GetPubKey())
 		delegatees[i] = dgtee
 
@@ -47,8 +48,9 @@ func NewVPowerHandlerMock(valWals []*web3.Wallet) *VPowerHandlerMock {
 	})
 
 	return &VPowerHandlerMock{
-		delegatees: delegatees,
-		validators: delegatees,
+		ValCnt:     valsCnt,
+		Delegatees: delegatees,
+		validators: delegatees[:valCnt],
 		mapVPowers: mapVPowers,
 		totalPower: sumPower,
 	}
@@ -62,7 +64,7 @@ func (mock *VPowerHandlerMock) Validators() ([]*abcitypes.Validator, int64) {
 			Address: v.Address(),
 			Power:   v.SumPower,
 		}
-		totalPower += mock.delegatees[i].SumPower
+		totalPower += mock.Delegatees[i].SumPower
 	}
 	return vals, totalPower
 }
@@ -82,14 +84,14 @@ func (mock *VPowerHandlerMock) GetTotalAmount() *uint256.Int {
 
 func (mock *VPowerHandlerMock) GetTotalPower() int64 {
 	sum := int64(0)
-	for _, v := range mock.delegatees {
+	for _, v := range mock.Delegatees {
 		sum += v.SumPower
 	}
 	return sum
 }
 
 func (mock *VPowerHandlerMock) TotalPowerOf(addr types.Address) int64 {
-	for _, v := range mock.delegatees {
+	for _, v := range mock.Delegatees {
 		if bytes.Compare(addr, v.Address()) == 0 {
 			return v.SumPower
 		}
@@ -106,7 +108,7 @@ func (mock *VPowerHandlerMock) DelegatedPowerOf(addr types.Address) int64 {
 }
 
 func (mock *VPowerHandlerMock) PickAddress(i int) types.Address {
-	return mock.delegatees[i].Address()
+	return mock.Delegatees[i].Address()
 }
 
 func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {

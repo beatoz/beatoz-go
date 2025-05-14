@@ -27,7 +27,7 @@ func Test_Mint(t *testing.T) {
 	for i := 0; i < valsCnt; i++ {
 		valWals[i] = acctMock.GetWallet(i)
 	}
-	vpowMock := vpowmock.NewVPowerHandlerMock(valWals)
+	vpowMock := vpowmock.NewVPowerHandlerMock(valWals, len(valWals))
 	totalSupply := initSupply.Clone()
 	changeSupply := uint256.NewInt(0)
 	fmt.Println("Test Mint using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())

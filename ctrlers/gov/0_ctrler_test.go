@@ -3,8 +3,7 @@ package gov
 import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	mockacct "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
-	mockstake "github.com/beatoz/beatoz-go/ctrlers/mocks/stake"
-	"github.com/beatoz/beatoz-go/ctrlers/stake"
+	mockvpower "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -13,7 +12,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 	"time"
 )
@@ -22,7 +20,7 @@ var (
 	config      = cfg.DefaultConfig()
 	govCtrler   *GovCtrler
 	acctMock    *mockacct.AcctHandlerMock
-	stakeHelper *mockstake.StakeHandlerMock
+	stakeHelper *mockvpower.VPowerHandlerMock //*mockstake.StakeHandlerMock
 	govParams0  = ctrlertypes.DefaultGovParams()
 	govParams1  = ctrlertypes.Test1GovParams()
 	govParams3  = ctrlertypes.Test3GovParams()
@@ -49,19 +47,14 @@ func init() {
 		return true
 	})
 
-	var delegatees []*stake.Delegatee
+	var dWals []*web3.Wallet
 	for i := 0; i < 14; i++ {
 		w := acctMock.GetWallet(i)
-		d := &stake.Delegatee{Addr: w.Address(), TotalPower: rand.Int63n(1_000_000)}
-		delegatees = append(delegatees, d)
+		//d := &stake.Delegatee{Addr: w.Address(), TotalPower: rand.Int63n(1_000_000)}
+		dWals = append(dWals, w)
 	}
 
-	stakeHelper = mockstake.NewStakeHandlerMock(
-		5, // 5 delegatees is only validator.
-		delegatees,
-	)
-	sort.Sort(stake.PowerOrderDelegatees(stakeHelper.Delegatees))
-
+	stakeHelper = mockvpower.NewVPowerHandlerMock(dWals, 5)
 }
 
 func TestMain(m *testing.M) {

@@ -28,7 +28,7 @@ func Test_Withdraw(t *testing.T) {
 	for i := 0; i < valsCnt; i++ {
 		valWals[i] = acctMock.GetWallet(i)
 	}
-	vpowMock := vpowmock.NewVPowerHandlerMock(valWals)
+	vpowMock := vpowmock.NewVPowerHandlerMock(valWals, len(valWals))
 	fmt.Println("Test Withdraw using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
 
 	//
