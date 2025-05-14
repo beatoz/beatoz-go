@@ -94,63 +94,6 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *btztypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) BeginBlock(bctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	// do nothing
-	return nil, nil
-}
-
-func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	header := bctx.BlockInfo().Header
-	sumFee := bctx.SumFee()
-	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
-
-		// give fee to block proposer and burn automatically by BurnRate().
-		burned := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.BurnRate())))
-		burned = new(uint256.Int).Div(burned, uint256.NewInt(100))
-		// todo: apply `burned` to SupplyCtrler
-		//if xerr := bctx.SupplyHandler.Burn(burned, bctx.Height()); xerr != nil {
-		//	return nil, xerr
-		//}
-
-		reward := new(uint256.Int).Sub(sumFee, burned)
-
-		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,
-		// the validator's account may not exist yet not in ledger.
-		proposer := ctrler.findAccount(header.GetProposerAddress(), true)
-		if proposer == nil {
-			proposer = btztypes.NewAccount(header.GetProposerAddress())
-		}
-		burnAcct := ctrler.findAccount(bctx.GovHandler.BurnAddress(), true)
-		if burnAcct == nil {
-			burnAcct = btztypes.NewAccount(bctx.GovHandler.BurnAddress())
-			ctrler.logger.Debug("Burn tx fee", "total tx fee", sumFee.Dec(), "reward", reward.Dec(), "burned", burned.Dec(), "burn address", burnAcct.Address)
-		}
-
-		if xerr := proposer.AddBalance(reward); xerr != nil {
-			return nil, xerr
-		}
-		if xerr := burnAcct.AddBalance(burned); xerr != nil {
-			return nil, xerr
-		}
-		_ = ctrler.setAccount(proposer, true)
-		_ = ctrler.setAccount(burnAcct, true)
-
-		return nil, nil
-	}
-	return nil, nil
-}
-
-func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	h, v, xerr := ctrler.acctState.Commit()
-	return h, v, xerr
-}
-
 func (ctrler *AcctCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
