@@ -134,10 +134,10 @@ func randBonding(ctrler *VPowerCtrler) ([]types.ValidatorUpdate, xerrors.XError)
 		dgt.addPower(fromAddr, power)
 		dgt.addDelegator(fromAddr)
 	}
-	sort.Sort(orderByPowerDelegatees(allDgtees))
+	sort.Sort(OrderByPowerDelegatees(allDgtees))
 	newLastVals := allDgtees[:govMock.MaxValidatorCnt()]
-	sort.Sort(orderByPowerDelegatees(lastVals))
-	sort.Sort(orderByPowerDelegatees(newLastVals))
+	sort.Sort(OrderByPowerDelegatees(lastVals))
+	sort.Sort(OrderByPowerDelegatees(newLastVals))
 
 	//
 	// Compute expected result

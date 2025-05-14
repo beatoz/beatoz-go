@@ -157,7 +157,7 @@ func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinV
 	maxValCnt := getMaxValCnt().(int)
 	minValPower := getMinValPower().(int64)
 
-	var delegatees orderByPowerDelegatees
+	var delegatees OrderByPowerDelegatees
 	xerr = atledger.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		d, _ := item.(*Delegatee)
 		if d.SelfPower < minValPower {
