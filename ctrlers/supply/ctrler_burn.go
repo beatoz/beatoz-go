@@ -15,7 +15,7 @@ func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.In
 
 func (ctrler *SupplyCtrler) burn(height int64, amt *uint256.Int) xerrors.XError {
 	// todo: Consider the case of burning multiply in one block
-	burn := NewSupply(height, nil, amt, false)
+	burn := NewSupply(height, nil, amt)
 	ctrler.burnedSupply = append(ctrler.burnedSupply, burn)
 
 	//adjusted := new(uint256.Int).Sub(ctrler.lastTotalSupply, amt)

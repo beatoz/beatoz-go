@@ -6,7 +6,6 @@ message SupplyProto {
   int64 height = 1;
   bytes _supply = 2;
   bytes _change = 3;
-  bool is_mint = 4;
 }
 
 

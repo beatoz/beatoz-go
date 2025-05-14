@@ -132,7 +132,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 				bctx.Height(),
 				uint256.MustFromBig(totalSupply.BigInt()),
 				uint256.MustFromBig(addedSupply.BigInt()),
-				true),
+			),
 			rewards: rewards,
 		}
 	}

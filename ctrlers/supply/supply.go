@@ -20,13 +20,12 @@ type Supply struct {
 	change *uint256.Int
 }
 
-func NewSupply(height int64, supply, change *uint256.Int, isMinted bool) *Supply {
+func NewSupply(height int64, supply, change *uint256.Int) *Supply {
 	ret := &Supply{
 		_proto: SupplyProto{
 			Height:  height,
 			XSupply: supply.Bytes(),
 			XChange: change.Bytes(),
-			IsMint:  isMinted,
 		},
 		supply: supply,
 		change: change,
@@ -71,9 +70,6 @@ func (rwd *Supply) Change() *uint256.Int {
 
 func (rwd *Supply) Height() int64 {
 	return rwd._proto.Height
-}
-func (rwd *Supply) IsMinted() bool {
-	return rwd._proto.IsMint
 }
 
 var _ v1.ILedgerItem = (*Supply)(nil)

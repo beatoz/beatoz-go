@@ -78,7 +78,6 @@ func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 			adjustedHeight,
 			newTotalSupply,
 			burnAmt, // change
-			false,
 		)
 		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), newSupply, true); xerr != nil {
 			ctrler.logger.Error("fail to set total supply", "error", xerr.Error())

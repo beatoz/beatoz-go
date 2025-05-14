@@ -70,7 +70,7 @@ func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xe
 	}
 	total, _ := item.(*Supply)
 	if total == nil {
-		total = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0), true)
+		total = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0))
 	}
 
 	item, xerr = ledger.Get(v1.LedgerKeyAdjustedSupply(), true)
@@ -79,7 +79,7 @@ func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xe
 	}
 	adjusted, _ := item.(*Supply)
 	if adjusted == nil {
-		adjusted = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0), true)
+		adjusted = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0))
 	}
 	reqCh, respCh := make(chan *reqMint, 1), make(chan *respMint, 1)
 	go computeIssuanceAndRewardRoutine(reqCh, respCh)
@@ -106,7 +106,7 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.lastAdjustedHeight = 1
 
 	// set initial total supply
-	initSupply := NewSupply(1, initTotalSupply, initTotalSupply, true)
+	initSupply := NewSupply(1, initTotalSupply, initTotalSupply)
 	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), initSupply, true); xerr != nil {
 		return xerr
 	}
