@@ -2,13 +2,17 @@ package vpower
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"strconv"
 )
 
 func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
+
+	var evts []abcitypes.Event
 
 	// set not sign count
 	votes := bctx.BlockInfo().LastCommitInfo.Votes
@@ -26,7 +30,29 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		return nil, xerr
 	}
 
-	//todo: slashing
+	// Punish ByzantineValidators
+	byzantines := bctx.BlockInfo().ByzantineValidators
+	if byzantines != nil && len(byzantines) > 0 {
+		ctrler.logger.Info("Byzantine validators is found", "count", len(byzantines))
+		for _, evi := range byzantines {
+			if slashed, xerr := ctrler.doPunish(
+				&evi, bctx.GovHandler.SlashRate()); xerr != nil {
+				ctrler.logger.Error("Error when punishing",
+					"byzantine", types.Address(evi.Validator.Address),
+					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
+			} else {
+				evts = append(evts, abcitypes.Event{
+					Type: "punishment.stake",
+					Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
+						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
+						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
+						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
+					},
+				})
+			}
+		}
+	}
 
 	// todo: reset limiter
 	//ctrler.vpowLimiter.Reset(
@@ -34,7 +60,8 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	//	bctx.GovHandler.MaxValidatorCnt(),
 	//	bctx.GovHandler.MaxIndividualStakeRate(),
 	//	bctx.GovHandler.MaxUpdatableStakeRate())
-	return nil, nil
+
+	return evts, nil
 }
 
 func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {

@@ -31,6 +31,10 @@ func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*Deleg
 	return ret, xerr
 }
 
+func (ctrler *VPowerCtrler) writeDelegatee(dgtee *Delegatee, exec bool) xerrors.XError {
+	return ctrler.powersState.Set(dgtee.key, dgtee, exec)
+}
+
 func (ctrler *VPowerCtrler) delDelegatee(addr types.Address, exec bool) xerrors.XError {
 	return ctrler.powersState.Del(v1.LedgerKeyDelegatee(addr), exec)
 }
@@ -42,6 +46,9 @@ func (ctrler *VPowerCtrler) readVPower(from, to types.Address, exec bool) (*VPow
 		ret, _ = item.(*VPower)
 	}
 	return ret, xerr
+}
+func (ctrler *VPowerCtrler) writeVPower(vpow *VPower, exec bool) xerrors.XError {
+	return ctrler.powersState.Set(vpow.key, vpow, exec)
 }
 
 func (ctrler *VPowerCtrler) seekVPowersOf(from types.Address, cb v1.FuncIterate, exec bool) xerrors.XError {
