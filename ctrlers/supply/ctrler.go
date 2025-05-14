@@ -36,6 +36,9 @@ type SupplyCtrler struct {
 	lastAdjustedSupply *uint256.Int
 	lastAdjustedHeight int64
 
+	mintedSupply []*Supply
+	burnedSupply []*Supply
+
 	reqCh  chan *reqMint
 	respCh chan *respMint
 
@@ -62,30 +65,30 @@ func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xe
 
 	// load supply info from ledger
 	item, xerr := ledger.Get(v1.LedgerKeyTotalSupply(), true)
-	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
+	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 		return nil, xerr
 	}
 	total, _ := item.(*Supply)
 	if total == nil {
-		total = &Supply{}
+		total = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0), true)
 	}
 
 	item, xerr = ledger.Get(v1.LedgerKeyAdjustedSupply(), true)
-	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
+	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 		return nil, xerr
 	}
 	adjusted, _ := item.(*Supply)
 	if adjusted == nil {
-		adjusted = &Supply{}
+		adjusted = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0), true)
 	}
 	reqCh, respCh := make(chan *reqMint, 1), make(chan *respMint, 1)
 	go computeIssuanceAndRewardRoutine(reqCh, respCh)
 
 	return &SupplyCtrler{
 		supplyState:        ledger,
-		lastTotalSupply:    new(uint256.Int).SetBytes(total.XSupply),
-		lastAdjustedSupply: new(uint256.Int).SetBytes(adjusted.XSupply),
-		lastAdjustedHeight: adjusted.Height,
+		lastTotalSupply:    total.Supply(),
+		lastAdjustedSupply: adjusted.Supply(),
+		lastAdjustedHeight: adjusted.Height(),
 		reqCh:              reqCh,
 		respCh:             respCh,
 		logger:             lg,
@@ -103,14 +106,7 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.lastAdjustedHeight = 1
 
 	// set initial total supply
-	initSupply := &Supply{
-		SupplyProto: SupplyProto{
-			Height:  1,
-			XChange: initTotalSupply.Bytes(),
-			XSupply: initTotalSupply.Bytes(),
-		},
-		key: nil,
-	}
+	initSupply := NewSupply(1, initTotalSupply, initTotalSupply, true)
 	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), initSupply, true); xerr != nil {
 		return xerr
 	}
@@ -196,33 +192,6 @@ func (ctrler *SupplyCtrler) RequestMint(bctx *ctrlertypes.BlockContext) {
 	defer ctrler.mtx.Unlock()
 
 	ctrler.requestMint(bctx)
-}
-
-func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.Int) xerrors.XError {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	return ctrler.burn(bctx.Height(), amt)
-}
-
-func (ctrler *SupplyCtrler) burn(height int64, amt *uint256.Int) xerrors.XError {
-	adjusted := new(uint256.Int).Sub(ctrler.lastTotalSupply, amt)
-	burn := &Supply{
-		SupplyProto: SupplyProto{
-			Height:  height,
-			XSupply: adjusted.Bytes(),
-			XChange: amt.Bytes(),
-		},
-	}
-	if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), burn, true); xerr != nil {
-		ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
-		return xerr
-	}
-
-	ctrler.lastTotalSupply = adjusted
-	ctrler.lastAdjustedSupply = adjusted
-	ctrler.lastAdjustedHeight = height
-	return nil
 }
 
 var _ ctrlertypes.ISupplyHandler = (*SupplyCtrler)(nil)

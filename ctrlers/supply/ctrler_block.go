@@ -2,6 +2,7 @@ package supply
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -63,6 +64,15 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
+
+	for _, burn := range ctrler.burnedSupply {
+		if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), burn, true); xerr != nil {
+			ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
+			return nil, 0, xerr
+		}
+		ctrler.lastAdjustedHeight = burn.Height()
+		ctrler.lastAdjustedSupply.Sub(ctrler.lastAdjustedSupply, burn.Change())
+	}
 
 	h, v, xerr := ctrler.supplyState.Commit()
 	if xerr != nil {
