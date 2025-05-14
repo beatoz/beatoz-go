@@ -21,11 +21,18 @@ type Supply struct {
 }
 
 func NewSupply(height int64, supply, change *uint256.Int) *Supply {
+	var xsupply, xchange []byte
+	if supply != nil {
+		xsupply = supply.Bytes()
+	}
+	if change != nil {
+		xchange = change.Bytes()
+	}
 	ret := &Supply{
 		_proto: SupplyProto{
 			Height:  height,
-			XSupply: supply.Bytes(),
-			XChange: change.Bytes(),
+			XSupply: xsupply,
+			XChange: xchange,
 		},
 		supply: supply,
 		change: change,
