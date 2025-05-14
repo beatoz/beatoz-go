@@ -77,7 +77,7 @@ func (s *StakeHandlerMock) PickAddress(i int) types.Address {
 	return s.Delegatees[i].Addr
 }
 
-func (s *StakeHandlerMock) ComputeWeight(height, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
+func (s *StakeHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
 	return nil, nil
 }
 
@@ -102,6 +102,7 @@ func (s *StakeHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerrors.X
 }
 
 var _ ctrlertypes.IStakeHandler = (*StakeHandlerMock)(nil)
+var _ ctrlertypes.IVPowerHandler = (*StakeHandlerMock)(nil)
 
 //type acctHelperMock struct {
 //	acctMap map[ctrlertypes.AcctKey]*ctrlertypes.Account

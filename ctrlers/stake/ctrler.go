@@ -1005,7 +1005,7 @@ func (ctrler *StakeCtrler) readRewardOf(addr types.Address) *Reward {
 	return rwd
 }
 
-func (s *StakeCtrler) ComputeWeight(height, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
+func (s *StakeCtrler) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
 	return nil, nil
 }
 
