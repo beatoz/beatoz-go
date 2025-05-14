@@ -6,17 +6,17 @@ import (
 )
 
 var (
-	KeyPrefixAccount        = []byte{0x00}
-	KeyPrefixGovParams      = []byte{0x10}
-	KeyPrefixProposal       = []byte{0x11}
-	KeyPrefixFrozenProp     = []byte{0x12}
-	KeyPrefixDelegatee      = []byte{0x20}
-	KeyPrefixVPower         = []byte{0x21}
-	KeyPrefixFrozenVPower   = []byte{0x22}
-	KeyPrefixSignBlocks     = []byte{0x23}
-	KeyPrefixTotalSupply    = []byte{0x30}
-	KeyPrefixAdjustedSupply = []byte{0x31}
-	KeyPrefixReward         = []byte{0x32}
+	KeyPrefixAccount          = []byte{0x00}
+	KeyPrefixGovParams        = []byte{0x10}
+	KeyPrefixProposal         = []byte{0x11}
+	KeyPrefixFrozenProp       = []byte{0x12}
+	KeyPrefixDelegatee        = []byte{0x20}
+	KeyPrefixVPower           = []byte{0x21}
+	KeyPrefixFrozenVPower     = []byte{0x22}
+	KeyPrefixMissedBlockCount = []byte{0x23}
+	KeyPrefixTotalSupply      = []byte{0x30}
+	KeyPrefixAdjustedSupply   = []byte{0x31}
+	KeyPrefixReward           = []byte{0x32}
 )
 
 func LedgerKeyProposal(txhash []byte) LedgerKey {
@@ -65,8 +65,8 @@ func LedgerKeyFrozenVPower(h int64, from types.Address) LedgerKey {
 	return k
 }
 
-func LedgerKeySignBlocks(signer types.Address) LedgerKey {
-	k := make([]byte, len(KeyPrefixSignBlocks)+len(signer))
+func LedgerKeyMissedBlockCount(signer types.Address) LedgerKey {
+	k := make([]byte, len(KeyPrefixMissedBlockCount)+len(signer))
 	copy(k, KeyPrefixFrozenVPower)
 	copy(k[len(KeyPrefixFrozenVPower):], signer)
 	return k

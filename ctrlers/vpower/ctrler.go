@@ -36,7 +36,7 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 		return &Delegatee{}
 	} else if bytes2.HasPrefix(key, v1.KeyPrefixFrozenVPower) {
 		return &FrozenVPower{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixSignBlocks) {
+	} else if bytes2.HasPrefix(key, v1.KeyPrefixMissedBlockCount) {
 		return new(BlockCount)
 	}
 	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
