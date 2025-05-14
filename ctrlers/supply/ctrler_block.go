@@ -30,14 +30,15 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		}
 	}
 
+	//
+	// Process transactions fee
 	header := bctx.BlockInfo().Header
 	sumFee := bctx.SumFee()
 	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
 
-		// give fee to block proposer and burn automatically by BurnRate().
+		// burn GovParams.BurnRate % of txs fee.
 		burnAmt := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.BurnRate())))
 		burnAmt = new(uint256.Int).Div(burnAmt, uint256.NewInt(100))
-		// Apply `burned` to SupplyCtrler
 		if xerr := ctrler.burn(bctx.Height(), burnAmt); xerr != nil {
 			return nil, xerr
 		}
@@ -45,6 +46,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 			return nil, xerr
 		}
 
+		// distribute the remaining fee to the proposer of this block.
 		rwdAmt := new(uint256.Int).Sub(sumFee, burnAmt)
 		if xerr := bctx.AcctHandler.AddBalance(header.GetProposerAddress(), rwdAmt, true); xerr != nil {
 			return nil, xerr
@@ -54,6 +56,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 
 		return nil, nil
 	}
+
 	return nil, nil
 }
 

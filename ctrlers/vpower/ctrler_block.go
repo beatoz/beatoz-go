@@ -17,7 +17,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	//
 	// Punish ByzantineValidators
 	byzantines := bctx.BlockInfo().ByzantineValidators
-	if byzantines != nil && len(byzantines) > 0 {
+	if len(byzantines) > 0 {
 		ctrler.logger.Info("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			if slashed, xerr := ctrler.doPunish(
@@ -51,8 +51,15 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				return nil, xerr
 			}
 
-			if int64(missedCnt) >= bctx.GovHandler.SignedBlocksWindow()-bctx.GovHandler.MinSignedBlocks() {
+			// `missedCnt` is reset every GovParams.InflationCycleBlocks
+			allowedDownCnt := bctx.GovHandler.InflationCycleBlocks() - bctx.GovHandler.MinSignedBlocks()
+			if int64(missedCnt) >= allowedDownCnt {
 				// un-bonding all voting power of validators
+
+				ctrler.logger.Info("Validator stop",
+					"address", types.Address(vote.Validator.Address),
+					"power", vote.Validator.Power,
+					"missed_blocks", missedCnt)
 
 				refundHeight := bctx.Height() + bctx.GovHandler.LazyUnstakingBlocks()
 
@@ -79,6 +86,9 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				}
 			}
 		}
+	}
+	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
+		_ = ctrler.resetAllMissedBlockCount(true)
 	}
 
 	// todo: reset limiter
