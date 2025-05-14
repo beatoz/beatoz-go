@@ -187,12 +187,6 @@ func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	}
 	return nil
 }
-func (ctrler *SupplyCtrler) RequestMint(bctx *ctrlertypes.BlockContext) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	ctrler.requestMint(bctx)
-}
 
 var _ ctrlertypes.ISupplyHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*SupplyCtrler)(nil)

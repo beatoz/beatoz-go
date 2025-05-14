@@ -8,6 +8,13 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func (ctrler *SupplyCtrler) RequestMint(bctx *ctrlertypes.BlockContext) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	ctrler.requestMint(bctx)
+}
+
 // requestMint makes reqMint object and send it via the channel reqCh.
 // it is called from BeginBlock.
 func (ctrler *SupplyCtrler) requestMint(bctx *ctrlertypes.BlockContext) {
