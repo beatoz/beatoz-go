@@ -240,7 +240,7 @@ func (ctrler *AcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, exec 
 
 	acct := ctrler.findAccount(addr, exec)
 	if acct == nil {
-		return xerrors.ErrNotFoundAccount.Wrapf("AddBalance - address: %v", addr)
+		acct = btztypes.NewAccount(addr)
 	}
 
 	if xerr := acct.AddBalance(amt); xerr != nil {

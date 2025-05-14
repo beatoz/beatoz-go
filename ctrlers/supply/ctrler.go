@@ -202,10 +202,10 @@ func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.In
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	return ctrler.burn(amt, bctx.Height())
+	return ctrler.burn(bctx.Height(), amt)
 }
 
-func (ctrler *SupplyCtrler) burn(amt *uint256.Int, height int64) xerrors.XError {
+func (ctrler *SupplyCtrler) burn(height int64, amt *uint256.Int) xerrors.XError {
 	adjusted := new(uint256.Int).Sub(ctrler.lastTotalSupply, amt)
 	burn := &Supply{
 		SupplyProto: SupplyProto{
