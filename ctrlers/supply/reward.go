@@ -16,7 +16,6 @@ type Reward struct {
 	slashed   *uint256.Int
 	withdrawn *uint256.Int
 	cumulated *uint256.Int
-	key       v1.LedgerKey
 }
 
 func NewReward(addr types.Address) *Reward {
@@ -43,7 +42,6 @@ func (rwd *Reward) Decode(k, v []byte) xerrors.XError {
 		return xerrors.From(err)
 	}
 	rwd.fromProto()
-	rwd.key = k
 	return nil
 }
 

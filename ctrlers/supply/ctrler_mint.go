@@ -38,7 +38,7 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
 		return nil, xerr
 	}
-	ctrler.lastTotalSupply = new(uint256.Int).SetBytes(resp.newSupply.XSupply)
+	ctrler.lastTotalSupply = resp.newSupply.Supply()
 	return resp, nil
 }
 
@@ -121,13 +121,11 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		respCh <- &respMint{
 			xerr: nil,
-			newSupply: &Supply{
-				SupplyProto: SupplyProto{
-					Height:  bctx.Height(),
-					XSupply: uint256.MustFromBig(totalSupply.BigInt()).Bytes(),
-					XChange: uint256.MustFromBig(addedSupply.BigInt()).Bytes(),
-				},
-			},
+			newSupply: NewSupply(
+				bctx.Height(),
+				uint256.MustFromBig(totalSupply.BigInt()),
+				uint256.MustFromBig(addedSupply.BigInt()),
+				true),
 			rewards: rewards,
 		}
 	}

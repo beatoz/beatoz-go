@@ -32,7 +32,7 @@ func (ctrler *SupplyCtrler) addRewardToState(rewards []*mintedReward, height int
 		}
 		_ = rwd.Issue(nrwd.amt, height)
 
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyReward(rwd.Address()), rwd, true); xerr != nil {
+		if xerr := ctrler.supplyState.Set(v1.LedgerKeyReward(nrwd.addr), rwd, true); xerr != nil {
 			return xerr
 		}
 	}

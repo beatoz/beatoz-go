@@ -90,9 +90,9 @@ func Test_Mint(t *testing.T) {
 		ctrler.requestMint(bctx)
 		result, xerr := ctrler.waitMint(bctx)
 		require.NoError(t, xerr)
-		supplyHeight := result.newSupply.Height
-		totalSupply = new(uint256.Int).SetBytes(result.newSupply.XSupply)
-		changeSupply = new(uint256.Int).SetBytes(result.newSupply.XChange)
+		supplyHeight := result.newSupply.Height()
+		totalSupply = result.newSupply.Supply()
+		changeSupply = result.newSupply.Change()
 
 		require.Equal(t, currHeight, supplyHeight)
 		require.NotEqual(t, expectedTotalSupply.Dec(), initSupply.Dec())
