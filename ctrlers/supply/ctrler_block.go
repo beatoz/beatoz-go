@@ -65,13 +65,29 @@ func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	for _, burn := range ctrler.burnedSupply {
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), burn, true); xerr != nil {
+	if len(ctrler.burnedSupply) > 0 {
+		newTotalSupply := ctrler.lastTotalSupply.Clone()
+		adjustedHeight := ctrler.lastAdjustedHeight
+		burnAmt := uint256.NewInt(0)
+		for _, burn := range ctrler.burnedSupply {
+			adjustedHeight = burn.Height()
+			_ = burnAmt.Add(burnAmt, burn.change)
+			_ = newTotalSupply.Sub(newTotalSupply, burn.change)
+		}
+		newSupply := NewSupply(
+			adjustedHeight,
+			newTotalSupply,
+			burnAmt, // change
+			false,
+		)
+		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), newSupply, true); xerr != nil {
+			ctrler.logger.Error("fail to set total supply", "error", xerr.Error())
+			return nil, 0, xerr
+		}
+		if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), newSupply, true); xerr != nil {
 			ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
 			return nil, 0, xerr
 		}
-		ctrler.lastAdjustedHeight = burn.Height()
-		ctrler.lastAdjustedSupply.Sub(ctrler.lastAdjustedSupply, burn.Change())
 	}
 
 	h, v, xerr := ctrler.supplyState.Commit()
