@@ -51,7 +51,7 @@ func Test_validatorUpdates(t *testing.T) {
 		// add new validator
 		lastVals = copyDelegateeArray(newVals)
 
-		sort.Sort(orderByPowerDelegatee(alls))
+		sort.Sort(orderByPowerDelegatees(alls))
 		expectedOutDgtee := alls[maxValCnt-1]
 
 		bottomPow = alls[maxValCnt-1].SumPower
@@ -81,7 +81,7 @@ func Test_validatorUpdates(t *testing.T) {
 		// slash
 		lastVals = copyDelegateeArray(newVals)
 
-		sort.Sort(orderByPowerDelegatee(alls))
+		sort.Sort(orderByPowerDelegatees(alls))
 		expectedNewDgtee = alls[maxValCnt]
 
 		// slash the power of one of validators.
@@ -111,7 +111,7 @@ func Test_validatorUpdates(t *testing.T) {
 		// slash partially
 		lastVals = copyDelegateeArray(newVals)
 
-		sort.Sort(orderByPowerDelegatee(alls))
+		sort.Sort(orderByPowerDelegatees(alls))
 		expectedUpdatedVal := alls[0]
 		expectedUpdatedVal.SumPower--
 

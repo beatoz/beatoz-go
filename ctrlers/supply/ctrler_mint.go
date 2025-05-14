@@ -108,7 +108,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 				//give `rwd` + `remainder` to `benef.Address()``
 				rwd = rwd.Add(remainder)
 
-				// todo: Apply `benef.singW` to `rwd`
+				// Apply `benef.singW` to `rwd`
 				rwd = rwd.Mul(benef.SignRate())
 
 				rewards[i] = &mintedReward{

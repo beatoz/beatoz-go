@@ -73,7 +73,7 @@ func Test_AnnualSd(t *testing.T) {
 		_added, _ := types.FromFons(sd)
 		_totsup, _ := types.FromFons(totalSupply)
 		_sumadded, _ := types.FromFons(sumAdded)
-		//fmt.Println("year", 1+i/oneYearSeconds, "week", i/oneWeeksSeconds, "W", Wall, "added", _added, "cumu", _sumadded, "total", _totsup, "reward rate", rwdRate.Truncate(2))
+
 		fmt.Printf("year: %3v (%4vw), total supply: %9v, added: %9v, sumAdded: %9v, rwdRate: % v, inflRate: %v, W: %v\n",
 			i/oneYearSeconds, i/oneWeeksSeconds, _totsup, _added, _sumadded, rwdRate.StringFixed(2), inflRate.StringFixed(2), Wall)
 

@@ -23,7 +23,7 @@ func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
 		},
 	}
 	ret.addr = crypto.PubKeyBytes2Addr(pubKey)
-	ret.key = v1.LedgerKeyDelegatee(ret.addr, nil)
+	ret.key = v1.LedgerKeyDelegatee(ret.addr)
 	return ret
 }
 
@@ -147,14 +147,14 @@ func findDelegateeByPubKey(pubKey bytes.HexBytes, dgtees []*Delegatee) *Delegate
 	return nil
 }
 
-type orderByPowerDelegatee []*Delegatee
+type orderByPowerDelegatees []*Delegatee
 
-func (dgtees orderByPowerDelegatee) Len() int {
+func (dgtees orderByPowerDelegatees) Len() int {
 	return len(dgtees)
 }
 
 // descending order by TotalPower
-func (dgtees orderByPowerDelegatee) Less(i, j int) bool {
+func (dgtees orderByPowerDelegatees) Less(i, j int) bool {
 	if dgtees[i].SumPower != dgtees[j].SumPower {
 		return dgtees[i].SumPower > dgtees[j].SumPower
 	}
@@ -168,25 +168,25 @@ func (dgtees orderByPowerDelegatee) Less(i, j int) bool {
 	return false
 }
 
-func (dgtees orderByPowerDelegatee) Swap(i, j int) {
+func (dgtees orderByPowerDelegatees) Swap(i, j int) {
 	dgtees[i], dgtees[j] = dgtees[j], dgtees[i]
 }
 
-var _ sort.Interface = (orderByPowerDelegatee)(nil)
+var _ sort.Interface = (orderByPowerDelegatees)(nil)
 
-type orderByPubDelegatee []*Delegatee
+type orderByPubDelegatees []*Delegatee
 
-func (dgtees orderByPubDelegatee) Len() int {
+func (dgtees orderByPubDelegatees) Len() int {
 	return len(dgtees)
 }
 
 // ascending order by address
-func (dgtees orderByPubDelegatee) Less(i, j int) bool {
+func (dgtees orderByPubDelegatees) Less(i, j int) bool {
 	return bytes.Compare(dgtees[i].PubKey, dgtees[j].PubKey) < 0
 }
 
-func (dgtees orderByPubDelegatee) Swap(i, j int) {
+func (dgtees orderByPubDelegatees) Swap(i, j int) {
 	dgtees[i], dgtees[j] = dgtees[j], dgtees[i]
 }
 
-var _ sort.Interface = (orderByPubDelegatee)(nil)
+var _ sort.Interface = (orderByPubDelegatees)(nil)

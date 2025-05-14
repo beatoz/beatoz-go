@@ -24,7 +24,7 @@ func (ctrler *VPowerCtrler) loadDelegatees(exec bool) ([]*Delegatee, xerrors.XEr
 
 func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*Delegatee, xerrors.XError) {
 	var ret *Delegatee
-	item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(addr, nil), exec)
+	item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(addr), exec)
 	if xerr == nil {
 		ret, _ = item.(*Delegatee)
 	}
@@ -32,7 +32,7 @@ func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*Deleg
 }
 
 func (ctrler *VPowerCtrler) delDelegatee(addr types.Address, exec bool) xerrors.XError {
-	return ctrler.powersState.Del(v1.LedgerKeyDelegatee(addr, nil), exec)
+	return ctrler.powersState.Del(v1.LedgerKeyDelegatee(addr), exec)
 }
 
 func (ctrler *VPowerCtrler) readVPower(from, to types.Address, exec bool) (*VPower, xerrors.XError) {
@@ -206,6 +206,13 @@ func (c *BlockCount) Decode(k, v []byte) xerrors.XError {
 
 func (c *BlockCount) Add() {
 	*c++
+}
+
+func (c *BlockCount) Int64() int64 {
+	if c == nil {
+		return int64(0)
+	}
+	return int64(*c)
 }
 
 var _ v1.ILedgerItem = (*BlockCount)(nil)

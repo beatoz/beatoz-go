@@ -43,7 +43,7 @@ func TestStaking(t *testing.T) {
 	ret, err := newValWal.StakingCommit(newValWal.Address(), defGas, defGasPrice, powAmt, bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log, "power", power, "balance", newValWal.GetBalance().Dec())
-	require.Contains(t, ret.CheckTx.Log, "too small stake to become validator", ret.CheckTx.Log)
+	require.Contains(t, ret.CheckTx.Log, "too small power to become validator", ret.CheckTx.Log)
 
 	//
 	// sufficient amount

@@ -47,8 +47,8 @@ func Test_InitLedger(t *testing.T) {
 	totalPower1 := int64(0)
 	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgt, _ := item.(*Delegatee)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr, nil), key)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr, nil), dgt.key)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr), key)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr), dgt.key)
 
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
@@ -447,7 +447,7 @@ func Test_Freezing(t *testing.T) {
 
 	powers0 := make(map[string]int64)
 	for _, v := range valWallets {
-		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address(), nil), true)
+		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
 		require.NoError(t, xerr)
 
 		dgtee, _ := item.(*Delegatee)
@@ -622,7 +622,7 @@ func Test_Freezing(t *testing.T) {
 	fmt.Println("return to initial vpowers - last committed height", lastHeight)
 
 	for _, v := range valWallets {
-		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address(), nil), true)
+		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
 		require.NoError(t, xerr)
 
 		dgtee, _ := item.(*Delegatee)
@@ -714,7 +714,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr, nil), key)
+		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr), key)
 		require.EqualValues(t, key, dgtee.key)
 		require.Equal(t, sumPowerOfDgtee[dgtee.addr.String()], dgtee.SumPower)
 		require.Equal(t, len(fromAddrsOfDgtee[dgtee.addr.String()]), len(dgtee.Delegators))

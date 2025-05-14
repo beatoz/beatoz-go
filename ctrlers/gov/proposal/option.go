@@ -10,9 +10,9 @@ type voteOption struct {
 	votes  int64
 }
 
-func NewVoteOptions(opts ...[]byte) []*voteOption {
+func NewVoteOptions(options ...[]byte) []*voteOption {
 	var voteOpts []*voteOption
-	for _, opt := range opts {
+	for _, opt := range options {
 		voteOpts = append(voteOpts, &voteOption{
 			option: opt,
 		})

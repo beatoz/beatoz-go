@@ -37,10 +37,10 @@ type BeatozApp struct {
 	lastBlockCtx *ctrlertypes.BlockContext
 	currBlockCtx *ctrlertypes.BlockContext
 
-	metaDB       *ctrlertypes.MetaDB
-	acctCtrler   *account.AcctCtrler
-	govCtrler    *gov.GovCtrler
-	stakeCtrler  *stake.StakeCtrler
+	metaDB     *ctrlertypes.MetaDB
+	acctCtrler *account.AcctCtrler
+	govCtrler  *gov.GovCtrler
+	//stakeCtrler  *stake.StakeCtrler
 	vpowCtrler   *vpower.VPowerCtrler
 	supplyCtrler *supply.SupplyCtrler
 	vmCtrler     *evm.EVMCtrler
@@ -70,10 +70,10 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 		panic(err)
 	}
 
-	stakeCtrler, err := stake.NewStakeCtrler(config, govCtrler, logger)
-	if err != nil {
-		panic(err)
-	}
+	//stakeCtrler, err := stake.NewStakeCtrler(config, govCtrler, logger)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	vpowCtrler, err := vpower.NewVPowerCtrler(config, int(govCtrler.MaxValidatorCnt()), logger)
 	if err != nil {
@@ -90,10 +90,10 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 	txExecutor := NewTrxExecutor(logger)
 
 	return &BeatozApp{
-		metaDB:       metaDB,
-		acctCtrler:   acctCtrler,
-		govCtrler:    govCtrler,
-		stakeCtrler:  stakeCtrler,
+		metaDB:     metaDB,
+		acctCtrler: acctCtrler,
+		govCtrler:  govCtrler,
+		//stakeCtrler:  stakeCtrler,
 		vpowCtrler:   vpowCtrler,
 		supplyCtrler: supplyCtrler,
 		vmCtrler:     vmCtrler,
@@ -114,9 +114,9 @@ func (ctrler *BeatozApp) Stop() error {
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
 	}
-	if err := ctrler.stakeCtrler.Close(); err != nil {
-		return err
-	}
+	//if err := ctrler.stakeCtrler.Close(); err != nil {
+	//	return err
+	//}
 	if err := ctrler.govCtrler.Close(); err != nil {
 		return err
 	}
@@ -238,10 +238,10 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		initTotalSupply = new(uint256.Int).Add(initTotalSupply, ctrlertypes.PowerToAmount(val.Power))
 	}
 
-	if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
-		ctrler.logger.Error("fail to initialize stake controller", "error", xerr)
-		panic(xerr)
-	}
+	//if xerr := ctrler.stakeCtrler.InitLedger(initStakes); xerr != nil {
+	//	ctrler.logger.Error("fail to initialize stake controller", "error", xerr)
+	//	panic(xerr)
+	//}
 
 	if xerr := ctrler.vpowCtrler.InitLedger(req.Validators); xerr != nil {
 		ctrler.logger.Error("fail to initialize voting power controller", "error", xerr)
@@ -399,7 +399,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 		ctrler.acctCtrler,
 		ctrler.vmCtrler,
 		ctrler.supplyCtrler,
-		ctrler.vpowCtrler, //ctrler.stakeCtrler, // todo: replace stakeCtrler with vpowCtrler
+		ctrler.vpowCtrler, //ctrler.stakeCtrler,
 	)
 	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
 	ctrler.currBlockCtx.SetBlockGasLimit(blockGasLimit)
@@ -420,12 +420,12 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	}
 	beginBlockEvents = append(beginBlockEvents, evs...)
 
-	evs, xerr = ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
-	if xerr != nil {
-		ctrler.logger.Error("failed to execute BeginBlock of stakeCtrler", "error", xerr)
-		panic(xerr)
-	}
-	beginBlockEvents = append(beginBlockEvents, evs...)
+	//evs, xerr = ctrler.stakeCtrler.BeginBlock(ctrler.currBlockCtx)
+	//if xerr != nil {
+	//	ctrler.logger.Error("failed to execute BeginBlock of stakeCtrler", "error", xerr)
+	//	panic(xerr)
+	//}
+	//beginBlockEvents = append(beginBlockEvents, evs...)
 
 	evs, xerr = ctrler.supplyCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
@@ -663,12 +663,12 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	}
 	beginBlockEvents = append(beginBlockEvents, evts...)
 
-	evts, xerr = ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
-	if xerr != nil {
-		ctrler.logger.Error("fail to execute EndBlock of stakeCtrler", "error", xerr)
-		panic(xerr)
-	}
-	beginBlockEvents = append(beginBlockEvents, evts...)
+	//evts, xerr = ctrler.stakeCtrler.EndBlock(ctrler.currBlockCtx)
+	//if xerr != nil {
+	//	ctrler.logger.Error("fail to execute EndBlock of stakeCtrler", "error", xerr)
+	//	panic(xerr)
+	//}
+	//beginBlockEvents = append(beginBlockEvents, evts...)
 
 	//
 	// adjust block gas limit
@@ -715,7 +715,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrlers := []ctrlertypes.ILedgerHandler{
 		ctrler.govCtrler,
 		ctrler.acctCtrler,
-		ctrler.stakeCtrler,
+		//ctrler.stakeCtrler,
 		ctrler.supplyCtrler,
 		ctrler.vpowCtrler,
 		ctrler.vmCtrler,

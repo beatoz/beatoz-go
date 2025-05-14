@@ -50,10 +50,10 @@ func LedgerKeyVPower(from, to types.Address) LedgerKey {
 	return k
 }
 
-func LedgerKeyDelegatee(addr, from types.Address) LedgerKey {
-	k := make([]byte, len(KeyPrefixDelegatee)+len(addr)+len(from))
+func LedgerKeyDelegatee(addr types.Address) LedgerKey {
+	k := make([]byte, len(KeyPrefixDelegatee)+len(addr))
 	copy(k, KeyPrefixDelegatee)
-	copy(k[len(KeyPrefixDelegatee):], append(addr, from...))
+	copy(k[len(KeyPrefixDelegatee):], addr)
 	return k
 }
 
