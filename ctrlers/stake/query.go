@@ -2,6 +2,7 @@ package stake
 
 import (
 	"fmt"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
@@ -12,7 +13,7 @@ import (
 	"sort"
 )
 
-func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
+func (ctrler *StakeCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 

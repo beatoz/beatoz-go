@@ -1,6 +1,7 @@
 package supply
 
 import (
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -8,13 +9,13 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
-func (ctrler *SupplyCtrler) Query(qry abcitypes.RequestQuery) ([]byte, xerrors.XError) {
+func (ctrler *SupplyCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	switch qry.Path {
+	switch req.Path {
 	case "reward":
-		return ctrler.queryReward(qry.Height, types.Address(qry.Data))
+		return ctrler.queryReward(req.Height, types.Address(req.Data))
 	default:
 		return nil, xerrors.ErrQuery.Wrapf("unknown query path")
 	}

@@ -40,7 +40,15 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		}
 
 	case "stakes", "stakes/total_power", "stakes/voting_power", "delegatee", "reward":
-		response.Value, xerr = ctrler.stakeCtrler.Query(req)
+		response.Value, xerr = ctrler.stakeCtrler.Query(
+			req,
+			func() interface{} {
+				return ctrler.govCtrler.MaxValidatorCnt()
+			},
+			func() interface{} {
+				return ctrler.govCtrler.MinValidatorPower()
+			},
+		)
 	case "proposal", "gov_params":
 		response.Value, xerr = ctrler.govCtrler.Query(req)
 	case "vm_call", "vm_estimate_gas":

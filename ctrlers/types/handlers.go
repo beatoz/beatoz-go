@@ -7,10 +7,12 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
+type Option func() interface{}
+
 type ILedgerHandler interface {
 	InitLedger(interface{}) xerrors.XError
 	Commit() ([]byte, int64, xerrors.XError)
-	Query(abcitypes.RequestQuery) ([]byte, xerrors.XError)
+	Query(abcitypes.RequestQuery, ...Option) ([]byte, xerrors.XError)
 	Close() xerrors.XError
 }
 

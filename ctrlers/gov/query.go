@@ -2,13 +2,14 @@ package gov
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
-func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
+func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
 	txhash := req.Data
 	switch req.Path {
 	case "proposal":

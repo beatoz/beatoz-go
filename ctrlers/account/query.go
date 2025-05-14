@@ -1,7 +1,7 @@
 package account
 
 import (
-	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -10,7 +10,7 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
-func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
+func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
 	immuLedger, xerr := ctrler.acctState.ImitableLedgerAt(req.Height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
@@ -18,7 +18,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 
 	item, xerr := immuLedger.Get(v1.LedgerKeyAccount(req.Data))
 	if xerr != nil {
-		item = btztypes.NewAccount(req.Data)
+		item = ctrlertypes.NewAccount(req.Data)
 	}
 	if item == nil {
 		return nil, xerrors.ErrQuery.Wrap(xerrors.ErrNotFoundAccount)
@@ -27,7 +27,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XEr
 	// NOTE
 	// `Account::Balance`, which type is *uint256.Int, is marshaled to hex-string.
 	// To marshal this value to decimal format...
-	acct, _ := item.(*btztypes.Account)
+	acct, _ := item.(*ctrlertypes.Account)
 	_acct := &struct {
 		Address types.Address  `json:"address"`
 		Name    string         `json:"name,omitempty"`
