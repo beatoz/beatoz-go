@@ -18,10 +18,17 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		ctrler.requestMint(bctx)
 	}
 
+	return nil, nil
+}
+
+func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	//
 	// Process transactions fee
 	header := bctx.BlockInfo().Header
-	sumFee := bctx.SumFee()
+	sumFee := bctx.SumFee() // it's value is 0 at BeginBlock.
 	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
 
 		// burn GovParams.BurnRate % of txs fee.
@@ -41,16 +48,8 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		}
 
 		ctrler.logger.Debug("txs's fee is processed", "total.fee", sumFee.Dec(), "reward", rwdAmt.Dec(), "burned", burnAmt.Dec())
-
 		return nil, nil
 	}
-
-	return nil, nil
-}
-
-func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
 
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		if _, xerr := ctrler.waitMint(bctx); xerr != nil {
