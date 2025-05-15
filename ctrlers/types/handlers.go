@@ -19,6 +19,7 @@ type ILedgerHandler interface {
 type IBlockHandler interface {
 	BeginBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
 	EndBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
+	Commit() ([]byte, int64, xerrors.XError)
 }
 
 type ITrxHandler interface {

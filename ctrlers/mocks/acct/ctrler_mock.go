@@ -148,6 +148,11 @@ func (mock *AcctHandlerMock) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcityp
 	panic("implement me")
 }
 
+func (mock *AcctHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (mock *AcctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	//TODO implement me
 	panic("implement me")

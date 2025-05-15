@@ -58,39 +58,50 @@ func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
 	return InitBlockCtxWith(bctx.Height()+1, bctx.GovHandler, bctx.AcctHandler, bctx.EVMHandler, bctx.SupplyHandler, bctx.VPowerHandler)
 }
 
-func DoBeginBlock(ctrler ctrlertypes.IBlockHandler) error {
+func DoBeginBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
 	bctx := CurrBlockCtx() //mocks.NextBlockCtx()
 	//fmt.Println("DoBeginBlock for", bctx.Height())
-	_, err := ctrler.BeginBlock(bctx)
-	return err
-}
-func DoEndBlock(ctrler ctrlertypes.IBlockHandler) error {
-	bctx := CurrBlockCtx()
-	//fmt.Println("DoEndBlock for", bctx.Height())
-	if _, err := ctrler.EndBlock(bctx); err != nil {
-		return err
+	for _, ctr := range ctrlers {
+		_, err := ctr.BeginBlock(bctx)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
-func DoCommitBlock(ctrler ctrlertypes.ILedgerHandler) error {
-	if _, v, err := ctrler.Commit(); err != nil {
-		return err
-	} else if v != currBlockCtx.Height() {
-		panic(fmt.Errorf("different height between ledger(%v) and currBlockCtx(%v)", v, currBlockCtx.Height()))
-	} else {
-		lastBlockCtx = currBlockCtx
-		currBlockCtx = NextBlockCtxOf(lastBlockCtx)
+func DoEndBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
+	bctx := CurrBlockCtx()
+	//fmt.Println("DoEndBlock for", bctx.Height())
+	for _, ctr := range ctrlers {
+		_, err := ctr.EndBlock(bctx)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
+}
+func DoCommitBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
+
+	for _, ctr := range ctrlers {
+		if _, v, err := ctr.Commit(); err != nil {
+			return err
+		} else if v != currBlockCtx.Height() {
+			panic(fmt.Errorf("different height between ledger(%v) and currBlockCtx(%v)", v, currBlockCtx.Height()))
+		}
+	}
+	lastBlockCtx = currBlockCtx
+	currBlockCtx = NextBlockCtxOf(lastBlockCtx)
 	//fmt.Printf("DoCommitBlock - last: %v, curr: %v\n", lastBlockCtx.Height(), currBlockCtx.Height())
 	return nil
 }
 
-func DoEndBlockCommit(ctrler interface{}) error {
-	if err := DoEndBlock(ctrler.(ctrlertypes.IBlockHandler)); err != nil {
+func DoEndBlockCommit(ctrler ...ctrlertypes.IBlockHandler) error {
+	if err := DoEndBlock(ctrler...); err != nil {
 		return err
 	}
-	if err := DoCommitBlock(ctrler.(ctrlertypes.ILedgerHandler)); err != nil {
+	if err := DoCommitBlock(ctrler...); err != nil {
 		return err
 	}
+
 	return nil
 }

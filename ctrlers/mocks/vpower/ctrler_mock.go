@@ -174,4 +174,9 @@ func (mock *VPowerHandlerMock) EndBlock(context *ctrlertypes.BlockContext) ([]ab
 	panic("implement me")
 }
 
+func (mock *VPowerHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
 var _ ctrlertypes.IVPowerHandler = (*VPowerHandlerMock)(nil)

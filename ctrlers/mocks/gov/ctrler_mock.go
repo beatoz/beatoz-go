@@ -26,6 +26,10 @@ func (mock *GovHandlerMock) EndBlock(context *ctrlertypes.BlockContext) ([]abcit
 	panic("implement me")
 }
 
+func (mock *GovHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
 func (mock *GovHandlerMock) ValidateTrx(context *ctrlertypes.TrxContext) xerrors.XError {
 	//TODO implement me
 	panic("implement me")
