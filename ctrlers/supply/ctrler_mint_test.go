@@ -67,7 +67,7 @@ func Test_Mint(t *testing.T) {
 	////
 
 	preRewards := make(map[string]*uint256.Int)
-	for currHeight := int64(2); currHeight < oneYearSeconds*30; currHeight += govMock.InflationCycleBlocks() {
+	for currHeight := int64(2); currHeight < govMock.InflationCycleBlocks()*1000; currHeight += govMock.InflationCycleBlocks() {
 		// expect x minting
 		weightInfo, xerr := vpowMock.ComputeWeight(
 			currHeight,

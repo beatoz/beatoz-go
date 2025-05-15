@@ -6,6 +6,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"time"
 )
 
 func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -13,7 +14,7 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	defer ctrler.mtx.Unlock()
 
 	//
-	// issue additional supply & reward
+	// Request to mint & reward
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		ctrler.requestMint(bctx)
 	}
@@ -26,7 +27,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	defer ctrler.mtx.Unlock()
 
 	//
-	// Process transactions fee
+	// Process txs fee: Burn and Reward
 	header := bctx.BlockInfo().Header
 	sumFee := bctx.SumFee() // it's value is 0 at BeginBlock.
 	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
@@ -34,9 +35,12 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		// burn GovParams.BurnRate % of txs fee.
 		burnAmt := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.BurnRate())))
 		burnAmt = new(uint256.Int).Div(burnAmt, uint256.NewInt(100))
+
+		// In ctrler.burn, ctrler.lastTotalSupply is changed.
 		if xerr := ctrler.burn(bctx.Height(), burnAmt); xerr != nil {
 			return nil, xerr
 		}
+
 		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.BurnAddress(), burnAmt, true); xerr != nil {
 			return nil, xerr
 		}
@@ -48,28 +52,37 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		}
 
 		ctrler.logger.Debug("txs's fee is processed", "total.fee", sumFee.Dec(), "reward", rwdAmt.Dec(), "burned", burnAmt.Dec())
-		return nil, nil
 	}
 
+	//
+	// Wait to finish minting...
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
-		if _, xerr := ctrler.waitMint(bctx); xerr != nil {
+		start := time.Now()
+		// In ctrler.waitMint, ctrler.lastTotalSupply is changed.
+		_, xerr := ctrler.waitMint(bctx)
+		since := time.Since(start)
+
+		ctrler.logger.Debug("wait to process mint and reward", "delay", since)
+		if xerr != nil {
 			ctrler.logger.Error("fail to requestMint", "error", xerr.Error())
 			return nil, xerr
 		}
 	}
 
+	//
+	// Set supply info to ledger
+	if ctrler.lastTotalSupply.IsChanged() {
+		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), ctrler.lastTotalSupply, true); xerr != nil {
+			return nil, xerr
+		}
+		ctrler.lastTotalSupply.ResetChanged()
+	}
 	return nil, nil
 }
 
 func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
-
-	if ctrler.lastTotalSupply.IsChanged() {
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), ctrler.lastTotalSupply, true); xerr != nil {
-			return nil, 0, xerr
-		}
-	}
 
 	h, v, xerr := ctrler.supplyState.Commit()
 	if xerr != nil {

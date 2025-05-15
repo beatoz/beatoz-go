@@ -1,6 +1,7 @@
 package supply
 
 import (
+	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -61,7 +62,6 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 	}
 
 	ctrler.lastTotalSupply.Add(bctx.Height(), resp.sumMintedAmt)
-
 	return resp, nil
 }
 
@@ -103,6 +103,13 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
 		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
+		if addedSupply.Sign() < 0 {
+			respCh <- &respMint{
+				xerr: xerrors.From(fmt.Errorf("critical error: calculated additional issuance amount must not be negative (got %v)", addedSupply)),
+			}
+			continue
+		}
+
 		rwdToVals := addedSupply.Mul(valRate).Floor()
 		rwdToAll := addedSupply.Sub(rwdToVals)
 
@@ -137,6 +144,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 					addr: benef.Address(),
 					amt:  uint256.MustFromBig(rwd.BigInt()),
 				}
+
 				_ = sumMintedAmt.Add(sumMintedAmt, rewards[i].amt)
 
 				remainder = rwd.Sub(rwd.Floor())
@@ -150,7 +158,6 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			rewards:      rewards,
 		}
 	}
-
 }
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
@@ -160,7 +167,7 @@ func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda 
 	}
 	_lambda := decimal.New(int64(lambda), -3)
 	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
-	expWHid := wa.Mul(H(height-adjustedHeight, 1))
+	expWHid := wa.Mul(H(height-adjustedHeight, 1)) // todo: change block interval
 
 	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
 	denom := decLambdaAddOne.Pow(expWHid)

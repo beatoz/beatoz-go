@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethcore "github.com/ethereum/go-ethereum/core"
@@ -116,6 +117,7 @@ func (bctx *BlockContext) ChainID() string {
 	return bctx.blockInfo.Header.ChainID
 }
 
+// DEPRECATED: Use for test only
 func (bctx *BlockContext) SetHeight(h int64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
@@ -128,6 +130,20 @@ func (bctx *BlockContext) Height() int64 {
 	defer bctx.mtx.RUnlock()
 
 	return bctx.blockInfo.Header.Height
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetProposerAddress(addr types.Address) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.ProposerAddress = addr
+}
+
+func (bctx *BlockContext) ProposerAddress() types.Address {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+	return bctx.blockInfo.Header.ProposerAddress
 }
 
 func (bctx *BlockContext) PreAppHash() bytes.HexBytes {

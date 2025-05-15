@@ -74,7 +74,7 @@ func (mock *AcctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *ct
 	return acct
 }
 
-func (mock *AcctHandlerMock) FindAccount(addr types.Address, exec bool) *ctrlertypes.Account {
+func (mock *AcctHandlerMock) FindAccount(addr types.Address, _ bool) *ctrlertypes.Account {
 	if w := mock.FindWallet(addr); w != nil {
 		return w.GetAccount()
 	}
@@ -108,7 +108,7 @@ func (mock *AcctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec boo
 }
 
 func (mock *AcctHandlerMock) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if receiver := mock.FindAccount(addr, exec); receiver == nil {
+	if receiver := mock.FindOrNewAccount(addr, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := receiver.AddBalance(amt); xerr != nil {
 		return xerr

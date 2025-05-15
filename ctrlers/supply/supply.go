@@ -76,17 +76,20 @@ func (s *Supply) Sub(height int64, amt *uint256.Int) {
 
 func (s *Supply) AdjustAdd(height int64, amt *uint256.Int) {
 	s.Add(height, amt)
-	_ = s.adjustSupply.Add(s.adjustSupply, amt)
+	s.adjustSupply = s.totalSupply.Clone()
 	s._proto.AdjustHeight = height
 }
 
 func (s *Supply) AdjustSub(height int64, amt *uint256.Int) {
 	s.Sub(height, amt)
-	_ = s.adjustSupply.Sub(s.adjustSupply, amt)
+	s.adjustSupply = s.totalSupply.Clone()
 	s._proto.AdjustHeight = height
 }
 func (s *Supply) IsChanged() bool {
 	return s.changed
+}
+func (s *Supply) ResetChanged() {
+	s.changed = false
 }
 
 var _ v1.ILedgerItem = (*Supply)(nil)

@@ -27,6 +27,7 @@ func init() {
 	config.SetRoot(rootDir)
 
 	govMock = govmock.NewGovHandlerMock(types.DefaultGovParams())
+	govMock.GetValues().InflationCycleBlocks = 10
 	acctMock = acctmock.NewAcctHandlerMock(1000)
 	//acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 	//	w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
@@ -61,12 +62,8 @@ func Test_InitLedger(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 }
 
-func Test_Burn(t *testing.T) {
-
-}
-
 func initLedger(initSupply *uint256.Int) (*SupplyCtrler, xerrors.XError) {
-	ctrler, xerr := NewSupplyCtrler(config, log.NewNopLogger())
+	ctrler, xerr := NewSupplyCtrler(config, log.NewNopLogger() /*log.NewTMLogger(os.Stdout)*/)
 	if xerr != nil {
 		return nil, xerr
 	}
