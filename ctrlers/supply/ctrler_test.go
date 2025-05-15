@@ -40,9 +40,10 @@ func Test_InitLedger(t *testing.T) {
 	intiSupply := types.PowerToAmount(350_000_000)
 	ctrler, xerr := initLedger(intiSupply)
 	require.NoError(t, xerr)
-	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.Dec())
-	require.Equal(t, intiSupply.Dec(), ctrler.lastAdjustedSupply.Dec())
-	require.Equal(t, int64(1), ctrler.lastAdjustedHeight)
+	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.GetTotalSupply().Dec())
+	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.GetAdjustSupply().Dec())
+	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetHeight())
+	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetAdjustHeight())
 
 	_ = mocks.InitBlockCtxWith(1, govMock, nil, nil, nil, nil)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
@@ -51,9 +52,10 @@ func Test_InitLedger(t *testing.T) {
 
 	ctrler, xerr = NewSupplyCtrler(config, log.NewNopLogger())
 	require.NoError(t, xerr)
-	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.Dec())
-	require.Equal(t, intiSupply.Dec(), ctrler.lastAdjustedSupply.Dec())
-	require.Equal(t, int64(1), ctrler.lastAdjustedHeight)
+	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.GetTotalSupply().Dec())
+	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.GetAdjustSupply().Dec())
+	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetHeight())
+	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetAdjustHeight())
 
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.RootDir))

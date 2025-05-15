@@ -17,19 +17,6 @@ func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		ctrler.requestMint(bctx)
 	}
-	return nil, nil
-}
-
-func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
-		if _, xerr := ctrler.waitMint(bctx); xerr != nil {
-			ctrler.logger.Error("fail to requestMint", "error", xerr.Error())
-			return nil, xerr
-		}
-	}
 
 	//
 	// Process transactions fee
@@ -61,35 +48,30 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	return nil, nil
 }
 
+func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
+		if _, xerr := ctrler.waitMint(bctx); xerr != nil {
+			ctrler.logger.Error("fail to requestMint", "error", xerr.Error())
+			return nil, xerr
+		}
+	}
+
+	return nil, nil
+}
+
 func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// todo: Improve how to save minted and burned info. at Commit.
-	//  Consider change Supply type.
-	if ctrler.mintedSupply != nil || ctrler.burnedSupply != nil {
-		newSupply := NewSupply(ctrler.burnedSupply.Height(), ctrler.lastTotalSupply, uint256.NewInt(0))
-		if ctrler.mintedSupply != nil {
-			newSupply.Mint(ctrler.mintedSupply.Change())
-			ctrler.mintedSupply = nil
-		}
-		if ctrler.burnedSupply != nil {
-			newSupply.Burn(ctrler.burnedSupply.Change())
-			if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), newSupply, true); xerr != nil {
-				ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
-				return nil, 0, xerr
-			}
-			ctrler.burnedSupply = nil
-		}
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), newSupply, true); xerr != nil {
-			ctrler.logger.Error("fail to set total supply", "error", xerr.Error())
+	if ctrler.lastTotalSupply.IsChanged() {
+		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), ctrler.lastTotalSupply, true); xerr != nil {
 			return nil, 0, xerr
 		}
-
-		ctrler.lastTotalSupply = newSupply.supply
-		ctrler.lastAdjustedSupply = newSupply.supply
-		ctrler.lastAdjustedHeight = newSupply.Height()
 	}
+
 	h, v, xerr := ctrler.supplyState.Commit()
 	if xerr != nil {
 		return nil, 0, xerr

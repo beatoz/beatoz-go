@@ -15,7 +15,6 @@ var (
 	KeyPrefixFrozenVPower     = []byte{0x22}
 	KeyPrefixMissedBlockCount = []byte{0x23}
 	KeyPrefixTotalSupply      = []byte{0x30}
-	KeyPrefixAdjustedSupply   = []byte{0x31}
 	KeyPrefixReward           = []byte{0x32}
 )
 
@@ -73,10 +72,7 @@ func LedgerKeyMissedBlockCount(signer types.Address) LedgerKey {
 }
 
 func LedgerKeyTotalSupply() LedgerKey {
-	return append(KeyPrefixAdjustedSupply, []byte("total")...)
-}
-func LedgerKeyAdjustedSupply() LedgerKey {
-	return append(KeyPrefixAdjustedSupply, []byte("adjust")...)
+	return append(KeyPrefixTotalSupply, []byte("supply")...)
 }
 
 func LedgerKeyReward(owner types.Address) LedgerKey {

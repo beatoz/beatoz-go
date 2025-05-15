@@ -2,10 +2,27 @@ package supply
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
 )
+
+type mintedReward struct {
+	addr btztypes.Address
+	amt  *uint256.Int
+}
+type reqMint struct {
+	bctx               *ctrlertypes.BlockContext
+	lastTotalSupply    *uint256.Int
+	lastAdjustedSupply *uint256.Int
+	lastAdjustedHeight int64
+}
+type respMint struct {
+	xerr         xerrors.XError
+	sumMintedAmt *uint256.Int
+	rewards      []*mintedReward
+}
 
 func (ctrler *SupplyCtrler) RequestMint(bctx *ctrlertypes.BlockContext) {
 	ctrler.mtx.Lock()
@@ -19,15 +36,17 @@ func (ctrler *SupplyCtrler) RequestMint(bctx *ctrlertypes.BlockContext) {
 func (ctrler *SupplyCtrler) requestMint(bctx *ctrlertypes.BlockContext) {
 	ctrler.reqCh <- &reqMint{
 		bctx:               bctx,
-		lastTotalSupply:    ctrler.lastTotalSupply.Clone(),
-		lastAdjustedSupply: ctrler.lastAdjustedSupply.Clone(),
-		lastAdjustedHeight: ctrler.lastAdjustedHeight,
+		lastTotalSupply:    ctrler.lastTotalSupply.GetTotalSupply(),
+		lastAdjustedSupply: ctrler.lastTotalSupply.GetAdjustSupply(),
+		lastAdjustedHeight: ctrler.lastTotalSupply.GetAdjustHeight(),
 	}
 }
 
 // waitMint updates supplyState of ctrler.
 // it is called from EndBlock.
 func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint, xerrors.XError) {
+
+	// wait response from computeIssuanceAndRewardRoutine
 	resp, _ := <-ctrler.respCh
 	if resp == nil {
 		return nil, xerrors.ErrNotFoundResult.Wrapf("no minting result")
@@ -37,18 +56,12 @@ func (ctrler *SupplyCtrler) waitMint(bctx *ctrlertypes.BlockContext) (*respMint,
 	}
 
 	// distribute rewards
-	if xerr := ctrler.addReward(resp.rewards, bctx.Height(), bctx.GovHandler.RewardPoolAddress()); xerr != nil {
+	if xerr := ctrler.distReward(resp.rewards, bctx.Height(), bctx.GovHandler.RewardPoolAddress()); xerr != nil {
 		return nil, xerr
 	}
 
-	if ctrler.mintedSupply == nil {
-		ctrler.mintedSupply = NewSupply(bctx.Height(), uint256.NewInt(0), uint256.NewInt(0))
-	}
-	ctrler.mintedSupply.Mint(resp.newSupply.Change())
-	//if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), resp.newSupply, true); xerr != nil {
-	//	return nil, xerr
-	//}
-	//ctrler.lastTotalSupply = resp.newSupply.Supply()
+	ctrler.lastTotalSupply.Add(bctx.Height(), resp.sumMintedAmt)
+
 	return resp, nil
 }
 
@@ -79,8 +92,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		)
 		if xerr != nil {
 			respCh <- &respMint{
-				xerr:      xerr,
-				newSupply: nil,
+				xerr: xerr,
 			}
 			continue
 		}
@@ -99,7 +111,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		beneficiaries := retWeight.Beneficiaries()
 		rewards := make([]*mintedReward, len(beneficiaries))
-		mintedSupply := uint256.NewInt(0)
+		sumMintedAmt := uint256.NewInt(0)
 		{
 			remainder := decimal.Zero
 			precision := int32(6)
@@ -125,20 +137,17 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 					addr: benef.Address(),
 					amt:  uint256.MustFromBig(rwd.BigInt()),
 				}
-				_ = mintedSupply.Add(mintedSupply, rewards[i].amt)
+				_ = sumMintedAmt.Add(sumMintedAmt, rewards[i].amt)
 
 				remainder = rwd.Sub(rwd.Floor())
 			}
 		}
 
+		// sumMintedAmt should be equal to addedSupply.
 		respCh <- &respMint{
-			xerr: nil,
-			newSupply: NewSupply(
-				bctx.Height(),
-				nil,
-				mintedSupply,
-			),
-			rewards: rewards,
+			xerr:         nil,
+			sumMintedAmt: sumMintedAmt,
+			rewards:      rewards,
 		}
 	}
 

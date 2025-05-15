@@ -4,8 +4,9 @@ option go_package = "github.com/beatoz/beatoz-go/ctrlers/supply";
 
 message SupplyProto {
   int64 height = 1;
-  bytes _supply = 2;
-  bytes _change = 3;
+  bytes _total_supply = 2;
+  int64 adjust_height = 3;
+  bytes _adjust_supply = 4;
 }
 
 

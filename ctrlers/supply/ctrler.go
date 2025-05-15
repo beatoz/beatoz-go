@@ -6,38 +6,16 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
-	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
 
-type mintedReward struct {
-	addr btztypes.Address
-	amt  *uint256.Int
-}
-type reqMint struct {
-	bctx               *ctrlertypes.BlockContext
-	lastTotalSupply    *uint256.Int
-	lastAdjustedSupply *uint256.Int
-	lastAdjustedHeight int64
-}
-type respMint struct {
-	xerr      xerrors.XError
-	newSupply *Supply
-	rewards   []*mintedReward
-}
-
 type SupplyCtrler struct {
 	supplyState v1.IStateLedger
 
-	lastTotalSupply    *uint256.Int
-	lastAdjustedSupply *uint256.Int
-	lastAdjustedHeight int64
-
-	mintedSupply *Supply
-	burnedSupply *Supply
+	lastTotalSupply *Supply
 
 	reqCh  chan *reqMint
 	respCh chan *respMint
@@ -47,7 +25,7 @@ type SupplyCtrler struct {
 }
 
 func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
-	if bytes.HasPrefix(key, v1.KeyPrefixTotalSupply) || bytes.HasPrefix(key, v1.KeyPrefixAdjustedSupply) {
+	if bytes.HasPrefix(key, v1.KeyPrefixTotalSupply) {
 		return &Supply{}
 	} else if bytes.HasPrefix(key, v1.KeyPrefixReward) {
 		return &Reward{}
@@ -70,29 +48,19 @@ func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xe
 	}
 	total, _ := item.(*Supply)
 	if total == nil {
-		total = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0))
+		total = NewSupply() // at genesis time.
 	}
 
-	item, xerr = ledger.Get(v1.LedgerKeyAdjustedSupply(), true)
-	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
-		return nil, xerr
-	}
-	adjusted, _ := item.(*Supply)
-	if adjusted == nil {
-		adjusted = NewSupply(0, uint256.NewInt(0), uint256.NewInt(0))
-	}
 	reqCh, respCh := make(chan *reqMint, 1), make(chan *respMint, 1)
 	go computeIssuanceAndRewardRoutine(reqCh, respCh)
 
 	return &SupplyCtrler{
-		supplyState:        ledger,
-		lastTotalSupply:    total.Supply(),
-		lastAdjustedSupply: adjusted.Supply(),
-		lastAdjustedHeight: adjusted.Height(),
-		reqCh:              reqCh,
-		respCh:             respCh,
-		logger:             lg,
-		mtx:                sync.RWMutex{},
+		supplyState:     ledger,
+		lastTotalSupply: total,
+		reqCh:           reqCh,
+		respCh:          respCh,
+		logger:          lg,
+		mtx:             sync.RWMutex{},
 	}, nil
 }
 
@@ -100,22 +68,8 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	initTotalSupply := req.(*uint256.Int)
-	ctrler.lastTotalSupply = initTotalSupply
-	ctrler.lastAdjustedSupply = initTotalSupply
-	ctrler.lastAdjustedHeight = 1
-
-	// set initial total supply
-	initSupply := NewSupply(1, initTotalSupply, initTotalSupply)
-	if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), initSupply, true); xerr != nil {
-		return xerr
-	}
-
-	// set initial adjusted supply & height
-	if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), initSupply, true); xerr != nil {
-		return xerr
-	}
-
+	// it will be saved at Commit
+	ctrler.lastTotalSupply.AdjustAdd(1, req.(*uint256.Int))
 	return nil
 }
 

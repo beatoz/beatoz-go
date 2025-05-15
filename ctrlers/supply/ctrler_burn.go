@@ -14,27 +14,6 @@ func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.In
 }
 
 func (ctrler *SupplyCtrler) burn(height int64, amt *uint256.Int) xerrors.XError {
-	if ctrler.burnedSupply == nil {
-		ctrler.burnedSupply = NewSupply(height, uint256.NewInt(0), uint256.NewInt(0))
-	}
-	ctrler.burnedSupply.Burn(amt)
-
-	//adjusted := new(uint256.Int).Sub(ctrler.lastTotalSupply, amt)
-	//burn := &Supply{
-	//	SupplyProto: SupplyProto{
-	//		Height:  height,
-	//		XSupply: adjusted.Bytes(),
-	//		XChange: amt.Bytes(),
-	//	},
-	//}
-	//if xerr := ctrler.supplyState.Set(v1.LedgerKeyAdjustedSupply(), burn, true); xerr != nil {
-	//	ctrler.logger.Error("fail to set adjusted supply", "error", xerr.Error())
-	//	return xerr
-	//}
-	//
-	//ctrler.lastTotalSupply = adjusted
-	//ctrler.lastAdjustedSupply = adjusted
-	//ctrler.lastAdjustedHeight = height
-
+	ctrler.lastTotalSupply.AdjustSub(height, amt)
 	return nil
 }

@@ -9,17 +9,17 @@ import (
 	"github.com/holiman/uint256"
 )
 
-// addReward distributes applies `mintedReward` to `supplyState`.
+// distReward distributes applies `mintedReward` to `supplyState`.
 // this is called from waitMint that is called from EndBlock.
-func (ctrler *SupplyCtrler) addReward(rewards []*mintedReward, height int64, poolAddr btztypes.Address) xerrors.XError {
+func (ctrler *SupplyCtrler) distReward(rewards []*mintedReward, height int64, poolAddr btztypes.Address) xerrors.XError {
 	if poolAddr != nil && !bytes.Equal(poolAddr, btztypes.ZeroAddress()) {
-		return ctrler.addRewqrdToPool()
+		return ctrler.distRewqrdToPool()
 	} else {
-		return ctrler.addRewardToState(rewards, height)
+		return ctrler.distRewardToState(rewards, height)
 	}
 }
 
-func (ctrler *SupplyCtrler) addRewardToState(rewards []*mintedReward, height int64) xerrors.XError {
+func (ctrler *SupplyCtrler) distRewardToState(rewards []*mintedReward, height int64) xerrors.XError {
 	for _, nrwd := range rewards {
 		item, xerr := ctrler.supplyState.Get(v1.LedgerKeyReward(nrwd.addr), true)
 		if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
@@ -39,7 +39,7 @@ func (ctrler *SupplyCtrler) addRewardToState(rewards []*mintedReward, height int
 	return nil
 }
 
-func (ctrler *SupplyCtrler) addRewqrdToPool() xerrors.XError {
+func (ctrler *SupplyCtrler) distRewqrdToPool() xerrors.XError {
 	panic("not supported yet")
 }
 

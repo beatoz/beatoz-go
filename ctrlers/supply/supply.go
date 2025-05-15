@@ -7,36 +7,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-/*
-Height  int64  `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
-
-	XSupply []byte `protobuf:"bytes,2,opt,name=_supply,json=Supply,proto3" json:"_supply,omitempty"`
-	XChange []byte `protobuf:"bytes,3,opt,name=_change,json=Change,proto3" json:"_change,omitempty"`
-	IsMint  bool   `protobuf:"varint,4,opt,name=is_mint,json=isMint,proto3" json:"is_mint,omitempty"`
-*/
 type Supply struct {
-	_proto SupplyProto
-	supply *uint256.Int
-	change *uint256.Int
+	_proto       SupplyProto
+	totalSupply  *uint256.Int
+	adjustSupply *uint256.Int
+	changed      bool
 }
 
-func NewSupply(height int64, supply, change *uint256.Int) *Supply {
-	var xsupply, xchange []byte
-	if supply != nil {
-		xsupply = supply.Bytes()
-	}
-	if change != nil {
-		xchange = change.Bytes()
-	}
-	ret := &Supply{
-		_proto: SupplyProto{
-			Height:  height,
-			XSupply: xsupply,
-			XChange: xchange,
-		},
-		supply: supply,
-		change: change,
-	}
+func NewSupply() *Supply {
+	ret := &Supply{}
+	ret.fromProto()
 	return ret
 }
 
@@ -58,35 +38,55 @@ func (s *Supply) Decode(k, v []byte) xerrors.XError {
 }
 
 func (s *Supply) fromProto() {
-	s.supply = new(uint256.Int).SetBytes(s._proto.XSupply)
-	s.change = new(uint256.Int).SetBytes(s._proto.XChange)
+	s.totalSupply = new(uint256.Int).SetBytes(s._proto.XTotalSupply)
+	s.adjustSupply = new(uint256.Int).SetBytes(s._proto.XAdjustSupply)
 }
 
 func (s *Supply) toProto() {
-	s._proto.XSupply = s.supply.Bytes()
-	s._proto.XChange = s.change.Bytes()
+	s._proto.XTotalSupply = s.totalSupply.Bytes()
+	s._proto.XAdjustSupply = s.adjustSupply.Bytes()
 }
 
-func (s *Supply) Supply() *uint256.Int {
-	return s.supply.Clone()
+func (s *Supply) GetTotalSupply() *uint256.Int {
+	return s.totalSupply.Clone()
 }
 
-func (s *Supply) Change() *uint256.Int {
-	return s.change.Clone()
+func (s *Supply) GetAdjustSupply() *uint256.Int {
+	return s.adjustSupply.Clone()
 }
 
-func (s *Supply) Height() int64 {
+func (s *Supply) GetHeight() int64 {
 	return s._proto.Height
 }
 
-func (s *Supply) Mint(amt *uint256.Int) {
-	_ = s.supply.Add(s.supply, amt)
-	_ = s.change.Add(s.change, amt)
+func (s *Supply) GetAdjustHeight() int64 {
+	return s._proto.AdjustHeight
 }
 
-func (s *Supply) Burn(amt *uint256.Int) {
-	_ = s.supply.Sub(s.supply, amt)
-	_ = s.change.Add(s.change, amt)
+func (s *Supply) Add(height int64, amt *uint256.Int) {
+	_ = s.totalSupply.Add(s.totalSupply, amt)
+	s._proto.Height = height
+	s.changed = true
+}
+func (s *Supply) Sub(height int64, amt *uint256.Int) {
+	_ = s.totalSupply.Sub(s.totalSupply, amt)
+	s._proto.Height = height
+	s.changed = true
+}
+
+func (s *Supply) AdjustAdd(height int64, amt *uint256.Int) {
+	s.Add(height, amt)
+	_ = s.adjustSupply.Add(s.adjustSupply, amt)
+	s._proto.AdjustHeight = height
+}
+
+func (s *Supply) AdjustSub(height int64, amt *uint256.Int) {
+	s.Sub(height, amt)
+	_ = s.adjustSupply.Sub(s.adjustSupply, amt)
+	s._proto.AdjustHeight = height
+}
+func (s *Supply) IsChanged() bool {
+	return s.changed
 }
 
 var _ v1.ILedgerItem = (*Supply)(nil)
