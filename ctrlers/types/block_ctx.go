@@ -406,7 +406,7 @@ func (bctx *BlockContext) SetProposerAddress(addr types.Address) {
 }
 
 // DEPRECATED: Use for test only
-func (bctx *BlockContext) SetEvidance(evidences []abcitypes.Evidence) {
+func (bctx *BlockContext) SetByzantine(evidences []abcitypes.Evidence) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 

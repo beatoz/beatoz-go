@@ -95,7 +95,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 		},
 		Height: offenseHeight,
 	}
-	mocks.CurrBlockCtx().SetEvidance([]abcitypes.Evidence{evidence})
+	mocks.CurrBlockCtx().SetByzantine([]abcitypes.Evidence{evidence})
 
 	require.NoError(t, mocks.DoBeginBlock(localGovCtrler))
 
