@@ -158,7 +158,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
-		AppVersion:       version.Uint64(version.MASK_MAJOR_VER, version.MASK_MINOR_VER),
+		AppVersion:       version.Major(),
 		LastBlockHeight:  lastHeight,
 		LastBlockAppHash: appHash,
 	}

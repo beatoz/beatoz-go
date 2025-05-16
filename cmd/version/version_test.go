@@ -3,6 +3,7 @@ package version
 import (
 	"github.com/stretchr/testify/require"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
+	"strconv"
 	"testing"
 )
 
@@ -36,4 +37,15 @@ func TestVersionMasking(t *testing.T) {
 		maskedVer = Uint64(MASK_MINOR_VER, MASK_COMMIT_VER)
 		require.Equal(t, minorVer<<48+commitVer, maskedVer)
 	}
+}
+
+func TestVersionParsing(t *testing.T) {
+	parseVersions("v1.2.3", "abcdef0123")
+	require.Equal(t, uint64(1), majorVer)
+	require.Equal(t, uint64(2), minorVer)
+	require.Equal(t, uint64(3), patchVer)
+
+	n, err := strconv.ParseUint("abcdef0123", 16, 64)
+	require.NoError(t, err)
+	require.Equal(t, n, commitVer)
 }
