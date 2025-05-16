@@ -3,7 +3,6 @@ package gov
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/stretchr/testify/require"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"math/rand"
 	"testing"
 	"time"
@@ -33,12 +32,7 @@ func TestPunish(t *testing.T) {
 		}
 	}
 
-	slashed, err := govCtrler.DoPunish(&abcitypes.Evidence{
-		Validator: abcitypes.Validator{
-			Address: valAddr,
-			Power:   stakeHelper.TotalPowerOf(valAddr),
-		},
-	})
+	slashed, err := govCtrler.doPunish(valAddr)
 	require.NoError(t, err)
 
 	// commit

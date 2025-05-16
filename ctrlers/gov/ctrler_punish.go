@@ -6,22 +6,13 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
-// DoPunish slashes the voting power of the byzantine validator(voter).
+// doPunish slashes the voting power of the byzantine validator(voter).
 // If the voter has already voted, it will be canceled.
 // This function is called from BeatozApp::BeginBlock.
-func (ctrler *GovCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	return ctrler.doPunish(evi)
-}
-
-func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
+func (ctrler *GovCtrler) doPunish(targetAddr types.Address) (int64, xerrors.XError) {
 	slashedPower := int64(0)
-	targetAddr := types.Address(evi.Validator.Address)
 
 	_ = ctrler.proposalState.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		prop, _ := item.(*proposal.GovProposal)
