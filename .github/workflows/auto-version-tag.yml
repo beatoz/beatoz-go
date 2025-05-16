@@ -1,0 +1,48 @@
+name: Auto Version Tag & Release
+
+on:
+  push:
+    branches:
+      - kyle-inflation
+
+jobs:
+  tag-and-release:
+    name: Bump Version, Tag, and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get Latest Tag
+        id: get_tag
+        run: |
+          latest_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+
+      - name: Run Version Script
+        id: new_tag
+        run: |
+          chmod +x scripts/auto-version-tag.sh
+          ./scripts/auto-version-tag.sh --dry > version_output.txt
+          tag=$(grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' version_output.txt | tail -n 1)
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      - name: Actually Tag and Push
+        if: steps.new_tag.outputs.tag != '' && steps.new_tag.outputs.tag != steps.get_tag.outputs.latest_tag
+        run: |
+          ./scripts/auto-version-tag.sh
+
+      - name: Create GitHub Release
+        if: steps.new_tag.outputs.tag != steps.get_tag.outputs.latest_tag
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.new_tag.outputs.tag }}
+          name: Release ${{ steps.new_tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
