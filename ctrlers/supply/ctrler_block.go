@@ -37,11 +37,11 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		burnAmt = new(uint256.Int).Div(burnAmt, uint256.NewInt(100))
 
 		// In ctrler.burn, ctrler.lastTotalSupply is changed.
-		if xerr := ctrler.burn(bctx.Height(), burnAmt); xerr != nil {
+		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.BurnAddress(), burnAmt, true); xerr != nil {
 			return nil, xerr
 		}
 
-		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.BurnAddress(), burnAmt, true); xerr != nil {
+		if xerr := ctrler.burn(bctx.Height(), burnAmt); xerr != nil {
 			return nil, xerr
 		}
 

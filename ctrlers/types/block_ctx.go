@@ -117,27 +117,11 @@ func (bctx *BlockContext) ChainID() string {
 	return bctx.blockInfo.Header.ChainID
 }
 
-// DEPRECATED: Use for test only
-func (bctx *BlockContext) SetHeight(h int64) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	bctx.blockInfo.Header.Height = h
-}
-
 func (bctx *BlockContext) Height() int64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
 	return bctx.blockInfo.Header.Height
-}
-
-// DEPRECATED: Use for test only
-func (bctx *BlockContext) SetProposerAddress(addr types.Address) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	bctx.blockInfo.Header.ProposerAddress = addr
 }
 
 func (bctx *BlockContext) ProposerAddress() types.Address {
@@ -395,4 +379,28 @@ func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max int64) int6
 		blockGasLimit = min
 	}
 	return blockGasLimit
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetHeight(h int64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.Height = h
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetProposerAddress(addr types.Address) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.ProposerAddress = addr
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetEvidance(evidences []abcitypes.Evidence) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.ByzantineValidators = append(bctx.blockInfo.ByzantineValidators, evidences...)
 }

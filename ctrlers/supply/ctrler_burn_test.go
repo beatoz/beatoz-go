@@ -58,6 +58,10 @@ func Test_Burn(t *testing.T) {
 
 		expectedBurned, expectedRwdFee, expectedProposerBal := uint256.NewInt(0), uint256.NewInt(0), uint256.NewInt(0)
 		if bytes.RandInt64N(1000)%2 == 0 {
+			// when the burning occurs.
+
+			// todo: test when the burning occurs multiple times in a block.
+
 			gas := bytes.RandInt64N(500_000) + govMock.MinTrxGas()
 			fee := types.GasToFee(gas, govMock.GasPrice())
 			mocks.CurrBlockCtx().AddFee(fee)
