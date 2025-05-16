@@ -20,24 +20,28 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	if len(byzantines) > 0 {
 		ctrler.logger.Info("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
-			if slashed, xerr := ctrler.doPunish(
-				&evi, bctx.GovHandler.SlashRate()); xerr != nil {
+			// slash the byzantine validator's voting power.
+			slashed, xerr := ctrler.doPunish(evi.Validator.Address, bctx.GovHandler.SlashRate())
+			if xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
-			} else if xerr = bctx.SupplyHandler.Burn(bctx, ctrlertypes.PowerToAmount(slashed)); xerr != nil {
-				return nil, xerr
-			} else {
-				evts = append(evts, abcitypes.Event{
-					Type: "punishment.stake",
-					Attributes: []abcitypes.EventAttribute{
-						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
-						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
-						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
-						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
-					},
-				})
 			}
+
+			// apply to SupplyHandler.lastTotalSupply.
+			if xerr := bctx.SupplyHandler.Burn(bctx, ctrlertypes.PowerToAmount(slashed)); xerr != nil {
+				return nil, xerr
+			}
+
+			evts = append(evts, abcitypes.Event{
+				Type: "slashing.stake",
+				Attributes: []abcitypes.EventAttribute{
+					{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
+					{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
+					{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
+					{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
+				},
+			})
 		}
 	}
 

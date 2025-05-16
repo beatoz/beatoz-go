@@ -1,20 +1,20 @@
 package vpower
 
 import (
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
 // doPunish is executed at BeginBlock
-func (ctrler *VPowerCtrler) doPunish(evi *abcitypes.Evidence, slashRate int32) (int64, xerrors.XError) {
-	dgtee, xerr := ctrler.readDelegatee(evi.Validator.Address, true)
+func (ctrler *VPowerCtrler) doPunish(byzantineAddr types.Address, slashRate int32) (int64, xerrors.XError) {
+	dgtee, xerr := ctrler.readDelegatee(byzantineAddr, true)
 	if xerr != nil {
 		return 0, xerr
 	}
 
 	//Punish the delegators as well as validator. issue #51
-	slashedPower, slashedSumPower, slashedSelfPower := int64(0), int64(0), int64(0)
+	slashedPower := int64(0)
 	for _, addr := range dgtee.Delegators {
 		vpow, xerr := ctrler.readVPower(addr, dgtee.addr, true)
 		if xerr != nil {
@@ -26,19 +26,19 @@ func (ctrler *VPowerCtrler) doPunish(evi *abcitypes.Evidence, slashRate int32) (
 			slashed := (pc.Power * int64(slashRate)) / 100
 			pc.Power -= slashed
 
-			slashedPower += slashed
-			slashedSumPower += pc.Power
+			vpow.SumPower -= slashed
+			dgtee.SumPower -= slashed
 			if bytes.Equal(addr, vpow.to) {
-				slashedSelfPower += pc.Power
+				dgtee.SelfPower -= slashed
 			}
+
+			slashedPower += slashed
 		}
 		if xerr = ctrler.writeVPower(vpow, true); xerr != nil {
 			return 0, xerr
 		}
 	}
 
-	dgtee.SumPower = slashedSumPower
-	dgtee.SelfPower = slashedSelfPower
 	if xerr = ctrler.writeDelegatee(dgtee, true); xerr != nil {
 		return 0, xerr
 	}
