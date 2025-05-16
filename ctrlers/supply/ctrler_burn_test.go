@@ -38,7 +38,7 @@ func Test_Burn(t *testing.T) {
 
 	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, nil, vpowMock)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
-	require.NoError(t, mocks.DoEndBlockCommit(ctrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
 	require.Equal(t, initSupply, ctrler.lastTotalSupply.totalSupply)
 	require.Equal(t, initSupply, ctrler.lastTotalSupply.adjustSupply)
@@ -147,7 +147,7 @@ func Test_Burn(t *testing.T) {
 			require.Equal(t, expectedProposerBal, acct.GetBalance())
 		}
 
-		require.NoError(t, mocks.DoCommitBlock(ctrler))
+		require.NoError(t, mocks.DoCommit(ctrler))
 
 		require.Equal(t, expectedTotalSupply, ctrler.lastTotalSupply.totalSupply)
 		require.Equal(t, expectedAdjustedSupply, ctrler.lastTotalSupply.adjustSupply)

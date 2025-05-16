@@ -22,7 +22,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 
 	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, nil, ctrler)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
-	require.NoError(t, mocks.DoEndBlockCommit(ctrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
 	//var fromWals0, toWals0 []*web3.Wallet
 	var powChunks0 []*PowerChunkProto
@@ -34,9 +34,10 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 			Height: 1,
 		})
 	}
-	for h := int64(2); h <= govMock.RipeningBlocks()*5; h++ {
-
-		require.NoError(t, mocks.DoBeginBlock(ctrler))
+	for h := int64(2); h <= govMock.RipeningBlocks()*2; h += govMock.InflationCycleBlocks() {
+		for i := mocks.CurrBlockCtx().Height(); i < h-1; i++ {
+			require.NoError(t, mocks.DoCommit(ctrler))
+		}
 
 		// processing random staking(delegating) txs
 		cnt := rand.Intn(100)
@@ -57,7 +58,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 			//toWals0 = append(toWals0, tos...)
 		}
 
-		require.NoError(t, mocks.DoEndBlockCommit(ctrler))
+		require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
 		// compute weight
 		// WaEx64ByPowerChunks
@@ -96,33 +97,6 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		require.Equal(t, w_computed.String(), sumIndW.String())
 		require.True(t, w_waex64pc.LessThanOrEqual(decimalOne), "WaEx64ByPowerChunks", w_waex64pc, "height", h)
 		require.True(t, w_computed.LessThanOrEqual(decimalOne), "ComputeWeight", w_computed, "height", h)
-		////
-		//if w_waex64pc.String() != w_computed.String() {
-		//	fmt.Println("--- WaEx64ByPowerChunk return", w_waex64pc)
-		//	for i, fw := range fromWals0 {
-		//		tw := toWals0[i]
-		//		pc := powChunks0[i]
-		//		fmt.Println("currHeight", h, "from", fw.Address(), "to", tw.Address(), "power", pc.Power, "txhash", bytes.HexBytes(pc.TxHash))
-		//	}
-		//	fmt.Println("WaEx64ByPowerChunk power count", len(powChunks0))
-		//	fmt.Println("--- ComputeWeight return", w_computed)
-		//	_cnt := 0
-		//	_sumW := decimal.Zero
-		//	for _, val := range ctrler.lastValidators {
-		//		for _, from := range val.Delegators {
-		//			vpow, xerr := ctrler.readVPower(from, val.addr, true)
-		//			require.NoError(t, xerr)
-		//			for _, pc := range vpow.PowerChunks {
-		//				fmt.Println("currHeight", h, "from", bytes.HexBytes(vpow.From), "to", vpow.to, "power", pc.Power, "txhash", bytes.HexBytes(pc.TxHash))
-		//				_cnt++
-		//
-		//				_w := WaEx64ByPowerChunk(vpow.PowerChunks, h, govParams.RipeningBlocks(), govParams.BondingBlocksWeightPermil(), totalSupply)
-		//				_sumW = _sumW.Add(_w)
-		//			}
-		//		}
-		//	}
-		//	fmt.Println("ComputeWeight power count", _cnt, "calculated weight", _sumW.String())
-		//}
 		require.Equal(t, w_waex64pc.String(), w_computed.String(), fmt.Sprintf("WaEx64ByPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, h))
 
 		//fmt.Printf("Block[%v] the %v delegate txs are executed and the weight is %v <> %v\n", h, cnt, w_waex64pc, w_computed)

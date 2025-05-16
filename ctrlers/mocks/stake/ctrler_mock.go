@@ -91,6 +91,10 @@ func (s *StakeHandlerMock) EndBlock(context *ctrlertypes.BlockContext) ([]abcity
 	panic("implement me")
 }
 
+func (s *StakeHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
 func (s *StakeHandlerMock) ValidateTrx(context *ctrlertypes.TrxContext) xerrors.XError {
 	//TODO implement me
 	panic("implement me")

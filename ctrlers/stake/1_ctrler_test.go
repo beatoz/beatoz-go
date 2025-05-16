@@ -113,7 +113,7 @@ func wrongIndividualLimit(t *testing.T) {
 	//require.NoError(t, xerr)
 	//_, _, xerr = stakeCtrler01.Commit()
 	//require.NoError(t, xerr)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 }
 
 func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
@@ -164,7 +164,7 @@ func wrongUpdatableLimit_ByNewValidator_Staking(t *testing.T) {
 	//require.NoError(t, xerr)
 	//_, _, xerr = stakeCtrler01.Commit()
 	//require.NoError(t, xerr)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 }
 
 func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
@@ -240,7 +240,7 @@ func wrongUpdatableLimit_ByNewValidator_Delegating(t *testing.T) {
 	//require.NoError(t, xerr)
 	//_, _, xerr = stakeCtrler01.Commit()
 	//require.NoError(t, xerr)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 }
 
 func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
@@ -274,7 +274,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 	//require.NoError(t, xerr)
 	//_, _, xerr = stakeCtrler01.Commit()
 	//require.NoError(t, xerr)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 
 	//bctx = mocks.NextBlockCtx()
 	//_, xerr = stakeCtrler01.BeginBlock(bctx)
@@ -309,7 +309,7 @@ func wrongUpdatableLimit_ByUnstaking(t *testing.T) {
 	//require.NoError(t, xerr)
 	//_, _, xerr = stakeCtrler01.Commit()
 	//require.NoError(t, xerr)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 }
 
 func resetTest(t *testing.T, valCnt int) {
@@ -372,7 +372,7 @@ func genesisStaking(t *testing.T, cnt int) {
 	//_, h, xerr := stakeCtrler01.Commit()
 	//require.Equal(t, bctx.Height(), h)
 	//require.NoError(t, xerr)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 
 	for i, w := range acctMock01.GetAllWallets() {
 		if i < validatorCnt {
@@ -389,7 +389,7 @@ func genesisStaking(t *testing.T, cnt int) {
 	//_, _ = stakeCtrler01.EndBlock(bctx) // at here, stakeCtrler01.lastValidators is set.
 	//_, h, _ = stakeCtrler01.Commit()
 	//require.Equal(t, bctx.Height(), h)
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler01))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler01))
 
 	vals, tp := stakeCtrler01.Validators()
 	require.Equal(t, totalPower, tp)

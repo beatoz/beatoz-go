@@ -401,4 +401,9 @@ func (memCtrler *SimuAcctCtrler) EndBlock(context *btztypes.BlockContext) ([]abc
 	panic("implement me")
 }
 
+func (memCtrler *SimuAcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
 var _ btztypes.IAccountHandler = (*SimuAcctCtrler)(nil)

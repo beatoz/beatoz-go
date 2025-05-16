@@ -518,6 +518,8 @@ func (govParams *GovParams) SlashRate() int32 {
 
 	return govParams._v.SlashRate
 }
+
+// DEPRECATED: Use InflationCycleBlocks() instead.
 func (govParams *GovParams) SignedBlocksWindow() int64 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()

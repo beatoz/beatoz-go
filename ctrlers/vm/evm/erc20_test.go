@@ -78,7 +78,7 @@ func init() {
 
 func Test_callEVM_Deploy(t *testing.T) {
 	os.RemoveAll(dbPath)
-	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)))
+	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
 
 	deployInput, err := abiERC20Contract.Pack("", "TokenOnBeatoz", "TOR")
 	require.NoError(t, err)

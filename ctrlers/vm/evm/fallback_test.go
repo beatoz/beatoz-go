@@ -42,7 +42,7 @@ func init() {
 
 func Test_Fallback(t *testing.T) {
 	os.RemoveAll(dbPath)
-	fallbackEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)))
+	fallbackEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
 
 	//
 	// deploy

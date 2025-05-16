@@ -39,7 +39,7 @@ func init() {
 	govMock = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	govMock.GetValues().LazyUnstakingBlocks = 500
 	govMock.GetValues().InflationCycleBlocks = 10
-	govMock.GetValues().RipeningBlocks = 100
+	govMock.GetValues().RipeningBlocks = 10 * govMock.InflationCycleBlocks()
 }
 
 func Test_NewValidatorSet(t *testing.T) {
@@ -84,7 +84,7 @@ func Test_NewValidatorSet(t *testing.T) {
 		}
 		//fmt.Printf("%d validators are changed, all delegatees are %v\n", len(bctx.ValUpdates), len(ctrler.allDelegatees))
 
-		require.NoError(t, mocks.DoCommitBlock(ctrler))
+		require.NoError(t, mocks.DoCommit(ctrler))
 
 		//// check ledger state
 		//require.NoError(t, xerr)

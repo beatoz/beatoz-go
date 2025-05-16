@@ -2,7 +2,6 @@ package gov
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
@@ -11,12 +10,9 @@ import (
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -90,69 +86,6 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.GovParams = *genAppState.GovParams
 	_ = ctrler.paramsState.Set(v1.LedgerKeyGovParams(), &ctrler.GovParams, true)
 	return nil
-}
-
-func (ctrler *GovCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	var evts []abcitypes.Event
-
-	byzantines := blockCtx.BlockInfo().ByzantineValidators
-	if byzantines != nil && len(byzantines) > 0 {
-		ctrler.logger.Info("GovCtrler: Byzantine validators is found", "count", len(byzantines))
-		for _, evi := range byzantines {
-			if slashed, xerr := ctrler.doPunish(&evi); xerr != nil {
-				ctrler.logger.Error("Error when punishing",
-					"byzantine", types.Address(evi.Validator.Address),
-					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
-			} else {
-				evts = append(evts, abcitypes.Event{
-					Type: "punishment.gov",
-					Attributes: []abcitypes.EventAttribute{
-						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
-						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
-						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
-						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
-					},
-				})
-			}
-		}
-	}
-
-	return evts, nil
-}
-
-// DoPunish slashes the voting power of the byzantine validator(voter).
-// If the voter has already voted, it will be canceled.
-// This function is called from BeatozApp::BeginBlock.
-func (ctrler *GovCtrler) DoPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	return ctrler.doPunish(evi)
-}
-
-func (ctrler *GovCtrler) doPunish(evi *abcitypes.Evidence) (int64, xerrors.XError) {
-	slashedPower := int64(0)
-	targetAddr := types.Address(evi.Validator.Address)
-
-	_ = ctrler.proposalState.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
-		prop, _ := item.(*proposal.GovProposal)
-		for _, v := range prop.Voters {
-			if bytes.Compare(v.Addr, targetAddr) == 0 {
-				// the voting power of `targetAddr` will be slashed and
-				// the vote of `targetAddr` will be canceled.
-				slashed, _ := prop.DoPunish(targetAddr, ctrler.SlashRate())
-				slashedPower += slashed
-
-				if xerr := ctrler.proposalState.Set(v1.LedgerKeyProposal(prop.TxHash), prop, true); xerr != nil {
-					return xerr
-				}
-				break
-			}
-		}
-		return nil
-	}, true)
-
-	return slashedPower, nil
 }
 
 func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -316,50 +249,6 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	return nil
 }
 
-func (ctrler *GovCtrler) EndBlock(ctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	var evts []abcitypes.Event
-
-	frozen, removed, xerr := ctrler.freezeProposals(ctx.Height())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	applied, xerr := ctrler.applyProposals(ctx.Height())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	for _, k := range frozen {
-		evts = append(evts, abcitypes.Event{
-			Type: "proposal",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("frozen"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
-			},
-		})
-	}
-	for _, k := range removed {
-		evts = append(evts, abcitypes.Event{
-			Type: "proposal",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("removed"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
-			},
-		})
-	}
-	for _, k := range applied {
-		evts = append(evts, abcitypes.Event{
-			Type: "proposal",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("applied"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
-			},
-		})
-	}
-
-	return evts, nil
-}
-
 // freezeProposals is called from EndBlock
 func (ctrler *GovCtrler) freezeProposals(height int64) ([]v1.LedgerKey, []v1.LedgerKey, xerrors.XError) {
 	var frozen []v1.LedgerKey
@@ -456,36 +345,6 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 	}, true)
 
 	return applied, xerr
-}
-
-func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	h0, v0, xerr := ctrler.paramsState.Commit()
-	if xerr != nil {
-		return nil, -1, xerr
-	}
-	h1, v1, xerr := ctrler.proposalState.Commit()
-	if xerr != nil {
-		return nil, -1, xerr
-	}
-	h2, v2, xerr := ctrler.frozenState.Commit()
-	if xerr != nil {
-		return nil, -1, xerr
-	}
-
-	if v0 != v1 || v1 != v2 {
-		return nil, -1, xerrors.ErrCommit.Wrapf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
-	}
-
-	if ctrler.newGovParams != nil {
-		ctrler.GovParams = *ctrler.newGovParams
-		ctrler.newGovParams = nil
-		ctrler.logger.Debug("New governance parameters is committed", "gov_params", ctrler.GovParams.String())
-	}
-	return crypto.DefaultHash(h0, h1, h2), v0, nil
-
 }
 
 func (ctrler *GovCtrler) Close() xerrors.XError {

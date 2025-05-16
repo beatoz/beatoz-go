@@ -130,7 +130,7 @@ func TestTrxStakingToSelf(t *testing.T) {
 	for _, txctx := range stakingToSelfTrxCtxs {
 		if mocks.LastBlockHeight() < txctx.Height() {
 			for mocks.LastBlockHeight() < txctx.Height() {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+				require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 			}
 		}
@@ -146,7 +146,7 @@ func TestTrxStakingToSelf(t *testing.T) {
 		sumPower += pow
 	}
 
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
@@ -161,7 +161,7 @@ func TestTrxStakingByTx(t *testing.T) {
 	for i, txctx := range stakingTrxCtxs {
 		if mocks.LastBlockHeight() < txctx.Height() {
 			for mocks.LastBlockHeight() < txctx.Height() {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+				require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 			}
 		}
@@ -194,7 +194,7 @@ func TestTrxStakingByTx(t *testing.T) {
 		sumPower += pow
 	}
 
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
@@ -283,7 +283,7 @@ func TestPunish(t *testing.T) {
 		require.Equal(t, totalPower0-sumSlashedPower0, delegatee.TotalPower)
 		require.Equal(t, totalPower0-sumSlashedPower0, delegatee.SumPowerOf(nil))
 
-		//require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+		//require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 		require.Equal(t, totalPower0-expectedSumSlashedPower, stakeCtrler.TotalPowerOf(delegatee.Addr))
 		require.Equal(t, allTotalPower0-expectedSumSlashedPower, stakeCtrler.ReadTotalPower())
@@ -321,7 +321,7 @@ func TestUnstakingByTx(t *testing.T) {
 
 		if mocks.LastBlockHeight() < txctx.Height() {
 			for mocks.LastBlockHeight() < txctx.Height() {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+				require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 			}
 		}
@@ -342,7 +342,7 @@ func TestUnstakingByTx(t *testing.T) {
 		sumUnstakingPower += s0.Power
 	}
 
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.ReadTotalPower())
 
@@ -394,7 +394,7 @@ func TestUnfreezing(t *testing.T) {
 
 	for mocks.LastBlockHeight() <= toBlockHeight {
 		require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
-		require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler)) // executing `unfreezingStakes` of `StakeCtrler`
+		require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler)) // executing `unfreezingStakes` of `StakeCtrler`
 	}
 
 	frozenStakes = stakeCtrler.ReadFrozenStakes()

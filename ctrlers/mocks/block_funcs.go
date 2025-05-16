@@ -80,28 +80,53 @@ func DoEndBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
 	}
 	return nil
 }
-func DoCommitBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
+func DoCommit(ctrlers ...ctrlertypes.IBlockHandler) error {
 
 	for _, ctr := range ctrlers {
 		if _, v, err := ctr.Commit(); err != nil {
 			return err
 		} else if v != currBlockCtx.Height() {
-			panic(fmt.Errorf("different height between ledger(%v) and currBlockCtx(%v)", v, currBlockCtx.Height()))
+			return fmt.Errorf("different height between ledger(%v) and currBlockCtx(%v)", v, currBlockCtx.Height())
 		}
 	}
 	lastBlockCtx = currBlockCtx
 	currBlockCtx = NextBlockCtxOf(lastBlockCtx)
-	//fmt.Printf("DoCommitBlock - last: %v, curr: %v\n", lastBlockCtx.Height(), currBlockCtx.Height())
+	//fmt.Printf("DoCommit - last: %v, curr: %v\n", lastBlockCtx.Height(), currBlockCtx.Height())
 	return nil
 }
 
-func DoEndBlockCommit(ctrler ...ctrlertypes.IBlockHandler) error {
+func DoEndBlockAndCommit(ctrler ...ctrlertypes.IBlockHandler) error {
 	if err := DoEndBlock(ctrler...); err != nil {
 		return err
 	}
-	if err := DoCommitBlock(ctrler...); err != nil {
+	if err := DoCommit(ctrler...); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func DoAllProcess(ctrlers ...ctrlertypes.IBlockHandler) error {
+	bctx := CurrBlockCtx()
+	for _, ctr := range ctrlers {
+		if _, err := ctr.BeginBlock(bctx); err != nil {
+			return err
+		}
+		if _, err := ctr.EndBlock(bctx); err != nil {
+			return err
+		}
+		if _, _, err := ctr.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DoAllProcessTo(height int64, ctrlers ...ctrlertypes.IBlockHandler) error {
+	for i := CurrBlockHeight(); i < height; i++ {
+		if err := DoAllProcess(ctrlers...); err != nil {
+			return err
+		}
+	}
 	return nil
 }

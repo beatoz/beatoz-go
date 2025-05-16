@@ -33,7 +33,7 @@ func Test_Query_Reward(t *testing.T) {
 		valWals[i] = acctMock.GetWallet(i)
 	}
 	vpowMock := vpowmock.NewVPowerHandlerMock(valWals, len(valWals))
-	fmt.Println("Test Withdraw using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
+	fmt.Println("Test to query reward using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
 
 	_, _, xerr = ctrler.Commit()
 	require.NoError(t, xerr)

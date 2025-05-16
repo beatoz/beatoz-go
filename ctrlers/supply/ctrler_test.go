@@ -48,7 +48,7 @@ func Test_InitLedger(t *testing.T) {
 
 	_ = mocks.InitBlockCtxWith(1, govMock, nil, nil, nil, nil)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
-	require.NoError(t, mocks.DoCommitBlock(ctrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 	require.NoError(t, ctrler.Close())
 
 	ctrler, xerr = NewSupplyCtrler(config, log.NewNopLogger())
