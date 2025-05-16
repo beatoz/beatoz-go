@@ -32,7 +32,7 @@ func TestPunish(t *testing.T) {
 		}
 	}
 
-	slashed, err := govCtrler.doPunish(byzantineAddr)
+	slashed, err := govCtrler.doSlash(byzantineAddr)
 	require.NoError(t, err)
 
 	// commit

@@ -21,7 +21,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		ctrler.logger.Info("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
 			// slash the byzantine validator's voting power.
-			slashed, xerr := ctrler.doPunish(evi.Validator.Address, bctx.GovHandler.SlashRate())
+			slashed, xerr := ctrler.doSlash(evi.Validator.Address, bctx.GovHandler.SlashRate())
 			if xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),

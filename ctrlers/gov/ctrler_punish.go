@@ -9,10 +9,10 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
-// doPunish slashes the voting power of the byzantine validator(voter).
+// doSlash slashes the voting power of the byzantine validator(voter).
 // If the voter has already voted, it will be canceled.
 // This function is called from BeatozApp::BeginBlock.
-func (ctrler *GovCtrler) doPunish(targetAddr types.Address) (int64, xerrors.XError) {
+func (ctrler *GovCtrler) doSlash(targetAddr types.Address) (int64, xerrors.XError) {
 	var punishedProp []*proposal.GovProposal
 	defer func() {
 		for _, prop := range punishedProp {

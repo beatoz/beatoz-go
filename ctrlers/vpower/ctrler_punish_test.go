@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func Test_Slash(t *testing.T) {
+func Test_Slash_Byzantine(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	ctrler, lastValUps0, valWallets0, xerr := initLedger(config)
@@ -52,8 +52,8 @@ func Test_Slash(t *testing.T) {
 	}
 
 	//
-	// doPunish
-	slashed, xerr := ctrler.doPunish(expectedByzantine.Address(), govMock.SlashRate())
+	// doSlash
+	slashed, xerr := ctrler.doSlash(expectedByzantine.Address(), govMock.SlashRate())
 	require.NoError(t, xerr)
 	require.Equal(t, expectedSlahsed, slashed)
 
@@ -85,7 +85,7 @@ func Test_Slash(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
-func Test_Punish_By_BlockProcess(t *testing.T) {
+func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	//totalSupply := types.ToFons(uint64(350_000_000))

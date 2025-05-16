@@ -6,8 +6,8 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
-// doPunish is executed at BeginBlock
-func (ctrler *VPowerCtrler) doPunish(targetAddr types.Address, slashRate int32) (int64, xerrors.XError) {
+// doSlash is executed at BeginBlock
+func (ctrler *VPowerCtrler) doSlash(targetAddr types.Address, slashRate int32) (int64, xerrors.XError) {
 	dgtee, xerr := ctrler.readDelegatee(targetAddr, true)
 	if xerr != nil {
 		return 0, xerr

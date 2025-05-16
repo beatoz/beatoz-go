@@ -18,7 +18,7 @@ func (ctrler *GovCtrler) BeginBlock(blockCtx *types.BlockContext) ([]types2.Even
 	if byzantines != nil && len(byzantines) > 0 {
 		ctrler.logger.Info("GovCtrler: Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
-			if slashed, xerr := ctrler.doPunish(evi.Validator.Address); xerr != nil {
+			if slashed, xerr := ctrler.doSlash(evi.Validator.Address); xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types3.Address(evi.Validator.Address),
 					"evidenceType", types2.EvidenceType_name[int32(evi.Type)])
