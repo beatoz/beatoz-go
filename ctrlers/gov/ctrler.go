@@ -380,7 +380,7 @@ func (ctrler *GovCtrler) GetGovParams() ctrlertypes.GovParams {
 	return ctrler.GovParams
 }
 
-func (ctrler *GovCtrler) ReadAllProposals() ([]*proposal.GovProposal, xerrors.XError) {
+func (ctrler *GovCtrler) ReadAllProposals(exec bool) ([]*proposal.GovProposal, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -390,7 +390,7 @@ func (ctrler *GovCtrler) ReadAllProposals() ([]*proposal.GovProposal, xerrors.XE
 		prop, _ := item.(*proposal.GovProposal)
 		proposals = append(proposals, prop)
 		return nil
-	}, false); xerr != nil {
+	}, exec); xerr != nil {
 		if xerr == xerrors.ErrNotFoundResult {
 			return nil, xerrors.ErrNotFoundProposal
 		}
@@ -400,11 +400,11 @@ func (ctrler *GovCtrler) ReadAllProposals() ([]*proposal.GovProposal, xerrors.XE
 	return proposals, nil
 }
 
-func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes) (*proposal.GovProposal, xerrors.XError) {
+func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes, exec bool) (*proposal.GovProposal, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	item, xerr := ctrler.proposalState.Get(v1.LedgerKeyProposal(txhash), false)
+	item, xerr := ctrler.proposalState.Get(v1.LedgerKeyProposal(txhash), exec)
 	if xerr != nil {
 		if errors.Is(xerr, xerrors.ErrNotFoundResult) {
 			return nil, xerrors.ErrNotFoundProposal

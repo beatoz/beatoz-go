@@ -10,10 +10,10 @@ import (
 
 func TestPunish(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
-	valAddr := vpowMock.PickAddress(rand.Intn(vpowMock.ValCnt))
+	byzantineAddr := vpowMock.PickAddress(rand.Intn(vpowMock.ValCnt))
 
 	// original proposals and voter's power
-	props, err := govCtrler.ReadAllProposals()
+	props, err := govCtrler.ReadAllProposals(false)
 	require.NoError(t, err)
 
 	type propSnapshot struct {
@@ -22,7 +22,7 @@ func TestPunish(t *testing.T) {
 	}
 	var props0 []propSnapshot
 	for _, prop := range props {
-		v, ok := prop.Voters[valAddr.String()]
+		v, ok := prop.Voters[byzantineAddr.String()]
 		if ok {
 			props0 = append(props0,
 				propSnapshot{
@@ -32,7 +32,7 @@ func TestPunish(t *testing.T) {
 		}
 	}
 
-	slashed, err := govCtrler.doPunish(valAddr)
+	slashed, err := govCtrler.doPunish(byzantineAddr)
 	require.NoError(t, err)
 
 	// commit
@@ -40,12 +40,12 @@ func TestPunish(t *testing.T) {
 	require.NoError(t, err)
 
 	// proposals and voter's power after punishing
-	props, err = govCtrler.ReadAllProposals()
+	props, err = govCtrler.ReadAllProposals(false)
 	require.NoError(t, err)
 
 	var props1 []propSnapshot
 	for _, prop := range props {
-		v, ok := prop.Voters[valAddr.String()]
+		v, ok := prop.Voters[byzantineAddr.String()]
 		if ok {
 			props1 = append(props1,
 				propSnapshot{

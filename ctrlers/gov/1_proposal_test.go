@@ -91,7 +91,7 @@ func init() {
 }
 
 func TestAddProposal(t *testing.T) {
-	props0, _ := govCtrler.ReadAllProposals()
+	props0, _ := govCtrler.ReadAllProposals(false)
 	require.NotNil(t, props0)
 
 	for i, c := range cases1 {
@@ -99,7 +99,7 @@ func TestAddProposal(t *testing.T) {
 		require.Equal(t, c.err, xerr, "index", i)
 	}
 
-	props1, _ := govCtrler.ReadAllProposals()
+	props1, _ := govCtrler.ReadAllProposals(false)
 	require.NotNil(t, props1)
 }
 
