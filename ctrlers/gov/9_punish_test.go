@@ -10,7 +10,7 @@ import (
 
 func TestPunish(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
-	valAddr := stakeHelper.PickAddress(rand.Intn(stakeHelper.ValCnt))
+	valAddr := vpowMock.PickAddress(rand.Intn(vpowMock.ValCnt))
 
 	// original proposals and voter's power
 	props, err := govCtrler.ReadAllProposals()

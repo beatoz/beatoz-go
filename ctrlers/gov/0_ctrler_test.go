@@ -20,7 +20,7 @@ var (
 	config      = cfg.DefaultConfig()
 	govCtrler   *GovCtrler
 	acctMock    *mockacct.AcctHandlerMock
-	stakeHelper *mockvpower.VPowerHandlerMock //*mockstake.StakeHandlerMock
+	vpowMock    *mockvpower.VPowerHandlerMock //*mockstake.StakeHandlerMock
 	govParams0  = ctrlertypes.DefaultGovParams()
 	govParams1  = ctrlertypes.Test1GovParams()
 	govParams3  = ctrlertypes.Test3GovParams()
@@ -54,7 +54,7 @@ func init() {
 		dWals = append(dWals, w)
 	}
 
-	stakeHelper = mockvpower.NewVPowerHandlerMock(dWals, 5)
+	vpowMock = mockvpower.NewVPowerHandlerMock(dWals, 5)
 }
 
 func TestMain(m *testing.M) {

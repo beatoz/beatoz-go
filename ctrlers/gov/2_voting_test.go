@@ -26,9 +26,9 @@ func init() {
 		panic(err)
 	}
 	txProposal := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		vpowMock.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(txProposal, stakeHelper.PickAddress(1), "")
+	_ = signTrx(txProposal, vpowMock.PickAddress(1), "")
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -38,26 +38,26 @@ func init() {
 	}
 
 	// no error
-	tx0 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx0 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx0, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx0, vpowMock.PickAddress(0), "")
 	// no right
-	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.ValCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx1 := web3.NewTrxVoting(vpowMock.PickAddress(vpowMock.ValCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.ValCnt), "")
+	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt), "")
 
 	// invalid payload params : wrong choice
-	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx2 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 1)
-	_ = signTrx(tx2, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx2, vpowMock.PickAddress(0), "")
 	// invalid payload params : wrong choice
-	tx3 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx3 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, -1)
-	_ = signTrx(tx3, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx3, vpowMock.PickAddress(0), "")
 	// not found result
-	tx4 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx4 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		bytes.RandBytes(32), 0)
-	_ = signTrx(tx4, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx4, vpowMock.PickAddress(0), "")
 
 	// test cases #1
 	voteTestCases1 = []*Case{
@@ -70,12 +70,12 @@ func init() {
 		{txctx: makeTrxCtx(tx0, 10, true), err: nil},                                                            // success
 	}
 
-	// txs of validators except stakeHelper.delegatees[0]
+	// txs of validators except vpowMock.delegatees[0]
 	var txs []*ctrlertypes.Trx
-	for i := 1; i < stakeHelper.ValCnt; i++ {
-		addr := stakeHelper.PickAddress(i)
+	for i := 1; i < vpowMock.ValCnt; i++ {
+		addr := vpowMock.PickAddress(i)
 		choice := int32(0)
-		//rn := int(bytes.RandInt63n(int64(len(stakeHelper.delegatees))))
+		//rn := int(bytes.RandInt63n(int64(len(vpowMock.delegatees))))
 		//if rn%3 == 0 {
 		//	choice = 1
 		//}
@@ -101,7 +101,7 @@ func TestVoting(t *testing.T) {
 		require.Equal(t, c.err, xerr, "index", i)
 
 		if xerr == nil {
-			votedPowers += stakeHelper.TotalPowerOf(c.txctx.Tx.From)
+			votedPowers += vpowMock.TotalPowerOf(c.txctx.Tx.From)
 		}
 	}
 
@@ -114,7 +114,7 @@ func TestVoting(t *testing.T) {
 	sumVotedPowers := int64(0)
 	for i, c := range voteTestCases1 {
 		if c.err == nil {
-			power := stakeHelper.TotalPowerOf(c.txctx.Tx.From)
+			power := vpowMock.TotalPowerOf(c.txctx.Tx.From)
 			require.Equal(t, power, prop.Options[0].Votes(), "index", i)
 			sumVotedPowers += prop.Options[0].Votes()
 		}
@@ -143,7 +143,7 @@ func TestMajority(t *testing.T) {
 		require.NoError(t, xerr)
 		require.NotNil(t, prop)
 
-		votedPowers += stakeHelper.TotalPowerOf(c.txctx.Tx.From)
+		votedPowers += vpowMock.TotalPowerOf(c.txctx.Tx.From)
 		if votedPowers >= prop.MajorityPower {
 			opt := prop.UpdateMajorOption()
 			require.NotNil(t, opt, votedPowers, prop.MajorityPower)
