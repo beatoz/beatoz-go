@@ -412,3 +412,11 @@ func (bctx *BlockContext) SetByzantine(evidences []abcitypes.Evidence) {
 
 	bctx.blockInfo.ByzantineValidators = append(bctx.blockInfo.ByzantineValidators, evidences...)
 }
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetBlockInfo(req abcitypes.RequestBeginBlock) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo = req
+}

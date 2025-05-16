@@ -126,17 +126,14 @@ func DoEndBlockAndCommit(ctrler ...ctrlertypes.IBlockHandler) error {
 }
 
 func DoAllProcess(ctrlers ...ctrlertypes.IBlockHandler) error {
-	bctx := CurrBlockCtx()
-	for _, ctr := range ctrlers {
-		if _, err := ctr.BeginBlock(bctx); err != nil {
-			return err
-		}
-		if _, err := ctr.EndBlock(bctx); err != nil {
-			return err
-		}
-		if _, _, err := ctr.Commit(); err != nil {
-			return err
-		}
+	if err := DoBeginBlock(ctrlers...); err != nil {
+		return err
+	}
+	if err := DoEndBlock(ctrlers...); err != nil {
+		return err
+	}
+	if err := DoCommit(ctrlers...); err != nil {
+		return err
 	}
 	return nil
 }

@@ -128,7 +128,7 @@ func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
 				},
 				Height: offenseHeight,
 			}
-			mocks.CurrBlockCtx().SetEvidance([]abcitypes.Evidence{evidence})
+			mocks.CurrBlockCtx().SetByzantine([]abcitypes.Evidence{evidence})
 
 			for _, expected := range expectedVPowers {
 				for _, pc := range expected.PowerChunks {
@@ -193,4 +193,76 @@ func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
 
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func Test_Punish_MissingBlock(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	allowedDownCnt := govMock.InflationCycleBlocks() - govMock.MinSignedBlocks()
+	require.True(t, allowedDownCnt > 0)
+
+	ctrler, lastValUps0, valWallets0, xerr := initLedger(config)
+	require.NoError(t, xerr)
+	require.Equal(t, len(lastValUps0), len(valWallets0))
+
+	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
+	require.NoError(t, mocks.DoAllProcess(ctrler))
+
+	targetValWal := valWallets0[rand.Intn(len(valWallets0))]
+	require.True(t, ctrler.IsValidator(targetValWal.Address()))
+	dgtee0, xerr := ctrler.readDelegatee(targetValWal.Address(), true)
+	require.NoError(t, xerr)
+	require.NotNil(t, dgtee0)
+
+	// It will return an error because the targetValWal has not missed any block.
+	// And missedCnt is set to 0.
+	missedCnt, xerr := ctrler.getMissedBlockCount(targetValWal.Address(), true)
+	require.Error(t, xerr)
+
+	for {
+		bctx := mocks.CurrBlockCtx()
+		require.NotNil(t, bctx)
+
+		// make targetVal not sign block
+		bi := mocks.CurrBlockCtx().BlockInfo()
+		require.NotNil(t, bi)
+		bi.LastCommitInfo.Votes = append([]abcitypes.VoteInfo(nil), abcitypes.VoteInfo{
+			Validator: abcitypes.Validator{
+				Address: targetValWal.Address(),
+			},
+			SignedLastBlock: false,
+		})
+		mocks.CurrBlockCtx().SetBlockInfo(bi)
+
+		// BeginBlock
+		// missedBlock is increased.
+		require.NoError(t, mocks.DoBeginBlock(ctrler))
+
+		_missedCnt, xerr := ctrler.getMissedBlockCount(targetValWal.Address(), true)
+		require.NoError(t, xerr)
+		require.Equal(t, missedCnt+1, _missedCnt)
+		missedCnt = _missedCnt
+
+		if int64(missedCnt) >= allowedDownCnt {
+			// all voting power of targetValWal should be unstaked.
+			_, xerr := ctrler.readDelegatee(targetValWal.Address(), true)
+			require.Error(t, xerr)
+
+			for _, addr := range dgtee0.Delegators {
+				_, xerr := ctrler.readVPower(addr, dgtee0.Address(), true)
+				require.Error(t, xerr)
+			}
+
+			// EndBlock and Commit
+			// update validators
+			require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
+
+			require.False(t, ctrler.IsValidator(targetValWal.Address()))
+			break
+		}
+
+		// EndBlock and Commit
+		require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
+		require.True(t, ctrler.IsValidator(targetValWal.Address()))
+	}
 }
