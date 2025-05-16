@@ -382,6 +382,14 @@ func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max int64) int6
 }
 
 // DEPRECATED: Use for test only
+func (bctx *BlockContext) SetChainID(chainId string) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.ChainID = chainId
+}
+
+// DEPRECATED: Use for test only
 func (bctx *BlockContext) SetHeight(h int64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()

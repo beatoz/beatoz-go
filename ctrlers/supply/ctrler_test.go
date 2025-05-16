@@ -46,7 +46,7 @@ func Test_InitLedger(t *testing.T) {
 	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetHeight())
 	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetAdjustHeight())
 
-	_ = mocks.InitBlockCtxWith(1, govMock, nil, nil, nil, nil)
+	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, nil, nil, nil, nil)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 	require.NoError(t, ctrler.Close())

@@ -18,7 +18,7 @@ func Test_Slash(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
+	_ = mocks.InitBlockCtxWith("", 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
@@ -94,7 +94,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
+	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 

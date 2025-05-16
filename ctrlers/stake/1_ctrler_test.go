@@ -345,7 +345,7 @@ func genesisStaking(t *testing.T, cnt int) {
 	totalPower := int64(0)
 	// gensis staking
 
-	bctx := mocks.InitBlockCtxWith(1, govMock01, acctMock01, nil, nil, nil)
+	bctx := mocks.InitBlockCtxWith("test-chain", 1, govMock01, acctMock01, nil, nil, nil)
 
 	//_, xerr := stakeCtrler01.BeginBlock(bctx)
 	//require.NoError(t, xerr)

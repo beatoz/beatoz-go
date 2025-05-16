@@ -36,7 +36,7 @@ func Test_Burn(t *testing.T) {
 	vpowMock := vpowmock.NewVPowerHandlerMock(valWals, len(valWals))
 	fmt.Println("Test Burn using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
 
-	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, nil, vpowMock)
+	_ = mocks.InitBlockCtxWith("", 1, govMock, acctMock, nil, nil, vpowMock)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 

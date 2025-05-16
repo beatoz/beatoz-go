@@ -20,7 +20,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(1, govMock, acctMock, nil, nil, ctrler)
+	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, acctMock, nil, nil, ctrler)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
