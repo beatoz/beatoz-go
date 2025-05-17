@@ -9,22 +9,27 @@ if [[ -z "$NEW_TAG" || -z "$LAST_TAG" ]]; then
   exit 1
 fi
 
-echo -e "## $NEW_TAG - $(date +%Y-%m-%d)\n" >> CHANGELOG.md
+BASE=$(git merge-base "$LAST_TAG" HEAD)
+COMMITS=$(git log "$BASE"..HEAD --pretty=format:"%s")
 
-TYPES=("feat" "fix" "chore" "docs" "refactor" "test" "perf")
-for type in "${TYPES[@]}"; do
-  entries=$(git log "$LAST_TAG..HEAD" --grep="^$type" --pretty=format:"- %s")
-  if [ -n "$entries" ]; then
-    echo -e "### $(case $type in
-      feat) echo 'Features' ;;
-      fix) echo 'Bug Fixes' ;;
-      chore) echo 'Other Changes' ;;
-      docs) echo 'Documentation' ;;
-      refactor) echo 'Code Refactoring' ;;
-      test) echo 'Tests' ;;
-      perf) echo 'Performance Improvements' ;;
-    esac)" >> CHANGELOG.md
-    echo "$entries" >> CHANGELOG.md
+echo "## $NEW_TAG - $(date +%Y-%m-%d)" > CHANGELOG.md
+echo "" >> CHANGELOG.md
+
+declare -A TYPE_LABELS=(
+  [feat]="### Features"
+  [fix]="### Bug Fixes"
+  [docs]="### Documentation"
+  [chore]="### Other Changes"
+  [refactor]="### Refactoring"
+  [test]="### Tests"
+  [perf]="### Performance"
+)
+
+for TYPE in "${!TYPE_LABELS[@]}"; do
+  LOG=$(echo "$COMMITS" | grep "^$TYPE" || true)
+  if [[ -n "$LOG" ]]; then
+    echo "${TYPE_LABELS[$TYPE]}" >> CHANGELOG.md
+    echo "$LOG" >> CHANGELOG.md
     echo "" >> CHANGELOG.md
   fi
 done
