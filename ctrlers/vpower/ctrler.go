@@ -18,7 +18,7 @@ import (
 )
 
 type VPowerCtrler struct {
-	powersState v1.IStateLedger
+	vpowerState v1.IStateLedger
 
 	allDelegatees  []*Delegatee
 	lastValidators []*Delegatee
@@ -51,7 +51,7 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 	}
 
 	ret := &VPowerCtrler{
-		powersState: powersState,
+		vpowerState: powersState,
 		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRate(), govParams.MaxUpdatableStakeRate()),
 		logger:      lg,
 	}
@@ -370,11 +370,11 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.powersState != nil {
-		if xerr := ctrler.powersState.Close(); xerr != nil {
+	if ctrler.vpowerState != nil {
+		if xerr := ctrler.vpowerState.Close(); xerr != nil {
 			ctrler.logger.Error("fail to close powerState", "error", xerr.Error())
 		}
-		ctrler.powersState = nil
+		ctrler.vpowerState = nil
 	}
 	return nil
 }
@@ -462,7 +462,7 @@ func (ctrler *VPowerCtrler) ImitableState(h int64) (v1.IImitable, xerrors.XError
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
-	return ctrler.powersState.ImitableLedgerAt(h)
+	return ctrler.vpowerState.ImitableLedgerAt(h)
 }
 
 var _ ctrlertypes.ILedgerHandler = (*VPowerCtrler)(nil)

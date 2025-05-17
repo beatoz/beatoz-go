@@ -89,7 +89,7 @@ func Test_NewValidatorSet(t *testing.T) {
 
 		//// check ledger state
 		//require.NoError(t, xerr)
-		//xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		//xerr = ctrler.vpowerState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		//	dgtee := item.(*Delegatee)
 		//	require.NotNil(t, findValUp(dgtee.PubKey, expectedValUps))
 		//	require.NotNil(t, findValUp(dgtee.PubKey, bctx.ValUpdates))

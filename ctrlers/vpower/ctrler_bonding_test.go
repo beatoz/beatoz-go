@@ -45,7 +45,7 @@ func Test_InitLedger(t *testing.T) {
 	}
 
 	totalPower1 := int64(0)
-	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowerState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgt, _ := item.(*Delegatee)
 		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr), key)
 		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr), dgt.key)
@@ -77,7 +77,7 @@ func Test_InitLedger(t *testing.T) {
 	}, true)
 
 	totalPower2 := int64(0)
-	xerr = ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowerState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		require.EqualValues(t, v1.LedgerKeyVPower(vpow.from, vpow.to), key)
 		require.EqualValues(t, key, vpow.key)
@@ -447,7 +447,7 @@ func Test_Freezing(t *testing.T) {
 
 	powers0 := make(map[string]int64)
 	for _, v := range valWallets {
-		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
+		item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
 		require.NoError(t, xerr)
 
 		dgtee, _ := item.(*Delegatee)
@@ -537,14 +537,14 @@ func Test_Freezing(t *testing.T) {
 		//}
 
 		if rand.Int()%10 == 0 {
-			_, lastHeight, xerr = ctrler.powersState.Commit()
+			_, lastHeight, xerr = ctrler.vpowerState.Commit()
 			require.NoError(t, xerr)
 			height = lastHeight + 1
 			//fmt.Println("Committed", "height", lastHeight)
 		}
 	}
 
-	_, lastHeight, xerr = ctrler.powersState.Commit()
+	_, lastHeight, xerr = ctrler.vpowerState.Commit()
 	require.NoError(t, xerr)
 	height = lastHeight + 1
 
@@ -556,7 +556,7 @@ func Test_Freezing(t *testing.T) {
 		var expectedRefundPower []int64
 		var expectedBalances []*uint256.Int
 		// frozen vpowers to be un-frozen (thawed) at height 'h'
-		xerr = ctrler.powersState.Seek(
+		xerr = ctrler.vpowerState.Seek(
 			v1.LedgerKeyFrozenVPower(h, nil),
 			true,
 			func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
@@ -593,7 +593,7 @@ func Test_Freezing(t *testing.T) {
 			require.Equal(t, expectedBalances[idx].String(), acct.Balance.String())
 		}
 
-		_, lastHeight, xerr = ctrler.powersState.Commit()
+		_, lastHeight, xerr = ctrler.vpowerState.Commit()
 		require.NoError(t, xerr)
 
 		for idx, addr := range expectedRefundAddrs {
@@ -603,7 +603,7 @@ func Test_Freezing(t *testing.T) {
 		}
 	}
 
-	ctrler.powersState.Seek(
+	ctrler.vpowerState.Seek(
 		v1.KeyPrefixFrozenVPower,
 		true,
 		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
@@ -622,7 +622,7 @@ func Test_Freezing(t *testing.T) {
 	fmt.Println("return to initial vpowers - last committed height", lastHeight)
 
 	for _, v := range valWallets {
-		item, xerr := ctrler.powersState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
+		item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
 		require.NoError(t, xerr)
 
 		dgtee, _ := item.(*Delegatee)
@@ -665,7 +665,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 
 	// check all vpowers
 	var txhashes1 []bytes2.HexBytes
-	xerr := ctrler.powersState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr := ctrler.vpowerState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		require.EqualValues(t, v1.LedgerKeyVPower(vpow.from, vpow.to), key)
 		require.EqualValues(t, key, vpow.key)
@@ -711,7 +711,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 	}
 
 	// check delegatees
-	xerr = ctrler.powersState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowerState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
 		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr), key)

@@ -146,7 +146,7 @@ func (ctrler *VPowerCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	h0, v0, xerr := ctrler.powersState.Commit()
+	h0, v0, xerr := ctrler.vpowerState.Commit()
 	if xerr != nil {
 		return nil, 0, xerr
 	}

@@ -43,7 +43,7 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 	}
 	var ret []*respStake
 
-	atledger, xerr := ctrler.powersState.ImitableLedgerAt(height)
+	atledger, xerr := ctrler.vpowerState.ImitableLedgerAt(height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
@@ -89,7 +89,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 
 	var ret *respDelegatee
 
-	atledger, xerr := ctrler.powersState.ImitableLedgerAt(height)
+	atledger, xerr := ctrler.vpowerState.ImitableLedgerAt(height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
@@ -131,7 +131,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 }
 
 func (ctrler *VPowerCtrler) queryTotalPower(height int64) ([]byte, xerrors.XError) {
-	atledger, xerr := ctrler.powersState.ImitableLedgerAt(height)
+	atledger, xerr := ctrler.vpowerState.ImitableLedgerAt(height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
@@ -149,7 +149,7 @@ func (ctrler *VPowerCtrler) queryTotalPower(height int64) ([]byte, xerrors.XErro
 }
 
 func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinValPower ctrlertypes.Option) ([]byte, xerrors.XError) {
-	atledger, xerr := ctrler.powersState.ImitableLedgerAt(height)
+	atledger, xerr := ctrler.vpowerState.ImitableLedgerAt(height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
