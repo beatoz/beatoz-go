@@ -97,12 +97,12 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		_ = ctrler.resetAllMissedBlockCount(true)
 	}
 
-	// todo: reset limiter
-	//ctrler.vpowLimiter.Reset(
-	//	ctrler.allDelegatees,
-	//	bctx.GovHandler.MaxValidatorCnt(),
-	//	bctx.GovHandler.MaxIndividualStakeRate(),
-	//	bctx.GovHandler.MaxUpdatableStakeRate())
+	// Reset vpowLimiter
+	totalPower := int64(0)
+	for _, v := range ctrler.lastValidators {
+		totalPower += v.SumPower
+	}
+	ctrler.vpowLimiter.Reset(totalPower, bctx.GovHandler.MaxUpdatableStakeRate())
 
 	return evts, nil
 }

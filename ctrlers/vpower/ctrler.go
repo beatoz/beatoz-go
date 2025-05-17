@@ -52,7 +52,7 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 
 	ret := &VPowerCtrler{
 		vpowerState: powersState,
-		vpowLimiter: nil, //NewVPowerLimiter(dgtees, govParams.MaxValidatorCnt(), govParams.MaxIndividualStakeRate(), govParams.MaxUpdatableStakeRate()),
+		vpowLimiter: NewVPowerLimiter(),
 		logger:      lg,
 	}
 	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
@@ -190,10 +190,10 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrOverFlow.Wrapf("validator(%v) power overflow occurs.\ntx:%v", ctx.Tx.To, ctx.Tx)
 		}
 
-		{
-			//
-			// todo: Implement stake limiter
-			//
+		//
+		// check updatable power
+		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, txPower, true); xerr != nil {
+			return xerr
 		}
 
 		// set the result of ValidateTrx
@@ -235,11 +235,10 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrNotFoundStake
 		}
 
-		{
-			//
-			// todo: implement checking updatable limitation.
-			// todo: Resolve issue #34: check updatable stake ratio
-			//
+		//
+		// check updatable power
+		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, vpow.SumPower, false); xerr != nil {
+			return xerr
 		}
 
 		// set the result of ValidateTrx

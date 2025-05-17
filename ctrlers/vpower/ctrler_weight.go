@@ -23,7 +23,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 		signW decimal.Decimal
 	})
 
-	ledger, xerr := ctrler.powersState.ImitableLedgerAt(max(height-1, 1))
+	ledger, xerr := ctrler.vpowerState.ImitableLedgerAt(max(height-1, 1))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -41,7 +41,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			c = *ptr
 		}
 		signRate, _ := decimal.NewFromInt(int64(c)).QuoRem(decimal.NewFromInt(inflationCycle), 6)
-		signRate = decimalOne.Sub(signRate) // = 1 - missedBlock/inflationCycle
+		signRate = decimal.NewFromInt(1).Sub(signRate) // = 1 - missedBlock/inflationCycle
 
 		for _, from := range val.Delegators {
 			vpow, xerr := ctrler.readVPower(from, val.addr, true)
