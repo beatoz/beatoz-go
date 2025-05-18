@@ -5,6 +5,19 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	MinuteSeconds int64 = 60
+	HourSeconds         = MinuteSeconds * 60
+	DaySeconds          = HourSeconds * 24
+	WeekSeconds         = DaySeconds * 7
+	YearSeconds         = DaySeconds * 365
+)
+
+var (
+	DecimalOne  = decimal.NewFromInt(1)
+	DecimalZero = decimal.Zero
+)
+
 type Weight struct {
 	sumWeight     decimal.Decimal
 	valsWeight    decimal.Decimal

@@ -18,20 +18,8 @@ import (
 
 var (
 	//DEPRECATED
-	amountPerPower         = uint256.NewInt(1_000000000_000000000) // 1BEATOZ == 1Power
-	secondsPerMinute int64 = 60
-	secondsPerHour   int64 = 60 * secondsPerMinute
-	secondsPerDay    int64 = 24 * secondsPerHour
-	secondsPerWeek   int64 = 7 * secondsPerDay
-	secondsPerYear   int64 = 365 * secondsPerDay
+	amountPerPower = uint256.NewInt(1_000000000_000000000) // 1BEATOZ == 1Power
 )
-
-//type GovParams struct {
-//	_v *GovParamsProto
-//	mtx    sync.RWMutex
-//}
-
-// type GovParams GovParamsProto
 
 type GovParams struct {
 	_v  GovParamsProto
@@ -248,13 +236,13 @@ func newGovParamsWith(interval int) *GovParams {
 			MinSelfStakeRate:          50,                                                             // 50%
 			MaxUpdatableStakeRate:     33,                                                             // 33%
 			MaxIndividualStakeRate:    33,                                                             // 33%
-			MinBondingBlocks:          2 * secondsPerWeek / int64(interval),                           // 2 weeks blocks
-			LazyUnstakingBlocks:       2 * secondsPerWeek / int64(interval),                           // 2 weeks blocks
+			MinBondingBlocks:          2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
+			LazyUnstakingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     390,                                                            // 0.390
-			InflationCycleBlocks:      secondsPerWeek / int64(interval),                               // 1 weeks blocks
+			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
-			RipeningBlocks:            secondsPerYear / int64(interval),                               // one year blocks
+			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
 			XRewardPoolAddress:        types.ZeroAddress(),                                            // zero address
 			ValidatorRewardRate:       30,                                                             // 30%
 			XBurnAddress:              types.ZeroAddress(),                                            // zero address
@@ -266,9 +254,9 @@ func newGovParamsWith(interval int) *GovParams {
 			MinTrxGas:                 4_000,                                   // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
 			MaxTrxGas:                 30_000_000,
 			MaxBlockGas:               50_000_000,
-			MinVotingPeriodBlocks:     secondsPerDay / int64(interval),     // 1 days blocks
-			MaxVotingPeriodBlocks:     7 * secondsPerDay / int64(interval), // 7 day blocks
-			LazyApplyingBlocks:        secondsPerDay / int64(interval),     // 1days blocks
+			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
+			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
+			LazyApplyingBlocks:        DaySeconds / int64(interval),     // 1days blocks
 			XRewardPerStake:           uint256.NewInt(4_756_468_797).Bytes(),
 		},
 		mtx: sync.RWMutex{},

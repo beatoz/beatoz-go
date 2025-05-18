@@ -1,6 +1,7 @@
 package vpower
 
 import (
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
@@ -11,8 +12,8 @@ import (
 func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) decimal.Decimal {
 	sumTmV := decimal.Zero
 	sumPowAmt := decimal.Zero
-	_tau := decimal.New(int64(tau), -3) // tau is permil
-	_keppa := decimalOne.Sub(_tau)      // keppa = 1 - tau
+	_tau := decimal.New(int64(tau), -3)        // tau is permil
+	_keppa := ctrlertypes.DecimalOne.Sub(_tau) // keppa = 1 - tau
 
 	for i, pow := range pows {
 		vpAmt := decimal.New(pow, int32(types.DECIMAL))
@@ -32,13 +33,13 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decima
 }
 
 func oldWi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) decimal.Decimal {
-	decDur := decimalOne
+	decDur := ctrlertypes.DecimalOne
 	if vdur < ripeningCycle {
 		decDur = decimal.NewFromInt(vdur).Div(decimal.NewFromInt(ripeningCycle))
 	}
 	decV := decimal.New(pow, int32(types.DECIMAL))
 	decTau := decimal.New(int64(tau), -3) // tau is permil
-	decKeppa := decimalOne.Sub(decTau)
+	decKeppa := ctrlertypes.DecimalOne.Sub(decTau)
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
@@ -54,8 +55,8 @@ func Wi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) 
 	}
 
 	decTau := decimal.New(int64(tau), -3) // tau is permil
-	decKeppa := decimalOne.Sub(decTau)
-	decCo := decimalOne
+	decKeppa := ctrlertypes.DecimalOne.Sub(decTau)
+	decCo := ctrlertypes.DecimalOne
 	if vdur < ripeningCycle {
 		decTm := decTau.Mul(decimal.NewFromInt(vdur)).Div(decimal.NewFromInt(ripeningCycle))
 		decCo = decTm.Add(decKeppa)
@@ -71,7 +72,7 @@ func Wi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) 
 
 func WaEx(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
+	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
 	weightedPower := decimal.Zero
@@ -96,7 +97,7 @@ func WaEx(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply deci
 
 func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, totalSupply *uint256.Int) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
+	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
 	risingPower := decimal.Zero
@@ -121,7 +122,7 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, totalSupply *uin
 
 func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, totalSupply *uint256.Int) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
+	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
 	risingPower := decimal.Zero
@@ -148,7 +149,7 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 
 func Scaled64PowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
-	_keppa := decimalOne.Sub(_tau)
+	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
 
 	_maturedPower := int64(0)
 	risingPower := decimal.Zero

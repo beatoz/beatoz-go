@@ -2,6 +2,7 @@ package vpower
 
 import (
 	"fmt"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/shopspring/decimal"
@@ -12,7 +13,7 @@ import (
 )
 
 var (
-	powerRipeningCycle = oneYearSeconds
+	powerRipeningCycle = ctrlertypes.YearSeconds
 )
 
 type testPowObj struct {
@@ -109,10 +110,10 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 		w_waex64 = w_waex64.Truncate(6)
 		dur3 += time.Since(start)
 
-		require.True(t, w_sumwi.LessThanOrEqual(decimalOne), "SumWi", w_sumwi, "nth", n)
-		require.True(t, w_wa.LessThanOrEqual(decimalOne), "Wa", w_wa, "nth", n)
-		require.True(t, w_waex.LessThanOrEqual(decimalOne), "WaEx", w_waex, "nth", n)
-		require.True(t, w_waex64.LessThanOrEqual(decimalOne), "WaEx64", w_waex64, "nth", n)
+		require.True(t, w_sumwi.LessThanOrEqual(ctrlertypes.DecimalOne), "SumWi", w_sumwi, "nth", n)
+		require.True(t, w_wa.LessThanOrEqual(ctrlertypes.DecimalOne), "Wa", w_wa, "nth", n)
+		require.True(t, w_waex.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx", w_waex, "nth", n)
+		require.True(t, w_waex64.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64", w_waex64, "nth", n)
 
 		require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))
 		require.True(t, w_wa.Equal(w_waex), fmt.Sprintf("Wa:%v, WaEx:%v, nth:%v", w_wa, w_waex, n))
@@ -215,13 +216,13 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 		dur6 += time.Since(start)
 		//fmt.Println("Scaled64PowerChunk return", w_w64pc)
 
-		require.True(t, w_sumwi.LessThanOrEqual(decimalOne), "SumWi", w_sumwi, "nth", n)
-		require.True(t, w_wa.LessThanOrEqual(decimalOne), "Wa", w_wa, "nth", n)
-		require.True(t, w_waex.LessThanOrEqual(decimalOne), "WaEx", w_waex, "nth", n)
-		require.True(t, w_waex64.LessThanOrEqual(decimalOne), "WaEx64", w_waex64, "nth", n)
-		require.True(t, w_waex64pc.LessThanOrEqual(decimalOne), "WaEx64ByPowerChunk", w_waex64pc, "nth", n)
-		require.True(t, w_w64pc.LessThanOrEqual(decimalOne), "By Scaled64PowerChunk", w_w64pc, "nth", n)
-		require.True(t, w_w64pc_patial.LessThanOrEqual(decimalOne), "Weight64ByPowerChunkPartially", w_w64pc_patial, "nth", n)
+		require.True(t, w_sumwi.LessThanOrEqual(ctrlertypes.DecimalOne), "SumWi", w_sumwi, "nth", n)
+		require.True(t, w_wa.LessThanOrEqual(ctrlertypes.DecimalOne), "Wa", w_wa, "nth", n)
+		require.True(t, w_waex.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx", w_waex, "nth", n)
+		require.True(t, w_waex64.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64", w_waex64, "nth", n)
+		require.True(t, w_waex64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64ByPowerChunk", w_waex64pc, "nth", n)
+		require.True(t, w_w64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "By Scaled64PowerChunk", w_w64pc, "nth", n)
+		require.True(t, w_w64pc_patial.LessThanOrEqual(ctrlertypes.DecimalOne), "Weight64ByPowerChunkPartially", w_w64pc_patial, "nth", n)
 
 		// w_sumwi has error, when the height is too small (less than about 500).
 		//require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))

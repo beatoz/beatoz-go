@@ -192,7 +192,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check updatable power
-		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, txPower, true); xerr != nil {
+		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, txPower, WHEN_POWER_ADD); xerr != nil {
 			return xerr
 		}
 
@@ -237,7 +237,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check updatable power
-		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, vpow.SumPower, false); xerr != nil {
+		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, vpow.SumPower, WHEN_POWER_SUB); xerr != nil {
 			return xerr
 		}
 

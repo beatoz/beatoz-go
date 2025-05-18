@@ -3,6 +3,7 @@ package vpower
 import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
@@ -95,8 +96,8 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		sumIndW = sumIndW.Truncate(6)
 
 		require.Equal(t, w_computed.String(), sumIndW.String())
-		require.True(t, w_waex64pc.LessThanOrEqual(decimalOne), "WaEx64ByPowerChunks", w_waex64pc, "height", h)
-		require.True(t, w_computed.LessThanOrEqual(decimalOne), "ComputeWeight", w_computed, "height", h)
+		require.True(t, w_waex64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64ByPowerChunks", w_waex64pc, "height", h)
+		require.True(t, w_computed.LessThanOrEqual(ctrlertypes.DecimalOne), "ComputeWeight", w_computed, "height", h)
 		require.Equal(t, w_waex64pc.String(), w_computed.String(), fmt.Sprintf("WaEx64ByPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, h))
 
 		//fmt.Printf("Block[%v] the %v delegate txs are executed and the weight is %v <> %v\n", h, cnt, w_waex64pc, w_computed)
