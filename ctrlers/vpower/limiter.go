@@ -16,9 +16,9 @@ const (
 type VPowerLimiter struct {
 	lastTotalPower int64
 
-	newTotalPower int64
-	addingPower   int64
-	subingPower   int64
+	estimatedTotalPower int64
+	addingPower         int64
+	subingPower         int64
 
 	allowRate int32
 }
@@ -29,7 +29,7 @@ func NewVPowerLimiter() *VPowerLimiter {
 
 func (limiter *VPowerLimiter) Reset(total int64, allowRate int32) {
 	limiter.lastTotalPower = total
-	limiter.newTotalPower = total
+	limiter.estimatedTotalPower = total
 	limiter.addingPower = 0
 	limiter.subingPower = 0
 	limiter.allowRate = allowRate
@@ -41,10 +41,10 @@ func (limiter *VPowerLimiter) CheckLimit(from, to types.Address, power int64, ad
 	}
 
 	if add {
-		limiter.newTotalPower += power
+		limiter.estimatedTotalPower += power
 		limiter.addingPower += power
 	} else {
-		limiter.newTotalPower -= power
+		limiter.estimatedTotalPower -= power
 		limiter.subingPower += power
 	}
 	return nil
@@ -57,16 +57,18 @@ func (limiter *VPowerLimiter) CheckLimit(from, to types.Address, power int64, ad
 func (limiter *VPowerLimiter) checkTotalPower(diff int64, add bool) xerrors.XError {
 	var rate int32
 	if add {
-		rate = changeRate(limiter.addingPower+diff, limiter.newTotalPower+diff)
-	} else if limiter.newTotalPower >= diff {
+		rate = changeRate(limiter.addingPower+diff, limiter.estimatedTotalPower+diff)
+	} else if limiter.estimatedTotalPower >= diff {
 		//
-		rate = changeRate(limiter.addingPower, limiter.newTotalPower-diff)
+		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower-diff)
 	} else {
-		return xerrors.ErrOverFlow.Wrapf("total power(%v) > diff(%v)", limiter.newTotalPower, diff)
+		return xerrors.ErrOverFlow.Wrapf("estimatedTotalPower(%v) > subtractedPower(%v)", limiter.estimatedTotalPower, diff)
 	}
 
 	if rate >= limiter.allowRate {
-		return xerrors.ErrUpdatableStakeRatio.Wrapf("expected total power(%v) expected change power(%v)", limiter.newTotalPower, limiter.addingPower+diff)
+		return xerrors.ErrUpdatableStakeRatio.Wrapf(
+			"combinedAddingPower(%v) / estimatedTotalPower(%v) > allowedRate(%v%%)",
+			limiter.addingPower+diff, limiter.estimatedTotalPower+diff, limiter.allowRate)
 	}
 	return nil
 }
