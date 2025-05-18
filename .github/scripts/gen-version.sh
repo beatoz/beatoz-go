@@ -38,6 +38,4 @@ else
 fi
 
 NEW_TAG="v$MAJOR.$MINOR.$PATCH"
-
-
 echo "$NEW_TAG"

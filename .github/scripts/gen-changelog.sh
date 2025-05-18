@@ -12,8 +12,8 @@ fi
 BASE=$(git merge-base "$LAST_TAG" HEAD)
 COMMITS=$(git log "$BASE"..HEAD --pretty=format:"%s")
 
-echo "## $NEW_TAG - $(date +%Y-%m-%d)" > CHANGELOG.md
-echo "" >> CHANGELOG.md
+echo "## $NEW_TAG - $(date +%Y-%m-%d)" # > CHANGELOG.md
+echo "" # >> CHANGELOG.md
 
 # 대상 타입들
 TYPES=(feat fix docs chore refactor test perf)
@@ -33,8 +33,8 @@ for TYPE in "${TYPES[@]}"; do
   LOG=$(echo "$COMMITS" | grep "^$TYPE" || true)
 
   if [[ -n "$LOG" ]]; then
-    echo "$SECTION_TITLE" >> CHANGELOG.md
-    echo "$LOG" | sed 's/^/- /' >> CHANGELOG.md
+    echo "$SECTION_TITLE" # >> CHANGELOG.md
+    echo "$LOG" | sed 's/^/- /' # >> CHANGELOG.md
     echo "" >> CHANGELOG.md
   fi
 done
