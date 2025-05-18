@@ -53,7 +53,7 @@ func Test_limiter(t *testing.T) {
 
 	// now    : new.total=111, added=11, subed=0
 	// applied: new.total=112, added=12, subed=0
-	// expected: error =
+	// expected: error
 	diffPower = int64(1)
 	require.Error(t, limiter.CheckLimit(nil, nil, diffPower, WHEN_POWER_ADD))
 	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
