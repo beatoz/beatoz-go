@@ -15,21 +15,26 @@ COMMITS=$(git log "$BASE"..HEAD --pretty=format:"%s")
 echo "## $NEW_TAG - $(date +%Y-%m-%d)" > CHANGELOG.md
 echo "" >> CHANGELOG.md
 
-declare -A TYPE_LABELS=(
-  [feat]="### Features"
-  [fix]="### Bug Fixes"
-  [docs]="### Documentation"
-  [chore]="### Other Changes"
-  [refactor]="### Refactoring"
-  [test]="### Tests"
-  [perf]="### Performance"
-)
+# 대상 타입들
+TYPES=(feat fix docs chore refactor test perf)
 
-for TYPE in "${!TYPE_LABELS[@]}"; do
+for TYPE in "${TYPES[@]}"; do
+  SECTION_TITLE=""
+  case "$TYPE" in
+    feat) SECTION_TITLE="### Features" ;;
+    fix) SECTION_TITLE="### Bug Fixes" ;;
+    docs) SECTION_TITLE="### Documentation" ;;
+    chore) SECTION_TITLE="### Other Changes" ;;
+    refactor) SECTION_TITLE="### Refactoring" ;;
+    test) SECTION_TITLE="### Tests" ;;
+    perf) SECTION_TITLE="### Performance" ;;
+  esac
+
   LOG=$(echo "$COMMITS" | grep "^$TYPE" || true)
+
   if [[ -n "$LOG" ]]; then
-    echo "${TYPE_LABELS[$TYPE]}" >> CHANGELOG.md
-    echo "$LOG" >> CHANGELOG.md
+    echo "$SECTION_TITLE" >> CHANGELOG.md
+    echo "$LOG" | sed 's/^/- /' >> CHANGELOG.md
     echo "" >> CHANGELOG.md
   fi
 done
