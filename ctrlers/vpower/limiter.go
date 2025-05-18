@@ -5,6 +5,11 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
+const (
+	WHEN_POWER_ADD = true
+	WHEN_POWER_SUB = false
+)
+
 // VPowerLimiter limits the change of voting power in one block.
 // It limits a stakeholder’s stake change to one-third of their current holdings.
 // And, it also limits total voting power changes to one-third of the **changed** total.
@@ -31,7 +36,7 @@ func (limiter *VPowerLimiter) Reset(total int64, allowRate int32) {
 }
 
 func (limiter *VPowerLimiter) CheckLimit(from, to types.Address, power int64, add bool) xerrors.XError {
-	if xerr := limiter.checkTotalPower(limiter.addingPower, add); xerr != nil {
+	if xerr := limiter.checkTotalPower(power, add); xerr != nil {
 		return xerr
 	}
 
@@ -60,8 +65,8 @@ func (limiter *VPowerLimiter) checkTotalPower(diff int64, add bool) xerrors.XErr
 		return xerrors.ErrOverFlow.Wrapf("total power(%v) > diff(%v)", limiter.newTotalPower, diff)
 	}
 
-	if rate > limiter.allowRate {
-		return xerrors.ErrUpdatableStakeRatio.Wrapf("expected total power(%v) expected change power(%v)")
+	if rate >= limiter.allowRate {
+		return xerrors.ErrUpdatableStakeRatio.Wrapf("expected total power(%v) expected change power(%v)", limiter.newTotalPower, limiter.addingPower+diff)
 	}
 	return nil
 }
