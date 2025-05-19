@@ -14,7 +14,6 @@ import (
 )
 
 func (ctrler *VPowerCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
-	//TODO implement me
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -73,6 +72,15 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 }
 
 func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]byte, xerrors.XError) {
+	type respStake struct {
+		From        types.Address     `json:"owner"`
+		To          types.Address     `json:"to"`
+		TxHash      btztypes.HexBytes `json:"txhash"`
+		StartHeight int64             `json:"startHeight,string"`
+		//RefundHeight int64           `json:"refundHeight,string"`
+		Power int64 `json:"power,string"`
+	}
+
 	type respDelegatee struct {
 		Addr                types.Address     `json:"address"`
 		PubKey              btztypes.HexBytes `json:"pubKey"`
@@ -82,7 +90,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 		Delegators          []types.Address   `json:"delegators"`
 		NotSignedBlockCount int64             `json:"notSingedBlockCount,string"`
 		// DEPRECATED: only for backward compatibility
-		Stakes []interface{} `json:"stakes,omitempty"`
+		Stakes []*respStake `json:"stakes,omitempty"`
 		// DEPRECATED: only for backward compatibility
 		NotSignedHeights interface{} `json:"notSignedBlocks,omitempty"`
 	}
@@ -107,9 +115,25 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 	}
 
 	dgtee, _ := item.(*Delegatee)
-	_delegators := make([]types.Address, len(dgtee.Delegators))
-	for i, dg := range dgtee.Delegators {
-		_delegators[i] = dg
+	dgtors := make([]types.Address, len(dgtee.Delegators))
+	var stakes []*respStake
+	for i, _addr := range dgtee.Delegators {
+		dgtors[i] = addr
+
+		item, xerr = atledger.Get(v1.LedgerKeyVPower(_addr, dgtee.addr))
+		if xerr != nil {
+			return nil, xerrors.ErrQuery.Wrap(xerr)
+		}
+		vpow, _ := item.(*VPower)
+		for _, pc := range vpow.PowerChunks {
+			stakes = append(stakes, &respStake{
+				From:        vpow.from,
+				To:          vpow.to,
+				TxHash:      pc.TxHash,
+				StartHeight: pc.Height,
+				Power:       pc.Power,
+			})
+		}
 	}
 	ret = &respDelegatee{
 		Addr:                dgtee.addr,
@@ -117,9 +141,9 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 		SelfPower:           dgtee.SelfPower,
 		TotalPower:          dgtee.SumPower,
 		SlashedPower:        0, // todo: Add slashed power data to Delegatee
-		Delegators:          _delegators,
+		Delegators:          dgtors,
 		NotSignedBlockCount: n,
-		Stakes:              nil,
+		Stakes:              stakes,
 		NotSignedHeights:    nil,
 	}
 
@@ -148,13 +172,14 @@ func (ctrler *VPowerCtrler) queryTotalPower(height int64) ([]byte, xerrors.XErro
 	return []byte(fmt.Sprintf("%v", ret)), nil
 }
 
+// queryVotingPower returns the sum of voting power of validators.
 func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinValPower ctrlertypes.Option) ([]byte, xerrors.XError) {
 	atledger, xerr := ctrler.vpowerState.ImitableLedgerAt(height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	maxValCnt := getMaxValCnt().(int)
+	maxValCnt := getMaxValCnt().(int32)
 	minValPower := getMinValPower().(int64)
 
 	var delegatees OrderByPowerDelegatees
@@ -171,7 +196,7 @@ func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinV
 	}
 	sort.Sort(delegatees)
 
-	n := libs.MinInt(len(delegatees), maxValCnt)
+	n := libs.MinInt(len(delegatees), int(maxValCnt))
 	validators := delegatees[:n]
 
 	retPower := int64(0)
