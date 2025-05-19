@@ -14,14 +14,14 @@ func NewVoteOptions(options ...[]byte) []*VoteOptionProto {
 	return voteOpts
 }
 
-func (opt *VoteOptionProto) DoVote(power int64) int64 {
-	opt.Votes += power
-	return opt.Votes
+func (x *VoteOptionProto) DoVote(power int64) int64 {
+	x.Votes += power
+	return x.Votes
 }
 
-func (opt *VoteOptionProto) CancelVote(power int64) int64 {
-	opt.Votes -= power
-	return opt.Votes
+func (x *VoteOptionProto) CancelVote(power int64) int64 {
+	x.Votes -= power
+	return x.Votes
 }
 
 type powerOrderVoteOptions []*VoteOptionProto

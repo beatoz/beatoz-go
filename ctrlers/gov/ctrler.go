@@ -131,7 +131,12 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 		// check applying blocks
 		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
-			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf(
+				"wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v",
+				txpayload.ApplyingHeight,
+				minApplyingHeight,
+				endVotingHeight,
+				ctrler.LazyApplyingBlocks())
 		}
 
 		// check options
@@ -253,6 +258,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]v1.LedgerKey, []v1.Led
 
 	defer func() {
 		for _, _prop := range newFrozens {
+			// set new frozen proposal with v1.LedgerKeyFrozenProp
 			_ = ctrler.govState.Set(v1.LedgerKeyFrozenProp(_prop.Header().TxHash), _prop, true)
 		}
 		for _, k := range frozenProps {
