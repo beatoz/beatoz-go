@@ -13,7 +13,6 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
-	"strings"
 	"sync"
 )
 
@@ -132,7 +131,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 		// check applying blocks
 		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
-			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyingHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong applyingHeight: must be set equal to or higher than minApplyingHeight. ApplyHeight:%v, minApplyingHeight:%v, endVotingHeight:%v, lazyApplyingBlocks:%v", txpayload.ApplyingHeight, minApplyingHeight, endVotingHeight, ctrler.LazyApplyingBlocks())
 		}
 
 		// check options
@@ -160,13 +159,13 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		}
 
 		// check choice validation
-		if txpayload.Choice < 0 || txpayload.Choice >= int32(len(prop.Options)) {
+		if txpayload.Choice < 0 || txpayload.Choice >= int32(len(prop.Options())) {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
 
 		// check end height
-		if ctx.Height() > prop.EndVotingHeight ||
-			ctx.Height() < prop.StartVotingHeight {
+		if ctx.Height() > prop.Header().EndVotingHeight ||
+			ctx.Height() < prop.Header().StartVotingHeight {
 			return xerrors.ErrNotVotingPeriod
 		}
 	default:
@@ -193,23 +192,34 @@ func (ctrler *GovCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	txpayload, _ := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 
-	voters := make(map[string]*proposal.Voter)
 	vals, totalVotingPower := ctx.VPowerHandler.Validators()
-	for _, v := range vals {
-		voters[types.Address(v.Address).String()] = &proposal.Voter{
-			Addr:   v.Address,
-			Power:  v.Power,
-			Choice: proposal.NOT_CHOICE, // -1
+	voters := make([]*proposal.VoterProto, len(vals))
+	for i, v := range vals {
+		voters[i] = &proposal.VoterProto{
+			Address: v.Address,
+			Power:   v.Power,
+			Choice:  proposal.NOT_CHOICE, // -1
 		}
 	}
 
-	prop, xerr := proposal.NewGovProposal(ctx.TxHash, txpayload.OptType,
+	prop, xerr := proposal.NewGovProposal(txpayload.OptType, ctx.TxHash,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks,
-		totalVotingPower, txpayload.ApplyingHeight, voters, txpayload.Options...)
+		totalVotingPower, txpayload.ApplyingHeight)
 	if xerr != nil {
 		return xerr
 	}
-	if xerr = ctrler.govState.Set(v1.LedgerKeyProposal(prop.TxHash), prop, ctx.Exec); xerr != nil {
+
+	/*
+		voters, txpayload.Options...
+	*/
+
+	for _, v := range voters {
+		prop.AddVoter(v.Address, v.Power)
+	}
+	for _, opt := range txpayload.Options {
+		prop.AddOption(opt)
+	}
+	if xerr = ctrler.govState.Set(v1.LedgerKeyProposal(prop.Header().TxHash), prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
 
@@ -226,11 +236,11 @@ func (ctrler *GovCtrler) execVoting(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	if xerr = prop.DoVote(ctx.Tx.From, txpayload.Choice); xerr != nil {
 		return xerr
 	}
-	if xerr = ctrler.govState.Set(v1.LedgerKeyProposal(prop.TxHash), prop, ctx.Exec); xerr != nil {
+	if xerr = ctrler.govState.Set(v1.LedgerKeyProposal(prop.Header().TxHash), prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
-	if prop.MajorOption != nil {
-		ctrler.logger.Debug("Voting to proposal", "key", prop.TxHash, "voter", ctx.Tx.From, "choice", txpayload.Choice)
+	if prop.MajorOption() != nil {
+		ctrler.logger.Debug("Voting to proposal", "key", prop.Header().TxHash, "voter", ctx.Tx.From, "choice", txpayload.Choice)
 	}
 	return nil
 }
@@ -243,7 +253,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]v1.LedgerKey, []v1.Led
 
 	defer func() {
 		for _, _prop := range newFrozens {
-			_ = ctrler.govState.Set(v1.LedgerKeyFrozenProp(_prop.TxHash), _prop, true)
+			_ = ctrler.govState.Set(v1.LedgerKeyFrozenProp(_prop.Header().TxHash), _prop, true)
 		}
 		for _, k := range frozenProps {
 			// remove frozen proposal
@@ -257,7 +267,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]v1.LedgerKey, []v1.Led
 
 	xerr := ctrler.govState.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		prop, _ := item.(*proposal.GovProposal)
-		if prop.EndVotingHeight < height {
+		if prop.Header().EndVotingHeight < height {
 
 			// DO NOT REMOVE `prop` from `proposalState`
 
@@ -294,37 +304,29 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 
 	xerr := ctrler.govState.Seek(v1.KeyPrefixFrozenProp, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		prop, _ := item.(*proposal.GovProposal)
-		if prop.ApplyingHeight <= height {
+		if prop.Header().ApplyHeight <= height {
 
-			// DO NOT REMOVE `prop` from `frozenState` at here.
+			// DO NOT REMOVE `prop` from `frozenState` in Seek.
 
-			if prop.MajorOption == nil {
+			if prop.MajorOption() == nil {
 				// not reachable.
 				ctrler.logger.Error("Apply proposal", "error", "major option is nil")
 			}
 
-			switch prop.OptType {
+			switch prop.Header().PropType {
 			case proposal.PROPOSAL_GOVPARAMS:
 				newGovParams := &ctrlertypes.GovParams{}
 
-				//
-				// hotfix
-				strOpt := string(prop.MajorOption.Option())
-				if strings.HasSuffix(strOpt, `""}`) {
-					strOpt = strings.ReplaceAll(strOpt, `""}`, `"}`)
-				}
-				//
-				//
-
+				strOpt := string(prop.MajorOption().Option)
 				if err := json.Unmarshal([]byte(strOpt), newGovParams); err != nil {
-					ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption.Option()))
+					ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption().Option))
 					return xerrors.From(err)
 				}
 
 				ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
 				ctrler.newGovParams = newGovParams
 			default:
-				ctrler.logger.Debug("Apply proposal", "key(txHash)", prop.TxHash, "type", prop.OptType)
+				ctrler.logger.Debug("Apply proposal", "key(txHash)", prop.Header().TxHash, "type", prop.Header().PropType)
 			}
 
 			applied = append(applied, key) // this key will be removed from frozenState

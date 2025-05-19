@@ -51,7 +51,6 @@ func init() {
 	var dWals []*web3.Wallet
 	for i := 0; i < 14; i++ {
 		w := acctMock.GetWallet(i)
-		//d := &stake.Delegatee{Addr: w.Address(), TotalPower: rand.Int63n(1_000_000)}
 		dWals = append(dWals, w)
 	}
 

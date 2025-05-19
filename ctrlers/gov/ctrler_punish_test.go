@@ -66,10 +66,14 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 
 	prop, err = localGovCtrler.ReadProposal(txctx.TxHash, false)
 	require.NoError(t, err)
-	propVoter := prop.Voters[voterAddr.String()]
+	propVoter := prop.FindVoter(voterAddr)
 	require.NotNil(t, propVoter)
 	require.Equal(t, expectedvoterPower, propVoter.Power)
-	fmt.Println("voter", voterAddr, "voterPower", expectedvoterPower, "prop", prop.TxHash, "totalPower", prop.TotalVotingPower)
+	fmt.Println(
+		"voter", voterAddr,
+		"voterPower", expectedvoterPower,
+		"prop", bytes.HexBytes(prop.Header().TxHash),
+		"totalPower", prop.Header().TotalVotingPower)
 
 	//
 	// progress blocks...
@@ -81,7 +85,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	//
 	// compute exptected values after punishment.
 	expectedSlashed := propVoter.Power * int64(localGovCtrler.SlashRate()) / int64(100)
-	expectedTotalVotingPower := prop.TotalVotingPower - expectedSlashed
+	expectedTotalVotingPower := prop.Header().TotalVotingPower - expectedSlashed
 	expectedvoterPower = expectedvoterPower - expectedSlashed
 
 	//
@@ -103,13 +107,17 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 		// check result
 		prop, err = localGovCtrler.ReadProposal(txctx.TxHash, true)
 		require.NoError(t, err)
-		propVoter = prop.Voters[voterAddr.String()]
+		propVoter = prop.FindVoter(voterAddr)
+		require.NotNil(t, propVoter)
 
-		fmt.Println("voter", propVoter.Addr, "voterPower", propVoter.Power, "prop", prop.TxHash, "totalPower", prop.TotalVotingPower)
+		//fmt.Println("voter", bytes.HexBytes(propVoter.Address),
+		//	"voterPower", propVoter.Power,
+		//	"prop", bytes.HexBytes(prop.Header().TxHash),
+		//	"totalPower", prop.Header().TotalVotingPower)
 
 		require.NotNil(t, propVoter)
 		require.Equal(t, expectedvoterPower, propVoter.Power)
-		require.Equal(t, expectedTotalVotingPower, prop.TotalVotingPower)
+		require.Equal(t, expectedTotalVotingPower, prop.Header().TotalVotingPower)
 	}
 
 	require.NoError(t, mocks.DoEndBlockAndCommit(localGovCtrler))
@@ -118,10 +126,10 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 		// check result
 		prop, err = localGovCtrler.ReadProposal(txctx.TxHash, false)
 		require.NoError(t, err)
-		propVoter = prop.Voters[voterAddr.String()]
+		propVoter = prop.FindVoter(voterAddr)
 		require.NotNil(t, propVoter)
 		require.Equal(t, expectedvoterPower, propVoter.Power)
-		require.Equal(t, expectedTotalVotingPower, prop.TotalVotingPower)
+		require.Equal(t, expectedTotalVotingPower, prop.Header().TotalVotingPower)
 	}
 
 }

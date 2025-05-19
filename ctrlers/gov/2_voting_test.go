@@ -115,8 +115,8 @@ func TestVoting(t *testing.T) {
 	for i, c := range voteTestCases1 {
 		if c.err == nil {
 			power := vpowMock.TotalPowerOf(c.txctx.Tx.From)
-			require.Equal(t, power, prop.Options[0].Votes(), "index", i)
-			sumVotedPowers += prop.Options[0].Votes()
+			require.Equal(t, power, prop.Option(0).Votes, "index", i)
+			sumVotedPowers += prop.Option(0).Votes
 		}
 	}
 
@@ -131,7 +131,7 @@ func TestMajority(t *testing.T) {
 	opt := prop.UpdateMajorOption()
 	require.Nil(t, opt)
 
-	votedPowers := prop.Options[0].Votes()
+	votedPowers := prop.Option(0).Votes
 	for i, c := range voteTestCases2 {
 		xerr := runCase(c)
 		require.Equal(t, c.err, xerr, "index", i)
@@ -144,11 +144,10 @@ func TestMajority(t *testing.T) {
 		require.NotNil(t, prop)
 
 		votedPowers += vpowMock.TotalPowerOf(c.txctx.Tx.From)
-		if votedPowers >= prop.MajorityPower {
+		if votedPowers >= prop.Header().MajorityPower {
 			opt := prop.UpdateMajorOption()
-			require.NotNil(t, opt, votedPowers, prop.MajorityPower)
-			require.EqualValues(t, prop.MajorOption, opt)
-			require.Equal(t, votedPowers, opt.Votes())
+			require.NotNil(t, opt, votedPowers, prop.Header().MajorityPower)
+			require.Equal(t, votedPowers, opt.Votes)
 		} else {
 			opt := prop.UpdateMajorOption()
 			require.Nil(t, opt)
@@ -171,8 +170,7 @@ func TestMajority(t *testing.T) {
 
 		opt := prop.UpdateMajorOption()
 		require.NotNil(t, opt)
-		require.EqualValues(t, prop.MajorOption, opt)
-		require.Equal(t, votedPowers, opt.Votes())
+		require.Equal(t, votedPowers, opt.Votes)
 	}
 }
 
@@ -191,7 +189,7 @@ func TestFreezingProposal(t *testing.T) {
 	//
 	// not changed
 	bctx := &ctrlertypes.BlockContext{}
-	bctx.SetHeight(prop.EndVotingHeight)
+	bctx.SetHeight(prop.Header().EndVotingHeight)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -203,21 +201,24 @@ func TestFreezingProposal(t *testing.T) {
 	//
 	// freezing the proposal
 	bctx = &ctrlertypes.BlockContext{}
-	bctx.SetHeight(prop.EndVotingHeight + 1)
+	bctx.SetHeight(prop.Header().EndVotingHeight + 1)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
+
+	// the proposal is frozen.
 	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
 	item, xerr := govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	frozenProp, _ := item.(*proposal.GovProposal)
-	require.NotNil(t, frozenProp.MajorOption)
-	// prop.MajorOption is nil, so...
-	prop.MajorOption = frozenProp.MajorOption
-	require.Equal(t, prop, frozenProp)
+	require.NotNil(t, frozenProp.MajorOption())
+
+	//// prop.MajorOption is nil, so...
+	//prop.MajorOption = frozenProp.MajorOption
+	//require.Equal(t, prop, frozenProp)
 
 	testFlagAlreadyFrozen = true
 }

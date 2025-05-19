@@ -2,7 +2,7 @@ syntax = "proto3";
 package types;
 option go_package = "github.com/beatoz/beatoz-go/ctrlers/stake";
 
-
+// DEPRECATED
 message RewardProto {
   bytes address = 1;
   bytes _issued = 2;
