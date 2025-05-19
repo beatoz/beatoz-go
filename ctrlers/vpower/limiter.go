@@ -1,7 +1,6 @@
 package vpower
 
 import (
-	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
@@ -35,7 +34,7 @@ func (limiter *VPowerLimiter) Reset(total int64, allowRate int32) {
 	limiter.allowRate = allowRate
 }
 
-func (limiter *VPowerLimiter) CheckLimit(from, to types.Address, power int64, add bool) xerrors.XError {
+func (limiter *VPowerLimiter) CheckLimit(power int64, add bool) xerrors.XError {
 	if xerr := limiter.checkTotalPower(power, add); xerr != nil {
 		return xerr
 	}
@@ -71,6 +70,19 @@ func (limiter *VPowerLimiter) checkTotalPower(diff int64, add bool) xerrors.XErr
 			limiter.addingPower+diff, limiter.estimatedTotalPower+diff, limiter.allowRate)
 	}
 	return nil
+}
+
+func (limiter *VPowerLimiter) ChangeRate(power int64, add bool) (int32, xerrors.XError) {
+	var rate int32
+	if add {
+		rate = changeRate(limiter.addingPower+power, limiter.estimatedTotalPower+power)
+	} else if limiter.estimatedTotalPower >= power {
+		//
+		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower-power)
+	} else {
+		return 0, xerrors.ErrOverFlow.Wrapf("estimatedTotalPower(%v) > subtractedPower(%v)", limiter.estimatedTotalPower, power)
+	}
+	return rate, nil
 }
 
 func changeRate(part, total int64) int32 {

@@ -14,6 +14,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math"
+	"strconv"
 	"sync"
 )
 
@@ -191,9 +192,21 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		}
 
 		//
-		// check updatable power
-		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, txPower, WHEN_POWER_ADD); xerr != nil {
+		// check the rate of total power change caused by txPower
+		if rate, xerr := ctrler.vpowLimiter.ChangeRate(txPower, WHEN_POWER_ADD); xerr != nil {
 			return xerr
+		} else if rate > ctrler.vpowLimiter.allowRate {
+			ctx.Events = append(ctx.Events, abcitypes.Event{
+				Type: "vpower.warning",
+				Attributes: []abcitypes.EventAttribute{
+					{Key: []byte("total"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.lastTotalPower, 10)), Index: false},
+					{Key: []byte("adding"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.addingPower, 10)), Index: false},
+					{Key: []byte("subing"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.subingPower, 10)), Index: false},
+					{Key: []byte("totaling"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.estimatedTotalPower, 10)), Index: false},
+					{Key: []byte("rate"), Value: []byte(strconv.FormatInt(int64(rate), 10)), Index: false},
+					{Key: []byte("allowed"), Value: []byte(strconv.FormatInt(int64(ctrler.vpowLimiter.allowRate), 10)), Index: false},
+				},
+			})
 		}
 
 		// set the result of ValidateTrx
@@ -236,9 +249,21 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 		}
 
 		//
-		// check updatable power
-		if xerr := ctrler.vpowLimiter.CheckLimit(nil, nil, vpow.SumPower, WHEN_POWER_SUB); xerr != nil {
+		// check the rate of total power change caused by vpow.SumPower
+		if rate, xerr := ctrler.vpowLimiter.ChangeRate(vpow.SumPower, WHEN_POWER_SUB); xerr != nil {
 			return xerr
+		} else if rate > ctrler.vpowLimiter.allowRate {
+			ctx.Events = append(ctx.Events, abcitypes.Event{
+				Type: "vpower.warning",
+				Attributes: []abcitypes.EventAttribute{
+					{Key: []byte("total"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.lastTotalPower, 10)), Index: false},
+					{Key: []byte("adding"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.addingPower, 10)), Index: false},
+					{Key: []byte("subing"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.subingPower, 10)), Index: false},
+					{Key: []byte("totaling"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.estimatedTotalPower, 10)), Index: false},
+					{Key: []byte("rate"), Value: []byte(strconv.FormatInt(int64(rate), 10)), Index: false},
+					{Key: []byte("allowed"), Value: []byte(strconv.FormatInt(int64(ctrler.vpowLimiter.allowRate), 10)), Index: false},
+				},
+			})
 		}
 
 		// set the result of ValidateTrx

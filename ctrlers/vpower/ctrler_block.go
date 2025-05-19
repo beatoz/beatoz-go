@@ -34,7 +34,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 			}
 
 			evts = append(evts, abcitypes.Event{
-				Type: "slashing.stake",
+				Type: "stake.slashing",
 				Attributes: []abcitypes.EventAttribute{
 					{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
 					{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
