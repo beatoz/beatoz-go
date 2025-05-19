@@ -26,6 +26,8 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	var evts []abcitypes.Event
+
 	//
 	// Process txs fee: Burn and Reward
 	header := bctx.BlockInfo().Header
@@ -54,6 +56,14 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 			return nil, xerr
 		}
 
+		evts = append(evts, abcitypes.Event{
+			Type: "txfee",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("burn"), Value: []byte(burnAmt.Dec()), Index: false},
+				{Key: []byte("reward"), Value: []byte(rwdAmt.Dec()), Index: false},
+			},
+		})
+
 		ctrler.logger.Debug("txs's fee is processed", "total.fee", sumFee.Dec(), "reward", rwdAmt.Dec(), "burned", burnAmt.Dec())
 	}
 
@@ -62,14 +72,22 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	if bctx.Height() > 0 && bctx.Height()%bctx.GovHandler.InflationCycleBlocks() == 0 {
 		start := time.Now()
 		// In ctrler.waitMint, ctrler.lastTotalSupply is changed.
-		_, xerr := ctrler.waitMint(bctx)
+		resp, xerr := ctrler.waitMint(bctx)
 		since := time.Since(start)
 
 		ctrler.logger.Debug("wait to process mint and reward", "delay", since)
 		if xerr != nil {
-			ctrler.logger.Error("fail to requestMint", "error", xerr.Error())
+			ctrler.logger.Error("waitMint returns", "error", xerr.Error())
 			return nil, xerr
 		}
+
+		evts = append(evts, abcitypes.Event{
+			Type: "supply",
+			Attributes: []abcitypes.EventAttribute{
+				{Key: []byte("mint"), Value: []byte(resp.sumMintedAmt.Dec()), Index: false},
+				{Key: []byte("supply"), Value: []byte(ctrler.lastTotalSupply.totalSupply.Dec()), Index: false},
+			},
+		})
 	}
 
 	//
@@ -80,7 +98,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		}
 		ctrler.lastTotalSupply.ResetChanged()
 	}
-	return nil, nil
+	return evts, nil
 }
 
 func (ctrler *SupplyCtrler) Commit() ([]byte, int64, xerrors.XError) {
