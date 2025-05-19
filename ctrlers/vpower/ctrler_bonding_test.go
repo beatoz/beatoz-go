@@ -328,6 +328,8 @@ func Test_Unbonding(t *testing.T) {
 
 	// -----------------------------------------------------------------------------------------------------------------
 	//
+	_, lastTotalPower := ctrler.Validators()
+	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatableStakeRate())
 
 	//
 	// unbonding
@@ -413,8 +415,17 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
 
+	_, lastTotalPower := ctrler.Validators()
+	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatableStakeRate())
+
 	onceWals := removeDupWallets(vals)
-	for _, valWal := range onceWals {
+	for i, valWal := range onceWals {
+		if i == len(onceWals)-1 {
+			// it is not acceptable that all validators do unbonding.
+			// if this happens, the beatoz network will stop
+			// and the test for the case is meaningless.
+			break
+		}
 		// unbonding self power deposited at genesis with zero txhash
 		zeroHash := bytes2.ZeroBytes(32) // points to self voting power
 		_, xerr = doUndelegate(ctrler, valWal, valWal.Address(), lastHeight+1, zeroHash)
@@ -447,10 +458,8 @@ func Test_Freezing(t *testing.T) {
 
 	powers0 := make(map[string]int64)
 	for _, v := range valWallets {
-		item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
+		dgtee, xerr := ctrler.readDelegatee(v.Address(), true)
 		require.NoError(t, xerr)
-
-		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, v.Address(), dgtee.addr)
 
 		powers0[dgtee.addr.String()] = dgtee.SumPower
@@ -459,6 +468,9 @@ func Test_Freezing(t *testing.T) {
 	_, lastHeight, xerr := ctrler.Commit()
 	require.NoError(t, xerr)
 	height := lastHeight + 1
+
+	_, lastTotalPower := ctrler.Validators()
+	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatableStakeRate())
 
 	froms, vals, powers, txhashes := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
 
@@ -470,6 +482,7 @@ func Test_Freezing(t *testing.T) {
 	minRefundHeight := int64(math.MaxInt64)
 	maxRefundHeight := int64(0)
 	for len(frozenTxhashes) < len(txhashes) {
+
 		var idx int
 		var txhash bytes2.HexBytes
 		for {

@@ -21,7 +21,7 @@ func Test_limiter(t *testing.T) {
 	diffPower := int64(7)
 	expectedAdded += diffPower
 	expectedNewTotal += diffPower
-	require.NoError(t, limiter.CheckLimit(nil, nil, diffPower, WHEN_POWER_ADD))
+	require.NoError(t, limiter.CheckLimit(diffPower, WHEN_POWER_ADD))
 	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
 	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
 	require.EqualValues(t, expectedAdded, limiter.addingPower)
@@ -33,7 +33,7 @@ func Test_limiter(t *testing.T) {
 	diffPower = int64(3)
 	expectedAdded += diffPower
 	expectedNewTotal += diffPower
-	require.NoError(t, limiter.CheckLimit(nil, nil, diffPower, WHEN_POWER_ADD))
+	require.NoError(t, limiter.CheckLimit(diffPower, WHEN_POWER_ADD))
 	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
 	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
 	require.EqualValues(t, expectedAdded, limiter.addingPower)
@@ -45,7 +45,7 @@ func Test_limiter(t *testing.T) {
 	diffPower = int64(1)
 	expectedAdded += diffPower
 	expectedNewTotal += diffPower
-	require.NoError(t, limiter.CheckLimit(nil, nil, diffPower, WHEN_POWER_ADD))
+	require.NoError(t, limiter.CheckLimit(diffPower, WHEN_POWER_ADD))
 	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
 	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
 	require.EqualValues(t, expectedAdded, limiter.addingPower)
@@ -55,7 +55,7 @@ func Test_limiter(t *testing.T) {
 	// applied: new.total=112, added=12, subed=0
 	// expected: error
 	diffPower = int64(1)
-	require.Error(t, limiter.CheckLimit(nil, nil, diffPower, WHEN_POWER_ADD))
+	require.Error(t, limiter.CheckLimit(diffPower, WHEN_POWER_ADD))
 	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
 	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
 	require.EqualValues(t, expectedAdded, limiter.addingPower)
@@ -72,7 +72,7 @@ func Test_limiter(t *testing.T) {
 	diffPower = int64(1)
 	expectedSubed += diffPower
 	expectedNewTotal -= diffPower
-	require.NoError(t, limiter.CheckLimit(nil, nil, diffPower, WHEN_POWER_SUB))
+	require.NoError(t, limiter.CheckLimit(diffPower, WHEN_POWER_SUB))
 	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
 	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
 	require.EqualValues(t, expectedAdded, limiter.addingPower)

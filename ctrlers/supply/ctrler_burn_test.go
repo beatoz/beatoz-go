@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-func Test_Burn(t *testing.T) {
+func Test_TxFeeProcessing(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	initSupply := types.PowerToAmount(350_000_000)
@@ -34,7 +34,7 @@ func Test_Burn(t *testing.T) {
 		valWals[i] = acctMock.GetWallet(i)
 	}
 	vpowMock := vpowmock.NewVPowerHandlerMock(valWals, len(valWals))
-	fmt.Println("Test Burn using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
+	fmt.Println("Test TxFeeProcessing using VPowerHandlerMock", "validator number", valsCnt, "total power", vpowMock.GetTotalPower())
 
 	_ = mocks.InitBlockCtxWith("", 1, govMock, acctMock, nil, nil, vpowMock)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
@@ -87,17 +87,17 @@ func Test_Burn(t *testing.T) {
 		//
 		{
 			// burn & fee reward
+			// expect that the treasury address(zero address)'s balance is increased
+			// and the proposer's balance is increased too.
+			// But the total supply is not changed.
 			//t0 := expectedTotalSupply.Dec()
-			expectedTotalSupply = new(uint256.Int).Sub(expectedTotalSupply, expectedBurned)
-			expectedAdjustedSupply = new(uint256.Int).Sub(expectedAdjustedSupply, expectedBurned)
+			expectedTotalSupply = ctrler.lastTotalSupply.GetTotalSupply()
+			expectedAdjustedSupply = ctrler.lastTotalSupply.GetAdjustSupply()
+			expectedAdjustedHeight = ctrler.lastTotalSupply.GetAdjustHeight()
 			expectedProposerBal = new(uint256.Int).Add(expectedProposerBal, expectedRwdFee)
-			if expectedBurned.Sign() > 0 {
-				expectedAdjustedSupply = expectedTotalSupply.Clone()
-				expectedAdjustedHeight = currHeight
-			}
 			//fmt.Println("expected burn", t0, "-", expectedBurned, "=", expectedTotalSupply, "bctx.sumfee", mocks.CurrBlockCtx().SumFee())
 
-			// inflation
+			// apply inflation
 			if currHeight%govMock.InflationCycleBlocks() == 0 {
 				_totalSupplyAmt := ctrler.lastTotalSupply.GetTotalSupply()
 				_adjustSupplyAmt := ctrler.lastTotalSupply.GetAdjustSupply()
@@ -125,12 +125,11 @@ func Test_Burn(t *testing.T) {
 		}
 
 		//
-		// ctrler.lastTotalSupply is changed in EndBlock
-		//
+		// If inflation orrcurs, ctrler.lastTotalSupply is changed in EndBlock
 		require.NoError(t, mocks.DoEndBlock(ctrler))
 
 		diff := absDiff(ctrler.lastTotalSupply.totalSupply, expectedTotalSupply)
-		require.LessOrEqual(t, diff.Uint64(), uint64(1), diff.Uint64())
+		require.LessOrEqual(t, diff.Uint64(), uint64(1), diff.Uint64()) // there may be an error from calculating weight.
 		expectedTotalSupply = ctrler.lastTotalSupply.GetTotalSupply()
 
 		item, xerr := ctrler.supplyState.Get(v1.LedgerKeyTotalSupply(), true)
