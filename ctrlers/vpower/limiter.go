@@ -75,10 +75,13 @@ func (limiter *VPowerLimiter) checkTotalPower(diff int64, add bool) xerrors.XErr
 func (limiter *VPowerLimiter) ChangeRate(power int64, add bool) (int32, xerrors.XError) {
 	var rate int32
 	if add {
-		rate = changeRate(limiter.addingPower+power, limiter.estimatedTotalPower+power)
+		limiter.estimatedTotalPower += power
+		limiter.addingPower += power
+		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower)
 	} else if limiter.estimatedTotalPower >= power {
-		//
-		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower-power)
+		limiter.estimatedTotalPower -= power
+		limiter.subingPower += power
+		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower)
 	} else {
 		return 0, xerrors.ErrOverFlow.Wrapf("estimatedTotalPower(%v) > subtractedPower(%v)", limiter.estimatedTotalPower, power)
 	}
