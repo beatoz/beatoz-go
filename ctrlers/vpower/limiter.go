@@ -4,9 +4,11 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
 
+type OP_POWER bool
+
 const (
-	WHEN_POWER_ADD = true
-	WHEN_POWER_SUB = false
+	ADD_POWER OP_POWER = true
+	SUB_POWER OP_POWER = false
 )
 
 // VPowerLimiter limits the change of voting power in one block.
@@ -34,12 +36,12 @@ func (limiter *VPowerLimiter) Reset(total int64, allowRate int32) {
 	limiter.allowRate = allowRate
 }
 
-func (limiter *VPowerLimiter) CheckLimit(power int64, add bool) xerrors.XError {
-	if xerr := limiter.checkTotalPower(power, add); xerr != nil {
+func (limiter *VPowerLimiter) CheckLimit(power int64, op OP_POWER) xerrors.XError {
+	if xerr := limiter.checkTotalPower(power, op); xerr != nil {
 		return xerr
 	}
 
-	if add {
+	if op == ADD_POWER {
 		limiter.estimatedTotalPower += power
 		limiter.addingPower += power
 	} else {
@@ -53,9 +55,9 @@ func (limiter *VPowerLimiter) CheckLimit(power int64, add bool) xerrors.XError {
 // After any changes—whether some amount is added or removed—the new total should be seen as: newly added amount + remaining(previously existing) amount.
 // To ensure stability, the existing amount must still represent at least 'X%' of the total after the change.
 // Therefore, the newly added amount is only allowed if it stays within '(100 - X)%' of the new total.
-func (limiter *VPowerLimiter) checkTotalPower(diff int64, add bool) xerrors.XError {
+func (limiter *VPowerLimiter) checkTotalPower(diff int64, op OP_POWER) xerrors.XError {
 	var rate int32
-	if add {
+	if op == ADD_POWER {
 		rate = changeRate(limiter.addingPower+diff, limiter.estimatedTotalPower+diff)
 	} else if limiter.estimatedTotalPower >= diff {
 		//
@@ -72,9 +74,9 @@ func (limiter *VPowerLimiter) checkTotalPower(diff int64, add bool) xerrors.XErr
 	return nil
 }
 
-func (limiter *VPowerLimiter) ChangeRate(power int64, add bool) (int32, xerrors.XError) {
+func (limiter *VPowerLimiter) ChangeRate(power int64, op OP_POWER) (int32, xerrors.XError) {
 	var rate int32
-	if add {
+	if op == ADD_POWER {
 		limiter.estimatedTotalPower += power
 		limiter.addingPower += power
 		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower)

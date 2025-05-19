@@ -193,7 +193,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by txPower
-		if rate, xerr := ctrler.vpowLimiter.ChangeRate(txPower, WHEN_POWER_ADD); xerr != nil {
+		if rate, xerr := ctrler.vpowLimiter.ChangeRate(txPower, ADD_POWER); xerr != nil {
 			return xerr
 		} else if rate > ctrler.vpowLimiter.allowRate {
 			ctx.Events = append(ctx.Events, abcitypes.Event{
@@ -250,7 +250,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by vpow.SumPower
-		if rate, xerr := ctrler.vpowLimiter.ChangeRate(vpow.SumPower, WHEN_POWER_SUB); xerr != nil {
+		if rate, xerr := ctrler.vpowLimiter.ChangeRate(vpow.SumPower, SUB_POWER); xerr != nil {
 			return xerr
 		} else if rate > ctrler.vpowLimiter.allowRate {
 			ctx.Events = append(ctx.Events, abcitypes.Event{
