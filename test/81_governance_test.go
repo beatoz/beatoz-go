@@ -2,7 +2,6 @@ package test
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	types2 "github.com/beatoz/beatoz-go/types"
@@ -134,6 +133,18 @@ func TestProposalAndVoting(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, proposalResult.Hash, prop.Proposal.Header().TxHash)
 	require.Equal(t, 1, len(prop.Proposal.Options()))
+	require.Equal(t, int64(0), prop.Proposal.Option(0).Votes)
+	require.Nil(t, prop.Proposal.MajorOption())
+	require.Equal(t, proposal.PROPOSAL_GOVPARAMS, prop.Proposal.Header().PropType)
+	require.Equal(t, startHeight, prop.Proposal.Header().StartVotingHeight)
+	require.Equal(t, startHeight+votePeriod, prop.Proposal.Header().EndVotingHeight)
+	require.Equal(t, applyHeight, prop.Proposal.Header().ApplyHeight)
+
+	votingPower, err := bzweb3.QueryVotingPower(0)
+	require.NoError(t, err)
+
+	require.Equal(t, votingPower, prop.Proposal.Header().TotalVotingPower)
+	require.Equal(t, (votingPower*2)/3, prop.Proposal.Header().MajorityPower)
 
 	option := prop.Proposal.Option(0)
 	require.NotNil(t, option)
@@ -145,13 +156,10 @@ func TestProposalAndVoting(t *testing.T) {
 	require.EqualValues(t, newGovParams.RewardPoolAddress(), _propGovParams.RewardPoolAddress())
 
 	//
-	// voting to new proposal
+	// voting to the proposal
+	//
 	lastBlockHeight, err = waitBlock(startHeight)
 	require.NoError(t, err)
-
-	prop, err = bzweb3.QueryProposal(proposalHash, 0)
-	require.NoError(t, err)
-	fmt.Println("proposal", prop)
 
 	// not validator: error expected
 	nonValWal := randCommonWallet()
@@ -162,6 +170,9 @@ func TestProposalAndVoting(t *testing.T) {
 	require.Equal(t, xerrors.ErrCheckTx.Code(), votingResult.CheckTx.Code)
 
 	// validator
+	dgtee, err := bzweb3.GetDelegatee(validatorWallet.Address())
+	require.NoError(t, err)
+
 	require.NoError(t, validatorWallet.SyncAccount(bzweb3))
 	votingResult, err = validatorWallet.VotingCommit(defGas, defGasPrice, proposalHash, 0, bzweb3)
 	require.NoError(t, err)
@@ -170,5 +181,7 @@ func TestProposalAndVoting(t *testing.T) {
 
 	prop, err = bzweb3.QueryProposal(proposalHash, 0)
 	require.NoError(t, err)
-	fmt.Println("proposal", prop)
+	require.Equal(t, dgtee.SumPower(), prop.Proposal.Option(0).Votes)
+	// MajorOption is set in EndBlock of startHeight + votingPeriod
+	require.Nil(t, prop.Proposal.MajorOption())
 }
