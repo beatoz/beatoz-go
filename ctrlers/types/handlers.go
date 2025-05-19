@@ -101,14 +101,9 @@ type IEVMHandler interface {
 }
 
 type IVPowerHandler interface {
-	IStakeHandler
 	ITrxHandler
 	IBlockHandler
-	//Validators() ([]*vpower.Delegatee, int64)
-	//IsValidator(types.Address) bool
-	//TotalPowerOf(types.Address) int64
-	//SelfPowerOf(types.Address) int64
-	//DelegatedPowerOf(types.Address) int64
+	IStakeHandler
 	ComputeWeight(int64, int64, int64, int32, *uint256.Int) (*Weight, xerrors.XError)
 }
 

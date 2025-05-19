@@ -36,14 +36,17 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		burnAmt := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.BurnRate())))
 		burnAmt = new(uint256.Int).Div(burnAmt, uint256.NewInt(100))
 
-		// In ctrler.burn, ctrler.lastTotalSupply is changed.
 		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.BurnAddress(), burnAmt, true); xerr != nil {
 			return nil, xerr
 		}
 
-		if xerr := ctrler.burn(bctx.Height(), burnAmt); xerr != nil {
-			return nil, xerr
-		}
+		//
+		// this is not burning.
+		// it is just to transfer to the zero address.
+		//// In ctrler.burn, ctrler.lastTotalSupply is changed.
+		//if xerr := ctrler.burn(bctx.Height(), burnAmt); xerr != nil {
+		//	return nil, xerr
+		//}
 
 		// distribute the remaining fee to the proposer of this block.
 		rwdAmt := new(uint256.Int).Sub(sumFee, burnAmt)
