@@ -10,27 +10,23 @@ import (
 )
 
 func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
-	txhash := req.Data
+
+	atledger, xerr := ctrler.govState.ImitableLedgerAt(req.Height)
+	if xerr != nil {
+		return nil, xerrors.ErrQuery.Wrap(xerr)
+	}
+
 	switch req.Path {
 	case "proposal":
-		atProposalLedger, xerr := ctrler.proposalState.ImitableLedgerAt(req.Height)
-		if xerr != nil {
-			return nil, xerrors.ErrQuery.Wrap(xerr)
-		}
-
-		atFrozenLedger, xerr := ctrler.frozenState.ImitableLedgerAt(req.Height)
-		if xerr != nil {
-			return nil, xerrors.ErrQuery.Wrap(xerr)
-		}
-
 		type _response struct {
 			Status   string                `json:"status"`
 			Proposal *proposal.GovProposal `json:"proposal"`
 		}
 
+		txhash := req.Data
 		if txhash == nil || len(txhash) == 0 {
 			var readProposals []*_response
-			if xerr := atProposalLedger.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			if xerr := atledger.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 				prop, _ := item.(*proposal.GovProposal)
 				readProposals = append(readProposals, &_response{
 					Status:   "voting",
@@ -41,7 +37,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			if xerr = atFrozenLedger.Seek(v1.KeyPrefixFrozenProp, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			if xerr = atledger.Seek(v1.KeyPrefixFrozenProp, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 				prop, _ := item.(*proposal.GovProposal)
 				readProposals = append(readProposals, &_response{
 					Status:   "frozen",
@@ -58,11 +54,11 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 			}
 			return v, nil
 		} else {
-			item, xerr := atProposalLedger.Get(v1.LedgerKeyProposal(txhash))
+			item, xerr := atledger.Get(v1.LedgerKeyProposal(txhash))
 			resp := &_response{Status: "voting"}
 			if xerr != nil {
 				if xerr.Code() == xerrors.ErrCodeNotFoundResult {
-					item, xerr = atFrozenLedger.Get(v1.LedgerKeyFrozenProp(txhash))
+					item, xerr = atledger.Get(v1.LedgerKeyFrozenProp(txhash))
 					if xerr != nil {
 						return nil, xerrors.ErrQuery.Wrap(xerr)
 					}
@@ -82,10 +78,6 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 			return v, nil
 		}
 	case "gov_params":
-		atledger, xerr := ctrler.paramsState.ImitableLedgerAt(req.Height)
-		if xerr != nil {
-			return nil, xerrors.ErrQuery.Wrap(xerr)
-		}
 		govParams, xerr := atledger.Get(v1.LedgerKeyGovParams())
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)

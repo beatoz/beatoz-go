@@ -5,7 +5,6 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ledger/v1"
 	types3 "github.com/beatoz/beatoz-go/types"
-	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	types2 "github.com/tendermint/tendermint/abci/types"
 	"strconv"
@@ -87,21 +86,9 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	h0, v0, xerr := ctrler.paramsState.Commit()
+	h, v, xerr := ctrler.govState.Commit()
 	if xerr != nil {
 		return nil, -1, xerr
-	}
-	h1, v1, xerr := ctrler.proposalState.Commit()
-	if xerr != nil {
-		return nil, -1, xerr
-	}
-	h2, v2, xerr := ctrler.frozenState.Commit()
-	if xerr != nil {
-		return nil, -1, xerr
-	}
-
-	if v0 != v1 || v1 != v2 {
-		return nil, -1, xerrors.ErrCommit.Wrapf("error: GovCtrler.Commit() has wrong version number - v0:%v, v1:%v, v2:%v", v0, v1, v2)
 	}
 
 	if ctrler.newGovParams != nil {
@@ -109,6 +96,6 @@ func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {
 		ctrler.newGovParams = nil
 		ctrler.logger.Debug("New governance parameters is committed", "gov_params", ctrler.GovParams.String())
 	}
-	return crypto.DefaultHash(h0, h1, h2), v0, nil
+	return h, v, nil
 
 }

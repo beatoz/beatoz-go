@@ -445,10 +445,10 @@ func GasToFee(gas int64, price *uint256.Int) *uint256.Int {
 	return new(uint256.Int).Mul(uint256.NewInt(uint64(gas)), price)
 }
 
-func MergeGovParams(oldParams, newParams *GovParams) {
+func MergeGovParams(fromPrams, toParams *GovParams) {
 	refT := reflect.TypeOf(GovParamsProto{})
-	refVOld := reflect.ValueOf(oldParams.GetValues()).Elem()
-	refVNew := reflect.ValueOf(newParams.GetValues()).Elem()
+	refVOld := reflect.ValueOf(fromPrams.GetValues()).Elem()
+	refVNew := reflect.ValueOf(toParams.GetValues()).Elem()
 
 	for i := 0; i < refT.NumField(); i++ {
 		field0 := refT.Field(i)

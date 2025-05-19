@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// At the package level, all proposals are typically applied or removed by preceding tests,
+// meaning that no proposals remain when TestPunish is executed.
 func TestPunish(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	byzantineAddr := vpowMock.PickAddress(rand.Intn(vpowMock.ValCnt))

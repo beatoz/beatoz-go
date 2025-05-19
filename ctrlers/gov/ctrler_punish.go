@@ -16,24 +16,23 @@ func (ctrler *GovCtrler) doSlash(targetAddr types.Address) (int64, xerrors.XErro
 	var punishedProp []*proposal.GovProposal
 	defer func() {
 		for _, prop := range punishedProp {
-			_ = ctrler.proposalState.Set(v1.LedgerKeyProposal(prop.TxHash), prop, true)
+			_ = ctrler.govState.Set(v1.LedgerKeyProposal(prop.TxHash), prop, true)
 			fmt.Println("punishment", "txhash", prop.TxHash, "total.power", prop.TotalVotingPower, "majore.power", prop.MajorityPower)
 			for _, voter := range prop.Voters {
 				fmt.Println("voter", voter.Addr, "power", voter.Power)
 			}
 
-			d, _ := ctrler.proposalState.Get(v1.LedgerKeyProposal(prop.TxHash), true)
+			d, _ := ctrler.govState.Get(v1.LedgerKeyProposal(prop.TxHash), true)
 			prop2, _ := d.(*proposal.GovProposal)
 			fmt.Println("read", "txhash", prop2.TxHash, "total.power", prop2.TotalVotingPower, "majore.power", prop2.MajorityPower)
 			for _, voter := range prop2.Voters {
 				fmt.Println("read voter", voter.Addr, "power", voter.Power)
 			}
-
 		}
 	}()
 
 	slashedPower := int64(0)
-	_ = ctrler.proposalState.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	_ = ctrler.govState.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 		prop, _ := item.(*proposal.GovProposal)
 		for _, v := range prop.Voters {
 			if bytes.Compare(v.Addr, targetAddr) == 0 {

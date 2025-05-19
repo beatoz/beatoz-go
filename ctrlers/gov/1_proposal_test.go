@@ -113,7 +113,7 @@ func TestProposalDuplicate(t *testing.T) {
 
 	for _, c := range cases2 {
 		key := v1.LedgerKeyProposal(c.txctx.TxHash)
-		item, xerr := govCtrler.proposalState.Get(key, false)
+		item, xerr := govCtrler.govState.Get(key, false)
 		require.NoError(t, xerr)
 		require.NotNil(t, item)
 		prop, _ := item.(*proposal.GovProposal)
