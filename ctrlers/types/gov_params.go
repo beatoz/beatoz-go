@@ -10,7 +10,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"math"
 	"reflect"
 	"sync"
 	"unicode"
@@ -27,197 +26,7 @@ type GovParams struct {
 }
 
 func DefaultGovParams() *GovParams {
-	return newGovParamsWith(1) // 1s interval
-}
-
-func Test1GovParams() *GovParams {
-	params := DefaultGovParams()
-	params._v.Version = 1
-	params._v.MaxValidatorCnt = 10
-	params._v.MinValidatorPower = 1
-	params._v.MinDelegatorPower = 1
-	params._v.XRewardPerStake = uint256.NewInt(2_000_000_000).Bytes()
-	params._v.LazyUnstakingBlocks = 10
-	params._v.LazyApplyingBlocks = 10
-	params._v.XGasPrice = uint256.NewInt(10).Bytes()
-	params._v.MinTrxGas = 10
-	params._v.MaxTrxGas = math.MaxUint64 / 2
-	params._v.MaxBlockGas = math.MaxUint64 / 2
-	params._v.MinVotingPeriodBlocks = 10
-	params._v.MaxVotingPeriodBlocks = 10
-	params._v.SignedBlocksWindow = 30
-	params._v.MinSignedBlocks = 3
-	params._v.InflationWeightPermil = 290
-	params._v.InflationCycleBlocks = 1
-	params._v.MinBondingBlocks = 1
-	params._v.BondingBlocksWeightPermil = 2
-	params._v.XRewardPoolAddress = types.ZeroAddress()
-	params._v.XBurnAddress = types.ZeroAddress()
-	return params
-}
-
-//	func Test2GovParams() *GovParams {
-//		return &GovParams{
-//			version:                   2,
-//			maxValidatorCnt:           10,
-//			minValidatorPower:         5, // 5 BEATOZ
-//			minDelegatorPower:         0, // issue(hotfix) RG78
-//			rewardPerPower:            uint256.NewInt(2_000_000_000),
-//			lazyUnstakingBlocks:       30,
-//			lazyApplyingBlocks:        40,
-//			gasPrice:                  uint256.NewInt(20),
-//			minTrxGas:                 uint64(20),
-//			maxTrxGas:                 math.MaxUint64 / 2,
-//			maxBlockGas:               math.MaxUint64 / 2,
-//			minVotingPeriodBlocks:     50,
-//			maxVotingPeriodBlocks:     60,
-//			minSelfStakeRatio:         50,                                                     // 50%
-//			maxUpdatableStakeRatio:    33,                                                     // 100%
-//			maxIndividualStakeRatio:   33,                                                     // 10000000%
-//			slashRatio:                50,                                                     // 50%
-//			signedBlocksWindow:        10000,                                                  // 10000 blocks
-//			minSignedBlocks:           5,                                                      // 500 blocks
-//			maxTotalSupply:            uint256.MustFromDecimal("700000000000000000000000000"), // 700,000,000 BEATOZ
-//			inflationWeightPermil:     290,                                                    // 0.290
-//			inflationCycleBlocks:      1,
-//			minBondingBlocks:          1,
-//			bondingBlocksWeightPermil: 2, // 0.002
-//			rewardPoolAddress:         types.ZeroAddress(),
-//			burnAddress:               types.ZeroAddress(), // 0x0000...0000
-//			burnRatio:                 10,                  // 10%
-//			ripeningBlocks:            secondsPerYear,
-//			maxValidatorsOfDelegator:  1,
-//			maxDelegatorsOfValidator:  1000,
-//		}
-//	}
-func Test3GovParams() *GovParams {
-	params := DefaultGovParams()
-	params._v.Version = 3
-	params._v.MaxValidatorCnt = 13
-	params._v.MinValidatorPower = 0
-	params._v.MinDelegatorPower = 0 // issue(hotfix) RG78
-	params._v.XRewardPerStake = uint256.NewInt(0).Bytes()
-	params._v.LazyUnstakingBlocks = 20
-	params._v.LazyApplyingBlocks = 0
-	params._v.XGasPrice = nil
-	params._v.MinTrxGas = 0
-	params._v.MaxTrxGas = math.MaxUint64 / 2
-	params._v.MaxBlockGas = math.MaxUint64 / 2
-	params._v.MinVotingPeriodBlocks = 0
-	params._v.MaxVotingPeriodBlocks = 0
-	params._v.MinSelfStakeRate = 0
-	params._v.MaxUpdatableStakeRate = 10
-	params._v.MaxIndividualStakeRate = 10
-	params._v.MinSelfStakeRate = 50
-	params._v.SignedBlocksWindow = 10000
-	params._v.MinSignedBlocks = 500
-	params._v.InflationWeightPermil = 290
-	params._v.InflationCycleBlocks = 1
-	params._v.MinBondingBlocks = 1
-	params._v.BondingBlocksWeightPermil = 2
-	params._v.XRewardPoolAddress = types.ZeroAddress()
-	params._v.XBurnAddress = types.ZeroAddress()
-
-	return params
-}
-
-//
-//func Test4GovParams() *GovParams {
-//	return &GovParams{
-//		version:                   4,
-//		maxValidatorCnt:           13,
-//		minValidatorPower:         7_000_000,
-//		minDelegatorPower:         0, // issue(hotfix) RG78
-//		rewardPerPower:            uint256.NewInt(4_756_468_797),
-//		lazyUnstakingBlocks:       20,
-//		lazyApplyingBlocks:        259200,
-//		gasPrice:                  uint256.NewInt(10_000_000_000),
-//		minTrxGas:                 uint64(100_000),
-//		maxTrxGas:                 math.MaxUint64 / 2,
-//		maxBlockGas:               math.MaxUint64 / 2,
-//		minVotingPeriodBlocks:     259200,
-//		maxVotingPeriodBlocks:     2592000,
-//		minSelfStakeRatio:         50,
-//		maxUpdatableStakeRatio:    10,
-//		maxIndividualStakeRatio:   10,
-//		slashRatio:                50,
-//		signedBlocksWindow:        10000,
-//		minSignedBlocks:           500,
-//		maxTotalSupply:            uint256.MustFromDecimal("700000000000000000000000000"), // 700,000,000 BEATOZ
-//		inflationWeightPermil:     290,
-//		inflationCycleBlocks:      1,
-//		minBondingBlocks:          1,
-//		bondingBlocksWeightPermil: 2, // 0.002
-//		rewardPoolAddress:         types.ZeroAddress(),
-//		burnAddress:               types.ZeroAddress(), // 0x0000...0000
-//		burnRatio:                 10,                  // 10%
-//		ripeningBlocks:            secondsPerYear,
-//		maxValidatorsOfDelegator:  1,
-//		maxDelegatorsOfValidator:  1000,
-//	}
-//}
-//
-//func Test5GovParams() *GovParams {
-//	return &GovParams{
-//		version:                   3,
-//		minValidatorPower:         0,
-//		minSelfStakeRatio:         40,
-//		maxUpdatableStakeRatio:    50,
-//		maxIndividualStakeRatio:   50,
-//		slashRatio:                60,
-//		maxTotalSupply:            uint256.MustFromDecimal("700000000000000000000000000"), // 700,000,000 BEATOZ
-//		inflationWeightPermil:     290,
-//		inflationCycleBlocks:      1,
-//		minBondingBlocks:          1,
-//		bondingBlocksWeightPermil: 2, // 0.002
-//		rewardPoolAddress:         types.ZeroAddress(),
-//		burnAddress:               types.ZeroAddress(), // 0x0000...0000
-//		burnRatio:                 10,                  // 10%
-//		ripeningBlocks:            secondsPerYear,
-//		maxValidatorsOfDelegator:  1,
-//		maxDelegatorsOfValidator:  1000,
-//	}
-//}
-//
-//func Test6GovParams_NoStakeLimiter() *GovParams {
-//	return &GovParams{
-//		version:                   2,
-//		maxValidatorCnt:           10,
-//		minValidatorPower:         5, // 5 BEATOZ
-//		minDelegatorPower:         0, // issue(hotfix) RG78
-//		rewardPerPower:            uint256.NewInt(2_000_000_000),
-//		lazyUnstakingBlocks:       30,
-//		lazyApplyingBlocks:        40,
-//		gasPrice:                  uint256.NewInt(20),
-//		minTrxGas:                 uint64(20),
-//		maxTrxGas:                 math.MaxUint64 / 2,
-//		maxBlockGas:               math.MaxUint64 / 2,
-//		minVotingPeriodBlocks:     50,
-//		maxVotingPeriodBlocks:     60,
-//		minSelfStakeRatio:         50,                                                     // 50%
-//		maxUpdatableStakeRatio:    100,                                                    // 100%
-//		maxIndividualStakeRatio:   10000000,                                               // 10000000%
-//		slashRatio:                50,                                                     // 50%
-//		signedBlocksWindow:        10000,                                                  // 10000 blocks
-//		minSignedBlocks:           5,                                                      // 500 blocks
-//		maxTotalSupply:            uint256.MustFromDecimal("700000000000000000000000000"), // 700,000,000 BEATOZ
-//		inflationWeightPermil:     290,
-//		inflationCycleBlocks:      1,
-//		minBondingBlocks:          1,
-//		bondingBlocksWeightPermil: 2, // 0.002
-//		rewardPoolAddress:         types.ZeroAddress(),
-//		burnAddress:               types.ZeroAddress(), // 0x0000...0000
-//		burnRatio:                 10,                  // 10%
-//		ripeningBlocks:            secondsPerYear,
-//		maxValidatorsOfDelegator:  1,
-//		maxDelegatorsOfValidator:  1000,
-//	}
-//}
-
-func emptyGovParams() *GovParams {
-	return &GovParams{
-		_v: GovParamsProto{},
-	}
+	return newGovParamsWith(1) // 7s interval
 }
 
 func newGovParamsWith(interval int) *GovParams {
@@ -667,18 +476,8 @@ var _ v1.ILedgerItem = (*GovParams)(nil)
 var _ IGovParams = (*GovParams)(nil)
 
 // functions for test
+type setFunc func(*GovParamsProto)
 
-// DEPRECATED
-func (govParams *GovParams) SetLazyUnstakingBlocks(n int64) {
-	govParams.mtx.Lock()
-	defer govParams.mtx.Unlock()
-
-	govParams._v.LazyUnstakingBlocks = n
-}
-
-func uint256ToString(i *uint256.Int) string {
-	if i == nil {
-		return ""
-	}
-	return i.String()
+func (govParams *GovParams) SetValue(cb setFunc) {
+	cb(&govParams._v)
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
-	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -28,7 +28,7 @@ func TestProposalAndVoting(t *testing.T) {
 
 	//
 	// new proposal
-	bzOpt, err := json.Marshal(ctrlertypes.Test3GovParams())
+	bzOpt, err := json.Marshal(govmock.ForTest3GovParams())
 	require.NoError(t, err)
 
 	lastBlockHeight, err := waitBlock(10)

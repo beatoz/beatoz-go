@@ -14,7 +14,7 @@ import (
 
 func TestSlash(t *testing.T) {
 	for i := 0; i < 21; i++ {
-		govParams := ctrlertypes.DefaultGovParams() //ctrlertypes.Test1GovParams()
+		govParams := ctrlertypes.DefaultGovParams()
 
 		delegatee := newDelegatee()
 

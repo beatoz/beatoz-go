@@ -324,7 +324,7 @@ func resetTest(t *testing.T, valCnt int) {
 	cfg.DBPath = filepath.Join(os.TempDir(), "stake-limiter-test")
 	os.RemoveAll(cfg.DBPath)
 
-	govMock01 = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams()) //ctrlertypes.Test1GovParams()
+	govMock01 = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	values := govMock01.GetValues()
 	values.MinValidatorPower = 1
 	values.MinDelegatorPower = 1

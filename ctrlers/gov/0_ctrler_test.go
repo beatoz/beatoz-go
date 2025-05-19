@@ -3,6 +3,7 @@ package gov
 import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	mockacct "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
+	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	mockvpower "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
@@ -22,8 +23,8 @@ var (
 	acctMock    *mockacct.AcctHandlerMock
 	vpowMock    *mockvpower.VPowerHandlerMock //*mockstake.StakeHandlerMock
 	govParams0  = ctrlertypes.DefaultGovParams()
-	govParams1  = ctrlertypes.Test1GovParams()
-	govParams3  = ctrlertypes.Test3GovParams()
+	govParams1  = govmock.ForTest1GovParams()
+	govParams3  = govmock.ForTest3GovParams()
 	defMinGas   = govParams0.MinTrxGas()
 	defGasPrice = govParams0.GasPrice()
 )
