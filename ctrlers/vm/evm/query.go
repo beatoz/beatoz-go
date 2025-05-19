@@ -15,7 +15,7 @@ import (
 	"math"
 )
 
-func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
+func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
 	from := req.Data[:types.AddrSize]
 	to := req.Data[types.AddrSize : types.AddrSize*2]
 	data := req.Data[types.AddrSize*2:]
@@ -41,7 +41,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery) ([]byte, xerrors.XErr
 		retData = nil
 	}
 	vmCallRet := &ctrlertypes.VMCallResult{
-		UsedGas:    execRet.UsedGas,
+		UsedGas:    int64(execRet.UsedGas),
 		ReturnData: retData,
 	}
 	if execRet.Err != nil {

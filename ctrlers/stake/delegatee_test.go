@@ -14,7 +14,7 @@ import (
 
 func TestSlash(t *testing.T) {
 	for i := 0; i < 21; i++ {
-		govParams := ctrlertypes.Test1GovParams()
+		govParams := ctrlertypes.DefaultGovParams()
 
 		delegatee := newDelegatee()
 
@@ -51,11 +51,11 @@ func TestSlash(t *testing.T) {
 			oriStakes[i] = s0.Clone()
 		}
 
-		slashedPower0 := delegatee.DoSlash(govParams.SlashRatio())
+		slashedPower0 := delegatee.DoSlash(govParams.SlashRate())
 
 		expectedSlashedPower := int64(0)
 		for _, s0 := range oriStakes {
-			slashedPower := (s0.Power * govParams.SlashRatio()) / int64(100)
+			slashedPower := (s0.Power * int64(govParams.SlashRate())) / int64(100)
 			if slashedPower < 1 {
 				slashedPower = s0.Power
 			}

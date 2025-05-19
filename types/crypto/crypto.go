@@ -16,6 +16,15 @@ func NewPrvKey() (*ecdsa.PrivateKey, error) {
 	return ethcrypto.GenerateKey()
 }
 
+func NewKeypairBytes() (abytes.HexBytes, abytes.HexBytes) {
+	prv0, _ := NewPrvKey()
+
+	prv := ethcrypto.FromECDSA(prv0)
+	pub := CompressPubkey(&prv0.PublicKey)
+
+	return prv, pub
+}
+
 func ImportPrvKey(d []byte) (*ecdsa.PrivateKey, error) {
 	return ethcrypto.ToECDSA(d)
 }
@@ -44,7 +53,7 @@ func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
 }
 
 // pubBytes is 33 bytes compressed format
-func PubBytes2Addr(pubBytes []byte) (types.Address, xerrors.XError) {
+func PubBytes2Addr(pubBytes abytes.HexBytes) (types.Address, xerrors.XError) {
 	// ethereum style
 	//pub, err := ethcrypto.DecompressPubkey(pubBytes)
 	//if err != nil {
@@ -54,6 +63,10 @@ func PubBytes2Addr(pubBytes []byte) (types.Address, xerrors.XError) {
 	//return a[:], nil
 
 	return abytes.HexBytes(tmsecp256k1.PubKey(pubBytes).Address()), nil
+}
+
+func PubKeyBytes2Addr(pubBytes abytes.HexBytes) types.Address {
+	return abytes.HexBytes(tmsecp256k1.PubKey(pubBytes).Address())
 }
 
 func CompressPubkey(pub *ecdsa.PublicKey) abytes.HexBytes {

@@ -12,7 +12,7 @@ type acctObj struct {
 	w *web3.Wallet
 
 	originBalance *uint256.Int
-	originNonce   uint64
+	originNonce   int64
 
 	sentTxsCnt int
 	retTxsCnt  int
@@ -20,7 +20,7 @@ type acctObj struct {
 	txHashes        map[string]types.Address
 	spentGas        *uint256.Int
 	expectedBalance *uint256.Int
-	expectedNonce   uint64
+	expectedNonce   int64
 
 	mtx sync.RWMutex
 }

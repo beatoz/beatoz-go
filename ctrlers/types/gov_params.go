@@ -1,597 +1,408 @@
 package types
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
-	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"math"
+	"reflect"
 	"sync"
+	"unicode"
 )
 
 var (
+	//DEPRECATED
 	amountPerPower = uint256.NewInt(1_000000000_000000000) // 1BEATOZ == 1Power
 )
 
 type GovParams struct {
-	version               int64
-	maxValidatorCnt       int64
-	minValidatorStake     *uint256.Int
-	minDelegatorStake     *uint256.Int
-	rewardPerPower        *uint256.Int
-	lazyUnstakingBlocks   int64
-	lazyApplyingBlocks    int64
-	gasPrice              *uint256.Int
-	minTrxGas             uint64
-	maxTrxGas             uint64
-	maxBlockGas           uint64
-	minVotingPeriodBlocks int64
-	maxVotingPeriodBlocks int64
-
-	minSelfStakeRatio       int64
-	maxUpdatableStakeRatio  int64
-	maxIndividualStakeRatio int64
-	slashRatio              int64
-	signedBlocksWindow      int64
-	minSignedBlocks         int64
-
+	_v  GovParamsProto
 	mtx sync.RWMutex
 }
 
 func DefaultGovParams() *GovParams {
-	return &GovParams{
-		version:           1,
-		maxValidatorCnt:   21,
-		minValidatorStake: uint256.MustFromDecimal("7000000000000000000000000"), // 7,000,000 BEATOZ
+	return newGovParamsWith(1) // 7s interval
+}
 
-		// issue(hotfix) RG78
-		minDelegatorStake: uint256.NewInt(0),
+func newGovParamsWith(interval int) *GovParams {
+	// block interval = `interval` seconds
+	// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
+	// min blocks/1Y = 31,536,000 / `interval` (if all blocks interval `interval` s)
 
-		//
-		// issue #60
-		//
-		// block interval = 3s
-		// min blocks/1Y = 10,512,000 (if all blocks interval 3s)
-		// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
-		// 1BEATOZ = 1POWer = 10^18 amount
-		//
-		// When the min issuance rate is 5%,
-		// 			= 0.05 BEATOZ [per 1Power(BEATOZ),1Y(10_512_000 blocks)]
-		//			= 0.05 BEATOZ / 10_512_000 blocks [per 1Power(BEATOZ), 1block]
-		//          = 50,000,000,000,000,000 / 10,512,000 [per 1Power(BEATOZ), 1block]
-		//			= 4,756,468,797.5646879756 [per 1Power(BEATOZ), 1block]
-		// the `rewardPerPower` should be 4,756,468,797.5646879756.
-		// When like this,
-		// the max issuance rate becomes ...
-		//			= 4,756,468,797 * 31,536,000(blocks in 1Y)
-		//			= 149,999,999,982,192,000 amount [per 1BEATOZ, 1Y]
-		// , it's about 15% of 1 power
-
-		// hotfix: because reward ledger and appHash is continually updated, block time is not controlled to 3s.
-		// so, reward = original reward / 3 = 4756468797
-		rewardPerPower:          uint256.NewInt(4_756_468_797),   // fons
-		lazyUnstakingBlocks:     2592000,                         // 90days blocks = 90 * 24 * 60 * 60s (90days seconds) / 3s(block intervals)
-		lazyApplyingBlocks:      28800,                           // 1days blocks = 24 * 60 * 60s (1days seconds) / 3s(block intervals)
-		gasPrice:                uint256.NewInt(250_000_000_000), // 250e9 = 250 Gfons
-		minTrxGas:               uint64(4000),                    // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
-		maxTrxGas:               30_000_000,
-		maxBlockGas:             50_000_000,
-		minVotingPeriodBlocks:   28800,  // 1day blocks = 24 * 60 * 60s(1day seconds) / 3s(block intervals)
-		maxVotingPeriodBlocks:   864000, // 30days blocks = 30 * 24 * 60 * 60s (30days seconds) / 3s(block intervals)
-		minSelfStakeRatio:       50,     // 50%
-		maxUpdatableStakeRatio:  33,     // 33%
-		maxIndividualStakeRatio: 33,     // 33%
-		slashRatio:              50,     // 50%
-		signedBlocksWindow:      10000,  // 10000 blocks
-		minSignedBlocks:         500,    // 500 blocks
+	ret := &GovParams{
+		_v: GovParamsProto{
+			Version:                   1,
+			MaxValidatorCnt:           21,
+			MinValidatorPower:         7_000_000, // 7,000,000 BEATOZ
+			MinDelegatorPower:         4_000,     //  `0` means that the delegating is disable.
+			MaxValidatorsOfDelegator:  1,
+			MaxDelegatorsOfValidator:  1000,
+			MinSelfStakeRate:          50,                                                             // 50%
+			MaxUpdatableStakeRate:     33,                                                             // 33%
+			MaxIndividualStakeRate:    33,                                                             // 33%
+			MinBondingBlocks:          2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
+			LazyUnstakingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
+			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
+			InflationWeightPermil:     390,                                                            // 0.390
+			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
+			BondingBlocksWeightPermil: 500,                                                            // 0.500
+			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
+			XRewardPoolAddress:        types.ZeroAddress(),                                            // zero address
+			ValidatorRewardRate:       30,                                                             // 30%
+			XBurnAddress:              types.ZeroAddress(),                                            // zero address
+			BurnRate:                  10,                                                             // 10%
+			SlashRate:                 50,                                                             // 50%
+			SignedBlocksWindow:        10_000,
+			MinSignedBlocks:           500,
+			XGasPrice:                 uint256.NewInt(250_000_000_000).Bytes(), // 250e9 = 250 Gfons
+			MinTrxGas:                 4_000,                                   // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
+			MaxTrxGas:                 30_000_000,
+			MaxBlockGas:               50_000_000,
+			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
+			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
+			LazyApplyingBlocks:        DaySeconds / int64(interval),     // 1days blocks
+			XRewardPerStake:           uint256.NewInt(4_756_468_797).Bytes(),
+		},
+		mtx: sync.RWMutex{},
 	}
+	return ret
 }
 
-func Test1GovParams() *GovParams {
-	return &GovParams{
-		version:                 1,
-		maxValidatorCnt:         10,
-		minValidatorStake:       uint256.MustFromDecimal("1000000000000000000"), // 1 BEATOZ
-		minDelegatorStake:       uint256.NewInt(0),                              // issue(hotfix) RG78
-		rewardPerPower:          uint256.NewInt(2_000_000_000),
-		lazyUnstakingBlocks:     10,
-		lazyApplyingBlocks:      10,
-		gasPrice:                uint256.NewInt(10),
-		minTrxGas:               uint64(10),
-		maxTrxGas:               math.MaxUint64 / 2,
-		maxBlockGas:             math.MaxUint64 / 2,
-		minVotingPeriodBlocks:   10,
-		maxVotingPeriodBlocks:   10,
-		minSelfStakeRatio:       50, // 50%
-		maxUpdatableStakeRatio:  33, // 33%
-		maxIndividualStakeRatio: 33, // 33%
-		slashRatio:              50, // 50%
-		signedBlocksWindow:      30,
-		minSignedBlocks:         3,
-	}
-}
+func (govParams *GovParams) Encode() ([]byte, xerrors.XError) {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-func Test2GovParams() *GovParams {
-	return &GovParams{
-		version:                 2,
-		maxValidatorCnt:         10,
-		minValidatorStake:       uint256.MustFromDecimal("5000000000000000000"), // 5 BEATOZ
-		minDelegatorStake:       uint256.NewInt(0),                              // issue(hotfix) RG78
-		rewardPerPower:          uint256.NewInt(2_000_000_000),
-		lazyUnstakingBlocks:     30,
-		lazyApplyingBlocks:      40,
-		gasPrice:                uint256.NewInt(20),
-		minTrxGas:               uint64(20),
-		maxTrxGas:               math.MaxUint64 / 2,
-		maxBlockGas:             math.MaxUint64 / 2,
-		minVotingPeriodBlocks:   50,
-		maxVotingPeriodBlocks:   60,
-		minSelfStakeRatio:       50,    // 50%
-		maxUpdatableStakeRatio:  33,    // 100%
-		maxIndividualStakeRatio: 33,    // 10000000%
-		slashRatio:              50,    // 50%
-		signedBlocksWindow:      10000, // 10000 blocks
-		minSignedBlocks:         5,     // 500 blocks
-	}
-}
-
-func Test3GovParams() *GovParams {
-	return &GovParams{
-		version:                 4,
-		maxValidatorCnt:         13,
-		minValidatorStake:       uint256.MustFromDecimal("0"),
-		minDelegatorStake:       uint256.NewInt(0), // issue(hotfix) RG78
-		rewardPerPower:          uint256.NewInt(0),
-		lazyUnstakingBlocks:     20,
-		lazyApplyingBlocks:      0,
-		gasPrice:                nil,
-		minTrxGas:               0,
-		maxTrxGas:               math.MaxUint64 / 2,
-		maxBlockGas:             math.MaxUint64 / 2,
-		minVotingPeriodBlocks:   0,
-		maxVotingPeriodBlocks:   0,
-		minSelfStakeRatio:       0,
-		maxUpdatableStakeRatio:  10,
-		maxIndividualStakeRatio: 10,
-		slashRatio:              50,
-		signedBlocksWindow:      10000,
-		minSignedBlocks:         500,
-	}
-}
-
-func Test4GovParams() *GovParams {
-	return &GovParams{
-		version:                 4,
-		maxValidatorCnt:         13,
-		minValidatorStake:       uint256.MustFromDecimal("7000000000000000000000000"),
-		minDelegatorStake:       uint256.NewInt(0), // issue(hotfix) RG78
-		rewardPerPower:          uint256.NewInt(4_756_468_797),
-		lazyUnstakingBlocks:     20,
-		lazyApplyingBlocks:      259200,
-		gasPrice:                uint256.NewInt(10_000_000_000),
-		minTrxGas:               uint64(100_000),
-		maxTrxGas:               math.MaxUint64 / 2,
-		maxBlockGas:             math.MaxUint64 / 2,
-		minVotingPeriodBlocks:   259200,
-		maxVotingPeriodBlocks:   2592000,
-		minSelfStakeRatio:       50,
-		maxUpdatableStakeRatio:  10,
-		maxIndividualStakeRatio: 10,
-		slashRatio:              50,
-		signedBlocksWindow:      10000,
-		minSignedBlocks:         500,
-	}
-}
-
-func Test5GovParams() *GovParams {
-	return &GovParams{
-		version:                 3,
-		minValidatorStake:       uint256.MustFromDecimal("0"),
-		minSelfStakeRatio:       40,
-		maxUpdatableStakeRatio:  50,
-		maxIndividualStakeRatio: 50,
-		slashRatio:              60,
-	}
-}
-
-func Test6GovParams_NoStakeLimiter() *GovParams {
-	return &GovParams{
-		version:                 2,
-		maxValidatorCnt:         10,
-		minValidatorStake:       uint256.MustFromDecimal("5000000000000000000"), // 5 BEATOZ
-		minDelegatorStake:       uint256.NewInt(0),                              // issue(hotfix) RG78
-		rewardPerPower:          uint256.NewInt(2_000_000_000),
-		lazyUnstakingBlocks:     30,
-		lazyApplyingBlocks:      40,
-		gasPrice:                uint256.NewInt(20),
-		minTrxGas:               uint64(20),
-		maxTrxGas:               math.MaxUint64 / 2,
-		maxBlockGas:             math.MaxUint64 / 2,
-		minVotingPeriodBlocks:   50,
-		maxVotingPeriodBlocks:   60,
-		minSelfStakeRatio:       50,       // 50%
-		maxUpdatableStakeRatio:  100,      // 100%
-		maxIndividualStakeRatio: 10000000, // 10000000%
-		slashRatio:              50,       // 50%
-		signedBlocksWindow:      10000,    // 10000 blocks
-		minSignedBlocks:         5,        // 500 blocks
-	}
-}
-
-func DecodeGovParams(bz []byte) (*GovParams, xerrors.XError) {
-	ret := &GovParams{}
-	if xerr := ret.Decode(bz); xerr != nil {
-		return nil, xerr
-	}
-	return ret, nil
-}
-
-func (r *GovParams) Key() v1.LedgerKey {
-	return bytes.ZeroBytes(32)
-}
-
-func (r *GovParams) Decode(bz []byte) xerrors.XError {
-	pm := &GovParamsProto{}
-	if err := proto.Unmarshal(bz, pm); err != nil {
-		return xerrors.From(err)
-	}
-	r.fromProto(pm)
-	return nil
-}
-
-func (r *GovParams) Encode() ([]byte, xerrors.XError) {
-	if bz, err := proto.Marshal(r.toProto()); err != nil {
+	if bz, err := proto.Marshal(&govParams._v); err != nil {
 		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
 }
 
-func (r *GovParams) fromProto(pm *GovParamsProto) {
-	r.mtx.Lock()
-	defer r.mtx.Unlock()
+func (govParams *GovParams) Decode(k, v []byte) xerrors.XError {
+	govParams.mtx.Lock()
+	defer govParams.mtx.Unlock()
 
-	r.version = pm.Version
-	r.maxValidatorCnt = pm.MaxValidatorCnt
-	r.minValidatorStake = new(uint256.Int).SetBytes(pm.XMinValidatorStake)
-	r.minDelegatorStake = new(uint256.Int).SetBytes(pm.XMinDelegatorStake)
-	r.rewardPerPower = new(uint256.Int).SetBytes(pm.XRewardPerPower)
-	r.lazyUnstakingBlocks = pm.LazyUnstakingBlocks
-	r.lazyApplyingBlocks = pm.LazyApplyingBlocks
-	r.gasPrice = new(uint256.Int).SetBytes(pm.XGasPrice)
-	r.minTrxGas = pm.MinTrxGas
-	r.maxTrxGas = pm.MaxTrxGas
-	r.maxBlockGas = pm.MaxBlockGas
-	r.minVotingPeriodBlocks = pm.MinVotingPeriodBlocks
-	r.maxVotingPeriodBlocks = pm.MaxVotingPeriodBlocks
-	r.minSelfStakeRatio = pm.MinSelfStakeRatio
-	r.maxUpdatableStakeRatio = pm.MaxUpdatableStakeRatio
-	r.maxIndividualStakeRatio = pm.MaxIndividualStakeRatio
-	r.slashRatio = pm.SlashRatio
-	r.signedBlocksWindow = pm.SignedBlocksWindow
-	r.minSignedBlocks = pm.MinSignedBlocks
-}
-
-func (r *GovParams) toProto() *GovParamsProto {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	a := &GovParamsProto{
-		Version:                 r.version,
-		MaxValidatorCnt:         r.maxValidatorCnt,
-		XMinValidatorStake:      r.minValidatorStake.Bytes(),
-		XMinDelegatorStake:      r.minDelegatorStake.Bytes(),
-		XRewardPerPower:         r.rewardPerPower.Bytes(),
-		LazyUnstakingBlocks:     r.lazyUnstakingBlocks,
-		LazyApplyingBlocks:      r.lazyApplyingBlocks,
-		XGasPrice:               r.gasPrice.Bytes(),
-		MinTrxGas:               r.minTrxGas,
-		MaxTrxGas:               r.maxTrxGas,
-		MaxBlockGas:             r.maxBlockGas,
-		MinVotingPeriodBlocks:   r.minVotingPeriodBlocks,
-		MaxVotingPeriodBlocks:   r.maxVotingPeriodBlocks,
-		MinSelfStakeRatio:       r.minSelfStakeRatio,
-		MaxUpdatableStakeRatio:  r.maxUpdatableStakeRatio,
-		MaxIndividualStakeRatio: r.maxIndividualStakeRatio,
-		SlashRatio:              r.slashRatio,
-		SignedBlocksWindow:      r.signedBlocksWindow,
-		MinSignedBlocks:         r.minSignedBlocks,
+	govParams._v = GovParamsProto{}
+	if err := proto.Unmarshal(v, &govParams._v); err != nil {
+		return xerrors.From(err)
 	}
-	return a
-}
-
-func (r *GovParams) MarshalJSON() ([]byte, error) {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	tm := &struct {
-		Version                 int64  `json:"version"`
-		MaxValidatorCnt         int64  `json:"maxValidatorCnt"`
-		MinValidatorStake       string `json:"minValidatorStake"`
-		MinDelegatorStake       string `json:"minDelegatorStake"`
-		RewardPerPower          string `json:"rewardPerPower"`
-		LazyUnstakingBlocks     int64  `json:"lazyUnstakingBlocks"`
-		LazyApplyingBlocks      int64  `json:"lazyApplyingBlocks"`
-		GasPrice                string `json:"gasPrice"`
-		MinTrxGas               uint64 `json:"minTrxGas"`
-		MaxTrxGas               uint64 `json:"maxTrxGas"`
-		MaxBlockGas             uint64 `json:"maxBlockGas"`
-		MinVotingBlocks         int64  `json:"minVotingPeriodBlocks"`
-		MaxVotingBlocks         int64  `json:"maxVotingPeriodBlocks"`
-		MinSelfStakeRatio       int64  `json:"minSelfStakeRatio"`
-		MaxUpdatableStakeRatio  int64  `json:"maxUpdatableStakeRatio"`
-		MaxIndividualStakeRatio int64  `json:"maxIndividualStakeRatio"`
-		SlashRatio              int64  `json:"slashRatio"`
-		SignedBlocksWindow      int64  `json:"signedBlocksWindow"`
-		MinSignedBlocks         int64  `json:"minSignedBlocks"`
-	}{
-		Version:                 r.version,
-		MaxValidatorCnt:         r.maxValidatorCnt,
-		MinValidatorStake:       uint256ToString(r.minValidatorStake), // hex-string
-		MinDelegatorStake:       uint256ToString(r.minDelegatorStake), // hex-string
-		RewardPerPower:          uint256ToString(r.rewardPerPower),    // hex-string
-		LazyUnstakingBlocks:     r.lazyUnstakingBlocks,
-		LazyApplyingBlocks:      r.lazyApplyingBlocks,
-		GasPrice:                uint256ToString(r.gasPrice),
-		MinTrxGas:               r.minTrxGas,
-		MaxTrxGas:               r.maxTrxGas,
-		MaxBlockGas:             r.maxBlockGas,
-		MinVotingBlocks:         r.minVotingPeriodBlocks,
-		MaxVotingBlocks:         r.maxVotingPeriodBlocks,
-		MinSelfStakeRatio:       r.minSelfStakeRatio,
-		MaxUpdatableStakeRatio:  r.maxUpdatableStakeRatio,
-		MaxIndividualStakeRatio: r.maxIndividualStakeRatio,
-		SlashRatio:              r.slashRatio,
-		SignedBlocksWindow:      r.signedBlocksWindow,
-		MinSignedBlocks:         r.minSignedBlocks,
-	}
-	return tmjson.Marshal(tm)
-}
-
-func uint256ToString(value *uint256.Int) string {
-	if value == nil {
-		return ""
-	}
-	return value.Dec()
-}
-
-func (r *GovParams) UnmarshalJSON(bz []byte) error {
-	tm := &struct {
-		Version                 int64  `json:"version"`
-		MaxValidatorCnt         int64  `json:"maxValidatorCnt"`
-		MinValidatorStake       string `json:"minValidatorStake"`
-		MinDelegatorStake       string `json:"minDelegatorStake"`
-		RewardPerPower          string `json:"rewardPerPower"`
-		LazyUnstakingBlocks     int64  `json:"lazyUnstakingBlocks"`
-		LazyApplyingBlocks      int64  `json:"lazyApplyingBlocks"`
-		GasPrice                string `json:"gasPrice"`
-		MinTrxGas               uint64 `json:"minTrxGas"`
-		MaxTrxGas               uint64 `json:"maxTrxGas"`
-		MaxBlockGas             uint64 `json:"maxBlockGas"`
-		MinVotingBlocks         int64  `json:"minVotingPeriodBlocks"`
-		MaxVotingBlocks         int64  `json:"maxVotingPeriodBlocks"`
-		MinSelfStakeRatio       int64  `json:"minSelfStakeRatio"`
-		MaxUpdatableStakeRatio  int64  `json:"maxUpdatableStakeRatio"`
-		MaxIndividualStakeRatio int64  `json:"maxIndividualStakeRatio"`
-		SlashRatio              int64  `json:"slashRatio"`
-		SignedBlocksWindow      int64  `json:"signedBlocksWindow"`
-		MinSignedBlocks         int64  `json:"minSignedBlocks"`
-	}{}
-
-	err := tmjson.Unmarshal(bz, tm)
-	if err != nil {
-		return err
-	}
-
-	r.mtx.Lock()
-	defer r.mtx.Unlock()
-
-	r.version = tm.Version
-	r.maxValidatorCnt = tm.MaxValidatorCnt
-	r.minValidatorStake, err = stringToUint256(tm.MinValidatorStake)
-	if err != nil {
-		return err
-	}
-	r.minDelegatorStake, err = stringToUint256(tm.MinDelegatorStake)
-	if err != nil {
-		return err
-	} else if r.minDelegatorStake == nil {
-		// RG-78: If `MinDelegatorStake` is 0, it means  that the `MinDelegatorStake` is not checked.
-		r.minDelegatorStake = uint256.NewInt(0)
-	}
-
-	r.rewardPerPower, err = stringToUint256(tm.RewardPerPower)
-	if err != nil {
-		return err
-	}
-	r.lazyUnstakingBlocks = tm.LazyUnstakingBlocks
-	r.lazyApplyingBlocks = tm.LazyApplyingBlocks
-	r.gasPrice, err = stringToUint256(tm.GasPrice)
-	if err != nil {
-		return err
-	}
-	r.minTrxGas = tm.MinTrxGas
-	r.maxTrxGas = tm.MaxTrxGas
-	r.maxBlockGas = tm.MaxBlockGas
-	r.minVotingPeriodBlocks = tm.MinVotingBlocks
-	r.maxVotingPeriodBlocks = tm.MaxVotingBlocks
-	r.minSelfStakeRatio = tm.MinSelfStakeRatio
-	r.maxUpdatableStakeRatio = tm.MaxUpdatableStakeRatio
-	r.maxIndividualStakeRatio = tm.MaxIndividualStakeRatio
-	r.slashRatio = tm.SlashRatio
-	r.signedBlocksWindow = tm.SignedBlocksWindow
-	r.minSignedBlocks = tm.MinSignedBlocks
 	return nil
 }
 
-func stringToUint256(value string) (*uint256.Int, error) {
-	if value == "" {
-		return nil, nil
-	}
-	returnValue, err := uint256.FromDecimal(value)
+func (govParams *GovParams) MarshalJSON() ([]byte, error) {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	raw, err := protojson.Marshal(&govParams._v)
 	if err != nil {
 		return nil, err
 	}
-	return returnValue, nil
-}
 
-func (r *GovParams) Version() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.version
-}
-
-func (r *GovParams) MaxValidatorCnt() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.maxValidatorCnt
-}
-
-func (r *GovParams) MinValidatorStake() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.minValidatorStake
-}
-
-func (r *GovParams) MinDelegatorStake() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	if r.minDelegatorStake == nil {
-		return uint256.NewInt(0)
+	var tmp map[string]interface{}
+	if err := json.Unmarshal(raw, &tmp); err != nil {
+		return nil, err
 	}
 
-	return r.minDelegatorStake
+	result := make(map[string]interface{})
+	for k, v := range tmp {
+		// 이름 바꾸기
+		// newKey := "AAA_" + k[4:] // 예: "val_0" → "AAA_0"
+		if k == "MaxTotalSupply" {
+			result["maxTotalSupply"] = govParams.MaxTotalSupply().String()
+		} else if k == "GasPrice" {
+			result["gasPrice"] = govParams.GasPrice().String()
+		} else {
+			result[lowercaseFirstIfUpper(k)] = v
+		}
+	}
+
+	return json.Marshal(result)
 }
 
-func (r *GovParams) RewardPerPower() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func (govParams *GovParams) UnmarshalJSON(d []byte) error {
+	var tmp map[string]interface{}
+	if err := json.Unmarshal(d, &tmp); err != nil {
+		return err
+	}
 
-	return new(uint256.Int).Set(r.rewardPerPower)
+	result := make(map[string]interface{})
+	for k, v := range tmp {
+		if k == "maxTotalSupply" || k == "gasPrice" {
+			result[uppercaseFirstIfUpper(k)] = base64.StdEncoding.EncodeToString(uint256.MustFromDecimal(v.(string)).Bytes())
+		} else if k == "burnAddress" || k == "rewardPoolAddress" || k == "rewardPerStake" {
+			result[uppercaseFirstIfUpper(k)] = v
+		} else {
+			result[k] = v
+		}
+	}
+
+	d0, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
+
+	govParams._v = GovParamsProto{}
+	if err := protojson.Unmarshal(d0, &govParams._v); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (r *GovParams) LazyUnstakingBlocks() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func uppercaseFirstIfUpper(s string) string {
+	if s == "" {
+		return s
+	}
 
-	return r.lazyUnstakingBlocks
+	firstRune, size := utf8DecodeRuneInString(s)
+	if unicode.IsLower(firstRune) {
+		lower := unicode.ToUpper(firstRune)
+		return string(lower) + s[size:]
+	}
+	return s
 }
 
-func (r *GovParams) LazyApplyingBlocks() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func lowercaseFirstIfUpper(s string) string {
+	if s == "" {
+		return s
+	}
 
-	return r.lazyApplyingBlocks
+	firstRune, size := utf8DecodeRuneInString(s)
+	if unicode.IsUpper(firstRune) {
+		lower := unicode.ToLower(firstRune)
+		return string(lower) + s[size:]
+	}
+	return s
 }
 
-func (r *GovParams) GasPrice() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return new(uint256.Int).Set(r.gasPrice)
+// 안전한 utf8 첫 글자 추출 (rune, size)
+func utf8DecodeRuneInString(s string) (rune, int) {
+	if s == "" {
+		return rune(0), 0
+	}
+	return []rune(s)[0], len(string([]rune(s)[0]))
 }
 
-func (r *GovParams) MinTrxGas() uint64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func (govParams *GovParams) Version() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	return r.minTrxGas
+	return govParams._v.Version
 }
 
-func (r *GovParams) MinTrxFee() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func (govParams *GovParams) MaxValidatorCnt() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	return new(uint256.Int).Mul(uint256.NewInt(r.minTrxGas), r.gasPrice)
+	return govParams._v.MaxValidatorCnt
+}
+func (govParams *GovParams) MinValidatorPower() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinValidatorPower
+}
+func (govParams *GovParams) MinDelegatorPower() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinDelegatorPower
+}
+func (govParams *GovParams) MaxValidatorsOfDelegator() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxValidatorsOfDelegator
+}
+func (govParams *GovParams) MaxDelegatorsOfValidator() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxDelegatorsOfValidator
+}
+func (govParams *GovParams) MinSelfStakeRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinSelfStakeRate
+}
+func (govParams *GovParams) MaxUpdatableStakeRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxUpdatableStakeRate
+}
+func (govParams *GovParams) MaxIndividualStakeRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxIndividualStakeRate
+}
+func (govParams *GovParams) MinBondingBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinBondingBlocks
+}
+func (govParams *GovParams) LazyUnstakingBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.LazyUnstakingBlocks
+}
+func (govParams *GovParams) MaxTotalSupply() *uint256.Int {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return new(uint256.Int).SetBytes(govParams._v.XMaxTotalSupply)
+}
+func (govParams *GovParams) InflationWeightPermil() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.InflationWeightPermil
+}
+func (govParams *GovParams) InflationCycleBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.InflationCycleBlocks
+}
+func (govParams *GovParams) BondingBlocksWeightPermil() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.BondingBlocksWeightPermil
+}
+func (govParams *GovParams) RipeningBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.RipeningBlocks
+}
+func (govParams *GovParams) RewardPoolAddress() types.Address {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return types.Address(govParams._v.XRewardPoolAddress).Copy()
+}
+func (govParams *GovParams) ValidatorRewardRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.ValidatorRewardRate
+}
+func (govParams *GovParams) BurnAddress() types.Address {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return types.Address(govParams._v.XBurnAddress).Copy()
+}
+func (govParams *GovParams) BurnRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.BurnRate
+}
+func (govParams *GovParams) SlashRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.SlashRate
 }
 
-func (r *GovParams) MaxTrxGas() uint64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+// DEPRECATED: Use InflationCycleBlocks() instead.
+func (govParams *GovParams) SignedBlocksWindow() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	return r.maxTrxGas
+	return govParams._v.SignedBlocksWindow
+}
+func (govParams *GovParams) MinSignedBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinSignedBlocks
+}
+func (govParams *GovParams) GasPrice() *uint256.Int {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return new(uint256.Int).SetBytes(govParams._v.XGasPrice)
+}
+func (govParams *GovParams) MinTrxFee() *uint256.Int {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	gasPrice := new(uint256.Int).SetBytes(govParams._v.XGasPrice)
+	return new(uint256.Int).Mul(uint256.NewInt(uint64(govParams._v.MinTrxGas)), gasPrice)
+}
+func (govParams *GovParams) MinTrxGas() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinTrxGas
+}
+func (govParams *GovParams) MaxTrxGas() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxTrxGas
+}
+func (govParams *GovParams) MaxBlockGas() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxBlockGas
+}
+func (govParams *GovParams) MaxVotingPeriodBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxVotingPeriodBlocks
+}
+func (govParams *GovParams) MinVotingPeriodBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinVotingPeriodBlocks
+}
+func (govParams *GovParams) LazyApplyingBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.LazyApplyingBlocks
 }
 
-func (r *GovParams) MaxTrxFee() *uint256.Int {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+// deprecated
+func (govParams *GovParams) RewardPerPower() *uint256.Int {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	return new(uint256.Int).Mul(uint256.NewInt(r.maxTrxGas), r.gasPrice)
+	return new(uint256.Int).SetBytes(govParams._v.XRewardPerStake)
 }
 
-func (r *GovParams) MaxBlockGas() uint64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func (govParams *GovParams) GetValues() *GovParamsProto {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	return r.maxBlockGas
+	return &govParams._v
 }
 
-func (r *GovParams) MinVotingPeriodBlocks() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.minVotingPeriodBlocks
+func (govParams *GovParams) Equal(o *GovParams) bool {
+	return proto.Equal(&govParams._v, &o._v)
 }
 
-func (r *GovParams) MaxVotingPeriodBlocks() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
+func (govParams *GovParams) String() string {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	return r.maxVotingPeriodBlocks
-}
-func (r *GovParams) MinSelfStakeRatio() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.minSelfStakeRatio
-}
-func (r *GovParams) MaxUpdatableStakeRatio() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.maxUpdatableStakeRatio
-}
-
-func (r *GovParams) MaxIndividualStakeRatio() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.maxIndividualStakeRatio
-}
-func (r *GovParams) SlashRatio() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.slashRatio
-}
-
-func (r *GovParams) SignedBlocksWindow() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.signedBlocksWindow
-}
-
-func (r *GovParams) MinSignedBlocks() int64 {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return r.minSignedBlocks
-}
-
-func (r *GovParams) String() string {
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	if bz, err := json.MarshalIndent(r, "", "  "); err != nil {
+	if bz, err := json.MarshalIndent(govParams, "", "  "); err != nil {
 		return err.Error()
 	} else {
 		return string(bz)
@@ -603,6 +414,7 @@ func MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
 }
 
+// DEPRECATED
 func AmountToPower(amt *uint256.Int) (int64, xerrors.XError) {
 	// 1 VotingPower == 1 BEATOZ
 	_vp := new(uint256.Int).Div(amt, amountPerPower)
@@ -613,11 +425,13 @@ func AmountToPower(amt *uint256.Int) (int64, xerrors.XError) {
 	return vp, nil
 }
 
+// DEPRECATED
 func PowerToAmount(power int64) *uint256.Int {
 	// 1 VotingPower == 1 BEATOZ = 10^18 amount
 	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), amountPerPower)
 }
 
+// DEPRECATED
 func AmountPerPower() *uint256.Int {
 	return amountPerPower.Clone()
 }
@@ -627,87 +441,43 @@ func FeeToGas(fee, price *uint256.Int) uint64 {
 	return gas.Uint64()
 }
 
-func GasToFee(gas uint64, price *uint256.Int) *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(gas), price)
+func GasToFee(gas int64, price *uint256.Int) *uint256.Int {
+	return new(uint256.Int).Mul(uint256.NewInt(uint64(gas)), price)
 }
 
-func MergeGovParams(oldParams, newParams *GovParams) {
-	if newParams.version == 0 {
-		newParams.version = oldParams.version
-	}
+func MergeGovParams(fromPrams, toParams *GovParams) {
+	refT := reflect.TypeOf(GovParamsProto{})
+	refVOld := reflect.ValueOf(fromPrams.GetValues()).Elem()
+	refVNew := reflect.ValueOf(toParams.GetValues()).Elem()
 
-	if newParams.maxValidatorCnt == 0 {
-		newParams.maxValidatorCnt = oldParams.maxValidatorCnt
-	}
+	for i := 0; i < refT.NumField(); i++ {
+		field0 := refT.Field(i)
+		fieldName := field0.Name
+		fieldType := field0.Type
 
-	if newParams.minValidatorStake == nil || newParams.minValidatorStake.IsZero() {
-		newParams.minValidatorStake = oldParams.minValidatorStake
-	}
+		newVal := refVNew.FieldByName(fieldName)
+		if !newVal.IsValid() || !newVal.CanSet() {
+			//fmt.Printf("skip %v\n", fieldName)
+			continue
+		}
 
-	if newParams.minDelegatorStake == nil || newParams.minDelegatorStake.IsZero() {
-		newParams.minDelegatorStake = oldParams.minDelegatorStake
-	}
+		zeroInf := reflect.Zero(fieldType).Interface()
 
-	if newParams.rewardPerPower == nil || newParams.rewardPerPower.IsZero() {
-		newParams.rewardPerPower = oldParams.rewardPerPower
-	}
-
-	if newParams.lazyUnstakingBlocks == 0 {
-		newParams.lazyUnstakingBlocks = oldParams.lazyUnstakingBlocks
-	}
-
-	if newParams.lazyApplyingBlocks == 0 {
-		newParams.lazyApplyingBlocks = oldParams.lazyApplyingBlocks
-	}
-
-	if newParams.gasPrice == nil || newParams.gasPrice.IsZero() {
-		newParams.gasPrice = oldParams.gasPrice
-	}
-
-	if newParams.minTrxGas == 0 {
-		newParams.minTrxGas = oldParams.minTrxGas
-	}
-
-	if newParams.maxTrxGas == 0 {
-		newParams.maxTrxGas = oldParams.maxTrxGas
-	}
-
-	if newParams.maxBlockGas == 0 {
-		newParams.maxBlockGas = oldParams.maxBlockGas
-	}
-
-	if newParams.minVotingPeriodBlocks == 0 {
-		newParams.minVotingPeriodBlocks = oldParams.minVotingPeriodBlocks
-	}
-
-	if newParams.maxVotingPeriodBlocks == 0 {
-		newParams.maxVotingPeriodBlocks = oldParams.maxVotingPeriodBlocks
-	}
-
-	if newParams.minSelfStakeRatio == 0 {
-		newParams.minSelfStakeRatio = oldParams.minSelfStakeRatio
-	}
-
-	if newParams.maxUpdatableStakeRatio == 0 {
-		newParams.maxUpdatableStakeRatio = oldParams.maxUpdatableStakeRatio
-	}
-
-	if newParams.maxIndividualStakeRatio == 0 {
-		newParams.maxIndividualStakeRatio = oldParams.maxIndividualStakeRatio
-	}
-
-	if newParams.slashRatio == 0 {
-		newParams.slashRatio = oldParams.slashRatio
-	}
-
-	if newParams.signedBlocksWindow == 0 {
-		newParams.signedBlocksWindow = oldParams.signedBlocksWindow
-	}
-
-	if newParams.minSignedBlocks == 0 {
-		newParams.minSignedBlocks = oldParams.minSignedBlocks
+		newInf := newVal.Interface()
+		if reflect.DeepEqual(newInf, zeroInf) {
+			oldVal := refVOld.FieldByName(fieldName)
+			newVal.Set(oldVal)
+			//fmt.Printf("%-10s | %-20s | %#v -> %#v\n", fieldName, fieldType, newInf, newVal.Interface())
+		}
 	}
 }
 
 var _ v1.ILedgerItem = (*GovParams)(nil)
-var _ IGovHandler = (*GovParams)(nil)
+var _ IGovParams = (*GovParams)(nil)
+
+// functions for test
+type setFunc func(*GovParamsProto)
+
+func (govParams *GovParams) SetValue(cb setFunc) {
+	cb(&govParams._v)
+}

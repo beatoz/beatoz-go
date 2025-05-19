@@ -14,6 +14,7 @@ import (
 	"sync"
 )
 
+// DEPRECATED
 type Stake struct {
 	From types.Address `json:"owner"`
 	To   types.Address `json:"to"`
@@ -47,11 +48,11 @@ func (s *Stake) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (s *Stake) Decode(d []byte) xerrors.XError {
+func (s *Stake) Decode(k, v []byte) xerrors.XError {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	if err := json.Unmarshal(d, s); err != nil {
+	if err := json.Unmarshal(v, s); err != nil {
 		return xerrors.From(err)
 	}
 	return nil

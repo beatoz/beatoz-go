@@ -21,7 +21,7 @@ const (
 type Account struct {
 	Address types.Address `json:"address"`
 	Name    string        `json:"name,omitempty"`
-	Nonce   uint64        `json:"nonce,string"`
+	Nonce   int64         `json:"nonce,string"`
 	Balance *uint256.Int  `json:"balance"`
 	Code    []byte        `json:"code,omitempty"`
 	DocURL  string        `json:"docURL,omitempty"`
@@ -99,21 +99,21 @@ func (acct *Account) AddNonce() {
 	acct.Nonce++
 }
 
-func (acct *Account) SetNonce(n uint64) {
+func (acct *Account) SetNonce(n int64) {
 	acct.mtx.Lock()
 	defer acct.mtx.Unlock()
 
 	acct.Nonce = n
 }
 
-func (acct *Account) GetNonce() uint64 {
+func (acct *Account) GetNonce() int64 {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
 	return acct.Nonce
 }
 
-func (acct *Account) CheckNonce(n uint64) xerrors.XError {
+func (acct *Account) CheckNonce(n int64) xerrors.XError {
 	acct.mtx.RLock()
 	defer acct.mtx.RUnlock()
 
@@ -193,12 +193,12 @@ func (acct *Account) Type() int16 {
 	return types.ACCT_COMMON_TYPE
 }
 
-func (acct *Account) Key() v1.LedgerKey {
-	acct.mtx.RLock()
-	acct.mtx.RUnlock()
-
-	return acct.Address
-}
+//func (acct *Account) Key() v1.LedgerKey {
+//	acct.mtx.RLock()
+//	acct.mtx.RUnlock()
+//
+//	return acct.Address
+//}
 
 func (acct *Account) Encode() ([]byte, xerrors.XError) {
 	if bz, err := proto.Marshal(&AcctProto{
@@ -215,9 +215,9 @@ func (acct *Account) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (acct *Account) Decode(d []byte) xerrors.XError {
+func (acct *Account) Decode(k, v []byte) xerrors.XError {
 	pm := &AcctProto{}
-	if err := proto.Unmarshal(d, pm); err != nil {
+	if err := proto.Unmarshal(v, pm); err != nil {
 		return xerrors.From(err)
 	}
 

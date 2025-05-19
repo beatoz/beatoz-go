@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -25,9 +26,9 @@ func init() {
 		panic(err)
 	}
 	txProposal := web3.NewTrxProposal(
-		stakeHelper.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		vpowMock.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(txProposal, stakeHelper.PickAddress(1), "")
+	_ = signTrx(txProposal, vpowMock.PickAddress(1), "")
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -37,26 +38,26 @@ func init() {
 	}
 
 	// no error
-	tx0 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx0 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx0, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx0, vpowMock.PickAddress(0), "")
 	// no right
-	tx1 := web3.NewTrxVoting(stakeHelper.PickAddress(stakeHelper.valCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx1 := web3.NewTrxVoting(vpowMock.PickAddress(vpowMock.ValCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx1, stakeHelper.PickAddress(stakeHelper.valCnt), "")
+	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt), "")
 
 	// invalid payload params : wrong choice
-	tx2 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx2 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 1)
-	_ = signTrx(tx2, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx2, vpowMock.PickAddress(0), "")
 	// invalid payload params : wrong choice
-	tx3 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx3 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, -1)
-	_ = signTrx(tx3, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx3, vpowMock.PickAddress(0), "")
 	// not found result
-	tx4 := web3.NewTrxVoting(stakeHelper.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+	tx4 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		bytes.RandBytes(32), 0)
-	_ = signTrx(tx4, stakeHelper.PickAddress(0), "")
+	_ = signTrx(tx4, vpowMock.PickAddress(0), "")
 
 	// test cases #1
 	voteTestCases1 = []*Case{
@@ -69,12 +70,12 @@ func init() {
 		{txctx: makeTrxCtx(tx0, 10, true), err: nil},                                                            // success
 	}
 
-	// txs of validators except stakeHelper.delegatees[0]
+	// txs of validators except vpowMock.delegatees[0]
 	var txs []*ctrlertypes.Trx
-	for i := 1; i < stakeHelper.valCnt; i++ {
-		addr := stakeHelper.PickAddress(i)
+	for i := 1; i < vpowMock.ValCnt; i++ {
+		addr := vpowMock.PickAddress(i)
 		choice := int32(0)
-		//rn := int(bytes.RandInt63n(int64(len(stakeHelper.delegatees))))
+		//rn := int(bytes.RandInt63n(int64(len(vpowMock.delegatees))))
 		//if rn%3 == 0 {
 		//	choice = 1
 		//}
@@ -100,22 +101,22 @@ func TestVoting(t *testing.T) {
 		require.Equal(t, c.err, xerr, "index", i)
 
 		if xerr == nil {
-			votedPowers += stakeHelper.TotalPowerOf(c.txctx.Tx.From)
+			votedPowers += vpowMock.TotalPowerOf(c.txctx.Tx.From)
 		}
 	}
 
 	_, _, xerr := govCtrler.Commit()
 	require.NoError(t, xerr)
 
-	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.NoError(t, xerr)
 
 	sumVotedPowers := int64(0)
 	for i, c := range voteTestCases1 {
 		if c.err == nil {
-			power := stakeHelper.TotalPowerOf(c.txctx.Tx.From)
-			require.Equal(t, power, prop.Options[0].Votes(), "index", i)
-			sumVotedPowers += prop.Options[0].Votes()
+			power := vpowMock.TotalPowerOf(c.txctx.Tx.From)
+			require.Equal(t, power, prop.Option(0).Votes, "index", i)
+			sumVotedPowers += prop.Option(0).Votes
 		}
 	}
 
@@ -123,14 +124,14 @@ func TestVoting(t *testing.T) {
 }
 
 func TestMajority(t *testing.T) {
-	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.NoError(t, xerr)
 	require.NotNil(t, prop)
 
 	opt := prop.UpdateMajorOption()
 	require.Nil(t, opt)
 
-	votedPowers := prop.Options[0].Votes()
+	votedPowers := prop.Option(0).Votes
 	for i, c := range voteTestCases2 {
 		xerr := runCase(c)
 		require.Equal(t, c.err, xerr, "index", i)
@@ -138,16 +139,15 @@ func TestMajority(t *testing.T) {
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
 
-		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
+		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 		require.NoError(t, xerr)
 		require.NotNil(t, prop)
 
-		votedPowers += stakeHelper.TotalPowerOf(c.txctx.Tx.From)
-		if votedPowers >= prop.MajorityPower {
+		votedPowers += vpowMock.TotalPowerOf(c.txctx.Tx.From)
+		if votedPowers >= prop.Header().MajorityPower {
 			opt := prop.UpdateMajorOption()
-			require.NotNil(t, opt, votedPowers, prop.MajorityPower)
-			require.EqualValues(t, prop.MajorOption, opt)
-			require.Equal(t, votedPowers, opt.Votes())
+			require.NotNil(t, opt, votedPowers, prop.Header().MajorityPower)
+			require.Equal(t, votedPowers, opt.Votes)
 		} else {
 			opt := prop.UpdateMajorOption()
 			require.Nil(t, opt)
@@ -164,14 +164,13 @@ func TestMajority(t *testing.T) {
 		_, _, xerr = govCtrler.Commit()
 		require.NoError(t, xerr)
 
-		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
+		prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 		require.NoError(t, xerr)
 		require.NotNil(t, prop)
 
 		opt := prop.UpdateMajorOption()
 		require.NotNil(t, opt)
-		require.EqualValues(t, prop.MajorOption, opt)
-		require.Equal(t, votedPowers, opt.Votes())
+		require.Equal(t, votedPowers, opt.Votes)
 	}
 }
 
@@ -184,45 +183,49 @@ func TestFreezingProposal(t *testing.T) {
 	_, _, xerr := govCtrler.Commit()
 	require.NoError(t, xerr)
 
-	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash)
+	prop, xerr := govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.NoError(t, xerr)
 
 	//
 	// not changed
 	bctx := &ctrlertypes.BlockContext{}
-	bctx.SetHeight(prop.EndVotingHeight)
+	bctx.SetHeight(prop.Header().EndVotingHeight)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	prop, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
+	prop, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.NoError(t, xerr)
 
 	//
 	// freezing the proposal
 	bctx = &ctrlertypes.BlockContext{}
-	bctx.SetHeight(prop.EndVotingHeight + 1)
+	bctx.SetHeight(prop.Header().EndVotingHeight + 1)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash)
+
+	// the proposal is frozen.
+	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
-	frozenProp, xerr := govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
+	item, xerr := govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
-	require.NotNil(t, frozenProp.MajorOption)
-	// prop.MajorOption is nil, so...
-	prop.MajorOption = frozenProp.MajorOption
-	require.Equal(t, prop, frozenProp)
+	frozenProp, _ := item.(*proposal.GovProposal)
+	require.NotNil(t, frozenProp.MajorOption())
+
+	//// prop.MajorOption is nil, so...
+	//prop.MajorOption = frozenProp.MajorOption
+	//require.Equal(t, prop, frozenProp)
 
 	testFlagAlreadyFrozen = true
 }
 
 func TestApplyingProposal(t *testing.T) {
 	oriParams := govCtrler.GovParams
-	require.Equal(t, ctrlertypes.DefaultGovParams(), &oriParams)
+	require.True(t, ctrlertypes.DefaultGovParams().Equal(&oriParams))
 
 	txProposalPayload, ok := trxCtxProposal.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
 	require.True(t, ok)
@@ -254,7 +257,7 @@ func TestApplyingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr := govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
+	frozenProp, xerr := govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozenProp)
 
@@ -269,10 +272,10 @@ func TestApplyingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr = govCtrler.frozenState.Get(trxCtxProposal.TxHash, false)
+	frozenProp, xerr = govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, frozenProp)
 
 	require.NotEqual(t, oriParams, govCtrler.GovParams)
-	require.Equal(t, govParams1, &govCtrler.GovParams)
+	require.True(t, govParams1.Equal(&govCtrler.GovParams))
 }

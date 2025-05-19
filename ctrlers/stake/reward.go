@@ -112,9 +112,9 @@ func (rwd *Reward) Encode() ([]byte, xerrors.XError) {
 	}
 }
 
-func (rwd *Reward) Decode(d []byte) xerrors.XError {
+func (rwd *Reward) Decode(k, v []byte) xerrors.XError {
 	m := RewardProto{}
-	if err := proto.Unmarshal(d, &m); err != nil {
+	if err := proto.Unmarshal(v, &m); err != nil {
 		return xerrors.From(err)
 	}
 

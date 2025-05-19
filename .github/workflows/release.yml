@@ -1,0 +1,65 @@
+name: Auto Version Tag & Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Version Script (Dry Run)
+        id: new_tag
+        run: |
+          chmod +x .github/scripts/gen-version.sh
+          .github/scripts/gen-version.sh > version_output.txt 2>&1
+          tag=$(grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' version_output.txt | tail -n 1 || echo "")
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      - name: Get Latest Tag
+        id: get_tag
+        run: |
+          latest_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo "")
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog Text
+        id: changelog
+        if: steps.new_tag.outputs.tag != '' && steps.new_tag.outputs.tag != steps.get_tag.outputs.latest_tag
+        run: |
+          chmod +x .github/scripts/gen-changelog.sh
+          body=$(.github/scripts/gen-changelog.sh ${{ steps.new_tag.outputs.tag }} ${{ steps.get_tag.outputs.latest_tag }})
+          echo "changelog_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Tag and Push
+        if: steps.new_tag.outputs.tag != '' && steps.new_tag.outputs.tag != steps.get_tag.outputs.latest_tag
+        run: |
+          git tag ${{ steps.new_tag.outputs.tag }}
+          git push origin ${{ steps.new_tag.outputs.tag }}
+
+      - name: Create GitHub Release
+        if: steps.new_tag.outputs.tag != '' && steps.new_tag.outputs.tag != steps.get_tag.outputs.latest_tag
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.new_tag.outputs.tag }}
+          name: Release ${{ steps.new_tag.outputs.tag }}
+          body: ${{ steps.changelog.outputs.changelog_body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

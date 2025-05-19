@@ -119,7 +119,7 @@ func TestTransferCommit_Bulk(t *testing.T) {
 }
 
 var mtx sync.Mutex
-var peerConns = make(map[string]int)
+var peerConns = make(map[int]int)
 
 func TestTransfer_OverBalance(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
@@ -182,7 +182,7 @@ func bulkTransferSync(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj, 
 	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
 
 	rpcNode := randPeer()
-	fmt.Printf("bulkTransferSync - account: %v, balance: %v, nonce: %v, rpcPeerIdx: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), rpcNode.PeerID)
+	fmt.Printf("bulkTransferSync - account: %v, balance: %v, nonce: %v, rpcPeerIdx: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), rpcNode.PeerIdx)
 	_bzweb3 := web3.NewBeatozWeb3(web3.NewHttpProvider(rpcNode.RPCURL))
 
 	subWg := &sync.WaitGroup{}
@@ -314,14 +314,14 @@ func bulkTransferCommit(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj
 	mtx.Lock()
 	peer := randPeer()
 	_bzweb3 := web3.NewBeatozWeb3(web3.NewHttpProvider(peer.RPCURL))
-	n, ok := peerConns[peer.PeerID]
+	n, ok := peerConns[peer.PeerIdx]
 	if ok {
-		peerConns[peer.PeerID] = n + 1
+		peerConns[peer.PeerIdx] = n + 1
 	} else {
-		peerConns[peer.PeerID] = 1
+		peerConns[peer.PeerIdx] = 1
 	}
 	mtx.Unlock()
-	//fmt.Printf("bulkTransferCommit - account: %v, balance: %v, nonce: %v, txcnt: %v, rpcPeerIdx: %v, conns: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), cnt, peer.PeerID, peerConns[peer.PeerID])
+	//fmt.Printf("bulkTransferCommit - account: %v, balance: %v, nonce: %v, txcnt: %v, rpcPeerIdx: %v, conns: %v\n", w.Address(), w.GetBalance(), w.GetNonce(), cnt, peer.PeerIdx, peerConns[peer.PeerIdx])
 
 	maxAmt := new(uint256.Int).Div(senderAcctObj.originBalance, uint256.NewInt(uint64(cnt)))
 	maxAmt = new(uint256.Int).Sub(maxAmt, baseFee)
@@ -342,7 +342,7 @@ func bulkTransferCommit(t *testing.T, wg *sync.WaitGroup, senderAcctObj *acctObj
 		//fmt.Printf("bulkTransfer - from: %v, to: %v, amount: %v\n", w.Address(), raddr, randAmt)
 
 		ret, err := w.TransferCommit(raddr, defGas, defGasPrice, randAmt, _bzweb3)
-		require.NoError(t, err, fmt.Sprintf("peerId: %v, conns: %v", peer.PeerID, peerConns[peer.PeerID]))
+		require.NoError(t, err, fmt.Sprintf("peerIdx: %v, conns: %v", peer.PeerIdx, peerConns[peer.PeerIdx]))
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
 

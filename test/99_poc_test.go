@@ -155,7 +155,7 @@ func TestPoC1(t *testing.T) {
 	//fmt.Printf("%s\n", submitTrx(wallet, trxObj))
 
 	fmt.Println("[after]")
-	sdContractAddr := crypto.CreateAddress(wallet.Address().Array20(), nonce)
+	sdContractAddr := crypto.CreateAddress(wallet.Address().Array20(), uint64(nonce))
 	accountData3 := getAccountData(sdContractAddr[:])
 	fmt.Printf("contract A: %s\n", sdContractAddr.String())
 	fmt.Printf("contract balance: %s\n", accountData3.Balance)
@@ -607,6 +607,6 @@ func TestPoC5(t *testing.T) {
 
 	require.NoError(t, targetWallet.SyncAccount(bzweb3))
 	// When targetWallet is validator, diff:3,146,750,000,000,000
-	fmt.Println("expected", expectedTargetWalletBalance.Dec(), "actual", targetWallet.GetBalance().Dec())
+	//fmt.Println("expected", expectedTargetWalletBalance.Dec(), "actual", targetWallet.GetBalance().Dec())
 	require.Equal(t, expectedTargetWalletBalance.Dec(), targetWallet.GetBalance().Dec())
 }

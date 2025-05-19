@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/require"
+	tmjson "github.com/tendermint/tendermint/libs/json"
+	"google.golang.org/protobuf/proto"
 	"testing"
 )
 
@@ -11,10 +13,12 @@ func TestProtoCodec(t *testing.T) {
 	bz, err := params0.Encode()
 	require.NoError(t, err)
 
-	params1, err := DecodeGovParams(bz)
+	params1 := &GovParams{}
+
+	err = params1.Decode(nil, bz)
 	require.NoError(t, err)
 
-	require.Equal(t, params0, params1)
+	require.True(t, proto.Equal(&params0._v, &params1._v))
 
 }
 
@@ -22,10 +26,15 @@ func TestJsonCodec(t *testing.T) {
 	params0 := DefaultGovParams()
 	bz, err := json.Marshal(params0)
 	require.NoError(t, err)
+	//fmt.Println("json", string(bz))
+
+	_, err = tmjson.Marshal(params0)
+	require.NoError(t, err)
+	//fmt.Println("tmjson", string(bz1))
 
 	params1 := &GovParams{}
 	err = json.Unmarshal(bz, params1)
 	require.NoError(t, err)
 
-	require.Equal(t, params0, params1)
+	require.True(t, proto.Equal(&params0._v, &params1._v))
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/cmd/commands"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/node"
 	beatozweb3 "github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/containerd/continuity/fs"
@@ -15,7 +16,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 )
 
@@ -24,7 +24,7 @@ var (
 )
 
 type PeerMock struct {
-	PeerID  string
+	PeerIdx int
 	ChainID string
 	Config  *cfg.Config
 	nd      *tmnode.Node
@@ -34,15 +34,15 @@ type PeerMock struct {
 	Pass []byte
 }
 
-func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerMock {
+func NewPeerMock(chain string, id int, p2pPort, rpcPort int, logLevel string) *PeerMock {
 	config := cfg.DefaultConfig()
 	config.LogLevel = logLevel
 	config.P2P.AllowDuplicateIP = true
 	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
 	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
 	config.Config.Moniker = fmt.Sprintf("peer-%v@%v", id, chain)
-	config.SetRoot(filepath.Join(os.TempDir(), "beatoz_test_"+id))
-	os.RemoveAll(config.RootDir) // reset root directory
+	config.SetRoot(filepath.Join(os.TempDir(), fmt.Sprintf("beatoz_test_%v", id)))
+	_ = os.RemoveAll(config.RootDir) // reset root directory
 	tmcfg.EnsureRoot(config.RootDir)
 
 	if err := config.ValidateBasic(); err != nil {
@@ -50,7 +50,7 @@ func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerM
 	}
 
 	return &PeerMock{
-		PeerID:  id,
+		PeerIdx: id,
 		ChainID: chain,
 		Config:  config,
 		RPCURL:  fmt.Sprintf("http://localhost:%d", rpcPort),
@@ -59,10 +59,19 @@ func NewPeerMock(chain, id string, p2pPort, rpcPort int, logLevel string) *PeerM
 	}
 }
 
-func (peer *PeerMock) CopyGenesisFrom(source string) error {
-	return fs.CopyFile(
-		peer.Config.GenesisFile(),
-		source)
+func (peer *PeerMock) CopyFilesFrom(srcPeer *PeerMock) {
+	// use genesis file of peer[0]
+	if err := fs.CopyFile(peer.Config.GenesisFile(), srcPeer.Config.GenesisFile()); err != nil {
+		panic(err)
+	}
+
+	//defaultValDirPath := filepath.Join(srcPeer.Config.RootDir, acrypto.DefaultValKeyDir)
+	//privValKeyFile := srcPeer.Config.PrivValidatorKeyFile()
+	//_keyFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValKeyFile), filepath.Ext(privValKeyFile)), peer.PeerIdx, filepath.Ext(privValKeyFile))
+	//
+	//if err := fs.CopyFile(peer.Config.PrivValidatorKeyFile(), _keyFilePath); err != nil {
+	//	panic(err)
+	//}
 }
 
 func (peer *PeerMock) IDAddress() (string, error) {
@@ -82,8 +91,8 @@ func (peer *PeerMock) SetPass(pass []byte) {
 	peer.Pass = pass
 }
 
-func (peer *PeerMock) Init() error {
-	return commands.InitFilesWith(peer.ChainID, peer.Config, 1, peer.Pass, 500, peer.Pass)
+func (peer *PeerMock) Init(valCnt int) error {
+	return commands.InitFilesWith(peer.ChainID, peer.Config, valCnt, peer.Pass, 500, peer.Pass)
 }
 
 func (peer *PeerMock) Start() error {
@@ -130,6 +139,14 @@ func (peer *PeerMock) PrivValKeyPath() string {
 	return peer.Config.PrivValidatorKeyFile()
 }
 
+func (peer *PeerMock) PrivValWallet() *beatozweb3.Wallet {
+	if w, err := beatozweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
+		panic(err)
+	} else {
+		return w
+	}
+}
+
 func randPeer() *PeerMock {
 	rand.Seed(time.Now().UnixNano())
 	n := rand.Intn(len(peers))
@@ -144,22 +161,24 @@ func randBeatozWeb3() *beatozweb3.BeatozWeb3 {
 func runPeers(n int) {
 	for i := 0; i < n; i++ {
 		ll := "*:error"
+		//ll := "*:info"
+
 		if i == 0 {
 			// change log level only on the first peer.
-			//	ll = "beatoz_AcctCtrler:debug,beatoz_EVMCtrler:debug,*:error"
-			ll = "*:info"
+			//ll = "beatoz_AcctCtrler:debug,beatoz_EVMCtrler:debug,*:error"
+			//ll = "*:info"
 		}
-		_peer := NewPeerMock("beatoz_test_chain", strconv.FormatInt(int64(i), 10), 46656+i, 36657+i, ll)
-		if err := _peer.Init(); err != nil {
+		_peer := NewPeerMock("beatoz_test_chain", i, 46656+i, 36657+i, ll)
+		if err := _peer.Init(1); err != nil { // with only one validator
 			panic(err)
 		}
 
 		if i > 0 {
-			// use genesis file of peer[0]
+			// use init files of peer[0]
+			_peer.CopyFilesFrom(peers[0])
+			_ = os.RemoveAll(_peer.WalletPath())
+
 			prevPeer := peers[i-1]
-			if err := _peer.CopyGenesisFrom(prevPeer.Config.GenesisFile()); err != nil {
-				panic(err)
-			}
 			_peer.SetPersistentPeer(prevPeer)
 		}
 

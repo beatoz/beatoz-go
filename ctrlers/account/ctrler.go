@@ -14,7 +14,7 @@ import (
 )
 
 type AcctCtrler struct {
-	acctState v1.IStateLedger[*btztypes.Account]
+	acctState v1.IStateLedger
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
@@ -23,7 +23,7 @@ type AcctCtrler struct {
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
 	lg := logger.With("module", "beatoz_AcctCtrler")
 
-	if _state, xerr := v1.NewStateLedger[*btztypes.Account]("accounts", config.DBDir(), 2048, func() *btztypes.Account { return &btztypes.Account{} }, lg); xerr != nil {
+	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 2048, func(key v1.LedgerKey) v1.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
@@ -46,7 +46,7 @@ func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
 		addr := append(holder.Address, nil...)
 		acct := &btztypes.Account{
 			Address: addr,
-			Balance: holder.Balance.Clone(),
+			Balance: holder.Balance,
 		}
 		if xerr := ctrler.setAccount(acct, true); xerr != nil {
 			return xerr
@@ -94,43 +94,6 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *btztypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func (ctrler *AcctCtrler) BeginBlock(ctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	// do nothing
-	return nil, nil
-}
-
-func (ctrler *AcctCtrler) EndBlock(ctx *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	header := ctx.BlockInfo().Header
-	if header.GetProposerAddress() != nil && ctx.SumFee().Sign() > 0 {
-		//
-		// give fee to block proposer
-		// If the validator(proposer) has no balance in genesis and this is first tx fee reward,
-		// the validator's account may not exist yet not in ledger.
-		acct := ctrler.findAccount(header.GetProposerAddress(), true)
-		if acct == nil {
-			acct = btztypes.NewAccount(header.GetProposerAddress())
-		}
-		xerr := acct.AddBalance(ctx.SumFee())
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, ctrler.setAccount(acct, true)
-	}
-	return nil, nil
-}
-
-func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	h, v, xerr := ctrler.acctState.Commit()
-	return h, v, xerr
-}
-
 func (ctrler *AcctCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -168,11 +131,11 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *btztypes.A
 }
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *btztypes.Account {
-	if acct, xerr := ctrler.acctState.Get(addr, exec); xerr != nil {
+	if acct, xerr := ctrler.acctState.Get(v1.LedgerKeyAccount(addr), exec); xerr != nil {
 		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
-		return acct
+		return acct.(*btztypes.Account)
 	}
 }
 
@@ -252,6 +215,7 @@ func (ctrler *AcctCtrler) setDoc(acct *btztypes.Account, name, url string) {
 	acct.SetDocURL(url)
 }
 
+// DEPRECATED: Add `AddBlance` and replace it.
 func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -270,6 +234,57 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 
 	return nil
 }
+func (ctrler *AcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(addr, exec)
+	if acct == nil {
+		acct = btztypes.NewAccount(addr)
+	}
+
+	if xerr := acct.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) SubBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(addr, exec)
+	if acct == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("SubBalance - address: %v", addr)
+	}
+
+	if xerr := acct.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (ctrler *AcctCtrler) SetBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(addr, exec)
+	if acct == nil {
+		acct = btztypes.NewAccount(addr)
+	}
+	acct.SetBalance(amt)
+
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+	return nil
+}
 
 func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
@@ -279,7 +294,7 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.Set(acct, exec)
+	return ctrler.acctState.Set(v1.LedgerKeyAccount(acct.Address), acct, exec)
 }
 
 func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
@@ -306,7 +321,7 @@ type SimuAcctCtrler struct {
 }
 
 func (memCtrler *SimuAcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return memCtrler.simuLedger.Set(acct)
+	return memCtrler.simuLedger.Set(v1.LedgerKeyAccount(acct.Address), acct)
 }
 
 func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btztypes.Account {
@@ -332,7 +347,7 @@ func (memCtrler *SimuAcctCtrler) FindAccount(addr types.Address, exec bool) *btz
 }
 
 func (memCtrler *SimuAcctCtrler) findAccount(addr types.Address) *btztypes.Account {
-	if acct, xerr := memCtrler.simuLedger.Get(addr); xerr != nil {
+	if acct, xerr := memCtrler.simuLedger.Get(v1.LedgerKeyAccount(addr)); xerr != nil {
 		//memCtrler.logger.Debug("SimuAcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
@@ -347,9 +362,48 @@ func (memCtrler *SimuAcctCtrler) Transfer(from types.Address, to types.Address, 
 func (memCtrler *SimuAcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	panic("SimuAcctCtrler can not have this method")
 }
+func (memCtrler *SimuAcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) SubBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) SetBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
 
 func (memCtrler *SimuAcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
 	panic("SimuAcctCtrler can not create ImmutableAcctCtrlerAt")
+}
+
+func (memCtrler *SimuAcctCtrler) ValidateTrx(context *btztypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) ExecuteTrx(context *btztypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) BeginBlock(context *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) EndBlock(context *btztypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (memCtrler *SimuAcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
 }
 
 var _ btztypes.IAccountHandler = (*SimuAcctCtrler)(nil)

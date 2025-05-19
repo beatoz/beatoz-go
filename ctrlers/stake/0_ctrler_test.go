@@ -5,6 +5,8 @@ import (
 	"fmt"
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	beatoztypes "github.com/beatoz/beatoz-go/types"
@@ -13,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -23,8 +24,8 @@ import (
 var (
 	config      = beatozcfg.DefaultConfig()
 	DBDIR       = filepath.Join(os.TempDir(), "stake-ctrler-test")
-	govParams00 = ctrlertypes.Test6GovParams_NoStakeLimiter() // `maxUpdatableStakeRatio = 100, maxIndividualStakeRatio = 10000000`
-	acctMock00  *mocks.AcctHandlerMock
+	govMock00   *gov.GovHandlerMock
+	acctMock00  *acct.AcctHandlerMock
 	stakeCtrler *stake.StakeCtrler
 
 	DelegateeWallets     []*web3.Wallet
@@ -32,18 +33,31 @@ var (
 	stakingTrxCtxs       []*ctrlertypes.TrxContext
 	unstakingTrxCtxs     []*ctrlertypes.TrxContext
 
-	dummyGas      = uint64(0)
-	dummyGasPrice = uint256.NewInt(0)
-	dummyNonce    = uint64(0)
+	defGas      = int64(0)
+	defGasPrice = uint256.NewInt(1)
+	dummyNonce  = int64(0)
 )
 
 func TestMain(m *testing.M) {
 	os.RemoveAll(DBDIR)
 
-	config.DBPath = DBDIR
-	stakeCtrler, _ = stake.NewStakeCtrler(config, govParams00, tmlog.NewNopLogger())
+	// `maxUpdatableStakeRatio = 100, maxIndividualStakeRatio = 10000000`
+	govMock00 = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
+	values := govMock00.GetValues()
+	values.MinValidatorPower = 5
+	values.MinDelegatorPower = 0
+	values.MaxUpdatableStakeRate = 100
+	values.MaxIndividualStakeRate = 10000000
+	values.LazyUnstakingBlocks = 30
 
-	acctMock00 = mocks.NewAccountHandlerMock(100 + int(govParams00.MaxValidatorCnt()))
+	defGas = govMock00.MinTrxGas()
+	defGasPrice = govMock00.GasPrice()
+	dummyNonce = int64(0)
+
+	config.DBPath = DBDIR
+	stakeCtrler, _ = stake.NewStakeCtrler(config, govMock00, tmlog.NewNopLogger())
+
+	acctMock00 = acct.NewAcctHandlerMock(100 + int(govMock00.MaxValidatorCnt()))
 	acctMock00.Iterate(func(idx int, w *web3.Wallet) bool {
 		w.GetAccount().SetBalance(beatoztypes.ToFons(1_000_000_000))
 		return true
@@ -110,13 +124,13 @@ func TestTrxStakingToSelf(t *testing.T) {
 	sumAmt := uint256.NewInt(0)
 	sumPower := int64(0)
 
-	_ = mocks.InitBlockCtxWith(0, acctMock00, govParams00, nil)
+	_ = mocks.InitBlockCtxWith("", 1, govMock00, acctMock00, nil, nil, nil)
 	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 
 	for _, txctx := range stakingToSelfTrxCtxs {
-		if mocks.LastBlockHeight() < txctx.Height {
-			for mocks.LastBlockHeight() < txctx.Height {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+		if mocks.LastBlockHeight() < txctx.Height() {
+			for mocks.LastBlockHeight() < txctx.Height() {
+				require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 			}
 		}
@@ -132,7 +146,7 @@ func TestTrxStakingToSelf(t *testing.T) {
 		sumPower += pow
 	}
 
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
@@ -145,9 +159,9 @@ func TestTrxStakingByTx(t *testing.T) {
 	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 
 	for i, txctx := range stakingTrxCtxs {
-		if mocks.LastBlockHeight() < txctx.Height {
-			for mocks.LastBlockHeight() < txctx.Height {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+		if mocks.LastBlockHeight() < txctx.Height() {
+			for mocks.LastBlockHeight() < txctx.Height() {
+				require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 			}
 		}
@@ -180,7 +194,7 @@ func TestTrxStakingByTx(t *testing.T) {
 		sumPower += pow
 	}
 
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 	require.Equal(t, sumAmt.String(), stakeCtrler.ReadTotalAmount().String())
 	require.Equal(t, sumPower, stakeCtrler.ReadTotalPower())
@@ -203,7 +217,7 @@ func TestDoReward(t *testing.T) {
 		})
 
 		expectedReward.Add(expectedReward,
-			new(uint256.Int).Mul(uint256.NewInt(uint64(val.Power)), govParams00.RewardPerPower()))
+			new(uint256.Int).Mul(uint256.NewInt(uint64(val.Power)), govMock00.RewardPerPower()))
 	}
 
 	issued, err := stakeCtrler.DoReward(mocks.LastBlockHeight(), votes)
@@ -214,12 +228,13 @@ func TestDoReward(t *testing.T) {
 func TestPunish(t *testing.T) {
 	allTotalPower0 := stakeCtrler.ReadTotalPower()
 	for _, byzanWallet := range DelegateeWallets {
+
 		totalPower0 := stakeCtrler.TotalPowerOf(byzanWallet.Address())
 		selfPower0 := stakeCtrler.SelfPowerOf(byzanWallet.Address())
 		require.Greater(t, selfPower0, int64(0))
 
 		_slashed := uint256.NewInt(uint64(selfPower0))
-		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govParams00.SlashRatio())))
+		_ = _slashed.Mul(_slashed, uint256.NewInt(uint64(govMock00.SlashRate())))
 		_ = _slashed.Div(_slashed, uint256.NewInt(uint64(100)))
 		expectedSlashed := int64(_slashed.Uint64())
 		require.Greater(t, expectedSlashed, int64(0))
@@ -237,14 +252,14 @@ func TestPunish(t *testing.T) {
 				Address: byzanWallet.Address(),
 				Power:   totalPower0,
 			},
-		}, govParams00.SlashRatio())
+		}, govMock00.SlashRate())
 		require.NoError(t, xerr)
 
 		delegatee = stakeCtrler.Delegatee(byzanWallet.Address())
 
 		expectedSumSlashedPower := int64(0)
 		for _, s0 := range oriStakes {
-			slashedPower := (s0.Power * govParams00.SlashRatio()) / int64(100)
+			slashedPower := (s0.Power * int64(govMock00.SlashRate())) / 100
 			if slashedPower < 1 {
 				slashedPower = s0.Power
 			}
@@ -268,8 +283,7 @@ func TestPunish(t *testing.T) {
 		require.Equal(t, totalPower0-sumSlashedPower0, delegatee.TotalPower)
 		require.Equal(t, totalPower0-sumSlashedPower0, delegatee.SumPowerOf(nil))
 
-		_, _, xerr = stakeCtrler.Commit()
-		require.NoError(t, xerr)
+		//require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 		require.Equal(t, totalPower0-expectedSumSlashedPower, stakeCtrler.TotalPowerOf(delegatee.Addr))
 		require.Equal(t, allTotalPower0-expectedSumSlashedPower, stakeCtrler.ReadTotalPower())
@@ -280,18 +294,7 @@ func TestPunish(t *testing.T) {
 
 // test for issue #43
 func TestUnstakingByNotOwner(t *testing.T) {
-	originHeight := mocks.LastBlockHeight()
-
-	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
-
 	for _, txctx := range unstakingTrxCtxs {
-
-		if mocks.LastBlockHeight() < txctx.Height {
-			for mocks.LastBlockHeight() < txctx.Height {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
-				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
-			}
-		}
 
 		ori := txctx.Tx.From
 		txctx.Tx.From = beatoztypes.RandAddress()
@@ -302,19 +305,6 @@ func TestUnstakingByNotOwner(t *testing.T) {
 
 		txctx.Tx.From = ori
 	}
-
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
-
-	// Rollback block context to `originHeight`
-	// This test case will fail,
-	// so any increase in block height caused by this test case should be ignored.
-	req := abcitypes.RequestBeginBlock{
-		Header: tmtypes.Header{
-			Height: originHeight,
-		},
-	}
-	bctx := ctrlertypes.NewBlockContext(req, govParams00, acctMock00, nil)
-	mocks.InitBlockCtx(bctx)
 }
 
 // TestUnstakingByTx requires that TestTrxStakingByTx had been executed.
@@ -328,9 +318,10 @@ func TestUnstakingByTx(t *testing.T) {
 	require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 
 	for _, txctx := range unstakingTrxCtxs {
-		if mocks.LastBlockHeight() < txctx.Height {
-			for mocks.LastBlockHeight() < txctx.Height {
-				require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+
+		if mocks.LastBlockHeight() < txctx.Height() {
+			for mocks.LastBlockHeight() < txctx.Height() {
+				require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 				require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
 			}
 		}
@@ -351,7 +342,7 @@ func TestUnstakingByTx(t *testing.T) {
 		sumUnstakingPower += s0.Power
 	}
 
-	require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler))
+	require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler))
 
 	require.Equal(t, sumPower0-sumUnstakingPower, stakeCtrler.ReadTotalPower())
 
@@ -399,11 +390,11 @@ func TestUnfreezing(t *testing.T) {
 		//new(uint256.Int).Add(s0.Amount, s0.ReceivedReward))
 	}
 
-	toBlockHeight := mocks.LastBlockHeight() + govParams00.LazyUnstakingBlocks()
+	toBlockHeight := mocks.LastBlockHeight() + govMock00.LazyUnstakingBlocks()
 
 	for mocks.LastBlockHeight() <= toBlockHeight {
 		require.NoError(t, mocks.DoBeginBlock(stakeCtrler))
-		require.NoError(t, mocks.DoEndBlockCommit(stakeCtrler)) // executing `unfreezingStakes` of `StakeCtrler`
+		require.NoError(t, mocks.DoEndBlockAndCommit(stakeCtrler)) // executing `unfreezingStakes` of `StakeCtrler`
 	}
 
 	frozenStakes = stakeCtrler.ReadFrozenStakes()

@@ -39,7 +39,7 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	//
 	tx := ctx.Tx
 
-	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(tx.Gas))
+	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
 	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
 	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
 		return xerr
@@ -60,19 +60,29 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
-		if xerr := ctx.TrxGovHandler.ValidateTrx(ctx); xerr != nil {
+		if xerr := ctx.GovHandler.ValidateTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
-		if xerr := ctx.TrxAcctHandler.ValidateTrx(ctx); xerr != nil {
+		if xerr := ctx.AcctHandler.ValidateTrx(ctx); xerr != nil {
 			return xerr
 		}
-	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
-		if xerr := ctx.TrxStakeHandler.ValidateTrx(ctx); xerr != nil {
+
+	//// todo: Handle TRX_WITHDROW by SupplyHandler and TRX_(UN)STAKING by VPowerHandler
+	//case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
+	//	if xerr := ctx.VPowerHandler.ValidateTrx(ctx); xerr != nil {
+	//		return xerr
+	//	}
+	case ctrlertypes.TRX_WITHDRAW:
+		if xerr := ctx.SupplyHandler.ValidateTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
+		if xerr := ctx.VPowerHandler.ValidateTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_CONTRACT:
-		if xerr := ctx.TrxEVMHandler.ValidateTrx(ctx); xerr != nil {
+		if xerr := ctx.EVMHandler.ValidateTrx(ctx); xerr != nil {
 			return xerr
 		}
 	default:
@@ -101,23 +111,33 @@ func runTrx(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
-		if xerr = ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr = ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
-		if xerr = ctx.TrxGovHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr = ctx.GovHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
 		if ctx.IsHandledByEVM() {
-			if xerr = ctx.TrxEVMHandler.ExecuteTrx(ctx); xerr != nil {
+			if xerr = ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
 				return xerr
 			}
-		} else if xerr = ctx.TrxAcctHandler.ExecuteTrx(ctx); xerr != nil {
+		} else if xerr = ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
-	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
-		if xerr = ctx.TrxStakeHandler.ExecuteTrx(ctx); xerr != nil {
+
+	//// todo: Handle TRX_WITHDROW by SupplyHandler and TRX_(UN)STAKING by VPowerHandler
+	//case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING, ctrlertypes.TRX_WITHDRAW:
+	//	if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
+	//		return xerr
+	//	}
+	case ctrlertypes.TRX_WITHDRAW:
+		if xerr = ctx.SupplyHandler.ExecuteTrx(ctx); xerr != nil {
+			return xerr
+		}
+	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
+		if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	default:

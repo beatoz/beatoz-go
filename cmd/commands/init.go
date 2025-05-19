@@ -184,10 +184,7 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			}
 			logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
 
-			pow, err := types.AmountToPower(types.DefaultGovParams().MinValidatorStake())
-			if err != nil {
-				return err
-			}
+			pow := types.DefaultGovParams().MinValidatorPower()
 			var valset []tmtypes.GenesisValidator
 			for _, pv := range pvs {
 				pubKey, err := pv.GetPubKey()
@@ -199,6 +196,7 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 					PubKey:  pubKey,
 					Power:   pow,
 				})
+				logger.Info("GenesisValidator", "address", pubKey.Address(), "power", pow)
 			}
 
 			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
@@ -208,15 +206,13 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 					Balance: uint256.MustFromDecimal("100000000000000000000000000"), // 100_000_000 * 1_000_000_000_000_000_000
 				}
 			}
-
-			logger.Info("Generate GenesisAssetHolder")
+			logger.Debug("GenesisAssetHolder", "holders count", len(holders))
 
 			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
-			genDoc.ConsensusParams.Block.MaxGas = blockGasLimit
 			if err != nil {
 				return err
 			}
-
+			genDoc.ConsensusParams.Block.MaxGas = blockGasLimit
 		}
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err

@@ -1,0 +1,30 @@
+syntax = "proto3";
+package types;
+option go_package = "github.com/beatoz/beatoz-go/ctrlers/gov/proposal";
+
+message VoterProto {
+  bytes address = 1;
+  int64 power = 2;
+  int32 choice = 3;
+}
+
+message GovProposalHeaderProto {
+  int32 prop_type = 1;
+  bytes tx_hash = 2;
+  int64 start_voting_height = 3;
+  int64 end_voting_height = 4;
+  int64 apply_height = 5;
+  int64 total_voting_power = 6;
+  int64 majority_power = 7;
+  repeated VoterProto voters = 8;
+}
+
+message voteOptionProto {
+  bytes option = 1;
+  int64 votes = 2;
+}
+message GovProposalProto {
+  GovProposalHeaderProto header = 1;
+  repeated voteOptionProto options = 2;
+  voteOptionProto major_option = 3;
+}

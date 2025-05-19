@@ -16,7 +16,7 @@ type slicedMap[T ILedgerItem] struct {
 //	}
 //}
 //
-//func (m *slicedMap[T]) Add(value T) error {
+//func (m *slicedMap[T]) Push(value T) error {
 //	m.mtx.Lock()
 //	defer m.mtx.Unlock()
 //

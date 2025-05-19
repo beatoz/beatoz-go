@@ -3,11 +3,13 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	"sync"
 	"time"
 )
@@ -15,38 +17,90 @@ import (
 type BlockContext struct {
 	blockInfo      abcitypes.RequestBeginBlock
 	blockSizeLimit int64
-	blockGasLimit  uint64
+	blockGasLimit  int64
 	blockGasPool   *ethcore.GasPool
 	feeSum         *uint256.Int
 	txsCnt         int
 	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
-	GovHandler   IGovHandler
-	AcctHandler  IAccountHandler
-	StakeHandler IStakeHandler
+	GovHandler  IGovHandler
+	AcctHandler IAccountHandler
+	EVMHandler  IEVMHandler
+
+	// DEPRECATED
+	//StakeHandler  IStakeHandler
+
+	SupplyHandler ISupplyHandler
+	VPowerHandler IVPowerHandler
 
 	ValUpdates abcitypes.ValidatorUpdates
 
 	mtx sync.RWMutex
 }
 
-func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, s IStakeHandler) *BlockContext {
+func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler) *BlockContext {
+
+	// all handlers should implement ITrxHandler and IBlockHandler
+	for _, handler := range []interface{}{g, a, e, su, vp} {
+		if handler != nil {
+			_ = handler.(ITrxHandler)
+			_ = handler.(IBlockHandler)
+		}
+
+	}
+
 	ret := &BlockContext{
-		blockInfo:    bi,
-		feeSum:       uint256.NewInt(0),
-		txsCnt:       0,
-		evmTxsCnt:    0,
-		appHash:      nil,
-		GovHandler:   g,
-		AcctHandler:  a,
-		StakeHandler: s,
-		ValUpdates:   nil,
+		blockInfo:   bi,
+		feeSum:      uint256.NewInt(0),
+		txsCnt:      0,
+		evmTxsCnt:   0,
+		appHash:     nil,
+		GovHandler:  g,
+		AcctHandler: a,
+		EVMHandler:  e,
+		//StakeHandler:  s,
+		SupplyHandler: su,
+		VPowerHandler: vp, // todo: perfectly implement temp code
+		ValUpdates:    nil,
 	}
 	if g != nil {
 		ret.setBlockGasLimit(g.MaxBlockGas())
 	}
 	return ret
+}
+
+func TempBlockContext(chainId string, height int64, btime time.Time, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler) *BlockContext {
+	next := NewBlockContext(
+		abcitypes.RequestBeginBlock{
+			Header: tmprototypes.Header{
+				ChainID: chainId,
+				Height:  height,
+				Time:    btime,
+			},
+		},
+		g, a, e, su, vp,
+	)
+	return next
+}
+
+func ExpectNextBlockContext(last *BlockContext, blockIntval time.Duration) *BlockContext {
+	tm := last.BlockInfo().Header.Time.Add(blockIntval * time.Second)
+	next := NewBlockContext(
+		abcitypes.RequestBeginBlock{
+			Header: tmprototypes.Header{
+				ChainID: last.ChainID(),
+				Height:  last.Height() + 1,
+				Time:    tm,
+			},
+		},
+		last.GovHandler,
+		last.AcctHandler,
+		last.EVMHandler,
+		last.SupplyHandler,
+		last.VPowerHandler,
+	)
+	return next
 }
 
 func (bctx *BlockContext) BlockInfo() abcitypes.RequestBeginBlock {
@@ -56,11 +110,11 @@ func (bctx *BlockContext) BlockInfo() abcitypes.RequestBeginBlock {
 	return bctx.blockInfo
 }
 
-func (bctx *BlockContext) SetHeight(h int64) {
+func (bctx *BlockContext) ChainID() string {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
-	bctx.blockInfo.Header.Height = h
+	return bctx.blockInfo.Header.ChainID
 }
 
 func (bctx *BlockContext) Height() int64 {
@@ -68,6 +122,12 @@ func (bctx *BlockContext) Height() int64 {
 	defer bctx.mtx.RUnlock()
 
 	return bctx.blockInfo.Header.Height
+}
+
+func (bctx *BlockContext) ProposerAddress() types.Address {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+	return bctx.blockInfo.Header.ProposerAddress
 }
 
 func (bctx *BlockContext) PreAppHash() bytes.HexBytes {
@@ -180,57 +240,57 @@ func (bctx *BlockContext) SetBlockSizeLimit(limit int64) {
 	bctx.blockSizeLimit = limit
 }
 
-func (bctx *BlockContext) GetBlockGasLimit() uint64 {
+func (bctx *BlockContext) GetBlockGasLimit() int64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 
 	return bctx.blockGasLimit
 }
 
-func (bctx *BlockContext) SetBlockGasLimit(gasLimit uint64) {
+func (bctx *BlockContext) SetBlockGasLimit(gasLimit int64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
 	bctx.setBlockGasLimit(gasLimit)
 }
 
-func (bctx *BlockContext) setBlockGasLimit(gasLimit uint64) {
+func (bctx *BlockContext) setBlockGasLimit(gasLimit int64) {
 	bctx.blockGasLimit = gasLimit
-	bctx.blockGasPool = new(ethcore.GasPool).AddGas(gasLimit)
+	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(gasLimit))
 }
 
-func (bctx *BlockContext) GetBlockGasUsed() uint64 {
+func (bctx *BlockContext) GetBlockGasUsed() int64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 	return bctx.getBlockGasUsed()
 }
 
-func (bctx *BlockContext) getBlockGasUsed() uint64 {
-	return bctx.blockGasLimit - bctx.blockGasPool.Gas()
+func (bctx *BlockContext) getBlockGasUsed() int64 {
+	return bctx.blockGasLimit - int64(bctx.blockGasPool.Gas())
 }
 
-func (bctx *BlockContext) UseBlockGas(gas uint64) xerrors.XError {
+func (bctx *BlockContext) UseBlockGas(gas int64) xerrors.XError {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
-	if err := bctx.blockGasPool.SubGas(gas); err != nil {
+	if err := bctx.blockGasPool.SubGas(uint64(gas)); err != nil {
 		return xerrors.ErrInvalidGas.Wrap(err)
 	}
 	return nil
 }
 
-func (bctx *BlockContext) RefundBlockGas(gas uint64) {
+func (bctx *BlockContext) RefundBlockGas(gas int64) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
 	// for debug
 	_gasPool0 := bctx.blockGasPool.Gas()
 
-	_ = bctx.blockGasPool.AddGas(gas)
+	_ = bctx.blockGasPool.AddGas(uint64(gas))
 
 	//
 	// for debug
-	_gasPool1 := bctx.blockGasPool.Gas()
+	_gasPool1 := int64(bctx.blockGasPool.Gas())
 	if _gasPool1 > bctx.blockGasLimit {
 		panic(fmt.Sprintf("before gas pool(%v), gas(%v), after gas pool(%v), gas limit(%v)", _gasPool0, gas, _gasPool1, bctx.blockGasLimit))
 	}
@@ -250,8 +310,8 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 
 	_bctx := &struct {
 		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
-		BlockGasLimit uint64                      `json:"blockGasLimit"`
-		BlockGasUsed  uint64                      `json:"blockGasUsed"`
+		BlockGasLimit int64                       `json:"blockGasLimit"`
+		BlockGasUsed  int64                       `json:"blockGasUsed"`
 		FeeSum        *uint256.Int                `json:"feeSum"`
 		TxsCnt        int                         `json:"txsCnt"`
 		EVMTxsCnt     int                         `json:"evmTxsCnt"`
@@ -275,8 +335,8 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 
 	_bctx := &struct {
 		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
-		BlockGasLimit uint64                      `json:"blockGasLimit"`
-		BlockGasUsed  uint64                      `json:"blockGasUsed"`
+		BlockGasLimit int64                       `json:"blockGasLimit"`
+		BlockGasUsed  int64                       `json:"blockGasUsed"`
 		FeeSum        *uint256.Int                `json:"feeSum"`
 		TxsCnt        int                         `json:"txsCnt"`
 		EVMTxsCnt     int                         `json:"evmTxsCnt"`
@@ -288,7 +348,7 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	}
 	bctx.blockInfo = _bctx.BlockInfo
 	bctx.blockGasLimit = _bctx.BlockGasLimit
-	bctx.blockGasPool = new(ethcore.GasPool).AddGas(bctx.blockGasLimit - _bctx.BlockGasUsed)
+	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(bctx.blockGasLimit - _bctx.BlockGasUsed))
 	bctx.feeSum = _bctx.FeeSum
 	bctx.txsCnt = _bctx.TxsCnt
 	bctx.evmTxsCnt = _bctx.EVMTxsCnt
@@ -296,7 +356,7 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	return nil
 }
 
-func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max uint64) uint64 {
+func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max int64) int64 {
 	if preBlockGasUsed == 0 {
 		return preBlockGasLimit
 	}
@@ -321,7 +381,42 @@ func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max uint64) uin
 	return blockGasLimit
 }
 
-type IBlockHandler interface {
-	BeginBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
-	EndBlock(*BlockContext) ([]abcitypes.Event, xerrors.XError)
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetChainID(chainId string) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.ChainID = chainId
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetHeight(h int64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.Height = h
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetProposerAddress(addr types.Address) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.Header.ProposerAddress = addr
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetByzantine(evidences []abcitypes.Evidence) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo.ByzantineValidators = append(bctx.blockInfo.ByzantineValidators, evidences...)
+}
+
+// DEPRECATED: Use for test only
+func (bctx *BlockContext) SetBlockInfo(req abcitypes.RequestBeginBlock) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.blockInfo = req
 }

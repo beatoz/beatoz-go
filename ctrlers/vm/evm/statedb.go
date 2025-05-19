@@ -74,7 +74,7 @@ func (s *StateDBWrapper) Finish() {
 
 		acct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
 		acct.SetBalance(amt)
-		acct.SetNonce(nonce)
+		acct.SetNonce(int64(nonce))
 
 		_ = s.acctHandler.SetAccount(acct, s.exec)
 
@@ -218,7 +218,7 @@ func (s *StateDBWrapper) addAccessedObjAddr(addr common.Address) {
 		stateObject := s.GetOrNewStateObject(addr)
 		if stateObject != nil {
 			beatozAcct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
-			stateObject.SetNonce(beatozAcct.Nonce)
+			stateObject.SetNonce(uint64(beatozAcct.Nonce))
 			stateObject.SetBalance(beatozAcct.Balance.ToBig())
 
 			s.accessedObjAddrs[addr] = s.snapshot + 1

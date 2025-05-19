@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
@@ -27,7 +28,7 @@ import (
 )
 
 var (
-	govParams   = ctrlertypes.DefaultGovParams()
+	govMock     = govmock.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	acctHandler acctHandlerMock
 	dbPath      = filepath.Join(os.TempDir(), "beatoz-evm-test")
 )
@@ -77,7 +78,7 @@ func init() {
 
 func Test_callEVM_Deploy(t *testing.T) {
 	os.RemoveAll(dbPath)
-	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout)))
+	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
 
 	deployInput, err := abiERC20Contract.Pack("", "TokenOnBeatoz", "TOR")
 	require.NoError(t, err)
@@ -87,7 +88,7 @@ func Test_callEVM_Deploy(t *testing.T) {
 
 	contAddr, txctx := testDeployContract(t, deployInput)
 	fromAcct := txctx.Sender
-	height := txctx.Height
+	height := txctx.Height()
 	erc20ContAddr = contAddr
 
 	fmt.Println("TestDeploy", "contract address", erc20ContAddr)
@@ -132,11 +133,16 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
+		govMock, &acctHandler, nil, nil, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
-	ret, xerr = execMethod(abiERC20Contract, fromAcct.Address, erc20ContAddr, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bctx.Height(), time.Now().Unix(),
+	ret, xerr = execMethod(
+		abiERC20Contract,
+		fromAcct.Address, erc20ContAddr,
+		fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
 	fmt.Println("<transferred>")
@@ -158,7 +164,10 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println(" (AFTER) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx = ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
+		govMock, &acctHandler, nil, nil, nil)
+
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -183,7 +192,9 @@ func Test_callEVM_Transfer(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(REOPEN) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
-	bctx = ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx = ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
+		govMock, &acctHandler, nil, nil, nil)
 	_, xerr = erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
@@ -199,22 +210,22 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
 	to := types.ZeroAddress()
 
-	bctx := ctrlertypes.NewBlockContext(abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}}, govParams, &acctHandler, nil)
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1, Time: time.Now()}},
+		govMock, &acctHandler, nil, nil, nil)
+
 	_, xerr := erc20EVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 
 	txctx := &ctrlertypes.TrxContext{
-		Height:      bctx.Height(),
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    nil,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		TxHash:       bytes2.RandBytes(32),
+		Tx:           web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
+		TxIdx:        1,
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     nil,
+		GasUsed:      0,
 	}
 
 	xerr = erc20EVM.ExecuteTrx(txctx)
@@ -231,7 +242,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 
 			// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
 			// Calculate an expected address with `fromAcct.Nonce-1`.
-			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), fromAcct.Nonce-1)
+			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce-1))
 			require.EqualValues(t, addr0[:], _addr)
 			require.EqualValues(t, addr0[:], txctx.RetData)
 
@@ -241,12 +252,12 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 
 	_, height, xerr := erc20EVM.Commit()
 	require.NoError(t, xerr)
-	require.Equal(t, txctx.Height, height)
+	require.Equal(t, txctx.Height(), height)
 
 	return contAddr, txctx
 }
 
-func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPrice, amt *uint256.Int, bn, bt int64, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
+func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPrice, amt *uint256.Int, methodName string, args ...interface{}) ([]interface{}, xerrors.XError) {
 	input, err := abiObj.Pack(methodName, args...)
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -254,18 +265,20 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas uint64, gasPr
 
 	fromAcct := acctHandler.FindAccount(from, true)
 	toAcct := acctHandler.FindAccount(to, true)
+
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: 1, Time: time.Now()}},
+		govMock, &acctHandler, nil, nil, nil)
+
 	txctx := &ctrlertypes.TrxContext{
-		Height:      1,
-		BlockTime:   time.Now().Unix(),
-		TxHash:      bytes2.RandBytes(32),
-		Tx:          web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
-		TxIdx:       1,
-		Exec:        true,
-		Sender:      fromAcct,
-		Receiver:    toAcct,
-		GasUsed:     0,
-		GovHandler:  govParams,
-		AcctHandler: &acctHandler,
+		BlockContext: bctx,
+		Tx:           web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
+		TxIdx:        1,
+		TxHash:       bytes2.RandBytes(32),
+		Exec:         true,
+		Sender:       fromAcct,
+		Receiver:     toAcct,
+		GasUsed:      0,
 	}
 	xerr := erc20EVM.ExecuteTrx(txctx)
 	if xerr != nil {
@@ -340,10 +353,10 @@ func (handler *acctHandlerMock) FindAccount(addr types.Address, exec bool) *ctrl
 	}
 	return nil
 }
-func (a *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if sender := a.FindAccount(from, exec); sender == nil {
+func (handler *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if sender := handler.FindAccount(from, exec); sender == nil {
 		return xerrors.ErrNotFoundAccount
-	} else if receiver := a.FindAccount(to, exec); receiver == nil {
+	} else if receiver := handler.FindAccount(to, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := sender.SubBalance(amt); xerr != nil {
 		return xerr
@@ -352,12 +365,36 @@ func (a *acctHandlerMock) Transfer(from, to types.Address, amt *uint256.Int, exe
 	}
 	return nil
 }
-func (a *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if receiver := a.FindAccount(to, exec); receiver == nil {
+func (handler *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := handler.FindAccount(to, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := receiver.AddBalance(amt); xerr != nil {
 		return xerr
 	}
+	return nil
+}
+
+func (handler *acctHandlerMock) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := handler.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (handler *acctHandlerMock) SubBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := handler.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (handler *acctHandlerMock) SetBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	receiver := handler.FindOrNewAccount(addr, exec)
+	receiver.SetBalance(amt)
 	return nil
 }
 
@@ -388,4 +425,31 @@ func (handler *acctHandlerMock) SetAccount(acct *ctrlertypes.Account, exec bool)
 	return nil
 }
 
+func (handler *acctHandlerMock) BeginBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (handler *acctHandlerMock) EndBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *acctHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (handler *acctHandlerMock) ValidateTrx(context *ctrlertypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (handler *acctHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
 var _ ctrlertypes.IAccountHandler = (*acctHandlerMock)(nil)
+var _ ctrlertypes.ITrxHandler = (*acctHandlerMock)(nil)
+var _ ctrlertypes.IBlockHandler = (*acctHandlerMock)(nil)

@@ -65,12 +65,26 @@ func (hb HexBytes) Bytes() []byte {
 	return hb
 }
 
+func (hb HexBytes) Copy() HexBytes {
+	return Copy(hb)
+}
+
 func (hb HexBytes) Compare(o HexBytes) int {
 	return Compare(hb, o)
 }
 
 func Compare(h1, h2 HexBytes) int {
 	return bytes.Compare(h1, h2)
+}
+
+func Equal(h1, h2 HexBytes) bool {
+	return bytes.Equal(h1, h2)
+}
+
+func Copy(s HexBytes) HexBytes {
+	ret := make(HexBytes, len(s))
+	copy(ret, s)
+	return ret
 }
 
 func (hb HexBytes) Array20() [20]byte {

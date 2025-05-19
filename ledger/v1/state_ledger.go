@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-type StateLedger[T ILedgerItem] struct {
+type StateLedger struct {
 	commitLedger   IMutable
 	imitableLedger IImitable
 
@@ -14,11 +14,10 @@ type StateLedger[T ILedgerItem] struct {
 	mtx    sync.RWMutex
 }
 
-var _ IStateLedger[ILedgerItem] = (*StateLedger[ILedgerItem])(nil)
+var _ IStateLedger = (*StateLedger)(nil)
 
-func NewStateLedger[T ILedgerItem](name, dbDir string, cacheSize int, newItem func() T, lg tmlog.Logger) (*StateLedger[T], xerrors.XError) {
-	newItemFunc := func() ILedgerItem { return newItem() }
-	_commitLedger, xerr := NewMutableLedger(name, dbDir, cacheSize, newItemFunc, lg)
+func NewStateLedger(name, dbDir string, cacheSize int, newItem FuncNewItemFor, lg tmlog.Logger) (*StateLedger, xerrors.XError) {
+	_commitLedger, xerr := NewMutableLedger(name, dbDir, cacheSize, newItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -28,63 +27,63 @@ func NewStateLedger[T ILedgerItem](name, dbDir string, cacheSize int, newItem fu
 		return nil, xerr
 	}
 
-	return &StateLedger[T]{
+	return &StateLedger{
 		commitLedger:   _commitLedger,
 		imitableLedger: _imitableLedger,
 		logger:         lg.With("ledger", "StateLedger"),
 	}, nil
 }
 
-func (ledger *StateLedger[T]) getLedger(exec bool) IImitable {
+func (ledger *StateLedger) getLedger(exec bool) IImitable {
 	if exec == true {
 		return ledger.commitLedger
 	}
 	return ledger.imitableLedger
 }
 
-func (ledger *StateLedger[T]) Version() int64 {
+func (ledger *StateLedger) Version() int64 {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	return ledger.commitLedger.Version()
 }
 
-func (ledger *StateLedger[T]) Get(key LedgerKey, exec bool) (T, xerrors.XError) {
+func (ledger *StateLedger) Get(key LedgerKey, exec bool) (ILedgerItem, xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	var emptyNil T
-	item, xerr := ledger.getLedger(exec).Get(key)
-	if item == nil {
-		item = emptyNil
-	}
-
-	return item.(T), xerr
+	return ledger.getLedger(exec).Get(key)
 }
 
-func (ledger *StateLedger[T]) Iterate(cb func(T) xerrors.XError, exec bool) xerrors.XError {
+func (ledger *StateLedger) Iterate(cb FuncIterate, exec bool) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
-	return ledger.getLedger(exec).Iterate(func(item ILedgerItem) xerrors.XError {
-		ledger.mtx.RUnlock()
-		defer ledger.mtx.RLock()
-
-		return cb(item.(T))
+	return ledger.getLedger(exec).Iterate(func(key LedgerKey, item ILedgerItem) xerrors.XError {
+		return cb(key, item)
 	})
 }
 
-func (ledger *StateLedger[T]) Set(item T, exec bool) xerrors.XError {
+func (ledger *StateLedger) Seek(prefix []byte, ascending bool, cb FuncIterate, exec bool) xerrors.XError {
+	ledger.mtx.RLock()
+	defer ledger.mtx.RUnlock()
+
+	return ledger.getLedger(exec).Seek(prefix, ascending, func(key LedgerKey, item ILedgerItem) xerrors.XError {
+		return cb(key, item)
+	})
+}
+
+func (ledger *StateLedger) Set(key LedgerKey, item ILedgerItem, exec bool) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	if xerr := ledger.getLedger(exec).Set(item); xerr != nil {
+	if xerr := ledger.getLedger(exec).Set(key, item); xerr != nil {
 		return xerr
 	}
 	return nil
 }
 
-func (ledger *StateLedger[T]) Del(key LedgerKey, exec bool) xerrors.XError {
+func (ledger *StateLedger) Del(key LedgerKey, exec bool) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
@@ -95,21 +94,21 @@ func (ledger *StateLedger[T]) Del(key LedgerKey, exec bool) xerrors.XError {
 	return nil
 }
 
-func (ledger *StateLedger[T]) Snapshot(exec bool) int {
+func (ledger *StateLedger) Snapshot(exec bool) int {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	return ledger.getLedger(exec).Snapshot()
 }
 
-func (ledger *StateLedger[T]) RevertToSnapshot(snap int, exec bool) xerrors.XError {
+func (ledger *StateLedger) RevertToSnapshot(snap int, exec bool) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	return ledger.getLedger(exec).RevertToSnapshot(snap)
 }
 
-func (ledger *StateLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
+func (ledger *StateLedger) Commit() ([]byte, int64, xerrors.XError) {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
@@ -126,7 +125,7 @@ func (ledger *StateLedger[T]) Commit() ([]byte, int64, xerrors.XError) {
 	return hash, ver, nil
 }
 
-func (ledger *StateLedger[T]) Close() xerrors.XError {
+func (ledger *StateLedger) Close() xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
@@ -141,7 +140,7 @@ func (ledger *StateLedger[T]) Close() xerrors.XError {
 }
 
 // ImitableLedgerAt returns the ledger that is immutable and not committable.
-func (ledger *StateLedger[T]) ImitableLedgerAt(height int64) (IImitable, xerrors.XError) {
+func (ledger *StateLedger) ImitableLedgerAt(height int64) (IImitable, xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 

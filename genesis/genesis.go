@@ -2,14 +2,14 @@ package genesis
 
 import (
 	"github.com/beatoz/beatoz-go/cmd/version"
-	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
-func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govParams *types2.GovParams) (*tmtypes.GenesisDoc, error) {
+func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetHolders []*GenesisAssetHolder, govParams *ctrlertypes.GovParams) (*tmtypes.GenesisDoc, error) {
 	appState := GenesisAppState{
 		AssetHolders: assetHolders,
 		GovParams:    govParams,

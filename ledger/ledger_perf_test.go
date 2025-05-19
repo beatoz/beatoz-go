@@ -60,7 +60,8 @@ func Benchmark_Set_V1(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		require.NoError(b, ledger.Set(testItemsV1[i%len(testItemsV1)]))
+		it := testItemsV1[i%len(testItemsV1)]
+		require.NoError(b, ledger.Set(it.Key(), it))
 	}
 	b.StopTimer()
 
@@ -78,7 +79,8 @@ func Benchmark_Set_V1_Mem(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		require.NoError(b, ledger.Set(testItemsV1[i%len(testItemsV1)]))
+		it := testItemsV1[i%len(testItemsV1)]
+		require.NoError(b, ledger.Set(it.Key(), it))
 	}
 	b.StopTimer()
 
@@ -173,7 +175,7 @@ func Benchmark_Commit_V1(b *testing.B) {
 		// set test data
 		for j := 0; j < 20_000; j++ {
 			item := newTestItemV1(bytes.RandHexString(512))
-			require.NoError(b, ledger.Set(item))
+			require.NoError(b, ledger.Set(item.Key(), item))
 			totalTxs++
 		}
 
@@ -210,8 +212,8 @@ func (i *TestItemV0) Encode() ([]byte, xerrors.XError) {
 	return []byte(fmt.Sprintf("key:%x,data:%v", i.key, i.data)), nil
 }
 
-func (i *TestItemV0) Decode(bz []byte) xerrors.XError {
-	toks := strings.Split(string(bz), ",")
+func (i *TestItemV0) Decode(v []byte) xerrors.XError {
+	toks := strings.Split(string(v), ",")
 	key, _ := strings.CutPrefix(toks[0], "key:")
 	data, _ := strings.CutPrefix(toks[1], "data:")
 
@@ -233,7 +235,7 @@ func newTestItemV1(data string) *TestItemV1 {
 	}
 }
 
-func emptyTestItemV1() v1.ILedgerItem {
+func emptyTestItemV1(key v1.LedgerKey) v1.ILedgerItem {
 	return &TestItemV1{
 		TestItemV0: &TestItemV0{},
 	}
@@ -241,4 +243,16 @@ func emptyTestItemV1() v1.ILedgerItem {
 
 func (i *TestItemV1) Key() v1.LedgerKey {
 	return i.key
+}
+func (i *TestItemV1) Decode(k, v []byte) xerrors.XError {
+	toks := strings.Split(string(v), ",")
+	key, _ := strings.CutPrefix(toks[0], "key:")
+	data, _ := strings.CutPrefix(toks[1], "data:")
+
+	var err error
+	if i.key, err = hex.DecodeString(key); err != nil {
+		return xerrors.From(err)
+	}
+	i.data = data
+	return nil
 }

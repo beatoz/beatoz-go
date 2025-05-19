@@ -1,0 +1,10 @@
+syntax = "proto3";
+package vpower;
+option go_package = "github.com/beatoz/beatoz-go/ctrlers/vpower";
+
+message delegatee_proto {
+  bytes pub_key = 1;
+  repeated bytes delegators = 2;
+  int64 sum_power = 3;
+  int64 self_power = 4;
+}

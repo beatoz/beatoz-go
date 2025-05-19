@@ -33,7 +33,7 @@ func TestSetDoc(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 
-	expectedBalance := new(uint256.Int).Sub(oriBalance, gasToFee(uint64(txRet.TxResult.GasUsed), defGasPrice))
+	expectedBalance := new(uint256.Int).Sub(oriBalance, types.GasToFee(txRet.TxResult.GasUsed, defGasPrice))
 	require.NoError(t, w.SyncAccount(bzweb3))
 	require.Equal(t, expectedBalance.Dec(), w.GetBalance().Dec())
 	require.Equal(t, name, w.GetAccount().Name)

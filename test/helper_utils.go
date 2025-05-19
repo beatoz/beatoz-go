@@ -33,51 +33,79 @@ var (
 	defGas           = defGovParams.MinTrxGas()
 	bigGas           = defGas * 10
 	smallGas         = defGas - 1
-	contractGas      = uint64(3_000_000)
+	contractGas      = int64(3_000_000)
 	defGasPrice      = defGovParams.GasPrice()
-	baseFee          = new(uint256.Int).Mul(uint256.NewInt(defGas), defGasPrice)
+	baseFee          = ctrlertypes.GasToFee(defGas, defGasPrice)
 	//smallFee         = uint256.NewInt(999_999_999_999_999)
 	defaultRpcNode *PeerMock
 )
 
-func prepareTest(peers []*PeerMock) {
-	for _, peer := range peers {
+func prepareTest(_peers []*PeerMock) {
+
+	walletsMap = make(map[ctrlertypes.AcctKey]*btzweb3.Wallet)
+
+	bzweb3 := randBeatozWeb3()
+	vals, err := queryValidators(1, bzweb3)
+	if err != nil {
+		panic(err)
+	}
+	if len(vals.Validators) > 1 {
+		panic("More than one validator")
+	}
+
+	for _, peer := range _peers {
 		// validators
-		if w, err := btzweb3.OpenWallet(libs.NewFileReader(peer.PrivValKeyPath())); err != nil {
-			panic(err)
-		} else {
-			addValidatorWallet(w)
-			fmt.Println("Validator", w.Address(), w.GetBalance())
+		w := peer.PrivValWallet()
+		for _, v := range vals.Validators {
+			if bytes.Equal([]byte(v.Address), w.Address()) {
+				addValidatorWallet(w)
+			}
 		}
 
 		// wallets
 		files, err := os.ReadDir(peer.WalletPath())
-		if err != nil {
-			panic(err)
-		}
-
-		walletsMap = make(map[ctrlertypes.AcctKey]*btzweb3.Wallet)
-
-		for _, file := range files {
-			if !file.IsDir() {
-				if w, err := btzweb3.OpenWallet(
-					libs.NewFileReader(filepath.Join(peer.WalletPath(), file.Name()))); err != nil {
-					panic(err)
-				} else {
-					wallets = append(wallets, w)
-
-					acctKey := ctrlertypes.ToAcctKey(w.Address())
-					walletsMap[acctKey] = w
-
-					bzweb3 := btzweb3.NewBeatozWeb3(btzweb3.NewHttpProvider(peer.RPCURL))
-					if err := w.SyncAccount(bzweb3); err != nil {
+		if err == nil {
+			for _, file := range files {
+				if !file.IsDir() {
+					if w, err := btzweb3.OpenWallet(
+						libs.NewFileReader(filepath.Join(peer.WalletPath(), file.Name()))); err != nil {
 						panic(err)
+					} else {
+						wallets = append(wallets, w)
+
+						acctKey := ctrlertypes.ToAcctKey(w.Address())
+						walletsMap[acctKey] = w
+
+						bzweb3 := btzweb3.NewBeatozWeb3(btzweb3.NewHttpProvider(peer.RPCURL))
+						if err := w.SyncAccount(bzweb3); err != nil {
+							panic(err)
+						}
+						//fmt.Println("Init Holder", w.Address(), w.GetBalance())
 					}
-					//fmt.Println("Init Holder", w.Address(), w.GetBalance())
 				}
 			}
 		}
-		fmt.Println("Init Holder count", len(wallets))
+	}
+
+	fmt.Println("Init Holder count", len(wallets))
+
+	//
+	// validator's balance is 0 at now,
+	// send amount to validators to use as gas.
+	sender := wallets[0]
+	_ = sender.Unlock(peers[0].Pass)
+	_ = sender.SyncAccount(bzweb3)
+
+	for _, peer := range _peers {
+		w := peer.PrivValWallet()
+		ret, _ := sender.TransferCommit(w.Address(), defGas, defGasPrice, btztypes.ToFons(10_000_000), bzweb3)
+		if ret.CheckTx.Code != xerrors.ErrCodeSuccess {
+			panic(ret.CheckTx.Code)
+		}
+		if ret.DeliverTx.Code != xerrors.ErrCodeSuccess {
+			panic(ret.DeliverTx.Code)
+		}
+		sender.AddNonce()
 	}
 
 	W0 = wallets[0]
@@ -198,6 +226,11 @@ func addValidatorWallet(w *btzweb3.Wallet) {
 	validatorWallets = append(validatorWallets, w)
 }
 
+func randValidatorWallet() *btzweb3.Wallet {
+	rn := rand.Intn(len(validatorWallets))
+	return validatorWallets[rn]
+}
+
 func isValidatorWallet(w *btzweb3.Wallet) bool {
 	return isValidator(w.Address())
 }
@@ -211,18 +244,13 @@ func isValidator(addr btztypes.Address) bool {
 	return false
 }
 
-func queryValidators(height int, bzweb3 *btzweb3.BeatozWeb3) (*coretypes.ResultValidators, error) {
+func queryValidators(height int64, bzweb3 *btzweb3.BeatozWeb3) (*coretypes.ResultValidators, error) {
 	return bzweb3.GetValidators(int64(height), 1, len(validatorWallets))
 }
 
 func randWallet() *btzweb3.Wallet {
 	rn := rand.Intn(len(wallets))
 	return wallets[rn]
-}
-
-func randValidatorWallet() *btzweb3.Wallet {
-	rn := rand.Intn(len(validatorWallets))
-	return validatorWallets[rn]
 }
 
 func randCommonWallet() *btzweb3.Wallet {
@@ -237,10 +265,6 @@ func randCommonWallet() *btzweb3.Wallet {
 func saveWallet(w *btzweb3.Wallet) error {
 	path := filepath.Join(defaultRpcNode.WalletPath(), fmt.Sprintf("wk%X.json", w.Address()))
 	return w.Save(libs.NewFileWriter(path))
-}
-
-func gasToFee(gas uint64, gasPrice *uint256.Int) *uint256.Int {
-	return new(uint256.Int).Mul(gasPrice, uint256.NewInt(gas))
 }
 
 func transferFrom(sender *btzweb3.Wallet, receiver btztypes.Address, _amt *uint256.Int, bzweb3 *btzweb3.BeatozWeb3) error {

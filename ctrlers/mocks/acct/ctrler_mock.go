@@ -1,4 +1,4 @@
-package mocks
+package acct
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -6,18 +6,20 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/rand"
 )
 
 type AcctHandlerMock struct {
 	wallets  []*web3.Wallet
-	accounts []*ctrlertypes.Account
+	accounts []*ctrlertypes.Account // has no private key
 }
 
-func NewAccountHandlerMock(walCnt int) *AcctHandlerMock {
+func NewAcctHandlerMock(walCnt int) *AcctHandlerMock {
 	var wals []*web3.Wallet
 	for i := 0; i < walCnt; i++ {
-		wals = append(wals, web3.NewWallet(nil))
+		w := web3.NewWallet(nil)
+		wals = append(wals, w)
 	}
 	return &AcctHandlerMock{wallets: wals}
 }
@@ -72,7 +74,7 @@ func (mock *AcctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *ct
 	return acct
 }
 
-func (mock *AcctHandlerMock) FindAccount(addr types.Address, exec bool) *ctrlertypes.Account {
+func (mock *AcctHandlerMock) FindAccount(addr types.Address, _ bool) *ctrlertypes.Account {
 	if w := mock.FindWallet(addr); w != nil {
 		return w.GetAccount()
 	}
@@ -104,10 +106,61 @@ func (mock *AcctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec boo
 	}
 	return nil
 }
+
+func (mock *AcctHandlerMock) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := mock.FindOrNewAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (mock *AcctHandlerMock) SubBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := mock.FindAccount(addr, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (mock *AcctHandlerMock) SetBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	receiver := mock.FindOrNewAccount(addr, exec)
+	receiver.SetBalance(amt)
+	return nil
+}
+
 func (mock *AcctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &AcctHandlerMock{}, nil
 }
-func (mock *AcctHandlerMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
+func (mock *AcctHandlerMock) SetAccount(acct *ctrlertypes.Account, b bool) xerrors.XError {
+	return nil
+}
+
+func (mock *AcctHandlerMock) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	_ = ctx.Sender.AddBalance(ctx.Tx.Amount)
+	_ = ctx.Receiver.SubBalance(ctx.Tx.Amount)
 	return nil
 }
 

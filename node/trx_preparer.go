@@ -78,7 +78,8 @@ func (tp *TrxPreparer) Add(req *abcitypes.RequestDeliverTx, prepareCallback func
 	}
 
 	tp.mtx.Lock()
-	tp.resultValues = append(tp.resultValues, nil)
+	// add an empty element
+	tp.resultValues = append(tp.resultValues, (*resultValue)(nil))
 	tp.reqCount++
 	tp.mtx.Unlock()
 

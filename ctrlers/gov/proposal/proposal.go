@@ -6,62 +6,83 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"github.com/holiman/uint256"
+	"google.golang.org/protobuf/proto"
 	"sort"
 	"sync"
 )
 
 type GovProposal struct {
-	GovProposalHeader `json:"header"`
-	Options           []*voteOption `json:"options"`
-	MajorOption       *voteOption   `json:"majorOption"`
+	v GovProposalProto
 
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(txhash bytes.HexBytes, optType int32, startHeight, votingBlocks, totalVotingPower, applyingHeight int64, voters map[string]*Voter, options ...[]byte) (*GovProposal, xerrors.XError) {
+func NewGovProposal(propType int32, txhash bytes.HexBytes, startHeight, votingBlocks, totalVotingPower, applyingHeight int64) (*GovProposal, xerrors.XError) {
 	endVotingHeight := startHeight + votingBlocks
 	return &GovProposal{
-		GovProposalHeader: GovProposalHeader{
-			TxHash:            txhash,
-			StartVotingHeight: startHeight,
-			EndVotingHeight:   endVotingHeight,
-			ApplyingHeight:    applyingHeight,
-			TotalVotingPower:  totalVotingPower,
-			MajorityPower:     (totalVotingPower * 2) / 3,
-			Voters:            voters,
-			OptType:           optType,
+		v: GovProposalProto{
+			Header: &GovProposalHeaderProto{
+				PropType:          propType,
+				TxHash:            txhash,
+				StartVotingHeight: startHeight,
+				EndVotingHeight:   endVotingHeight,
+				ApplyHeight:       applyingHeight,
+				TotalVotingPower:  totalVotingPower,
+				MajorityPower:     (totalVotingPower * 2) / 3,
+			},
+			Options:     nil,
+			MajorOption: nil,
 		},
-		Options:     NewVoteOptions(options...),
-		MajorOption: nil,
 	}, nil
 }
 
-func (prop *GovProposal) Key() v1.LedgerKey {
-	prop.mtx.RLock()
-	defer prop.mtx.RUnlock()
+func (prop *GovProposal) AddOption(opt []byte) {
+	prop.mtx.Lock()
+	defer prop.mtx.Unlock()
 
-	_key := make([]byte, len(prop.TxHash))
-	copy(_key, prop.TxHash)
-	return _key
+	prop.v.Options = append(prop.v.Options, &VoteOptionProto{
+		Option: opt,
+		Votes:  0,
+	})
+}
+
+func (prop *GovProposal) AddVoter(addr types.Address, power int64) {
+	prop.mtx.Lock()
+	defer prop.mtx.Unlock()
+
+	prop.v.Header.addVoter(addr, power)
 }
 
 func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {
 	prop.mtx.RLock()
 	defer prop.mtx.RUnlock()
 
-	if bz, err := json.Marshal(prop); err != nil {
+	if bz, err := proto.Marshal(&prop.v); err != nil {
 		return bz, xerrors.From(err)
 	} else {
 		return bz, nil
 	}
 }
 
-func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
+func (prop *GovProposal) MarshalJSON() ([]byte, error) {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+
+	return json.Marshal(&prop.v)
+}
+
+func (prop *GovProposal) UnmarshalJSON(bz []byte) error {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
-	if err := json.Unmarshal(bz, prop); err != nil {
+	return json.Unmarshal(bz, &prop.v)
+}
+
+func (prop *GovProposal) Decode(k, v []byte) xerrors.XError {
+	prop.mtx.Lock()
+	defer prop.mtx.Unlock()
+
+	if err := proto.Unmarshal(v, &prop.v); err != nil {
 		return xerrors.From(err)
 	}
 	return nil
@@ -69,14 +90,39 @@ func (prop *GovProposal) Decode(bz []byte) xerrors.XError {
 
 var _ v1.ILedgerItem = (*GovProposal)(nil)
 
+func (prop *GovProposal) Header() *GovProposalHeaderProto {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+	return prop.v.GetHeader()
+}
+
+func (prop *GovProposal) Option(idx int) *VoteOptionProto {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+
+	return prop.v.Options[idx]
+}
+func (prop *GovProposal) Options() []*VoteOptionProto {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+
+	return prop.v.Options
+}
+
+func (prop *GovProposal) MajorOption() *VoteOptionProto {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+	return prop.v.MajorOption
+}
+
 func (prop *GovProposal) DoVote(addr types.Address, choice int32) xerrors.XError {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
 	// cancel previous vote
-	voter := prop.Voters[addr.String()]
+	voter := prop.v.Header.findVoter(addr)
 	if voter == nil {
-		return xerrors.NewOrdinary("not found voter")
+		return xerrors.ErrNotFoundVoter
 	}
 
 	if voter.Choice == choice {
@@ -90,17 +136,17 @@ func (prop *GovProposal) DoVote(addr types.Address, choice int32) xerrors.XError
 	return nil
 }
 
-func (prop *GovProposal) cancelVote(voter *Voter) {
+func (prop *GovProposal) cancelVote(voter *VoterProto) {
 	if voter.Choice >= 0 {
-		opt := prop.Options[voter.Choice]
+		opt := prop.v.Options[voter.Choice]
 		opt.CancelVote(voter.Power)
 		voter.Choice = -1
 	}
 }
 
-func (prop *GovProposal) doVote(voter *Voter, choice int32) {
+func (prop *GovProposal) doVote(voter *VoterProto, choice int32) {
 	if choice >= 0 {
-		opt := prop.Options[choice]
+		opt := prop.v.Options[choice]
 		if opt == nil {
 			return //xerrors.NewOrdinary("not found option")
 		}
@@ -110,76 +156,64 @@ func (prop *GovProposal) doVote(voter *Voter, choice int32) {
 	}
 }
 
-func (prop *GovProposal) DoPunish(addr types.Address, ratio int64) (int64, xerrors.XError) {
+func (prop *GovProposal) DoSlash(addr types.Address, rate int32) (int64, xerrors.XError) {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
-	voter, ok := prop.Voters[addr.String()]
-	if !ok {
+	voter := prop.v.Header.findVoter(addr)
+	if voter == nil {
 		return 0, xerrors.ErrNotFoundVoter
 	}
 
 	choice := voter.Choice
 	if choice >= 0 {
-		// if voter already finishes selection, cancel it.
+		//  cancel it, if the voter already finishes selection.
 		prop.cancelVote(voter)
 	}
 
-	_p0 := uint256.NewInt(uint64(voter.Power))
-	_ = _p0.Mul(_p0, uint256.NewInt(uint64(ratio)))
-	_ = _p0.Div(_p0, uint256.NewInt(uint64(100)))
-	slashingPower := int64(_p0.Uint64())
-
-	voter.Power -= slashingPower
+	slash := voter.Power * int64(rate) / 100
+	if slash <= 0 {
+		slash = voter.Power
+	}
+	voter.Power -= slash
 
 	if voter.Power <= 0 {
-		delete(prop.Voters, addr.String())
+		_ = prop.v.Header.removeVoter(addr)
 	} else if choice >= 0 {
-		// vote again with slashed power
+		// do vote again with slashed power
 		prop.doVote(voter, choice)
 	}
-	prop.TotalVotingPower -= slashingPower
-	prop.MajorityPower = (prop.TotalVotingPower * 2) / 3
+	prop.v.Header.TotalVotingPower -= slash
+	prop.v.Header.MajorityPower = (prop.v.Header.TotalVotingPower * 2) / 3
 
-	return slashingPower, nil
+	return slash, nil
 }
 
-func (prop *GovProposal) UpdateMajorOption() *voteOption {
+func (prop *GovProposal) UpdateMajorOption() *VoteOptionProto {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
 	return prop.updateMajorOption()
 }
 
-func (prop *GovProposal) updateMajorOption() *voteOption {
-	sort.Sort(powerOrderVoteOptions(prop.Options))
-	if prop.Options[0].Votes() >= prop.MajorityPower {
-		prop.MajorOption = prop.Options[0]
+func (prop *GovProposal) updateMajorOption() *VoteOptionProto {
+	sort.Sort(powerOrderVoteOptions(prop.v.Options))
+	if prop.v.Options[0].Votes >= prop.v.Header.MajorityPower {
+		prop.v.MajorOption = prop.v.Options[0]
 	}
-	return prop.MajorOption
-}
-
-func (prop *GovProposal) isMajor(opt *voteOption) bool {
-	return opt.Votes() >= prop.MajorityPower
+	return prop.v.MajorOption
 }
 
 func (prop *GovProposal) IsVoter(addr types.Address) bool {
-	_, ok := prop.Voters[addr.String()]
-	return ok
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+
+	return prop.v.Header.IsVoter(addr)
 }
 
-type powerOrderVoteOptions []*voteOption
+func (prop *GovProposal) FindVoter(addr types.Address) *VoterProto {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
 
-func (opts powerOrderVoteOptions) Len() int {
-	return len(opts)
+	return prop.v.Header.findVoter(addr)
 }
-
-func (opts powerOrderVoteOptions) Less(i, j int) bool {
-	return opts[i].votes > opts[j].votes
-}
-
-func (opts powerOrderVoteOptions) Swap(i, j int) {
-	opts[i], opts[j] = opts[j], opts[i]
-}
-
-var _ sort.Interface = (powerOrderVoteOptions)(nil)
