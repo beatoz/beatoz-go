@@ -57,7 +57,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		}
 
 		evts = append(evts, abcitypes.Event{
-			Type: "txfee",
+			Type: "supply.txfee",
 			Attributes: []abcitypes.EventAttribute{
 				{Key: []byte("burn"), Value: []byte(burnAmt.Dec()), Index: false},
 				{Key: []byte("reward"), Value: []byte(rwdAmt.Dec()), Index: false},
@@ -82,10 +82,10 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		}
 
 		evts = append(evts, abcitypes.Event{
-			Type: "supply",
+			Type: "supply.mint",
 			Attributes: []abcitypes.EventAttribute{
 				{Key: []byte("mint"), Value: []byte(resp.sumMintedAmt.Dec()), Index: false},
-				{Key: []byte("supply"), Value: []byte(ctrler.lastTotalSupply.totalSupply.Dec()), Index: false},
+				{Key: []byte("total.supply"), Value: []byte(ctrler.lastTotalSupply.totalSupply.Dec()), Index: false},
 			},
 		})
 	}
