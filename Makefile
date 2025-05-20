@@ -102,6 +102,9 @@ install: $(TARGETOS)
 	@echo "[$(@)] Install binaries to $(LOCAL_GOPATH)/bin"
 	@cp $(BUILDDIR)/* $(LOCAL_GOPATH)/bin
 
+clean-pbm:
+	@find . -type f -name "*.pb.go" -exec rm -f {} +
+
 clean:
 	@echo "[$(@)] Clean build..."
 	@rm -rf $(BUILDDIR)
