@@ -82,7 +82,7 @@ func Test_Mint(t *testing.T) {
 		//wa := vpower.WaEx64ByPowerChunk(vpowMock.PowerChunks, currHeight, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		//wa = wa.Truncate(precision)
 
-		si := Si(currHeight, 1, adjustedHeight, adjustedSupply, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
+		si := Si(currHeight, int64(govMock.InflationBlockInterval()), adjustedHeight, adjustedSupply, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
 		expectedTotalSupply := uint256.MustFromBig(si.BigInt())
 		expectedChange := new(uint256.Int).Sub(expectedTotalSupply, totalSupply)
 		//fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedSupply", adjustedSupply, "adjustedHeight", 1, "max", govMock.MaxTotalSupply(), "lamda", govMock.InflationWeightPermil(), "total", expectedTotalSupply, "pre.total", totalSupply, "change", expectedChange)

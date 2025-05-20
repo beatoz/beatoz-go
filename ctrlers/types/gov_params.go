@@ -27,10 +27,10 @@ type GovParams struct {
 }
 
 func DefaultGovParams() *GovParams {
-	return newGovParamsWith(7) // 7s interval
+	return NewGovParams(1) // 1s interval
 }
 
-func newGovParamsWith(interval int) *GovParams {
+func NewGovParams(interval int) *GovParams {
 	// block interval = `interval` seconds
 	// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
 	// min blocks/1Y = 31,536,000 / `interval` (if all blocks interval `interval` s)
