@@ -170,29 +170,29 @@ func TestPoC1(t *testing.T) {
 	require.True(t, cmpBal > 0, accountData.Balance, accountData2.Balance)
 }
 
-/**
-contract Attack {
-    constructor () payable {
-        Caller caller = new Caller(); // nonce = 1
-
-        // uint8 nonce = 0x02;
-        // b = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), address(this), bytes1(nonce))))));
-        // address(c).call(abi.encodeWithSelector(Caller.revertCall.selector, b)); // make warm address
-
-        address victim = 0x000000000000000000000000000000000000dEaD;
-        address(caller).call(abi.encodeWithSelector(Caller.revertCall.selector, victim)); // make warm address
-        victim.call{value: 1}(""); // set balance 1
-    }
-}
-
-contract Caller {
-    function revertCall(address target) external {
-        target.call("");
-        require(target == address(this)); // 강제로 죽이기
-    }
-}
-*/
-
+// TestPoc2 uses the following contracts.
+// This test case is related to issue #66.
+//
+//	contract Attack {
+//	   constructor () payable {
+//	       Caller caller = new Caller(); // nonce = 1
+//
+//	       // uint8 nonce = 0x02;
+//	       // b = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), address(this), bytes1(nonce))))));
+//	       // address(c).call(abi.encodeWithSelector(Caller.revertCall.selector, b)); // make warm address
+//
+//	       address victim = 0x000000000000000000000000000000000000dEaD;
+//	       address(caller).call(abi.encodeWithSelector(Caller.revertCall.selector, victim)); // make warm address
+//	       victim.call{value: 1}(""); // set balance 1
+//	   }
+//	}
+//
+//	contract Caller {
+//	   function revertCall(address target) external {
+//	       target.call("");
+//	       require(target == address(this)); // force revert
+//	   }
+//	}
 func TestPoC2(t *testing.T) {
 	wallet := randWallet()
 	require.NoError(t, wallet.Unlock(defaultRpcNode.Pass))
@@ -211,6 +211,7 @@ func TestPoC2(t *testing.T) {
 	//gas := big.NewInt(0)
 	//gas.SetString("10000000000000000", 10)
 	_amt := uint256.MustFromDecimal("10000000000000000")
+	_usedGas := int64(0)
 
 	victimAddress, _ := types.HexToAddress("0x000000000000000000000000000000000000dEaD")
 	transferTrx := web3.NewTrxTransfer(fromAddr, victimAddress, nonce, defGas, defGasPrice, _amt)
@@ -220,13 +221,15 @@ func TestPoC2(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.CheckTx.Code, retCommit.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.DeliverTx.Code, retCommit.DeliverTx.Log)
 
+	_usedGas = retCommit.DeliverTx.GasUsed
 	nonce += 1
 
 	victimAcData := getAccountData(victimAddress)
+	beforeBalance := victimAcData.Balance
 	fmt.Printf("victim balance: %s\n", victimAcData.Balance)
 	time.Sleep(1 * time.Second)
 
-	fmt.Printf("[victim balance to 1]\n")
+	fmt.Printf("[victim balance to 1 in deploying contract]\n")
 	selfdestructContract, _ := hex.DecodeString("6080604052600060405161001290610188565b604051809103906000f08015801561002e573d6000803e3d6000fd5b509050600061dead90508173ffffffffffffffffffffffffffffffffffffffff166380f9c68560e01b8260405160240161006891906101d6565b604051602081830303815290604052907bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff83818316178352505050506040516100d29190610262565b6000604051808303816000865af19150503d806000811461010f576040519150601f19603f3d011682016040523d82523d6000602084013e610114565b606091505b5050508073ffffffffffffffffffffffffffffffffffffffff16600160405161013c9061029f565b60006040518083038185875af1925050503d8060008114610179576040519150601f19603f3d011682016040523d82523d6000602084013e61017e565b606091505b50505050506102b4565b61021b8061030183390190565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006101c082610195565b9050919050565b6101d0816101b5565b82525050565b60006020820190506101eb60008301846101c7565b92915050565b600081519050919050565b600081905092915050565b60005b8381101561022557808201518184015260208101905061020a565b60008484015250505050565b600061023c826101f1565b61024681856101fc565b9350610256818560208601610207565b80840191505092915050565b600061026e8284610231565b915081905092915050565b50565b60006102896000836101fc565b915061029482610279565b600082019050919050565b60006102aa8261027c565b9150819050919050565b603f806102c26000396000f3fe6080604052600080fdfea264697066735822122004cbec8f42d807b744d1abeee4052e46587d5710408930a2edc0fbe543f0a01964736f6c63430008120033608060405234801561001057600080fd5b506101fb806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c806380f9c68514610030575b600080fd5b61004a60048036038101906100459190610152565b61004c565b005b8073ffffffffffffffffffffffffffffffffffffffff1660405161006f906101b0565b6000604051808303816000865af19150503d80600081146100ac576040519150601f19603f3d011682016040523d82523d6000602084013e6100b1565b606091505b5050503073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff16146100ec57600080fd5b50565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600061011f826100f4565b9050919050565b61012f81610114565b811461013a57600080fd5b50565b60008135905061014c81610126565b92915050565b600060208284031215610168576101676100ef565b5b60006101768482850161013d565b91505092915050565b600081905092915050565b50565b600061019a60008361017f565b91506101a58261018a565b600082019050919050565b60006101bb8261018d565b915081905091905056fea2646970667358221220d70ff81326f852813449940c219fdecbf56b4fedca68730017a4bcbe7784be1664736f6c63430008120033")
 	trxObj := web3.NewTrxContract(fromAddr, types.ZeroAddress(), nonce, contractGas, defGasPrice, uint256.NewInt(1), selfdestructContract)
 	//submitTrx(wallet, trxObj)
@@ -235,11 +238,25 @@ func TestPoC2(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.CheckTx.Code, retCommit.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retCommit.DeliverTx.Code, retCommit.DeliverTx.Log)
 
+	_usedGas = retCommit.DeliverTx.GasUsed
+
 	time.Sleep(1 * time.Second)
 	victimAcData = getAccountData(victimAddress)
 	fmt.Printf("victim balance: %s\n", victimAcData.Balance)
 
-	require.Equal(t, "10000000000000001", victimAcData.Balance)
+	// Before auto-burning is applied, the following code should pass.
+	// After enabling auto-burning (which transfers `100 - GovParams.TxFeeRewardRate` percent of the transaction fee to 0x00..dEaD,
+	// the address used as the victimAddress in the Attack contract),
+	// the balance of victimAddress no longer matches the expected value below.
+
+	// require.Equal(t, "10000000000000001", victimAcData.Balance)
+	_usedFee := types2.GasToFee(_usedGas, defGasPrice)
+	_deadFee := new(uint256.Int).Mul(_usedFee, uint256.NewInt(uint64(100-defGovParams.TxFeeRewardRate())))
+	_deadFee = new(uint256.Int).Div(_deadFee, uint256.NewInt(100))
+	expectedBalance := uint256.MustFromDecimal(beforeBalance)
+	expectedBalance.Add(expectedBalance, uint256.NewInt(1)) // transferred in deploying contract
+	_ = expectedBalance.Add(expectedBalance, _deadFee)
+	require.Equal(t, expectedBalance.Dec(), victimAcData.Balance)
 }
 
 /*

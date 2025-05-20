@@ -167,7 +167,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 			}
 
-			// RG-78: check minDelegatorPower
+			// check minDelegatorPower
 			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {
 				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", txPower, minDelegatorPower)
@@ -175,7 +175,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 			// it's delegating. check minSelfStakeRatio
 			selfrate := dgtee.SelfPower * int64(100) / (dgtee.SumPower + txPower)
-			if selfrate < int64(ctx.GovHandler.MinSelfStakeRate()) {
+			if selfrate < int64(ctx.GovHandler.MinSelfPowerRate()) {
 				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.SumPower, txPower))
 			}
 
@@ -355,7 +355,7 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 		panic("not reachable")
 	}
 
-	refundHeight := ctx.Height() + ctx.GovHandler.LazyUnstakingBlocks()
+	refundHeight := ctx.Height() + ctx.GovHandler.LazyUnbondingBlocks()
 
 	//
 	// Remove power

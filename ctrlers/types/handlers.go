@@ -34,11 +34,11 @@ type IGovParams interface {
 	MinDelegatorPower() int64
 	MaxValidatorsOfDelegator() int32
 	MaxDelegatorsOfValidator() int32
-	MinSelfStakeRate() int32
-	MaxUpdatableStakeRate() int32
-	MaxIndividualStakeRate() int32
+	MinSelfPowerRate() int32
+	MaxUpdatablePowerRate() int32
+	MaxIndividualPowerRate() int32
 	MinBondingBlocks() int64
-	LazyUnstakingBlocks() int64
+	LazyUnbondingBlocks() int64
 	MaxTotalSupply() *uint256.Int
 	InflationWeightPermil() int32
 	InflationCycleBlocks() int64
@@ -46,8 +46,8 @@ type IGovParams interface {
 	RipeningBlocks() int64
 	RewardPoolAddress() types.Address
 	ValidatorRewardRate() int32
-	BurnAddress() types.Address
-	BurnRate() int32
+	DeadAddress() types.Address
+	TxFeeRewardRate() int32
 	SlashRate() int32
 	SignedBlocksWindow() int64
 	MinSignedBlocks() int64

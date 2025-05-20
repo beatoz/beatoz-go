@@ -180,7 +180,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 
 	//
 	// max...
-	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfStakeRate())
+	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfPowerRate())
 	maxAllowedPower = maxAllowedPower - valStakes.TotalPower
 	maxAllowedAmt := ctrlertypes.PowerToAmount(maxAllowedPower)
 

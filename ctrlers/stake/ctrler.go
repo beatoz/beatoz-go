@@ -78,7 +78,7 @@ func NewStakeCtrler(config *cfg.Config, govHandler ctrlertypes.IGovParams, logge
 		rewardLedger:      rewardLedger,
 		rwdLedgUpInterval: int64(10),
 		lastRwdHash:       rwdHashDB.LastRewardHash(),
-		stakeLimiter:      NewStakeLimiter(nil, govHandler.MaxValidatorCnt(), govHandler.MaxIndividualStakeRate(), govHandler.MaxUpdatableStakeRate()),
+		stakeLimiter:      NewStakeLimiter(nil, govHandler.MaxValidatorCnt(), govHandler.MaxIndividualPowerRate(), govHandler.MaxUpdatablePowerRate()),
 		govParams:         govHandler,
 		logger:            lg,
 	}
@@ -145,7 +145,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 	sort.Sort(PowerOrderDelegatees(ctrler.allDelegatees)) // sort by power
 
 	ctrler.stakeLimiter.Reset(PowerOrderDelegatees(ctrler.allDelegatees),
-		ctrler.govParams.MaxValidatorCnt(), ctrler.govParams.MaxIndividualStakeRate(), ctrler.govParams.MaxUpdatableStakeRate())
+		ctrler.govParams.MaxValidatorCnt(), ctrler.govParams.MaxIndividualPowerRate(), ctrler.govParams.MaxUpdatablePowerRate())
 
 	//
 	// End of code from EndBlock
@@ -264,7 +264,7 @@ func (ctrler *StakeCtrler) BeginBlock(blockCtx *ctrlertypes.BlockContext) ([]abc
 
 				stakes := delegatee.DelAllStakes()
 				for _, _s0 := range stakes {
-					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyUnstakingBlocks()
+					_s0.RefundHeight = blockCtx.Height() + ctrler.govParams.LazyUnbondingBlocks()
 					_ = ctrler.frozenLedger.Set(_s0.Key(), _s0, true) // add s0 to frozen ledger
 				}
 				_ = ctrler.delegateeLedger.Del(delegatee.Key(), true)
@@ -440,7 +440,7 @@ func (ctrler *StakeCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 
 			// it's delegating. check minSelfStakeRatio
 			selfRatio := delegatee.SelfStakeRatio(txPower)
-			if selfRatio < int64(ctx.GovHandler.MinSelfStakeRate()) {
+			if selfRatio < int64(ctx.GovHandler.MinSelfPowerRate()) {
 				return xerrors.From(fmt.Errorf("not enough self power - validator: %v, self power: %v, total power: %v", delegatee.Addr, delegatee.GetSelfPower(), delegatee.GetTotalPower()))
 			}
 
@@ -614,13 +614,13 @@ func (ctrler *StakeCtrler) exeUnstaking(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 	_ = delegatee.DelStake(txhash)
 
-	s0.RefundHeight = ctx.Height() + ctx.GovHandler.LazyUnstakingBlocks()
+	s0.RefundHeight = ctx.Height() + ctx.GovHandler.LazyUnbondingBlocks()
 	_ = ctrler.frozenLedger.Set(s0.Key(), s0, ctx.Exec) // add s0 to frozen ledger
 
 	if delegatee.SelfPower == 0 {
 		stakes := delegatee.DelAllStakes()
 		for _, _s0 := range stakes {
-			_s0.RefundHeight = ctx.Height() + ctx.GovHandler.LazyUnstakingBlocks()
+			_s0.RefundHeight = ctx.Height() + ctx.GovHandler.LazyUnbondingBlocks()
 			_ = ctrler.frozenLedger.Set(_s0.Key(), _s0, ctx.Exec) // add s0 to frozen ledger
 		}
 	}

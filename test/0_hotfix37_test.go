@@ -69,7 +69,7 @@ func TestTransfer0(t *testing.T) {
 	senderBalance.Sub(senderBalance, _amt)
 	validatorBalance.Add(validatorBalance, _amt)
 	_rwd := types.GasToFee(defGas, defGasPrice)
-	_rwd = _rwd.Mul(_rwd, uint256.NewInt(uint64(100-defGovParams.BurnRate())))
+	_rwd = _rwd.Mul(_rwd, uint256.NewInt(uint64(defGovParams.TxFeeRewardRate())))
 	_rwd = _rwd.Div(_rwd, uint256.NewInt(uint64(100)))
 	validatorBalance.Add(validatorBalance, _rwd)
 

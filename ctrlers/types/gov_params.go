@@ -38,15 +38,15 @@ func newGovParamsWith(interval int) *GovParams {
 		_v: GovParamsProto{
 			Version:                   1,
 			MaxValidatorCnt:           21,
-			MinValidatorPower:         7_000_000, // 7,000,000 BEATOZ
-			MinDelegatorPower:         4_000,     //  `0` means that the delegating is disable.
+			MinValidatorPower:         100_000, // 100,000 BEATOZ
+			MinDelegatorPower:         100,
 			MaxValidatorsOfDelegator:  1,
 			MaxDelegatorsOfValidator:  1000,
-			MinSelfStakeRate:          50,                                                             // 50%
-			MaxUpdatableStakeRate:     33,                                                             // 33%
-			MaxIndividualStakeRate:    33,                                                             // 33%
+			MinSelfPowerRate:          50,                                                             // 50%
+			MaxUpdatablePowerRate:     33,                                                             // 33%
+			MaxIndividualPowerRate:    33,                                                             // 33%
 			MinBondingBlocks:          2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
-			LazyUnstakingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
+			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     390,                                                            // 0.390
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
@@ -54,8 +54,8 @@ func newGovParamsWith(interval int) *GovParams {
 			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
 			XRewardPoolAddress:        types.ZeroAddress(),                                            // zero address
 			ValidatorRewardRate:       30,                                                             // 30%
-			XBurnAddress:              types.ZeroAddress(),                                            // zero address
-			BurnRate:                  10,                                                             // 10%
+			XDeadAddress:              types.DeadAddress(),                                            // zero address
+			TxFeeRewardRate:           90,                                                             // 90%
 			SlashRate:                 50,                                                             // 50%
 			SignedBlocksWindow:        10_000,
 			MinSignedBlocks:           500,
@@ -111,8 +111,6 @@ func (govParams *GovParams) MarshalJSON() ([]byte, error) {
 
 	result := make(map[string]interface{})
 	for k, v := range tmp {
-		// 이름 바꾸기
-		// newKey := "AAA_" + k[4:] // 예: "val_0" → "AAA_0"
 		if k == "MaxTotalSupply" {
 			result["maxTotalSupply"] = govParams.MaxTotalSupply().String()
 		} else if k == "GasPrice" {
@@ -135,7 +133,7 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 	for k, v := range tmp {
 		if k == "maxTotalSupply" || k == "gasPrice" {
 			result[uppercaseFirstIfUpper(k)] = base64.StdEncoding.EncodeToString(uint256.MustFromDecimal(v.(string)).Bytes())
-		} else if k == "burnAddress" || k == "rewardPoolAddress" || k == "rewardPerStake" {
+		} else if k == "deadAddress" || k == "rewardPoolAddress" || k == "rewardPerStake" {
 			result[uppercaseFirstIfUpper(k)] = v
 		} else {
 			result[k] = v
@@ -225,23 +223,23 @@ func (govParams *GovParams) MaxDelegatorsOfValidator() int32 {
 
 	return govParams._v.MaxDelegatorsOfValidator
 }
-func (govParams *GovParams) MinSelfStakeRate() int32 {
+func (govParams *GovParams) MinSelfPowerRate() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.MinSelfStakeRate
+	return govParams._v.MinSelfPowerRate
 }
-func (govParams *GovParams) MaxUpdatableStakeRate() int32 {
+func (govParams *GovParams) MaxUpdatablePowerRate() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.MaxUpdatableStakeRate
+	return govParams._v.MaxUpdatablePowerRate
 }
-func (govParams *GovParams) MaxIndividualStakeRate() int32 {
+func (govParams *GovParams) MaxIndividualPowerRate() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.MaxIndividualStakeRate
+	return govParams._v.MaxIndividualPowerRate
 }
 func (govParams *GovParams) MinBondingBlocks() int64 {
 	govParams.mtx.RLock()
@@ -249,11 +247,11 @@ func (govParams *GovParams) MinBondingBlocks() int64 {
 
 	return govParams._v.MinBondingBlocks
 }
-func (govParams *GovParams) LazyUnstakingBlocks() int64 {
+func (govParams *GovParams) LazyUnbondingBlocks() int64 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.LazyUnstakingBlocks
+	return govParams._v.LazyUnbondingBlocks
 }
 func (govParams *GovParams) MaxTotalSupply() *uint256.Int {
 	govParams.mtx.RLock()
@@ -297,17 +295,17 @@ func (govParams *GovParams) ValidatorRewardRate() int32 {
 
 	return govParams._v.ValidatorRewardRate
 }
-func (govParams *GovParams) BurnAddress() types.Address {
+func (govParams *GovParams) DeadAddress() types.Address {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return types.Address(govParams._v.XBurnAddress).Copy()
+	return types.Address(govParams._v.XDeadAddress).Copy()
 }
-func (govParams *GovParams) BurnRate() int32 {
+func (govParams *GovParams) TxFeeRewardRate() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.BurnRate
+	return govParams._v.TxFeeRewardRate
 }
 func (govParams *GovParams) SlashRate() int32 {
 	govParams.mtx.RLock()

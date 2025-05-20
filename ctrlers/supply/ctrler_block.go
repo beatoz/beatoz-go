@@ -34,14 +34,16 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	sumFee := bctx.SumFee() // it's value is 0 at BeginBlock.
 	if header.GetProposerAddress() != nil && sumFee.Sign() > 0 {
 
-		// burn GovParams.BurnRate % of txs fee.
-		burnAmt := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.BurnRate())))
-		burnAmt = new(uint256.Int).Div(burnAmt, uint256.NewInt(100))
-
-		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.BurnAddress(), burnAmt, true); xerr != nil {
+		//
+		// Reward the GovParams.TxFeeRewardRate % of txs fee to the proposer of this block.
+		rwdAmt := new(uint256.Int).Mul(sumFee, uint256.NewInt(uint64(bctx.GovHandler.TxFeeRewardRate())))
+		rwdAmt = new(uint256.Int).Div(rwdAmt, uint256.NewInt(100))
+		if xerr := bctx.AcctHandler.AddBalance(header.GetProposerAddress(), rwdAmt, true); xerr != nil {
 			return nil, xerr
 		}
 
+		//
+		// Auto burn: transfer the remaining fee to DEAD Address
 		//
 		// this is not burning.
 		// it is just to transfer to the zero address.
@@ -50,21 +52,18 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		//	return nil, xerr
 		//}
 
-		// distribute the remaining fee to the proposer of this block.
-		rwdAmt := new(uint256.Int).Sub(sumFee, burnAmt)
-		if xerr := bctx.AcctHandler.AddBalance(header.GetProposerAddress(), rwdAmt, true); xerr != nil {
+		deadAmt := new(uint256.Int).Sub(sumFee, rwdAmt)
+		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
 			return nil, xerr
 		}
-
 		evts = append(evts, abcitypes.Event{
 			Type: "supply.txfee",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("burn"), Value: []byte(burnAmt.Dec()), Index: false},
+				{Key: []byte("burn"), Value: []byte(deadAmt.Dec()), Index: false},
 				{Key: []byte("reward"), Value: []byte(rwdAmt.Dec()), Index: false},
 			},
 		})
-
-		ctrler.logger.Debug("txs's fee is processed", "total.fee", sumFee.Dec(), "reward", rwdAmt.Dec(), "burned", burnAmt.Dec())
+		ctrler.logger.Debug("txs's fee is processed", "total.fee", sumFee.Dec(), "reward", rwdAmt.Dec(), "dead", deadAmt.Dec())
 	}
 
 	//

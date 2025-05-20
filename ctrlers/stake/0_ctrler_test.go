@@ -46,9 +46,9 @@ func TestMain(m *testing.M) {
 	values := govMock00.GetValues()
 	values.MinValidatorPower = 5
 	values.MinDelegatorPower = 0
-	values.MaxUpdatableStakeRate = 100
-	values.MaxIndividualStakeRate = 10000000
-	values.LazyUnstakingBlocks = 30
+	values.MaxUpdatablePowerRate = 100
+	values.MaxIndividualPowerRate = 10000000
+	values.LazyUnbondingBlocks = 30
 
 	defGas = govMock00.MinTrxGas()
 	defGasPrice = govMock00.GasPrice()
@@ -390,7 +390,7 @@ func TestUnfreezing(t *testing.T) {
 		//new(uint256.Int).Add(s0.Amount, s0.ReceivedReward))
 	}
 
-	toBlockHeight := mocks.LastBlockHeight() + govMock00.LazyUnstakingBlocks()
+	toBlockHeight := mocks.LastBlockHeight() + govMock00.LazyUnbondingBlocks()
 
 	for mocks.LastBlockHeight() <= toBlockHeight {
 		require.NoError(t, mocks.DoBeginBlock(stakeCtrler))

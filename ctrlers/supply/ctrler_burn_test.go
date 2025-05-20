@@ -65,7 +65,7 @@ func Test_TxFeeProcessing(t *testing.T) {
 			gas := bytes.RandInt64N(500_000) + govMock.MinTrxGas()
 			fee := types.GasToFee(gas, govMock.GasPrice())
 			mocks.CurrBlockCtx().AddFee(fee)
-			expectedBurned = new(uint256.Int).Mul(fee, uint256.NewInt(uint64(govMock.BurnRate())))
+			expectedBurned = new(uint256.Int).Mul(fee, uint256.NewInt(uint64(100-govMock.TxFeeRewardRate())))
 			expectedBurned = new(uint256.Int).Div(expectedBurned, uint256.NewInt(100))
 			expectedRwdFee = new(uint256.Int).Sub(fee, expectedBurned)
 

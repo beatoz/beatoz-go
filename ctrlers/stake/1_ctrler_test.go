@@ -329,7 +329,7 @@ func resetTest(t *testing.T, valCnt int) {
 	values.MinValidatorPower = 1
 	values.MinDelegatorPower = 1
 	values.MaxValidatorCnt = 10
-	values.LazyUnstakingBlocks = 10
+	values.LazyUnbondingBlocks = 10
 
 	ctrler, xerr := stake.NewStakeCtrler(cfg, govMock01, tmlog.NewNopLogger())
 	require.NoError(t, xerr)

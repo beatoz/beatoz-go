@@ -37,7 +37,7 @@ func init() {
 	})
 
 	govMock = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
-	govMock.GetValues().LazyUnstakingBlocks = 500
+	govMock.GetValues().LazyUnbondingBlocks = 500
 	govMock.GetValues().InflationCycleBlocks = 10
 	govMock.GetValues().MinSignedBlocks = 5
 	govMock.GetValues().RipeningBlocks = 10 * govMock.InflationCycleBlocks()
