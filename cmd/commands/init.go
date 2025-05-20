@@ -15,13 +15,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
-	beatozChainID = "mainnet"
-	holderCnt     = 10
-	privValCnt    = 1
-	blockGasLimit = int64(36_000_000)
+	beatozChainID        = "mainnet"
+	holderCnt            = 10
+	privValCnt           = 1
+	blockGasLimit        = int64(36_000_000)
+	assumedBlockInterval = "7s"
+	inflationCycleBlocks = int64(86400)
 
 	privValSecretFeederAddr string
 )
@@ -73,7 +76,22 @@ func AddInitFlags(cmd *cobra.Command) {
 			"this value is deterministically adjusted based on the gas usage in the blockchain network.\n"+
 			"however, it cannot exceed the `maxBlockGas` of Governance Parameters.",
 	)
-
+	cmd.Flags().StringVar(
+		&assumedBlockInterval,
+		"assumed_block_interval",
+		assumedBlockInterval,
+		"the virtual block interval in seconds.\n"+
+			"It is used only for estimating time from block numbers inflation calculations.\n"+
+			"This value does not affect the actual block production time.\n"+
+			"It also does not affect the inflation cycle itself.",
+	)
+	cmd.Flags().Int64Var(
+		&inflationCycleBlocks,
+		"inflation_cycle_blocks",
+		inflationCycleBlocks,
+		"the number of blocks required to trigger a new inflation event.\n"+
+			"This determines the frequency of inflation based on block count, not real time.",
+	)
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
@@ -208,7 +226,14 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			}
 			logger.Debug("GenesisAssetHolder", "holders count", len(holders))
 
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, types.DefaultGovParams())
+			blockInterval, err := time.ParseDuration(assumedBlockInterval)
+			if err != nil {
+				return err
+			}
+			govParams := types.NewGovParams(int(blockInterval.Seconds()))
+			govParams.GetValues().InflationCycleBlocks = inflationCycleBlocks
+
+			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, govParams)
 			if err != nil {
 				return err
 			}
