@@ -2,9 +2,10 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/stretchr/testify/require"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"google.golang.org/protobuf/proto"
+	"reflect"
 	"testing"
 )
 
@@ -23,18 +24,19 @@ func TestProtoCodec(t *testing.T) {
 }
 
 func TestJsonCodec(t *testing.T) {
-	params0 := DefaultGovParams()
-	bz, err := json.Marshal(params0)
-	require.NoError(t, err)
-	//fmt.Println("json", string(bz))
-
-	_, err = tmjson.Marshal(params0)
-	require.NoError(t, err)
-	//fmt.Println("tmjson", string(bz1))
-
-	params1 := &GovParams{}
-	err = json.Unmarshal(bz, params1)
+	govParams := DefaultGovParams()
+	jz, err := json.MarshalIndent(govParams, "", "  ")
 	require.NoError(t, err)
 
-	require.True(t, proto.Equal(&params0._v, &params1._v))
+	fmt.Println(string(jz))
+
+	govParams2 := &GovParams{}
+	err = json.Unmarshal(jz, govParams2)
+	require.NoError(t, err)
+
+	require.True(t, reflect.DeepEqual(govParams, govParams2))
+
+	jz2, err := json.MarshalIndent(govParams2, "", "  ")
+	require.NoError(t, err)
+	require.Equal(t, jz, jz2)
 }

@@ -43,6 +43,7 @@ type IGovParams interface {
 
 	MaxTotalSupply() *uint256.Int
 	InflationWeightPermil() int32
+	InflationBlockInterval() int32
 	InflationCycleBlocks() int64
 	BondingBlocksWeightPermil() int32
 	RipeningBlocks() int64

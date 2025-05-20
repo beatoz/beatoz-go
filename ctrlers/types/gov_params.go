@@ -27,7 +27,7 @@ type GovParams struct {
 }
 
 func DefaultGovParams() *GovParams {
-	return newGovParamsWith(1) // 7s interval
+	return newGovParamsWith(7) // 7s interval
 }
 
 func newGovParamsWith(interval int) *GovParams {
@@ -51,6 +51,7 @@ func newGovParamsWith(interval int) *GovParams {
 			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     390,                                                            // 0.390
+			InflationBlockInterval:    int32(interval),                                                // `interval` seconds
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
 			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
@@ -278,6 +279,13 @@ func (govParams *GovParams) InflationWeightPermil() int32 {
 	defer govParams.mtx.RUnlock()
 
 	return govParams._v.InflationWeightPermil
+}
+
+func (govParams *GovParams) InflationBlockInterval() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.InflationBlockInterval
 }
 func (govParams *GovParams) InflationCycleBlocks() int64 {
 	govParams.mtx.RLock()
