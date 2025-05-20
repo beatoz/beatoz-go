@@ -32,6 +32,11 @@ func IsZeroAddress(addr Address) bool {
 	return true
 }
 
+func DeadAddress() Address {
+	r, _ := hex.DecodeString("000000000000000000000000000000000000DEAD")
+	return r
+}
+
 func HexToAddress(_hex string) (Address, error) {
 	if strings.HasPrefix(_hex, "0x") {
 		_hex = _hex[2:]

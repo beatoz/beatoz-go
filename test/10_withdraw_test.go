@@ -70,7 +70,7 @@ func TestWithdraw(t *testing.T) {
 	//// check balance of val0
 	//oriBal := val0.GetBalance()
 	//usedFee := types.GasToFee(defGas, defGasPrice)
-	//rwdFee := new(uint256.Int).Mul(usedFee, uint256.NewInt(uint64(100-defGovParams.BurnRate())))
+	//rwdFee := new(uint256.Int).Mul(usedFee, uint256.NewInt(uint64(defGovParams.TxFeeRewardRate())))
 	//rwdFee = rwdFee.Div(rwdFee, uint256.NewInt(uint64(100)))
 	//expectedBal := new(uint256.Int).Add(oriBal, reqAmt)
 	//expectedBal = expectedBal.Sub(expectedBal, usedFee)

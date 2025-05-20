@@ -170,7 +170,7 @@ func TestProposalAndVoting(t *testing.T) {
 	require.Equal(t, xerrors.ErrCheckTx.Code(), votingResult.CheckTx.Code)
 
 	// validator
-	dgtee, err := bzweb3.GetDelegatee(validatorWallet.Address())
+	dgtee, err := bzweb3.QueryDelegatee(validatorWallet.Address())
 	require.NoError(t, err)
 
 	require.NoError(t, validatorWallet.SyncAccount(bzweb3))
@@ -181,7 +181,7 @@ func TestProposalAndVoting(t *testing.T) {
 
 	prop, err = bzweb3.QueryProposal(proposalHash, 0)
 	require.NoError(t, err)
-	require.Equal(t, dgtee.SumPower(), prop.Proposal.Option(0).Votes)
+	require.Equal(t, dgtee.TotalPower, prop.Proposal.Option(0).Votes)
 	// MajorOption is set in EndBlock of startHeight + votingPeriod
 	require.Nil(t, prop.Proposal.MajorOption())
 }

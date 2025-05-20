@@ -29,7 +29,7 @@ func TestStaking(t *testing.T) {
 	newValWal := peers[1].PrivValWallet() // not validator yet
 	require.NoError(t, newValWal.Unlock(peers[1].Pass))
 	require.NoError(t, newValWal.SyncAccount(bzweb3))
-	_, err := bzweb3.GetDelegatee(newValWal.Address())
+	_, err := bzweb3.QueryDelegatee(newValWal.Address())
 	require.Error(t, err)
 
 	govParams, err := bzweb3.GetGovParams()
@@ -60,7 +60,7 @@ func TestStaking(t *testing.T) {
 	require.NoError(t, checkStake(newValWal.Address(), power, txHash))
 	require.NoError(t, checkDelegatee(newValWal.Address(), power, power))
 
-	valStakes1, err := bzweb3.GetDelegatee(newValWal.Address())
+	valStakes1, err := bzweb3.QueryDelegatee(newValWal.Address())
 	require.NoError(t, err)
 	require.Equal(t, power, valStakes1.SelfPower)
 	require.Equal(t, power, valStakes1.TotalPower)
@@ -115,7 +115,7 @@ func TestDelegating(t *testing.T) {
 	require.NoError(t, err)
 
 	valWal := peers[0].PrivValWallet()
-	valStakes0, err := bzweb3.GetDelegatee(valWal.Address())
+	valStakes0, err := bzweb3.QueryDelegatee(valWal.Address())
 	require.NoError(t, err)
 
 	stakePower := govParams.MinDelegatorPower()
@@ -169,7 +169,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	require.NoError(t, err)
 
 	valWal := peers[0].PrivValWallet()
-	valStakes, err := bzweb3.GetDelegatee(valWal.Address())
+	valStakes, err := bzweb3.QueryDelegatee(valWal.Address())
 	require.NoError(t, err)
 
 	fmt.Println(valStakes)
@@ -180,7 +180,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 
 	//
 	// max...
-	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfStakeRate())
+	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfPowerRate())
 	maxAllowedPower = maxAllowedPower - valStakes.TotalPower
 	maxAllowedAmt := ctrlertypes.PowerToAmount(maxAllowedPower)
 
@@ -203,7 +203,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 func checkDelegatee(localValAddr rtypes0.Address, expectedTotalPower, expectedSelfPower int64) error {
 	bzweb3 := randBeatozWeb3()
 
-	val, err := bzweb3.GetDelegatee(localValAddr)
+	val, err := bzweb3.QueryDelegatee(localValAddr)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func checkDelegatee(localValAddr rtypes0.Address, expectedTotalPower, expectedSe
 
 func checkStake(addr rtypes0.Address, expectedPower int64, txhash []byte) error {
 	bzweb3 := randBeatozWeb3()
-	stakes, err := bzweb3.GetStakes(addr)
+	stakes, err := bzweb3.QueryStakes(addr)
 	if err != nil {
 		return err
 	}

@@ -641,7 +641,7 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 		consensusParams = &abcitypes.ConsensusParams{
 			Block: &abcitypes.BlockParams{
 				MaxBytes: ctrler.currBlockCtx.GetBlockSizeLimit(),
-				MaxGas:   int64(newBlockGasLimit),
+				MaxGas:   newBlockGasLimit,
 			},
 		}
 

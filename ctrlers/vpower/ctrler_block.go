@@ -67,7 +67,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 					"power", vote.Validator.Power,
 					"missed_blocks", missedCnt)
 
-				refundHeight := bctx.Height() + bctx.GovHandler.LazyUnstakingBlocks()
+				refundHeight := bctx.Height() + bctx.GovHandler.LazyUnbondingBlocks()
 
 				dgtee, xerr := ctrler.readDelegatee(vote.Validator.Address, true)
 				if xerr != nil {
@@ -102,7 +102,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	for _, v := range ctrler.lastValidators {
 		totalPower += v.SumPower
 	}
-	ctrler.vpowLimiter.Reset(totalPower, bctx.GovHandler.MaxUpdatableStakeRate())
+	ctrler.vpowLimiter.Reset(totalPower, bctx.GovHandler.MaxUpdatablePowerRate())
 
 	return evts, nil
 }

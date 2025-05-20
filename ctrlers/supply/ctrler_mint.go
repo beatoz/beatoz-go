@@ -101,7 +101,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		waAll := retWeight.SumWeight()  //.Truncate(precision) // is too expensive
 		waVals := retWeight.ValWeight() //.Truncate(precision)
 
-		totalSupply := Si(bctx.Height(), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
+		totalSupply := Si(bctx.Height(), int64(bctx.GovHandler.InflationBlockInterval()), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
 		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
 		if addedSupply.Sign() < 0 {
 			respCh <- &respMint{
@@ -161,13 +161,13 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 }
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
+func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
 	_lambda := decimal.New(int64(lambda), -3)
 	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
-	expWHid := wa.Mul(H(height-adjustedHeight, 1)) // todo: change block interval
+	expWHid := wa.Mul(H(height-adjustedHeight, blockIntv))
 
 	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
 	denom := decLambdaAddOne.Pow(expWHid)
@@ -177,12 +177,10 @@ func Si(height, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda 
 }
 
 // H returns the normalized block time corresponding to the given block height.
+// (`ret = current_height * block_interval_sec / one_year_seconds`)
 // It calculates how far along the blockchain is relative to a predefined reference period.
 // For example, if the reference period is one year, a return value of 1.0 indicates that
 // exactly one reference period has elapsed.
-
-var oneYearSeconds int64 = 31_536_000
-
 func H(height, blockIntvSec int64) decimal.Decimal {
-	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(oneYearSeconds))
+	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(ctrlertypes.YearSeconds))
 }

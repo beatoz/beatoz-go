@@ -329,7 +329,7 @@ func Test_Unbonding(t *testing.T) {
 	// -----------------------------------------------------------------------------------------------------------------
 	//
 	_, lastTotalPower := ctrler.Validators()
-	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatableStakeRate())
+	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatablePowerRate())
 
 	//
 	// unbonding
@@ -363,7 +363,7 @@ func Test_Unbonding(t *testing.T) {
 	require.Equal(t, totalPower0, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
 	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
-	refundHeight := lastHeight + govMock.LazyUnstakingBlocks()
+	refundHeight := lastHeight + govMock.LazyUnbondingBlocks()
 	frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozen)
@@ -416,7 +416,7 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 	require.NoError(t, xerr)
 
 	_, lastTotalPower := ctrler.Validators()
-	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatableStakeRate())
+	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatablePowerRate())
 
 	onceWals := removeDupWallets(vals)
 	for i, valWal := range onceWals {
@@ -470,7 +470,7 @@ func Test_Freezing(t *testing.T) {
 	height := lastHeight + 1
 
 	_, lastTotalPower := ctrler.Validators()
-	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatableStakeRate())
+	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatablePowerRate())
 
 	froms, vals, powers, txhashes := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
 
@@ -493,10 +493,10 @@ func Test_Freezing(t *testing.T) {
 				frozenCntOf[fmt.Sprintf("%v|%v", height, froms[idx].Address())]++
 				if frozenCntOf[fmt.Sprintf("%v|%v", height, froms[idx].Address())] == 1 {
 					// newly frozen vpower, not power chunk
-					refundCntAt[height+govMock.LazyUnstakingBlocks()]++
+					refundCntAt[height+govMock.LazyUnbondingBlocks()]++
 				}
-				minRefundHeight = libs.MinInt64(minRefundHeight, height+govMock.LazyUnstakingBlocks())
-				maxRefundHeight = libs.MaxInt64(maxRefundHeight, height+govMock.LazyUnstakingBlocks())
+				minRefundHeight = libs.MinInt64(minRefundHeight, height+govMock.LazyUnbondingBlocks())
+				maxRefundHeight = libs.MaxInt64(maxRefundHeight, height+govMock.LazyUnbondingBlocks())
 				break
 			}
 		}
@@ -520,7 +520,7 @@ func Test_Freezing(t *testing.T) {
 		require.Equal(t, sumPower0-power, dgtee1.SumPower)
 		require.Equal(t, selfPower0, dgtee1.SelfPower)
 
-		refundHeight := height + govMock.LazyUnstakingBlocks()
+		refundHeight := height + govMock.LazyUnbondingBlocks()
 		frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromW.Address(), true)
 		require.NoError(t, xerr)
 		require.NotNil(t, frozen)

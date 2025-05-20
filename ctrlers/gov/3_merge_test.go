@@ -67,15 +67,15 @@ func TestMergeGovParams(t *testing.T) {
 
 	rawVals := newParams.GetValues()
 	rawVals.RipeningBlocks = v0
-	rawVals.XBurnAddress = v1
+	rawVals.XDeadAddress = v1
 
 	ctrlertypes.MergeGovParams(oriParams, newParams)
 	require.Equal(t, v0, newParams.RipeningBlocks())
-	require.Equal(t, v1, newParams.BurnAddress())
+	require.Equal(t, v1, newParams.DeadAddress())
 	require.False(t, reflect.DeepEqual(newParams, ctrlertypes.DefaultGovParams()))
 
 	rawVals.RipeningBlocks = ctrlertypes.DefaultGovParams().RipeningBlocks()
-	rawVals.XBurnAddress = ctrlertypes.DefaultGovParams().BurnAddress()
+	rawVals.XDeadAddress = ctrlertypes.DefaultGovParams().DeadAddress()
 	require.True(t, reflect.DeepEqual(newParams, ctrlertypes.DefaultGovParams()))
 }
 
