@@ -3,13 +3,14 @@ module github.com/beatoz/beatoz-go
 go 1.22.5
 
 require (
-	github.com/beatoz/beatoz-sdk-go v0.1.5
+	github.com/beatoz/beatoz-sdk-go v0.2.2
 	github.com/beatoz/sfeeder v0.0.1
 	github.com/containerd/continuity v0.3.0
 	github.com/cosmos/iavl v1.3.0
 	github.com/ethereum/go-ethereum v1.10.23
 	github.com/gogo/protobuf v1.3.2
 	github.com/holiman/uint256 v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.9.0
@@ -88,7 +89,6 @@ require (
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
-	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect

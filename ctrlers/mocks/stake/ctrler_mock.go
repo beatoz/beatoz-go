@@ -1,8 +1,8 @@
 package stake
 
 import (
-	"github.com/beatoz/beatoz-go/ctrlers/stake"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -12,10 +12,10 @@ import (
 
 type StakeHandlerMock struct {
 	ValCnt     int
-	Delegatees []*stake.Delegatee
+	Delegatees []*vpower.Delegatee
 }
 
-func NewStakeHandlerMock(valCnt int, delegatees []*stake.Delegatee) *StakeHandlerMock {
+func NewStakeHandlerMock(valCnt int, delegatees []*vpower.Delegatee) *StakeHandlerMock {
 	return &StakeHandlerMock{
 		ValCnt:     valCnt,
 		Delegatees: delegatees,
@@ -27,17 +27,17 @@ func (s *StakeHandlerMock) Validators() ([]*abcitypes.Validator, int64) {
 	vals := make([]*abcitypes.Validator, s.ValCnt)
 	for i := 0; i < s.ValCnt; i++ {
 		vals[i] = &abcitypes.Validator{
-			Address: s.Delegatees[i].Addr,
-			Power:   s.Delegatees[i].TotalPower,
+			Address: s.Delegatees[i].Address(),
+			Power:   s.Delegatees[i].GetSumPower(),
 		}
-		totalPower += s.Delegatees[i].TotalPower
+		totalPower += s.Delegatees[i].GetSumPower()
 	}
 	return vals, totalPower
 }
 
 func (s *StakeHandlerMock) IsValidator(addr types.Address) bool {
 	for i := 0; i < s.ValCnt; i++ {
-		if bytes.Compare(addr, s.Delegatees[i].Addr) == 0 {
+		if bytes.Compare(addr, s.Delegatees[i].Address()) == 0 {
 			return true
 		}
 	}
@@ -51,15 +51,15 @@ func (s *StakeHandlerMock) GetTotalAmount() *uint256.Int {
 func (s *StakeHandlerMock) GetTotalPower() int64 {
 	sum := int64(0)
 	for _, v := range s.Delegatees {
-		sum += v.TotalPower
+		sum += v.GetSumPower()
 	}
 	return sum
 }
 
 func (s *StakeHandlerMock) TotalPowerOf(addr types.Address) int64 {
 	for _, v := range s.Delegatees {
-		if bytes.Compare(addr, v.Addr) == 0 {
-			return v.TotalPower
+		if bytes.Compare(addr, v.Address()) == 0 {
+			return v.GetSumPower()
 		}
 	}
 	return int64(0)
@@ -74,7 +74,7 @@ func (s *StakeHandlerMock) DelegatedPowerOf(addr types.Address) int64 {
 }
 
 func (s *StakeHandlerMock) PickAddress(i int) types.Address {
-	return s.Delegatees[i].Addr
+	return s.Delegatees[i].Address()
 }
 
 func (s *StakeHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
