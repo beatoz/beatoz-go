@@ -80,11 +80,9 @@ func AddInitFlags(cmd *cobra.Command) {
 		&assumedBlockInterval,
 		"assumed_block_interval",
 		assumedBlockInterval,
-		"the virtual block interval in seconds.\n"+
-			"It is used only for estimating time from block numbers inflation calculations.\n"+
-			"This value does not affect the actual block production time.\n"+
-			"It also does not affect the inflation cycle itself.",
-	)
+		"assumed time between blocks in seconds, used for estimating time from block count.\n"+
+			"It is not based on actual block production timing.\n"+
+			"Instead, it is used as a constant reference to estimate time from the number of blocks produced.")
 	cmd.Flags().Int64Var(
 		&inflationCycleBlocks,
 		"inflation_cycle_blocks",
