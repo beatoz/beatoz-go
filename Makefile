@@ -94,7 +94,6 @@ pbm:
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_params.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ gov_proposal.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ trx.proto
-	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ reward.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ delegatee.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ vpower.proto
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ supply.proto
