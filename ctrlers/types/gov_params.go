@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
@@ -110,12 +111,15 @@ func (govParams *GovParams) MarshalJSON() ([]byte, error) {
 	result := make(map[string]interface{})
 	for k, v := range tmp {
 		if k == "MaxTotalSupply" {
-			result["maxTotalSupply"] = govParams.MaxTotalSupply().String()
+			v = govParams.MaxTotalSupply().String()
 		} else if k == "GasPrice" {
-			result["gasPrice"] = govParams.GasPrice().String()
-		} else {
-			result[lowercaseFirstIfUpper(k)] = v
+			v = govParams.GasPrice().String()
+		} else if k == "DeadAddress" {
+			v = govParams.DeadAddress().String()
+		} else if k == "RewardPoolAddress" {
+			v = govParams.RewardPoolAddress().String()
 		}
+		result[lowercaseFirstIfUpper(k)] = v
 	}
 
 	return json.Marshal(result)
@@ -130,9 +134,15 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 	result := make(map[string]interface{})
 	for k, v := range tmp {
 		if k == "maxTotalSupply" || k == "gasPrice" {
+			// v is decimal string
 			result[uppercaseFirstIfUpper(k)] = base64.StdEncoding.EncodeToString(uint256.MustFromDecimal(v.(string)).Bytes())
-		} else if k == "deadAddress" || k == "rewardPoolAddress" || k == "rewardPerStake" {
-			result[uppercaseFirstIfUpper(k)] = v
+		} else if k == "deadAddress" || k == "rewardPoolAddress" {
+			// v is hex string
+			_v, err := hex.DecodeString(v.(string))
+			if err != nil {
+				return err
+			}
+			result[uppercaseFirstIfUpper(k)] = base64.StdEncoding.EncodeToString(_v)
 		} else {
 			result[k] = v
 		}
