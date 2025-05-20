@@ -40,7 +40,7 @@ var defaultNewItemFor = func(key v1.LedgerKey) v1.ILedgerItem {
 func NewGovCtrler(config *cfg.Config, logger log.Logger) (*GovCtrler, error) {
 	lg := logger.With("module", "beatoz_GovCtrler")
 
-	govState, xerr := v1.NewStateLedger("gov", config.DBDir(), 2048, defaultNewItemFor, lg)
+	govState, xerr := v1.NewStateLedger("gov", config.DBDir(), 16, defaultNewItemFor, lg)
 	if xerr != nil {
 		return nil, xerr
 	}

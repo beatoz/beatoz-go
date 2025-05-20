@@ -36,7 +36,7 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_SupplyCtrler")
 
-	ledger, xerr := v1.NewStateLedger("supply", config.DBDir(), 21*2048, defaultNewItem, lg)
+	ledger, xerr := v1.NewStateLedger("supply", config.DBDir(), 21*1000, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}

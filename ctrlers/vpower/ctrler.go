@@ -46,7 +46,7 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_VPowerCtrler")
 
-	powersState, xerr := v1.NewStateLedger("vpows", config.DBDir(), 21*2048, defaultNewItem, lg)
+	powersState, xerr := v1.NewStateLedger("vpows", config.DBDir(), 21*1000, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
