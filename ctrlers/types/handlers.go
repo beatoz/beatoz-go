@@ -38,30 +38,29 @@ type IGovParams interface {
 	MaxUpdatablePowerRate() int32
 	MaxIndividualPowerRate() int32
 	MinBondingBlocks() int64
+	MinSignedBlocks() int64
 	LazyUnbondingBlocks() int64
+
 	MaxTotalSupply() *uint256.Int
 	InflationWeightPermil() int32
 	InflationCycleBlocks() int64
 	BondingBlocksWeightPermil() int32
 	RipeningBlocks() int64
 	RewardPoolAddress() types.Address
-	ValidatorRewardRate() int32
 	DeadAddress() types.Address
+	ValidatorRewardRate() int32
 	TxFeeRewardRate() int32
 	SlashRate() int32
-	SignedBlocksWindow() int64
-	MinSignedBlocks() int64
+
 	GasPrice() *uint256.Int
 	MinTrxFee() *uint256.Int
 	MinTrxGas() int64
 	MaxTrxGas() int64
 	MaxBlockGas() int64
+
 	MaxVotingPeriodBlocks() int64
 	MinVotingPeriodBlocks() int64
 	LazyApplyingBlocks() int64
-
-	// deprecated
-	RewardPerPower() *uint256.Int
 }
 
 type IGovHandler interface {

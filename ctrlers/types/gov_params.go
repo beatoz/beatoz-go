@@ -42,10 +42,11 @@ func newGovParamsWith(interval int) *GovParams {
 			MinDelegatorPower:         100,
 			MaxValidatorsOfDelegator:  1,
 			MaxDelegatorsOfValidator:  1000,
-			MinSelfPowerRate:          50,                                                             // 50%
-			MaxUpdatablePowerRate:     33,                                                             // 33%
-			MaxIndividualPowerRate:    33,                                                             // 33%
-			MinBondingBlocks:          2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
+			MinSelfPowerRate:          50,                                // 50%
+			MaxUpdatablePowerRate:     33,                                // 33%
+			MaxIndividualPowerRate:    33,                                // 33%
+			MinBondingBlocks:          2 * WeekSeconds / int64(interval), // 2 weeks blocks
+			MinSignedBlocks:           500,
 			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     390,                                                            // 0.390
@@ -53,20 +54,17 @@ func newGovParamsWith(interval int) *GovParams {
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
 			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
 			XRewardPoolAddress:        types.ZeroAddress(),                                            // zero address
-			ValidatorRewardRate:       30,                                                             // 30%
 			XDeadAddress:              types.DeadAddress(),                                            // zero address
+			ValidatorRewardRate:       30,                                                             // 30%
 			TxFeeRewardRate:           90,                                                             // 90%
 			SlashRate:                 50,                                                             // 50%
-			SignedBlocksWindow:        10_000,
-			MinSignedBlocks:           500,
-			XGasPrice:                 uint256.NewInt(250_000_000_000).Bytes(), // 250e9 = 250 Gfons
-			MinTrxGas:                 4_000,                                   // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
+			XGasPrice:                 uint256.NewInt(250_000_000_000).Bytes(),                        // 250e9 = 250 Gfons
+			MinTrxGas:                 4_000,                                                          // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
 			MaxTrxGas:                 30_000_000,
 			MaxBlockGas:               50_000_000,
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
 			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
 			LazyApplyingBlocks:        DaySeconds / int64(interval),     // 1days blocks
-			XRewardPerStake:           uint256.NewInt(4_756_468_797).Bytes(),
 		},
 		mtx: sync.RWMutex{},
 	}
@@ -247,6 +245,12 @@ func (govParams *GovParams) MinBondingBlocks() int64 {
 
 	return govParams._v.MinBondingBlocks
 }
+func (govParams *GovParams) MinSignedBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MinSignedBlocks
+}
 func (govParams *GovParams) LazyUnbondingBlocks() int64 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
@@ -289,17 +293,17 @@ func (govParams *GovParams) RewardPoolAddress() types.Address {
 
 	return types.Address(govParams._v.XRewardPoolAddress).Copy()
 }
-func (govParams *GovParams) ValidatorRewardRate() int32 {
-	govParams.mtx.RLock()
-	defer govParams.mtx.RUnlock()
-
-	return govParams._v.ValidatorRewardRate
-}
 func (govParams *GovParams) DeadAddress() types.Address {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
 	return types.Address(govParams._v.XDeadAddress).Copy()
+}
+func (govParams *GovParams) ValidatorRewardRate() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.ValidatorRewardRate
 }
 func (govParams *GovParams) TxFeeRewardRate() int32 {
 	govParams.mtx.RLock()
@@ -314,19 +318,6 @@ func (govParams *GovParams) SlashRate() int32 {
 	return govParams._v.SlashRate
 }
 
-// DEPRECATED: Use InflationCycleBlocks() instead.
-func (govParams *GovParams) SignedBlocksWindow() int64 {
-	govParams.mtx.RLock()
-	defer govParams.mtx.RUnlock()
-
-	return govParams._v.SignedBlocksWindow
-}
-func (govParams *GovParams) MinSignedBlocks() int64 {
-	govParams.mtx.RLock()
-	defer govParams.mtx.RUnlock()
-
-	return govParams._v.MinSignedBlocks
-}
 func (govParams *GovParams) GasPrice() *uint256.Int {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
@@ -375,14 +366,6 @@ func (govParams *GovParams) LazyApplyingBlocks() int64 {
 	defer govParams.mtx.RUnlock()
 
 	return govParams._v.LazyApplyingBlocks
-}
-
-// deprecated
-func (govParams *GovParams) RewardPerPower() *uint256.Int {
-	govParams.mtx.RLock()
-	defer govParams.mtx.RUnlock()
-
-	return new(uint256.Int).SetBytes(govParams._v.XRewardPerStake)
 }
 
 func (govParams *GovParams) GetValues() *GovParamsProto {

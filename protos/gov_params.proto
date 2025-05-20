@@ -14,31 +14,26 @@ message GovParamsProto {
   int32   max_updatable_power_rate = 8;
   int32   max_individual_power_rate = 9;
   int64   min_bonding_blocks = 10;
-  int64   lazy_unbonding_blocks = 11;
+  int64   min_signed_blocks = 11;
+  int64   lazy_unbonding_blocks = 12;
 
-  bytes   _max_total_supply = 12;
-  int32   inflation_weight_permil = 13;
-  int64   inflation_cycle_blocks = 14;
-  int32   bonding_blocks_weight_permil = 15;
-  int64   ripening_blocks = 16;
-  bytes   _reward_pool_address = 17;
-  int32   validator_reward_rate = 18;
+  bytes   _max_total_supply = 13;
+  int32   inflation_weight_permil = 14;
+  int64   inflation_cycle_blocks = 15;
+  int32   bonding_blocks_weight_permil = 16;
+  int64   ripening_blocks = 17;
+  bytes   _reward_pool_address = 18;
   bytes   _dead_address = 19;
-  int32   tx_fee_reward_rate = 20;
+  int32   validator_reward_rate = 20;
+  int32   tx_fee_reward_rate = 21;
+  int32   slash_rate = 22;
 
-  int32   slash_rate = 21;
-  int64   signed_blocks_window = 22;
-  int64   min_signed_blocks = 23;
+  bytes   _gas_price = 23;
+  int64   min_trx_gas = 24;
+  int64   max_trx_gas = 25;
+  int64   max_block_gas = 26;
 
-  bytes   _gas_price = 24;
-  int64   min_trx_gas = 25;
-  int64   max_trx_gas = 26;
-  int64   max_block_gas = 27;
-
-  int64   min_voting_period_blocks = 28;
-  int64   max_voting_period_blocks = 29;
-  int64   lazy_applying_blocks = 30;
-
-  // deprecated
-  bytes   _reward_per_stake = 31;
+  int64   min_voting_period_blocks = 27;
+  int64   max_voting_period_blocks = 28;
+  int64   lazy_applying_blocks = 29;
 }

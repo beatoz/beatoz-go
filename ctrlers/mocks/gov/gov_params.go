@@ -14,7 +14,6 @@ func ForTest1GovParams() *ctrlertypes.GovParams {
 		v.MaxValidatorCnt = 10
 		v.MinValidatorPower = 1
 		v.MinDelegatorPower = 1
-		v.XRewardPerStake = uint256.NewInt(2_000_000_000).Bytes()
 		v.LazyUnbondingBlocks = 10
 		v.LazyApplyingBlocks = 10
 		v.XGasPrice = uint256.NewInt(10).Bytes()
@@ -23,7 +22,6 @@ func ForTest1GovParams() *ctrlertypes.GovParams {
 		v.MaxBlockGas = math.MaxUint64 / 2
 		v.MinVotingPeriodBlocks = 10
 		v.MaxVotingPeriodBlocks = 10
-		v.SignedBlocksWindow = 30
 		v.MinSignedBlocks = 3
 		v.InflationWeightPermil = 290
 		v.InflationCycleBlocks = 1
@@ -40,8 +38,7 @@ func ForTest3GovParams() *ctrlertypes.GovParams {
 		v.Version = 3
 		v.MaxValidatorCnt = 13
 		v.MinValidatorPower = 0
-		v.MinDelegatorPower = 0 // issue(hotfix) RG78
-		v.XRewardPerStake = uint256.NewInt(0).Bytes()
+		v.MinDelegatorPower = 0
 		v.LazyUnbondingBlocks = 20
 		v.LazyApplyingBlocks = 0
 		v.XGasPrice = nil
@@ -54,7 +51,6 @@ func ForTest3GovParams() *ctrlertypes.GovParams {
 		v.MaxUpdatablePowerRate = 10
 		v.MaxIndividualPowerRate = 10
 		v.MinSelfPowerRate = 50
-		v.SignedBlocksWindow = 10000
 		v.MinSignedBlocks = 500
 		v.InflationWeightPermil = 290
 		v.InflationCycleBlocks = 1
