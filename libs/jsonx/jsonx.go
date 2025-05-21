@@ -22,10 +22,8 @@ var (
 )
 
 func init() {
-	// ▶️ 1) int64 → string
-	//jsoniter.RegisterTypeEncoderFunc("int64", encodeInt64, isEmptyInt64) // :contentReference[oaicite:0]{index=0}
-	//jsoniter.RegisterTypeDecoderFunc("int64", decodeInt64)
-	jsoniter.RegisterExtension(&int64Extension{})
+	// ▶️ 1) int64 / uint64 → string
+	jsoniter.RegisterExtension(&xint64Extension{})
 	// ▶️ 2) snake_case → camelCase
 	jsoniter.RegisterExtension(&camelCaseExtension{}) // :contentReference[oaicite:1]{index=1}
 }

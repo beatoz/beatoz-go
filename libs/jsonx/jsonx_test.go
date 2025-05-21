@@ -17,6 +17,7 @@ func TestMarshal(t *testing.T) {
 		IntField      int           `json:"int_field"`
 		Int64Field    int64         `json:"int64_field"`
 		Int64FieldStr int64         `json:"int64_field_str,string"`
+		Uint64Field   uint64        `json:"uint64_field"`
 		BoolField     bool          `json:"bool_field"`
 		NestedField   TestSubStruct `json:"nested_field"`
 		UntaggedInt   int64
@@ -27,6 +28,7 @@ func TestMarshal(t *testing.T) {
 		IntField:      42,
 		Int64Field:    9223372036854775807, // 최대 int64 값
 		Int64FieldStr: 9223372036854775807,
+		Uint64Field:   18446744073709551615,
 		BoolField:     true,
 		NestedField: TestSubStruct{
 			SubField:      "nested",
@@ -60,6 +62,9 @@ func TestMarshal(t *testing.T) {
 	if _, exists := actual["int64FieldStr"]; !exists {
 		t.Error("Expected 'int64FieldStr' in result")
 	}
+	if _, exists := actual["uint64Field"]; !exists {
+		t.Error("Expected 'uint64Field' in result")
+	}
 
 	// Check whether int64 values are encoded as strings.
 	int64Value, ok := actual["int64Field"].(string)
@@ -74,6 +79,13 @@ func TestMarshal(t *testing.T) {
 		t.Error("Expected int64FieldStr to be encoded as string")
 	} else if int64FieldStr != "9223372036854775807" {
 		t.Errorf("Expected int64FieldStr to be '9223372036854775807', got '%s'", int64FieldStr)
+	}
+
+	uint64Value, ok := actual["uint64Field"].(string)
+	if !ok {
+		t.Error("Expected uint64Field to be encoded as string")
+	} else if uint64Value != "18446744073709551615" {
+		t.Errorf("Expected uint64Field to be '18446744073709551615', got '%s'", uint64Value)
 	}
 
 	// no json tag
