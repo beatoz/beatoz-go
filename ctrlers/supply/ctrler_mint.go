@@ -101,7 +101,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		waAll := retWeight.SumWeight()  //.Truncate(precision) // is too expensive
 		waVals := retWeight.ValWeight() //.Truncate(precision)
 
-		totalSupply := Si(bctx.Height(), int64(bctx.GovHandler.InflationBlockInterval()), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
+		totalSupply := Si(bctx.Height(), int64(bctx.GovHandler.AssumedBlockInterval()), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
 		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
 		if addedSupply.Sign() < 0 {
 			respCh <- &respMint{

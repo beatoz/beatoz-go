@@ -3,38 +3,38 @@ package types;
 option go_package = "github.com/beatoz/beatoz-go/ctrlers/types";
 
 message GovParamsProto {
-  int32   version = 1;
+  int32   version                        = 1;
+  int32   assumed_block_interval         = 2;
 
-  int32   max_validator_cnt = 2;
-  int64   min_validator_power = 3;
-  int64   min_delegator_power = 4;
-  int32   max_validators_of_delegator = 5;
-  int32   max_delegators_of_validator = 6;
-  int32   min_self_power_rate = 7;
-  int32   max_updatable_power_rate = 8;
-  int32   max_individual_power_rate = 9;
-  int64   min_bonding_blocks = 10;
-  int64   min_signed_blocks = 11;
-  int64   lazy_unbonding_blocks = 12;
+  int32   max_validator_cnt              = 3;
+  int64   min_validator_power            = 4;
+  int64   min_delegator_power            = 5;
+  int32   max_validators_of_delegator    = 6;
+  int32   max_delegators_of_validator    = 7;
+  int32   min_self_power_rate            = 8;
+  int32   max_updatable_power_rate       = 9;
+  int32   max_individual_power_rate      = 10;
+  int64   min_bonding_blocks             = 11;
+  int64   min_signed_blocks              = 12;
+  int64   lazy_unbonding_blocks          = 13;
 
-  bytes   _max_total_supply = 13;
-  int32   inflation_weight_permil = 14;
-  int32   inflation_block_interval = 15;
-  int64   inflation_cycle_blocks = 16;
-  int32   bonding_blocks_weight_permil = 17;
-  int64   ripening_blocks = 18;
-  bytes   _reward_pool_address = 19;
-  bytes   _dead_address = 20;
-  int32   validator_reward_rate = 21;
-  int32   tx_fee_reward_rate = 22;
-  int32   slash_rate = 23;
+  bytes   _max_total_supply              = 14;
+  int32   inflation_weight_permil        = 15;
+  int64   inflation_cycle_blocks         = 16;
+  int32   bonding_blocks_weight_permil   = 17;
+  int64   ripening_blocks                = 18;
+  bytes   _reward_pool_address           = 19;
+  bytes   _dead_address                  = 20;
+  int32   validator_reward_rate          = 21;
+  int32   tx_fee_reward_rate             = 22;
+  int32   slash_rate                     = 23;
 
-  bytes   _gas_price = 24;
-  int64   min_trx_gas = 25;
-  int64   max_trx_gas = 26;
-  int64   max_block_gas = 27;
+  bytes   _gas_price                     = 24;
+  int64   min_trx_gas                    = 25;
+  int64   max_trx_gas                    = 26;
+  int64   max_block_gas                  = 27;
 
-  int64   min_voting_period_blocks = 28;
-  int64   max_voting_period_blocks = 29;
-  int64   lazy_applying_blocks = 30;
+  int64   min_voting_period_blocks       = 28;
+  int64   max_voting_period_blocks       = 29;
+  int64   lazy_applying_blocks           = 30;
 }

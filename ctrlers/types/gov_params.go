@@ -35,6 +35,7 @@ func NewGovParams(interval int) *GovParams {
 	ret := &GovParams{
 		_v: GovParamsProto{
 			Version:                   1,
+			AssumedBlockInterval:      int32(interval), // `interval` seconds
 			MaxValidatorCnt:           21,
 			MinValidatorPower:         100_000, // 100,000 BEATOZ
 			MinDelegatorPower:         100,
@@ -48,7 +49,6 @@ func NewGovParams(interval int) *GovParams {
 			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     390,                                                            // 0.390
-			InflationBlockInterval:    int32(interval),                                                // `interval` seconds
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
 			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
@@ -226,11 +226,11 @@ func (govParams *GovParams) InflationWeightPermil() int32 {
 	return govParams._v.InflationWeightPermil
 }
 
-func (govParams *GovParams) InflationBlockInterval() int32 {
+func (govParams *GovParams) AssumedBlockInterval() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.InflationBlockInterval
+	return govParams._v.AssumedBlockInterval
 }
 func (govParams *GovParams) InflationCycleBlocks() int64 {
 	govParams.mtx.RLock()
