@@ -115,7 +115,7 @@ func (enc *uint64Encoder) Encode(ptr unsafe.Pointer, stream *jsoniter.Stream) {
 	encodeUint64(ptr, stream)
 }
 func (enc *uint64Encoder) IsEmpty(ptr unsafe.Pointer) bool {
-	return isEmptyInt64(ptr)
+	return isEmptyUint64(ptr)
 }
 
 var _ jsoniter.ValEncoder = (*uint64Encoder)(nil)
