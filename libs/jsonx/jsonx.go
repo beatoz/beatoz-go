@@ -6,12 +6,13 @@ import (
 )
 
 var _jsonx = jsoniter.Config{
-	EscapeHTML:                    true,
-	MarshalFloatWith6Digits:       true,
-	ObjectFieldMustBeSimpleString: true,
-	OnlyTaggedField:               false,
-	ValidateJsonRawMessage:        true,
+	IndentionStep:          2,
+	EscapeHTML:             true,
+	SortMapKeys:            true,
+	ValidateJsonRawMessage: true,
 }.Froze()
+
+//var _jsonx = jsoniter.ConfigCompatibleWithStandardLibrary
 
 var (
 	Marshal       = _jsonx.Marshal       //jsoniter.ConfigCompatibleWithStandardLibrary.Marshal
@@ -23,13 +24,7 @@ var (
 
 func init() {
 	// ▶️ 1) int64 / uint64 → string
-	jsoniter.RegisterExtension(&xint64Extension{})
+	jsoniter.RegisterExtension(newIntegerExtension(reflect.Int64, reflect.Uint64))
 	// ▶️ 2) snake_case → camelCase
-	jsoniter.RegisterExtension(&camelCaseExtension{}) // :contentReference[oaicite:1]{index=1}
-}
-
-// 필드 정보를 전달하기 위한 구조체
-type FieldInfo struct {
-	Field        reflect.StructField
-	HasStringTag bool
+	jsoniter.RegisterExtension(&camelCaseExtension{})
 }

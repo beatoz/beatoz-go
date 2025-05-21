@@ -55,6 +55,10 @@ func TestMarshal(t *testing.T) {
 		t.Error("Expected 'stringField' in result")
 	}
 
+	if _, exists := actual["intField"]; !exists {
+		t.Error("Expected 'intField' in result")
+	}
+
 	if _, exists := actual["int64Field"]; !exists {
 		t.Error("Expected 'int64Field' in result")
 	}
@@ -65,6 +69,15 @@ func TestMarshal(t *testing.T) {
 	if _, exists := actual["uint64Field"]; !exists {
 		t.Error("Expected 'uint64Field' in result")
 	}
+
+	// when unmarshaling to map[string]interface{},
+	// `int` is always decoded as `float64`.
+	//intValue, ok := actual["intField"].(int)
+	//if !ok {
+	//	t.Error("Expected intField to be encoded as int")
+	//} else if intValue != 42 {
+	//	t.Errorf("Expected intField to be '9223372036854775807', got '%d'", intValue)
+	//}
 
 	// Check whether int64 values are encoded as strings.
 	int64Value, ok := actual["int64Field"].(string)
