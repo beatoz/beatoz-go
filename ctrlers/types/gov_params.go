@@ -1,15 +1,12 @@
 package types
 
 import (
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"reflect"
 	"sync"
@@ -38,6 +35,7 @@ func NewGovParams(interval int) *GovParams {
 	ret := &GovParams{
 		_v: GovParamsProto{
 			Version:                   1,
+			AssumedBlockInterval:      int32(interval), // `interval` seconds
 			MaxValidatorCnt:           21,
 			MinValidatorPower:         100_000, // 100,000 BEATOZ
 			MinDelegatorPower:         100,
@@ -51,7 +49,6 @@ func NewGovParams(interval int) *GovParams {
 			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     390,                                                            // 0.390
-			InflationBlockInterval:    int32(interval),                                                // `interval` seconds
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
 			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
@@ -99,66 +96,14 @@ func (govParams *GovParams) MarshalJSON() ([]byte, error) {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	raw, err := protojson.Marshal(&govParams._v)
-	if err != nil {
-		return nil, err
-	}
-
-	var tmp map[string]interface{}
-	if err := json.Unmarshal(raw, &tmp); err != nil {
-		return nil, err
-	}
-
-	result := make(map[string]interface{})
-	for k, v := range tmp {
-		if k == "MaxTotalSupply" {
-			v = govParams.MaxTotalSupply().String()
-		} else if k == "GasPrice" {
-			v = govParams.GasPrice().String()
-		} else if k == "DeadAddress" {
-			v = govParams.DeadAddress().String()
-		} else if k == "RewardPoolAddress" {
-			v = govParams.RewardPoolAddress().String()
-		}
-		result[lowercaseFirstIfUpper(k)] = v
-	}
-
-	return json.Marshal(result)
+	return jsonx.Marshal(&govParams._v)
 }
 
 func (govParams *GovParams) UnmarshalJSON(d []byte) error {
-	var tmp map[string]interface{}
-	if err := json.Unmarshal(d, &tmp); err != nil {
-		return err
-	}
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
 
-	result := make(map[string]interface{})
-	for k, v := range tmp {
-		if k == "maxTotalSupply" || k == "gasPrice" {
-			// v is decimal string
-			result[uppercaseFirstIfUpper(k)] = base64.StdEncoding.EncodeToString(uint256.MustFromDecimal(v.(string)).Bytes())
-		} else if k == "deadAddress" || k == "rewardPoolAddress" {
-			// v is hex string
-			_v, err := hex.DecodeString(v.(string))
-			if err != nil {
-				return err
-			}
-			result[uppercaseFirstIfUpper(k)] = base64.StdEncoding.EncodeToString(_v)
-		} else {
-			result[k] = v
-		}
-	}
-
-	d0, err := json.Marshal(result)
-	if err != nil {
-		return err
-	}
-
-	govParams._v = GovParamsProto{}
-	if err := protojson.Unmarshal(d0, &govParams._v); err != nil {
-		return err
-	}
-	return nil
+	return jsonx.Unmarshal(d, &govParams._v)
 }
 
 func uppercaseFirstIfUpper(s string) string {
@@ -281,11 +226,11 @@ func (govParams *GovParams) InflationWeightPermil() int32 {
 	return govParams._v.InflationWeightPermil
 }
 
-func (govParams *GovParams) InflationBlockInterval() int32 {
+func (govParams *GovParams) AssumedBlockInterval() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.InflationBlockInterval
+	return govParams._v.AssumedBlockInterval
 }
 func (govParams *GovParams) InflationCycleBlocks() int64 {
 	govParams.mtx.RLock()
@@ -401,7 +346,7 @@ func (govParams *GovParams) String() string {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	if bz, err := json.MarshalIndent(govParams, "", "  "); err != nil {
+	if bz, err := jsonx.MarshalIndent(govParams, "", "  "); err != nil {
 		return err.Error()
 	} else {
 		return string(bz)

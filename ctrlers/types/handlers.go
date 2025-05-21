@@ -29,6 +29,8 @@ type ITrxHandler interface {
 
 type IGovParams interface {
 	Version() int32
+	AssumedBlockInterval() int32
+
 	MaxValidatorCnt() int32
 	MinValidatorPower() int64
 	MinDelegatorPower() int64
@@ -43,7 +45,6 @@ type IGovParams interface {
 
 	MaxTotalSupply() *uint256.Int
 	InflationWeightPermil() int32
-	InflationBlockInterval() int32
 	InflationCycleBlocks() int64
 	BondingBlocksWeightPermil() int32
 	RipeningBlocks() int64

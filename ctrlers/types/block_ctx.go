@@ -1,8 +1,8 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -326,7 +326,7 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 		AppHash:       bctx.appHash,
 	}
 
-	return json.Marshal(_bctx)
+	return jsonx.Marshal(_bctx)
 }
 
 func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
@@ -343,7 +343,7 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 		AppHash       []byte                      `json:"appHash"`
 	}{}
 
-	if err := json.Unmarshal(bz, _bctx); err != nil {
+	if err := jsonx.Unmarshal(bz, _bctx); err != nil {
 		return err
 	}
 	bctx.blockInfo = _bctx.BlockInfo

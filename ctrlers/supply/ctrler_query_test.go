@@ -5,10 +5,10 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"os"
 	"testing"
 	"time"
@@ -58,7 +58,7 @@ func Test_Query_Reward(t *testing.T) {
 			require.NoError(t, xerr)
 
 			rwd := &Reward{}
-			require.NoError(t, tmjson.Unmarshal(bz, rwd))
+			require.NoError(t, jsonx.Unmarshal(bz, rwd))
 
 			if preRwd == nil {
 				preRwd = rwd

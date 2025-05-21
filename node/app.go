@@ -11,13 +11,13 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/vm/evm"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/genesis"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	abcicli "github.com/tendermint/tendermint/abci/client"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -174,7 +174,7 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	_ = ctrler.metaDB.PutChainID(ctrler.rootConfig.ChainID)
 
 	appState := genesis.GenesisAppState{}
-	if err := tmjson.Unmarshal(req.AppStateBytes, &appState); err != nil {
+	if err := jsonx.Unmarshal(req.AppStateBytes, &appState); err != nil {
 		panic(err)
 	}
 

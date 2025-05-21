@@ -1,11 +1,11 @@
 package node
 
 import (
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
 func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
@@ -34,7 +34,7 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 				Code    bytes.HexBytes `json:"code,omitempty"`
 				DocURL  string         `json:"docURL,omitempty"`
 			}{}
-			if err := tmjson.Unmarshal(response.Value, &_acct); err != nil {
+			if err := jsonx.Unmarshal(response.Value, &_acct); err != nil {
 				xerr = xerrors.ErrQuery.Wrap(err)
 			}
 		}

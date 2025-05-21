@@ -2,7 +2,7 @@ package types
 
 import (
 	"encoding/binary"
-	"github.com/tendermint/tendermint/libs/json"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"
 )
@@ -91,14 +91,14 @@ func (stdb *MetaDB) LastBlockContext() *BlockContext {
 		return nil
 	}
 	ret := &BlockContext{}
-	if err := json.Unmarshal(bz, ret); err != nil {
+	if err := jsonx.Unmarshal(bz, ret); err != nil {
 		return nil
 	}
 	return ret
 }
 
 func (stdb *MetaDB) PutLastBlockContext(ctx *BlockContext) error {
-	bz, err := json.Marshal(ctx)
+	bz, err := jsonx.Marshal(ctx)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 package genesis
 
 import (
-	"encoding/json"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/holiman/uint256"
@@ -21,7 +21,7 @@ func (gh *GenesisAssetHolder) MarshalJSON() ([]byte, error) {
 		Balance: gh.Balance.Dec(),
 	}
 
-	return json.Marshal(tm)
+	return jsonx.Marshal(tm)
 }
 
 func (gh *GenesisAssetHolder) UnmarshalJSON(bz []byte) error {
@@ -30,7 +30,7 @@ func (gh *GenesisAssetHolder) UnmarshalJSON(bz []byte) error {
 		Balance string        `json:"balance"`
 	}{}
 
-	if err := json.Unmarshal(bz, tm); err != nil {
+	if err := jsonx.Unmarshal(bz, tm); err != nil {
 		return err
 	}
 
@@ -51,6 +51,3 @@ func (gh *GenesisAssetHolder) Hash() []byte {
 	hasher.Write(gh.Balance.Bytes())
 	return hasher.Sum(nil)
 }
-
-var _ json.Marshaler = (*GenesisAssetHolder)(nil)
-var _ json.Unmarshaler = (*GenesisAssetHolder)(nil)

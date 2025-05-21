@@ -1,11 +1,10 @@
 ## Usages and features
 
-type | gettable | settable | committable | at height | usage
--|:--------:|:--------:|:-----------:|:---------:|-
-ImitableLedger        |    O     |    X     |      X      |     O     | query
-MemLedger |    O     |    O     |      X      |     O     | checkTx, evmCall(?)
-MutableLedger |    O     |    O     |      O      |     X     | deliverTx
-
+ type           | gettable | settable | committable | at height | usage               
+----------------|:--------:|:--------:|:-----------:|:---------:|---------------------
+ ImitableLedger |    O     |    X     |      X      |     O     | query               
+ MemLedger      |    O     |    O     |      X      |     O     | checkTx, evmCall(?) 
+ MutableLedger  |    O     |    O     |      O      |     X     | deliverTx           
 
 ```go
 type IGettable interface {

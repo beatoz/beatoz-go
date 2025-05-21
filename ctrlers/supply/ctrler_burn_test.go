@@ -115,7 +115,7 @@ func Test_TxFeeProcessing(t *testing.T) {
 				//wa := vpower.WaEx64ByPowerChunk(vpowMock.PowerChunks, currHeight, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 				//wa = wa.Truncate(precision)
 
-				si := Si(currHeight, int64(govMock.InflationBlockInterval()), _adjustHeight, _adjustSupplyAmt, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
+				si := Si(currHeight, int64(govMock.AssumedBlockInterval()), _adjustHeight, _adjustSupplyAmt, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
 				//expectedTotalSupply = uint256.MustFromBig(si.BigInt())
 				newTotalSupply := uint256.MustFromBig(si.BigInt())
 				addedAmt := new(uint256.Int).Sub(newTotalSupply, _totalSupplyAmt)

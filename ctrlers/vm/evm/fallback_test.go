@@ -3,9 +3,9 @@ package evm
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -33,7 +33,7 @@ func init() {
 	// load an abi file of contract
 	if bz, err := ioutil.ReadFile("../../../test/abi_fallback_contract.json"); err != nil {
 		panic(err)
-	} else if err := json.Unmarshal(bz, &buildInfoFallbackContract); err != nil {
+	} else if err := jsonx.Unmarshal(bz, &buildInfoFallbackContract); err != nil {
 		panic(err)
 	} else if abiFallbackContract, err = abi.JSON(bytes.NewReader(buildInfoFallbackContract.ABI)); err != nil {
 		panic(err)

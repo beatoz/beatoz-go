@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"encoding/json"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/proto/tendermint/crypto"
@@ -12,7 +13,7 @@ type QueryResult struct {
 }
 
 func (qr *QueryResult) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
+	return jsonx.Marshal(&struct {
 		Code      uint32           `json:"code,omitempty"`
 		Log       string           `json:"log,omitempty"`
 		Info      string           `json:"info,omitempty"`
@@ -47,7 +48,7 @@ func (qr *QueryResult) UnmarshalJSON(bz []byte) error {
 		Height    int64            `json:"height,omitempty"`
 		Codespace string           `json:"codespace,omitempty"`
 	}{}
-	if err := json.Unmarshal(bz, tmpQr); err != nil {
+	if err := jsonx.Unmarshal(bz, tmpQr); err != nil {
 		return err
 	}
 

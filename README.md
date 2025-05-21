@@ -3,9 +3,11 @@
 ## Prerequisite
 
 ### golang
+
 Install golang v1.21+
 
 ### protoc (protobuf compiler)
+
 ```bash
 brew install protobuf
 
@@ -16,6 +18,7 @@ libprotoc 3.21.12
 ```
 
 ### protoc-gen-go
+
 ```bash
 go install google.golang.org/protobuf/cmd/protoc-gen-go
 
@@ -25,7 +28,6 @@ protoc-gen-go --version
 protoc-gen-go v1.28.1
 ```
 
- 
 ## Sources
 
 ```bash
@@ -39,6 +41,7 @@ make
 ```
 
 ## Run BEATOZ
+
 ```bash
 build/darwin/beatoz init --chain_id local_test_net --priv_validator_secret 1234
 

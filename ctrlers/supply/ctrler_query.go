@@ -3,10 +3,10 @@ package supply
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
 func (ctrler *SupplyCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
@@ -35,7 +35,7 @@ func (ctrler *SupplyCtrler) queryReward(height int64, address types.Address) ([]
 	if rwd == nil {
 		rwd = NewReward(address) // all fields are 0
 	}
-	bz, err := tmjson.Marshal(rwd)
+	bz, err := jsonx.Marshal(rwd)
 	if err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)
 	}

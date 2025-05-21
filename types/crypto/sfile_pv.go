@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/beatoz/beatoz-go/libs"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -15,7 +16,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 
 	"github.com/tendermint/tendermint/crypto"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/libs/protoio"
 	"github.com/tendermint/tendermint/libs/tempfile"
@@ -60,7 +60,7 @@ type SFilePVKey struct {
 //		panic("cannot save PrivValidator key: filePath not set")
 //	}
 //
-//	jsonBytes, err := tmjson.MarshalIndent(pvKey, "", "  ")
+//	jsonBytes, err := jsonx.MarshalIndent(pvKey, "", "  ")
 //	if err != nil {
 //		panic(err)
 //	}
@@ -85,7 +85,7 @@ func (pvKey SFilePVKey) SaveWith(s []byte) {
 		panic(err)
 	}
 
-	//jsonWalKey, err := tmjson.MarshalIndent(walKey, "", "  ")
+	//jsonWalKey, err := jsonx.MarshalIndent(walKey, "", "  ")
 	//if err != nil {
 	//	panic(err)
 	//}
@@ -156,7 +156,7 @@ func (lss *SFilePVLastSignState) Save() {
 	if outFile == "" {
 		panic("cannot save SFilePVLastSignState: filePath not set")
 	}
-	jsonBytes, err := tmjson.MarshalIndent(lss, "", "  ")
+	jsonBytes, err := jsonx.MarshalIndent(lss, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -221,7 +221,7 @@ func loadSFilePV(keyFilePath, stateFilePath string, loadState bool, s []byte) *S
 	}
 
 	walKey := WalletKey{}
-	err = tmjson.Unmarshal(jsonWalKeyBytes, &walKey)
+	err = jsonx.Unmarshal(jsonWalKeyBytes, &walKey)
 	if err != nil {
 		tmos.Exit(fmt.Sprintf("Error reading PrivValidator key from %v: %v\n", keyFilePath, err))
 	}
@@ -255,7 +255,7 @@ func loadSFilePV(keyFilePath, stateFilePath string, loadState bool, s []byte) *S
 		if err != nil {
 			tmos.Exit(err.Error())
 		}
-		err = tmjson.Unmarshal(stateJSONBytes, &pvState)
+		err = jsonx.Unmarshal(stateJSONBytes, &pvState)
 		if err != nil {
 			tmos.Exit(fmt.Sprintf("Error reading PrivValidator state from %v: %v\n", stateFilePath, err))
 		}

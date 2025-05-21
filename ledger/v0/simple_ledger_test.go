@@ -1,7 +1,7 @@
 package v0
 
 import (
-	"encoding/json"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -26,7 +26,7 @@ func (i *MyItem) Key() LedgerKey {
 }
 
 func (i *MyItem) Encode() ([]byte, xerrors.XError) {
-	if bz, err := json.Marshal(i); err != nil {
+	if bz, err := jsonx.Marshal(i); err != nil {
 		return nil, xerrors.From(err)
 	} else {
 		return bz, nil
@@ -34,7 +34,7 @@ func (i *MyItem) Encode() ([]byte, xerrors.XError) {
 }
 
 func (i *MyItem) Decode(d []byte) xerrors.XError {
-	if err := json.Unmarshal(d, i); err != nil {
+	if err := jsonx.Unmarshal(d, i); err != nil {
 		return xerrors.From(err)
 	}
 	return nil

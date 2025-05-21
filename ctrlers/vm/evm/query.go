@@ -3,6 +3,7 @@ package evm
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	"math"
 )
@@ -50,7 +50,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 		vmCallRet.Err = ""
 	}
 
-	retbz, err := tmjson.Marshal(vmCallRet)
+	retbz, err := jsonx.Marshal(vmCallRet)
 	if err != nil {
 		return nil, xerrors.From(err)
 	}

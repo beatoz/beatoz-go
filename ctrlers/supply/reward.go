@@ -1,9 +1,9 @@
 package supply
 
 import (
-	"encoding/json"
 	"fmt"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -77,7 +77,7 @@ func (rwd *Reward) MarshalJSON() ([]byte, error) {
 		Cumulated: rwd.cumulated.Dec(),
 		Height:    rwd._proto.Height,
 	}
-	return json.Marshal(_tmp)
+	return jsonx.Marshal(_tmp)
 }
 
 func (rwd *Reward) UnmarshalJSON(d []byte) error {
@@ -90,7 +90,7 @@ func (rwd *Reward) UnmarshalJSON(d []byte) error {
 		Height    int64         `json:"height,omitempty"`
 	}{}
 
-	if err := json.Unmarshal(d, tmp); err != nil {
+	if err := jsonx.Unmarshal(d, tmp); err != nil {
 		return err
 	}
 
@@ -150,7 +150,7 @@ func (rwd *Reward) Slash(r *uint256.Int, h int64) xerrors.XError {
 }
 
 func (rwd *Reward) String() string {
-	bz, _ := json.MarshalIndent(rwd, "", "  ")
+	bz, _ := jsonx.MarshalIndent(rwd, "", "  ")
 	return string(bz)
 }
 

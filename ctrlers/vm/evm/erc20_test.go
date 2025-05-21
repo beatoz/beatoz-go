@@ -6,6 +6,7 @@ import (
 	"fmt"
 	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -61,7 +62,7 @@ func init() {
 	abiFile := "../../../test/abi_erc20.json"
 	if bz, err := ioutil.ReadFile(abiFile); err != nil {
 		panic(err)
-	} else if err := json.Unmarshal(bz, &erc20BuildInfo); err != nil {
+	} else if err := jsonx.Unmarshal(bz, &erc20BuildInfo); err != nil {
 		panic(err)
 	} else if abiERC20Contract, err = abi.JSON(bytes.NewReader(erc20BuildInfo.ABI)); err != nil {
 		panic(err)

@@ -1,8 +1,8 @@
 package proposal
 
 import (
-	"encoding/json"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -68,14 +68,14 @@ func (prop *GovProposal) MarshalJSON() ([]byte, error) {
 	prop.mtx.RLock()
 	defer prop.mtx.RUnlock()
 
-	return json.Marshal(&prop.v)
+	return jsonx.Marshal(&prop.v)
 }
 
 func (prop *GovProposal) UnmarshalJSON(bz []byte) error {
 	prop.mtx.Lock()
 	defer prop.mtx.Unlock()
 
-	return json.Unmarshal(bz, &prop.v)
+	return jsonx.Unmarshal(bz, &prop.v)
 }
 
 func (prop *GovProposal) Decode(k, v []byte) xerrors.XError {

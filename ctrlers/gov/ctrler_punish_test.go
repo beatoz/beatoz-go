@@ -6,12 +6,12 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	"math/rand"
 	"os"
@@ -39,7 +39,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	expectedvoterPower := vpowMock.TotalPowerOf(voterAddr)
 
 	// proposal
-	bzOpt, err := json.Marshal(govParams0)
+	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)
 	tx := web3.NewTrxProposal(
 		voterAddr, btztypes.ZeroAddress(), 1, defMinGas, defGasPrice,

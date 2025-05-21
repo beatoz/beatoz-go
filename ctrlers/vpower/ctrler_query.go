@@ -5,11 +5,11 @@ import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	btztypes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"sort"
 )
 
@@ -64,7 +64,7 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	bz, err := tmjson.Marshal(ret)
+	bz, err := jsonx.Marshal(ret)
 	if err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)
 	}
@@ -147,7 +147,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 		NotSignedHeights:    nil,
 	}
 
-	bz, err := tmjson.Marshal(ret)
+	bz, err := jsonx.Marshal(ret)
 	if err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)
 	}
