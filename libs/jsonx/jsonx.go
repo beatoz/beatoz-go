@@ -5,14 +5,7 @@ import (
 	"reflect"
 )
 
-var _jsonx = jsoniter.Config{
-	IndentionStep:          2,
-	EscapeHTML:             true,
-	SortMapKeys:            true,
-	ValidateJsonRawMessage: true,
-}.Froze()
-
-//var _jsonx = jsoniter.ConfigCompatibleWithStandardLibrary
+var _jsonx = jsoniter.ConfigCompatibleWithStandardLibrary
 
 var (
 	Marshal       = _jsonx.Marshal       //jsoniter.ConfigCompatibleWithStandardLibrary.Marshal
