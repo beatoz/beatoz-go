@@ -7,6 +7,15 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	DivisionPrecision = 6
+	ResultPrecision   = 3
+)
+
+func init() {
+	decimal.DivisionPrecision = DivisionPrecision
+}
+
 // Wa calculates the total voting power weight of all validators and delegators.
 // The result may differ from the sum of Wi due to floating-point error.
 func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) decimal.Decimal {
@@ -28,7 +37,7 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decima
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := _tau.Mul(sumTmV).Add(_keppa.Mul(sumPowAmt)).QuoRem(totalSupply, int32(types.DECIMAL))
+	q, _ := _tau.Mul(sumTmV).Add(_keppa.Mul(sumPowAmt)).QuoRem(totalSupply, DivisionPrecision)
 	return q
 }
 
@@ -43,7 +52,7 @@ func oldWi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decima
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := decTau.Mul(decDur).Add(decKeppa).Mul(decV).QuoRem(totalSupply, int32(types.DECIMAL))
+	q, _ := decTau.Mul(decDur).Add(decKeppa).Mul(decV).QuoRem(totalSupply, DivisionPrecision)
 	return q
 }
 
@@ -66,7 +75,7 @@ func Wi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) 
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := decCo.Mul(decV).QuoRem(totalSupply, int32(types.DECIMAL))
+	q, _ := decCo.Mul(decV).QuoRem(totalSupply, DivisionPrecision)
 	return q
 }
 
@@ -91,7 +100,7 @@ func WaEx(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply deci
 
 	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
 	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
-	q, _ := decPowerAmt.QuoRem(totalSupply, int32(types.DECIMAL))
+	q, _ := decPowerAmt.QuoRem(totalSupply, DivisionPrecision)
 	return q
 }
 
@@ -116,10 +125,12 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, totalSupply *uin
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
 	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
 
-	q, _ := decWightedPower.QuoRem(decTotalSupply, int32(types.DECIMAL))
+	q, _ := decWightedPower.QuoRem(decTotalSupply, DivisionPrecision)
 	return q
 }
 
+// WaEx64ByPowerChunk calculates the voting power weight not applied.
+// `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / totalSupply`
 func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, totalSupply *uint256.Int) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
@@ -143,10 +154,12 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
 	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
 
-	q, _ := decWightedPower.QuoRem(decTotalSupply, int32(types.DECIMAL))
+	q, _ := decWightedPower.QuoRem(decTotalSupply, DivisionPrecision)
 	return q
 }
 
+// Scaled64PowerChunk calculates the voting power weight not applied to the total supply.
+// `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power}`
 func Scaled64PowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := ctrlertypes.DecimalOne.Sub(_tau)

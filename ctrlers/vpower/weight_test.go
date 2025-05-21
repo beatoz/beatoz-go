@@ -50,9 +50,9 @@ func Test_Wi(t *testing.T) {
 
 		for _, vpobj := range vpObjs {
 			wi0 := oldWi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-			wi0 = wi0.Truncate(6)
+			wi0 = wi0.Truncate(ResultPrecision)
 			wi1 := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-			wi1 = wi1.Truncate(6)
+			wi1 = wi1.Truncate(ResultPrecision)
 			require.Equal(t, wi0, wi1, "not equal", "wi0", wi0, "wi1", wi1)
 
 			_wa := wa.Add(wi1)
@@ -87,27 +87,27 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		w_sumwi = w_sumwi.Truncate(6)
+		w_sumwi = w_sumwi.Truncate(ResultPrecision)
 		dur0 += time.Since(start)
 		//fmt.Println("sum of Wi", w_sumwi)
 
 		// Wa
 		start = time.Now()
 		w_wa := Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_wa = w_wa.Truncate(6)
+		w_wa = w_wa.Truncate(ResultPrecision)
 		dur1 += time.Since(start)
 		//fmt.Println("Wa return", w_wa)
 
 		// WaEx
 		start = time.Now()
 		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_waex = w_waex.Truncate(6)
+		w_waex = w_waex.Truncate(ResultPrecision)
 		dur2 += time.Since(start)
 
 		// WaEx64
 		start = time.Now()
 		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
-		w_waex64 = w_waex64.Truncate(6)
+		w_waex64 = w_waex64.Truncate(ResultPrecision)
 		dur3 += time.Since(start)
 
 		require.True(t, w_sumwi.LessThanOrEqual(ctrlertypes.DecimalOne), "SumWi", w_sumwi, "nth", n)
@@ -165,34 +165,34 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 			wi := Wi(pow, dur, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			w_sumwi = w_sumwi.Add(wi)
 		}
-		w_sumwi = w_sumwi.Truncate(6)
+		w_sumwi = w_sumwi.Truncate(ResultPrecision)
 		dur0 += time.Since(start)
 		//fmt.Println("sum of Wi", w_sumwi)
 
 		// Wa
 		start = time.Now()
 		w_wa := Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_wa = w_wa.Truncate(6)
+		w_wa = w_wa.Truncate(ResultPrecision)
 		dur1 += time.Since(start)
 		//fmt.Println("Wa return", w_wa)
 
 		// WaEx
 		start = time.Now()
 		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_waex = w_waex.Truncate(6)
+		w_waex = w_waex.Truncate(ResultPrecision)
 		dur2 += time.Since(start)
 
 		// WaEx64
 		start = time.Now()
 		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
-		w_waex64 = w_waex64.Truncate(6)
+		w_waex64 = w_waex64.Truncate(ResultPrecision)
 		dur3 += time.Since(start)
 		//fmt.Println("WaEx64 return", w_waex64)
 
 		// WaEx64ByPowerChunks
 		start = time.Now()
 		w_waex64pc := WaEx64ByPowerChunk(powChunks, currHeight, powerRipeningCycle, tau, totalSupply)
-		w_waex64pc = w_waex64pc.Truncate(6)
+		w_waex64pc = w_waex64pc.Truncate(ResultPrecision)
 		dur4 += time.Since(start)
 		//fmt.Println("WaEx64ByPowerChunk return", w_waex64pc)
 
@@ -200,8 +200,8 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 		start = time.Now()
 		w_w64pc := Scaled64PowerChunk(powChunks, currHeight, powerRipeningCycle, tau)
 		_totalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
-		w_w64pc, _ = w_w64pc.QuoRem(_totalSupply, int32(types.DECIMAL))
-		w_w64pc = w_w64pc.Truncate(6)
+		w_w64pc, _ = w_w64pc.QuoRem(_totalSupply, DivisionPrecision)
+		w_w64pc = w_w64pc.Truncate(ResultPrecision)
 		dur5 += time.Since(start)
 		//fmt.Println("Scaled64PowerChunk return", w_w64pc)
 
@@ -211,8 +211,8 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 		w_w64pc_patial0 := Scaled64PowerChunk(powChunks[:rdx], currHeight, powerRipeningCycle, tau)
 		w_w64pc_patial1 := Scaled64PowerChunk(powChunks[rdx:], currHeight, powerRipeningCycle, tau)
 		w_w64pc_patial := w_w64pc_patial0.Add(w_w64pc_patial1)
-		w_w64pc_patial, _ = w_w64pc_patial.QuoRem(_totalSupply, int32(types.DECIMAL))
-		w_w64pc_patial = w_w64pc_patial.Truncate(6)
+		w_w64pc_patial, _ = w_w64pc_patial.QuoRem(_totalSupply, DivisionPrecision)
+		w_w64pc_patial = w_w64pc_patial.Truncate(ResultPrecision)
 		dur6 += time.Since(start)
 		//fmt.Println("Scaled64PowerChunk return", w_w64pc)
 

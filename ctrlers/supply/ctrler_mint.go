@@ -121,16 +121,15 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		sumMintedAmt := uint256.NewInt(0)
 		{
 			remainder := decimal.Zero
-			precision := int32(6)
 
 			for i, benef := range beneficiaries {
 				wi := benef.Weight() //.Truncate(precision) // Truncate is too expensive.
 
 				// for all delegators
-				rwd, _ := rwdToAll.Mul(wi).QuoRem(waAll, precision)
+				rwd, _ := rwdToAll.Mul(wi).QuoRem(waAll, int32(decimal.DivisionPrecision))
 				// for only validators
 				if benef.IsValidator() {
-					_rwd, _ := rwdToVals.Mul(wi).QuoRem(waVals, precision)
+					_rwd, _ := rwdToVals.Mul(wi).QuoRem(waVals, int32(decimal.DivisionPrecision))
 					rwd = rwd.Add(_rwd)
 				}
 
@@ -168,7 +167,6 @@ func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uin
 	_lambda := decimal.New(int64(lambda), -3)
 	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
 	expWHid := wa.Mul(H(height-adjustedHeight, blockIntv))
-
 	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
 	denom := decLambdaAddOne.Pow(expWHid)
 

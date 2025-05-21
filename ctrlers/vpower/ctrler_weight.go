@@ -40,7 +40,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			ptr, _ := item.(*BlockCount)
 			c = *ptr
 		}
-		signRate, _ := decimal.NewFromInt(int64(c)).QuoRem(decimal.NewFromInt(inflationCycle), 6)
+		signRate, _ := decimal.NewFromInt(int64(c)).QuoRem(decimal.NewFromInt(inflationCycle), DivisionPrecision)
 		signRate = decimal.NewFromInt(1).Sub(signRate) // = 1 - missedBlock/inflationCycle
 
 		for _, from := range val.Delegators {
@@ -78,14 +78,6 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			height, ripeningBlocks, tau, totalSupply)
 		weightInfo.Add(addr, benefW, benefPowChunks.signW, benefPowChunks.val)
 	}
-
-	//totalSupplyPower := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
-	//vpowW := Scaled64PowerChunk(allPowChunks, height, ripeningBlocks, tau)
-	//vpowW, _ = vpowW.QuoRem(totalSupplyPower, int32(types.DECIMAL))
-	//// weightInfo.SumWeight is equal to vpowW
-	//if vpowW.Equal(weightInfo.SumWeight()) == false {
-	//	panic(fmt.Errorf("vpowW(%v) != weightInfo.SumWeight(%v)", vpowW, weightInfo.SumWeight()))
-	//}
 
 	return weightInfo, nil
 }
