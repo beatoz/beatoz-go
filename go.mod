@@ -10,6 +10,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.23
 	github.com/gogo/protobuf v1.3.2
 	github.com/holiman/uint256 v1.3.1
+	github.com/json-iterator/go v1.1.12
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.13.0
@@ -63,7 +64,6 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lib/pq v1.10.6 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
