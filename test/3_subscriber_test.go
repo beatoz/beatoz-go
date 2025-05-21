@@ -20,8 +20,10 @@ func TestSubscriber(t *testing.T) {
 		event := &coretypes.ResultEvent{}
 		err := tmjson.Unmarshal(result, event)
 		require.NoError(t, err)
-		_, ok := event.Data.(types.EventDataNewBlock)
+
+		d, ok := event.Data.(types.EventDataNewBlock)
 		require.True(t, ok)
+		require.NotNil(t, d.Block)
 
 		wg.Done()
 	})

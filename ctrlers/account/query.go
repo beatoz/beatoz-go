@@ -3,11 +3,11 @@ package account
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
 func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
@@ -43,7 +43,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.
 		Code:    acct.Code,
 		DocURL:  acct.DocURL,
 	}
-	if raw, err := tmjson.Marshal(_acct); err != nil {
+	if raw, err := jsonx.Marshal(_acct); err != nil {
 		return nil, xerrors.ErrQuery.Wrap(err)
 	} else {
 		return raw, nil

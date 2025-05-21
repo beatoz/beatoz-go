@@ -4,9 +4,9 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 )
 
 func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
@@ -48,7 +48,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 				return nil, xerrors.ErrQuery.Wrap(xerr)
 			}
 
-			v, err := tmjson.Marshal(readProposals)
+			v, err := jsonx.Marshal(readProposals)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
@@ -70,7 +70,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 			prop, _ := item.(*proposal.GovProposal)
 			resp.Proposal = prop
 
-			v, err := tmjson.Marshal(resp)
+			v, err := jsonx.Marshal(resp)
 			if err != nil {
 				return nil, xerrors.ErrQuery.Wrap(err)
 			}
@@ -82,7 +82,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
-		bz, err := tmjson.Marshal(govParams)
+		bz, err := jsonx.Marshal(govParams)
 		if err != nil {
 			return nil, xerrors.ErrQuery.Wrap(err)
 		}

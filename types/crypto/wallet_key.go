@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/beatoz/beatoz-go/libs"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethec "github.com/ethereum/go-ethereum/crypto/secp256k1"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/crypto/pbkdf2"
 	"io"
 	"path/filepath"
@@ -135,7 +135,7 @@ func OpenWalletKey(r io.Reader) (*WalletKey, error) {
 	n, err := r.Read(buf)
 	if n > 0 {
 		wk := &WalletKey{}
-		if err := tmjson.Unmarshal(buf[:n], wk); err != nil {
+		if err := jsonx.Unmarshal(buf[:n], wk); err != nil {
 			return nil, err
 		}
 		return wk, nil
@@ -144,7 +144,7 @@ func OpenWalletKey(r io.Reader) (*WalletKey, error) {
 }
 
 func (wk *WalletKey) Save(wr io.Writer) (int, error) {
-	bz, err := tmjson.MarshalIndent(wk, "", "  ")
+	bz, err := jsonx.MarshalIndent(wk, "", "  ")
 	if err != nil {
 		return 0, err
 	}
@@ -273,7 +273,7 @@ func (wk *WalletKey) PubKey() []byte {
 }
 
 func (wk *WalletKey) String() string {
-	bz, _ := tmjson.MarshalIndent(wk, "", "  ")
+	bz, _ := jsonx.MarshalIndent(wk, "", "  ")
 	return string(bz)
 }
 

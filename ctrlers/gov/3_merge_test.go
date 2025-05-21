@@ -1,9 +1,9 @@
 package gov
 
 import (
-	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ var (
 )
 
 func init() {
-	bzOpt, err := json.Marshal(govParams3)
+	bzOpt, err := jsonx.Marshal(govParams3)
 	if err != nil {
 		panic(err)
 	}

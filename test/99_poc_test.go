@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -15,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io/ioutil"
 	"log"
@@ -70,7 +70,7 @@ func getAccountData(address types.Address) AccountData {
 	reqUrl := defaultRpcNode.RPCURL + "/abci_query?path=\"account\"&data=0x" + address.String()
 	res := requestHttp(reqUrl)
 	var accountRes AccountQueryResponse
-	err := json.Unmarshal(res, &accountRes)
+	err := jsonx.Unmarshal(res, &accountRes)
 	if err != nil {
 		log.Fatalf("Error in Unmarshal: %v", err)
 	}
@@ -79,7 +79,7 @@ func getAccountData(address types.Address) AccountData {
 	decodeAccountValue, _ := base64.StdEncoding.DecodeString(accountValue)
 
 	var accountData AccountData
-	err = json.Unmarshal(decodeAccountValue, &accountData)
+	err = jsonx.Unmarshal(decodeAccountValue, &accountData)
 
 	return accountData
 }
@@ -299,10 +299,10 @@ func TestPoc3(t *testing.T) {
 		Error   json.RawMessage `json:"error"`
 	}{}
 
-	err := tmjson.Unmarshal(retbz, resp)
+	err := jsonx.Unmarshal(retbz, resp)
 	require.NoError(t, err, string(retbz))
 	resp2 := &coretypes.ResultBroadcastTxCommit{}
-	err = tmjson.Unmarshal(resp.Result, resp2)
+	err = jsonx.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err, string(resp.Result))
 
 	require.Greater(t, len(resp2.DeliverTx.Events), 1)
@@ -331,10 +331,10 @@ func TestPoc3(t *testing.T) {
 	nonce++
 	transferTrx := web3.NewTrxTransfer(fromAddr, contractAddr, nonce, bigGas, defGasPrice, _amt)
 	retbz = submitTrx(wallet, transferTrx)
-	err = tmjson.Unmarshal(retbz, resp)
+	err = jsonx.Unmarshal(retbz, resp)
 	require.NoError(t, err)
 	resp2 = &coretypes.ResultBroadcastTxCommit{}
-	err = tmjson.Unmarshal(resp.Result, resp2)
+	err = jsonx.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, resp2.CheckTx.Code, resp2.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeDeliverTx, resp2.DeliverTx.Code)
@@ -353,10 +353,10 @@ func TestPoc3(t *testing.T) {
 	nonce++
 	tx := web3.NewTrxContract(fromAddr, contractAddr, nonce, contractGas, defGasPrice, uint256.NewInt(0), data)
 	retbz = submitTrx(wallet, tx)
-	err = tmjson.Unmarshal(retbz, resp)
+	err = jsonx.Unmarshal(retbz, resp)
 	require.NoError(t, err)
 	resp2 = &coretypes.ResultBroadcastTxCommit{}
-	err = tmjson.Unmarshal(resp.Result, resp2)
+	err = jsonx.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err)
 
 	contAcct = getAccountData(contractAddr)

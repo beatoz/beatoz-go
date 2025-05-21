@@ -3,10 +3,10 @@ package commands
 import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/libs"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/libs/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,7 +111,7 @@ func showWalletKeyFile(path string) error {
 			PrvKey:    wk.PrvKey(),
 			PubKey:    wk.PubKey(),
 		}
-		if bz, err := json.MarshalIndent(tmp, "", " "); err != nil {
+		if bz, err := jsonx.MarshalIndent(tmp, "", " "); err != nil {
 			return err
 		} else {
 			fmt.Println(string(bz))

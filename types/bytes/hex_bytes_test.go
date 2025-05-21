@@ -3,7 +3,7 @@ package bytes
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -19,7 +19,7 @@ func Test_UnmarshalJSON_HexString(t *testing.T) {
 	data := []byte("\"" + hexStr + "\"")
 
 	hexBytes := HexBytes{}
-	require.NoError(t, json.Unmarshal(data, &hexBytes))
+	require.NoError(t, jsonx.Unmarshal(data, &hexBytes))
 	require.Equal(t, HexBytes(bz20), hexBytes)
 }
 
@@ -30,7 +30,7 @@ func Test_UnmarshalJSON_0xHexString(t *testing.T) {
 	data := []byte("\"0x" + hexStr + "\"")
 
 	hexBytes := HexBytes{}
-	require.NoError(t, json.Unmarshal(data, &hexBytes))
+	require.NoError(t, jsonx.Unmarshal(data, &hexBytes))
 	require.Equal(t, HexBytes(bz20), hexBytes)
 }
 
@@ -41,6 +41,6 @@ func Test_UnmarshalJSON_Base64(t *testing.T) {
 	data := []byte("\"" + b64 + "\"")
 
 	hexBytes := HexBytes{}
-	require.NoError(t, json.Unmarshal(data, &hexBytes))
+	require.NoError(t, jsonx.Unmarshal(data, &hexBytes))
 	require.Equal(t, HexBytes(bz20), hexBytes)
 }

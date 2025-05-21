@@ -8,10 +8,10 @@ import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
@@ -117,7 +117,7 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			//check options
 			checkGovParams := &ctrlertypes.GovParams{}
 			for _, option := range txpayload.Options {
-				if err := json.Unmarshal(option, checkGovParams); err != nil {
+				if err := jsonx.Unmarshal(option, checkGovParams); err != nil {
 					return xerrors.ErrInvalidTrxPayloadParams.Wrap(err)
 				}
 			}
@@ -324,7 +324,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 				newGovParams := &ctrlertypes.GovParams{}
 
 				strOpt := string(prop.MajorOption().Option)
-				if err := json.Unmarshal([]byte(strOpt), newGovParams); err != nil {
+				if err := jsonx.Unmarshal([]byte(strOpt), newGovParams); err != nil {
 					ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption().Option))
 					return xerrors.From(err)
 				}

@@ -181,6 +181,7 @@ func waitBlock(n int64) (int64, error) {
 			sub.Stop()
 			subWg.Done()
 		}
+
 		lastHeight = event.Data.(tmtypes.EventDataNewBlock).Block.Height
 		if lastHeight >= n {
 			sub.Stop()

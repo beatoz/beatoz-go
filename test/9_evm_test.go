@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -83,7 +84,7 @@ func testDeployWithNilAddress(t *testing.T, abiFile string, args []interface{}) 
 		Bytecode         hexutil.Bytes   `json:"bytecode"`
 		DeployedBytecode hexutil.Bytes   `json:"deployedBytecode"`
 	}
-	err = json.Unmarshal(bz, &erc20BuildInfo)
+	err = jsonx.Unmarshal(bz, &erc20BuildInfo)
 	require.NoError(t, err)
 	abiERC20Contract, err := abi.JSON(bytes2.NewReader(erc20BuildInfo.ABI))
 	require.NoError(t, err)

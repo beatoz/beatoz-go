@@ -3,7 +3,7 @@ package genesis
 import (
 	"github.com/beatoz/beatoz-go/cmd/version"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	tmjson "github.com/tendermint/tendermint/libs/json"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -14,7 +14,7 @@ func NewGenesisDoc(chainID string, validators []tmtypes.GenesisValidator, assetH
 		AssetHolders: assetHolders,
 		GovParams:    govParams,
 	}
-	appStateJsonBlob, err := tmjson.Marshal(appState)
+	appStateJsonBlob, err := jsonx.Marshal(appState)
 	if err != nil {
 		return nil, err
 	}

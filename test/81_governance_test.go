@@ -1,9 +1,9 @@
 package test
 
 import (
-	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -53,7 +53,7 @@ func TestIncorrectProposal(t *testing.T) {
 		v.SlashRate = rand.Int32()
 		v.XRewardPoolAddress = bytes.RandBytes(20)
 	})
-	bzOpt, err = json.Marshal(newGovParams)
+	bzOpt, err = jsonx.Marshal(newGovParams)
 	require.NoError(t, err)
 
 	// wrong voting period (less than min)
@@ -111,7 +111,7 @@ func TestProposalAndVoting(t *testing.T) {
 		v.SlashRate = rand.Int32()
 		v.XRewardPoolAddress = bytes.RandBytes(20)
 	})
-	bzOpt, err := json.Marshal(newGovParams)
+	bzOpt, err := jsonx.Marshal(newGovParams)
 	require.NoError(t, err)
 
 	lastBlockHeight, err := waitBlock(10)
@@ -149,7 +149,7 @@ func TestProposalAndVoting(t *testing.T) {
 	option := prop.Proposal.Option(0)
 	require.NotNil(t, option)
 	_propGovParams := &types.GovParams{}
-	err = json.Unmarshal(option.Option, _propGovParams)
+	err = jsonx.Unmarshal(option.Option, _propGovParams)
 	require.NoError(t, err)
 	require.Equal(t, newGovParams.Version(), _propGovParams.Version())
 	require.Equal(t, newGovParams.SlashRate(), _propGovParams.SlashRate())

@@ -1,9 +1,9 @@
 package gov
 
 import (
-	"encoding/json"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	bzOpt, err := json.Marshal(govParams0)
+	bzOpt, err := jsonx.Marshal(govParams0)
 	if err != nil {
 		panic(err)
 	}
@@ -134,7 +134,7 @@ func TestProposalDuplicate(t *testing.T) {
 }
 
 func TestOverflowBlockHeight(t *testing.T) {
-	bzOpt, err := json.Marshal(govParams0)
+	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)
 
 	tx := web3.NewTrxProposal(
@@ -147,7 +147,7 @@ func TestOverflowBlockHeight(t *testing.T) {
 }
 
 func TestApplyingHeight(t *testing.T) {
-	bzOpt, err := json.Marshal(govParams0)
+	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)
 
 	tx0 := web3.NewTrxProposal( // applyingHeight : 518410
