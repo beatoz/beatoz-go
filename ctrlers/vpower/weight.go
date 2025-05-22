@@ -12,7 +12,7 @@ var (
 )
 
 func init() {
-	SetDivisionPrecision(8)
+	SetDivisionPrecision(9)
 }
 
 func SetDivisionPrecision(precision int32) {
