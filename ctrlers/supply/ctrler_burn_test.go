@@ -15,13 +15,11 @@ import (
 	"testing"
 )
 
+// todo: test when the burning occurs multiple times in a block.
 func Test_TxFeeProcessing(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	initSupply := types.PowerToAmount(350_000_000)
-	//totalSupply := initSupply.Clone()
-	//adjustSupply := initSupply.Clone()
-	//changeSupply := uint256.NewInt(0)
 
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
@@ -44,23 +42,25 @@ func Test_TxFeeProcessing(t *testing.T) {
 	require.Equal(t, initSupply, ctrler.lastTotalSupply.adjustSupply)
 	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetAdjustHeight())
 
-	for currHeight := int64(2); currHeight < govMock.InflationCycleBlocks()*30; currHeight++ {
+	// Use a short InflationCycleBlocks value for faster testing.
+	// The original value should be restored afterward to avoid affecting other tests.
+	orgInflCycleBlocks := govMock.InflationCycleBlocks()
+	govMock.GetValues().InflationCycleBlocks = 10
+	defer func() { govMock.GetValues().InflationCycleBlocks = orgInflCycleBlocks }()
+
+	for currHeight := int64(2); currHeight < govMock.InflationCycleBlocks()+10; currHeight++ {
 		//fmt.Println("---- block", currHeight)
 
-		var (
-			expectedTotalSupply    = ctrler.lastTotalSupply.GetTotalSupply()
-			expectedAdjustedSupply = ctrler.lastTotalSupply.GetAdjustSupply()
-			expectedAdjustedHeight = ctrler.lastTotalSupply.GetAdjustHeight()
-		)
+		expectedTotalSupply := ctrler.lastTotalSupply.GetTotalSupply()
+		expectedAdjustedSupply := ctrler.lastTotalSupply.GetAdjustSupply()
+		expectedAdjustedHeight := ctrler.lastTotalSupply.GetAdjustHeight()
 
 		proposer := btztypes.RandAddress()
 		mocks.CurrBlockCtx().SetProposerAddress(proposer)
 
 		expectedBurned, expectedRwdFee, expectedProposerBal := uint256.NewInt(0), uint256.NewInt(0), uint256.NewInt(0)
-		if bytes.RandInt64N(1000)%2 == 0 {
+		if bytes.RandInt64N(2) == 0 {
 			// when the burning occurs.
-
-			// todo: test when the burning occurs multiple times in a block.
 
 			gas := bytes.RandInt64N(500_000) + govMock.MinTrxGas()
 			fee := types.GasToFee(gas, govMock.GasPrice())
@@ -90,7 +90,7 @@ func Test_TxFeeProcessing(t *testing.T) {
 			// expect that the treasury address(zero address)'s balance is increased
 			// and the proposer's balance is increased too.
 			// But the total supply is not changed.
-			//t0 := expectedTotalSupply.Dec()
+			// This burn operation does not reduce the total supply.
 			expectedTotalSupply = ctrler.lastTotalSupply.GetTotalSupply()
 			expectedAdjustedSupply = ctrler.lastTotalSupply.GetAdjustSupply()
 			expectedAdjustedHeight = ctrler.lastTotalSupply.GetAdjustHeight()
