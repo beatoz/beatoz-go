@@ -7,13 +7,25 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const (
-	DivisionPrecision = 6
-	ResultPrecision   = 3
+var (
+	guaranteedPrecision = int32(decimal.DivisionPrecision)
 )
 
 func init() {
-	decimal.DivisionPrecision = DivisionPrecision
+	SetDivisionPrecision(8)
+}
+
+func SetDivisionPrecision(precision int32) {
+	guaranteedPrecision = max(3, precision/3)
+	decimal.DivisionPrecision = int(precision)
+}
+
+func GetGuaranteedPrecision() int32 {
+	return guaranteedPrecision
+}
+
+func GetDivisionPrecision() int32 {
+	return int32(decimal.DivisionPrecision)
 }
 
 // Wa calculates the total voting power weight of all validators and delegators.
@@ -30,21 +42,22 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decima
 
 		tmV := vpAmt
 		if vpdurs[i] < ripeningCycle {
-			tmV = decimal.NewFromInt(vpdurs[i]).Mul(vpAmt).Div(decimal.NewFromInt(ripeningCycle))
+			tmV = decimal.NewFromInt(vpdurs[i]).Mul(vpAmt)
+			tmV, _ = tmV.QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
 		}
 		sumTmV = sumTmV.Add(tmV)
 	}
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := _tau.Mul(sumTmV).Add(_keppa.Mul(sumPowAmt)).QuoRem(totalSupply, DivisionPrecision)
+	q, _ := _tau.Mul(sumTmV).Add(_keppa.Mul(sumPowAmt)).QuoRem(totalSupply, GetDivisionPrecision())
 	return q
 }
 
 func oldWi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) decimal.Decimal {
 	decDur := ctrlertypes.DecimalOne
 	if vdur < ripeningCycle {
-		decDur = decimal.NewFromInt(vdur).Div(decimal.NewFromInt(ripeningCycle))
+		decDur, _ = decimal.NewFromInt(vdur).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
 	}
 	decV := decimal.New(pow, int32(types.DECIMAL))
 	decTau := decimal.New(int64(tau), -3) // tau is permil
@@ -52,7 +65,7 @@ func oldWi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decima
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := decTau.Mul(decDur).Add(decKeppa).Mul(decV).QuoRem(totalSupply, DivisionPrecision)
+	q, _ := decTau.Mul(decDur).Add(decKeppa).Mul(decV).QuoRem(totalSupply, GetDivisionPrecision())
 	return q
 }
 
@@ -67,7 +80,7 @@ func Wi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) 
 	decKeppa := ctrlertypes.DecimalOne.Sub(decTau)
 	decCo := ctrlertypes.DecimalOne
 	if vdur < ripeningCycle {
-		decTm := decTau.Mul(decimal.NewFromInt(vdur)).Div(decimal.NewFromInt(ripeningCycle))
+		decTm, _ := decTau.Mul(decimal.NewFromInt(vdur)).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
 		decCo = decTm.Add(decKeppa)
 	}
 
@@ -75,7 +88,7 @@ func Wi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) 
 
 	// Use `QuoRem` instead of `Div`.
 	// Because `Div` does round up, the sum of `Wi` can be greater than `1`.
-	q, _ := decCo.Mul(decV).QuoRem(totalSupply, DivisionPrecision)
+	q, _ := decCo.Mul(decV).QuoRem(totalSupply, GetDivisionPrecision())
 	return q
 }
 
@@ -91,8 +104,8 @@ func WaEx(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply deci
 			// mature power
 			_maturedPower += pow
 		} else {
-			decDur := decimal.NewFromInt(vpdurs[i]).Div(decimal.NewFromInt(ripeningCycle)) // dur = vpdur / ripeningCycle
-			decCo := _tau.Mul(decDur).Add(_keppa)                                          // tau * (vpdur / ripeningCycle) + keppa
+			decDur, _ := decimal.NewFromInt(vpdurs[i]).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision()) // dur = vpdur / ripeningCycle
+			decCo := _tau.Mul(decDur).Add(_keppa)                                                                        // tau * (vpdur / ripeningCycle) + keppa
 			decV := decimal.NewFromInt(pow)
 			weightedPower = weightedPower.Add(decCo.Mul(decV))
 		}
@@ -100,7 +113,7 @@ func WaEx(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply deci
 
 	weightedPower = weightedPower.Mul(decimal.New(1, int32(types.DECIMAL)))
 	decPowerAmt := weightedPower.Add(decimal.New(_maturedPower, int32(types.DECIMAL)))
-	q, _ := decPowerAmt.QuoRem(totalSupply, DivisionPrecision)
+	q, _ := decPowerAmt.QuoRem(totalSupply, GetDivisionPrecision())
 	return q
 }
 
@@ -117,15 +130,16 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, totalSupply *uin
 			_maturedPower += pow
 		} else {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
-			decW := _tau.Mul(decimal.NewFromInt(durs[i])).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pow))
+			decW, _ := _tau.Mul(decimal.NewFromInt(durs[i])).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
+			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pow))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
 	}
 
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
-	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
 
-	q, _ := decWightedPower.QuoRem(decTotalSupply, DivisionPrecision)
+	q, _ := decWightedPower.QuoRem(decTotalSupply, GetDivisionPrecision())
 	return q
 }
 
@@ -145,16 +159,17 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 			_maturedPower += pc.Power
 		} else {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
-			decW := _tau.Mul(decimal.NewFromInt(dur)).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
+			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
+			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
 		//fmt.Println("WaEx64ByPowerChunk", "currHeight", currHeight, "pc.Height", pc.Height, "dur", dur, "Power", pc.Power, "txHash", bytes.HexBytes(pc.TxHash))
 	}
 
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
-	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))
+	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
 
-	q, _ := decWightedPower.QuoRem(decTotalSupply, DivisionPrecision)
+	q, _ := decWightedPower.QuoRem(decTotalSupply, GetDivisionPrecision())
 	return q
 }
 
@@ -174,7 +189,8 @@ func Scaled64PowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 			_maturedPower += pc.Power
 		} else {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
-			decW := _tau.Mul(decimal.NewFromInt(dur)).Div(decimal.NewFromInt(ripeningCycle)).Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
+			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
+			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
 		//fmt.Println("Scaled64PowerChunk", "power", pc.Power, "height", pc.Height, "dur", dur)

@@ -40,7 +40,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			ptr, _ := item.(*BlockCount)
 			c = *ptr
 		}
-		signRate, _ := decimal.NewFromInt(int64(c)).QuoRem(decimal.NewFromInt(inflationCycle), DivisionPrecision)
+		signRate, _ := decimal.NewFromInt(int64(c)).QuoRem(decimal.NewFromInt(inflationCycle), GetDivisionPrecision())
 		signRate = decimal.NewFromInt(1).Sub(signRate) // = 1 - missedBlock/inflationCycle
 
 		for _, from := range val.Delegators {
