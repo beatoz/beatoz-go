@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -27,7 +28,7 @@ func Test_JsonCodec(t *testing.T) {
 	jz, err := jsonx.MarshalIndent(govParams, "", "  ")
 	require.NoError(t, err)
 
-	//fmt.Println(string(jz))
+	fmt.Println(string(jz))
 
 	govParams2 := &GovParams{}
 	err = jsonx.Unmarshal(jz, govParams2)
