@@ -132,10 +132,6 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	var lastHeight int64
 	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
 	if ctrler.lastBlockCtx == nil {
-		// to ensure backward compatibility
-		lastHeight = ctrler.metaDB.LastBlockHeight()
-		appHash = ctrler.metaDB.LastBlockAppHash()
-
 		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
@@ -148,12 +144,17 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	} else {
 		lastHeight = ctrler.lastBlockCtx.Height()
 		appHash = ctrler.lastBlockCtx.AppHash()
-
-		ctrler.logger.Debug("Info", "height", lastHeight, "appHash", appHash)
 	}
 
 	// get chain_id
-	ctrler.rootConfig.ChainID = ctrler.metaDB.ChainID()
+	ctrler.rootConfig.ChainID = ctrler.lastBlockCtx.ChainID()
+
+	ctrler.logger.Info("last block information",
+		"chainID", ctrler.lastBlockCtx.ChainID(),
+		"height", ctrler.lastBlockCtx.Height(),
+		"appHash", ctrler.lastBlockCtx.AppHash(),
+		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
+		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit())
 
 	return abcitypes.ResponseInfo{
 		Data:             "",
@@ -170,8 +171,6 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	if req.GetChainId() == "" {
 		panic("there is no chain_id")
 	}
-	ctrler.rootConfig.ChainID = req.GetChainId()
-	_ = ctrler.metaDB.PutChainID(ctrler.rootConfig.ChainID)
 
 	appState, initTotalSupply, xerr := checkRequestInitChain(req)
 	if xerr != nil {
@@ -202,9 +201,19 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(err)
 	}
 
-	// set initial block gas limit
+	// set initial block info
+	ctrler.lastBlockCtx.SetChainID(req.GetChainId())
 	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
 	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
+	ctrler.lastBlockCtx.SetAppHash(appHash)
+	ctrler.rootConfig.ChainID = req.GetChainId()
+
+	ctrler.logger.Info("chain initialization",
+		"chainID", ctrler.lastBlockCtx.ChainID(),
+		"height", ctrler.lastBlockCtx.Height(),
+		"appHash", ctrler.lastBlockCtx.AppHash(),
+		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
+		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit())
 
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{
@@ -678,7 +687,6 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 		"appHash", ctrler.currBlockCtx.AppHash())
 
 	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
-	_ = ctrler.metaDB.PutLastBlockHeight(ver0)
 
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
