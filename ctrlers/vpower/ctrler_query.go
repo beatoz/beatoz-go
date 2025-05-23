@@ -169,7 +169,7 @@ func (ctrler *VPowerCtrler) queryTotalPower(height int64) ([]byte, xerrors.XErro
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
-	return []byte(fmt.Sprintf("%v", ret)), nil
+	return []byte(fmt.Sprintf("\"%v\"", ret)), nil
 }
 
 // queryVotingPower returns the sum of voting power of validators.
@@ -203,5 +203,5 @@ func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinV
 	for _, v := range validators {
 		retPower += v.SumPower
 	}
-	return []byte(fmt.Sprintf("%v", retPower)), nil
+	return []byte(fmt.Sprintf("\"%v\"", retPower)), nil
 }
