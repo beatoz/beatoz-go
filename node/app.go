@@ -12,6 +12,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
+	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -124,7 +125,6 @@ func (ctrler *BeatozApp) SetLocalClient(client abcicli.Client) {
 
 	ctrler.localClient = client
 }
-
 func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	ctrler.logger.Info("Info", "version", tmver.ABCIVersion, "AppVersion", version.String())
 
@@ -173,14 +173,10 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.rootConfig.ChainID = req.GetChainId()
 	_ = ctrler.metaDB.PutChainID(ctrler.rootConfig.ChainID)
 
-	appState := genesis.GenesisAppState{}
-	if err := jsonx.Unmarshal(req.AppStateBytes, &appState); err != nil {
-		panic(err)
-	}
-
-	appHash, err := appState.Hash()
-	if err != nil {
-		panic(err)
+	appState, initTotalSupply, xerr := checkRequestInitChain(req)
+	if xerr != nil {
+		ctrler.logger.Error("BeatozApp", "error", xerr)
+		panic(xerr)
 	}
 
 	if xerr := ctrler.govCtrler.InitLedger(&appState); xerr != nil {
@@ -192,35 +188,18 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(xerr)
 	}
 
-	initTotalSupply := uint256.NewInt(0)
-	for _, holder := range appState.AssetHolders {
-		initTotalSupply = new(uint256.Int).Add(initTotalSupply, holder.Balance)
-	}
-
 	if xerr := ctrler.supplyCtrler.InitLedger(initTotalSupply); xerr != nil {
 		ctrler.logger.Error("fail to initialize supply controller", "error", xerr)
 	}
 
-	// validator - initial stakes
-	for _, val := range req.Validators {
-		pubBytes := val.PubKey.GetSecp256K1()
-		addr, xerr := crypto.PubBytes2Addr(pubBytes)
-		if xerr != nil {
-			ctrler.logger.Error("BeatozApp", "error", xerr)
-			panic(xerr)
-		}
-
-		// Generate account of validator,
-		// if validator account is not initialized at acctCtrler.InitLedger,
-		if ctrler.acctCtrler.FindOrNewAccount(addr, true) == nil {
-			panic("fail to create account of validator")
-		}
-
-		initTotalSupply = new(uint256.Int).Add(initTotalSupply, ctrlertypes.PowerToAmount(val.Power))
-	}
 	if xerr := ctrler.vpowCtrler.InitLedger(req.Validators); xerr != nil {
 		ctrler.logger.Error("fail to initialize voting power controller", "error", xerr)
 		panic(xerr)
+	}
+
+	appHash, err := appState.Hash()
+	if err != nil {
+		panic(err)
 	}
 
 	// set initial block gas limit
@@ -707,4 +686,33 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	return abcitypes.ResponseCommit{
 		Data: appHash[:],
 	}
+}
+
+func checkRequestInitChain(req abcitypes.RequestInitChain) (*genesis.GenesisAppState, *uint256.Int, error) {
+	//
+	// genesis voting power
+	genVotinPower := int64(0)
+	for _, val := range req.Validators {
+		genVotinPower += val.Power
+	}
+	genVotingPowerAmt := types2.ToFons(uint64(genVotinPower))
+
+	genAppState := &genesis.GenesisAppState{}
+	if err := jsonx.Unmarshal(req.AppStateBytes, genAppState); err != nil {
+		return nil, nil, err
+	}
+
+	//
+	// initial supply
+	genTotalSupply := genVotingPowerAmt.Clone()
+	for _, holder := range genAppState.AssetHolders {
+		_ = genTotalSupply.Add(genTotalSupply, holder.Balance)
+	}
+
+	govParams := genAppState.GovParams
+	maxTotalSupply := govParams.MaxTotalSupply()
+	if genTotalSupply.Cmp(maxTotalSupply) > 0 {
+		return nil, nil, fmt.Errorf("error: initial supply (%d) cannot exceed max total supply (%d)", genTotalSupply, maxTotalSupply)
+	}
+	return genAppState, genTotalSupply, nil
 }
