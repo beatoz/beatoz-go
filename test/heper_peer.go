@@ -92,7 +92,16 @@ func (peer *PeerMock) SetPass(pass []byte) {
 }
 
 func (peer *PeerMock) Init(valCnt int) error {
-	return commands.InitFilesWith(peer.ChainID, peer.Config, valCnt, peer.Pass, 500, peer.Pass)
+	initParams := commands.DefaultIniParams()
+	initParams.ChainID = peer.ChainID
+	initParams.ValCnt = valCnt
+	initParams.ValSecret = peer.Pass
+	initParams.HolderCnt = 500
+	initParams.HolderSecret = peer.Pass
+	initParams.InitVotingPower = int64(1_000_000 * valCnt)
+	initParams.InitTotalSupply = int64(100_000_000*500 + 1_000_000*valCnt)
+	initParams.MaxTotalSupply = int64(100_000_000*500 + 1_000_000*valCnt*2)
+	return commands.InitFilesWith(peer.Config, initParams)
 }
 
 func (peer *PeerMock) Start() error {

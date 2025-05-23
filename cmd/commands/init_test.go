@@ -7,7 +7,6 @@ import (
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	tmcfg "github.com/tendermint/tendermint/config"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -88,9 +87,10 @@ func Test_InitialAmounts(t *testing.T) {
 		}
 		require.Equal(t, params.InitVotingPower, actualInitPower)
 
+		fmt.Println("actualInitPower", actualInitPower)
 		//
 		// initial supply
-		actualInitSupply := uint256.NewInt(uint64(actualInitPower))
+		actualInitSupply := types2.ToFons(uint64(actualInitPower))
 		for _, holder := range appState.AssetHolders {
 			_ = actualInitSupply.Add(actualInitSupply, holder.Balance)
 		}
