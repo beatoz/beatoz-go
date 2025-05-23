@@ -65,7 +65,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		// WaEx64ByPowerChunks
 		w_waex64pc := WaEx64ByPowerChunk(powChunks0, h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		//fmt.Println("--- WaEx64ByPowerChunk return", w_waex64pc)
-		w_waex64pc = w_waex64pc.Truncate(6)
+		w_waex64pc = w_waex64pc.Truncate(GetGuaranteedPrecision())
 
 		// ComputeWeight
 		weightComputed, xerr := ctrler.ComputeWeight(
@@ -87,13 +87,13 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		require.Equal(t, expectedValsSumWeights, weightComputed.ValWeight())
 
 		//fmt.Println("--- ComputeWeight return", weightComputed.SumWeight())
-		w_computed := weightComputed.SumWeight().Truncate(6)
+		w_computed := weightComputed.SumWeight().Truncate(GetGuaranteedPrecision())
 
 		sumIndW := decimal.Zero
 		for _, b := range weightComputed.Beneficiaries() {
 			sumIndW = sumIndW.Add(b.Weight())
 		}
-		sumIndW = sumIndW.Truncate(6)
+		sumIndW = sumIndW.Truncate(GetGuaranteedPrecision())
 
 		require.Equal(t, w_computed.String(), sumIndW.String())
 		require.True(t, w_waex64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64ByPowerChunks", w_waex64pc, "height", h)

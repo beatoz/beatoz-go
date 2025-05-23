@@ -64,8 +64,7 @@ func NextBlockCtxOf(bctx *ctrlertypes.BlockContext) *ctrlertypes.BlockContext {
 }
 
 func DoBeginBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
-	bctx := CurrBlockCtx() //mocks.NextBlockCtx()
-	//fmt.Println("DoBeginBlock for", bctx.Height())
+	bctx := CurrBlockCtx()
 	for _, ctr := range ctrlers {
 		_, err := ctr.BeginBlock(bctx)
 		if err != nil {
@@ -90,7 +89,6 @@ func DoRunTrx(ctrler ctrlertypes.ITrxHandler, txctxs ...*ctrlertypes.TrxContext)
 
 func DoEndBlock(ctrlers ...ctrlertypes.IBlockHandler) error {
 	bctx := CurrBlockCtx()
-	//fmt.Println("DoEndBlock for", bctx.Height())
 	for _, ctr := range ctrlers {
 		_, err := ctr.EndBlock(bctx)
 		if err != nil {
@@ -110,7 +108,6 @@ func DoCommit(ctrlers ...ctrlertypes.IBlockHandler) error {
 	}
 	lastBlockCtx = currBlockCtx
 	currBlockCtx = NextBlockCtxOf(lastBlockCtx)
-	//fmt.Printf("DoCommit - last: %v, curr: %v\n", lastBlockCtx.Height(), currBlockCtx.Height())
 	return nil
 }
 
@@ -144,5 +141,6 @@ func DoAllProcessTo(height int64, ctrlers ...ctrlertypes.IBlockHandler) error {
 			return err
 		}
 	}
+	fmt.Println("DoAllProcessTo - current height:", currBlockCtx.Height())
 	return nil
 }
