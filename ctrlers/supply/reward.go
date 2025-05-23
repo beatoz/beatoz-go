@@ -106,6 +106,8 @@ func (rwd *Reward) UnmarshalJSON(d []byte) error {
 func (rwd *Reward) Issue(r *uint256.Int, h int64) xerrors.XError {
 	if rwd._proto.Height < h {
 		rwd.issued = new(uint256.Int).Set(r)
+		rwd.withdrawn = uint256.NewInt(0)
+		rwd.slashed = uint256.NewInt(0)
 		rwd._proto.Height = h
 	} else if rwd._proto.Height == h {
 		_ = rwd.issued.Add(rwd.issued, r)
@@ -121,7 +123,9 @@ func (rwd *Reward) Issue(r *uint256.Int, h int64) xerrors.XError {
 func (rwd *Reward) Withdraw(r *uint256.Int, h int64) xerrors.XError {
 
 	if rwd._proto.Height < h {
+		rwd.issued = uint256.NewInt(0)
 		rwd.withdrawn = new(uint256.Int).Set(r)
+		rwd.slashed = uint256.NewInt(0)
 		rwd._proto.Height = h
 	} else if rwd._proto.Height == h {
 		_ = rwd.withdrawn.Add(rwd.withdrawn, r)
@@ -136,6 +140,8 @@ func (rwd *Reward) Withdraw(r *uint256.Int, h int64) xerrors.XError {
 
 func (rwd *Reward) Slash(r *uint256.Int, h int64) xerrors.XError {
 	if rwd._proto.Height < h {
+		rwd.issued = uint256.NewInt(0)
+		rwd.withdrawn = uint256.NewInt(0)
 		rwd.slashed = new(uint256.Int).Set(r)
 		rwd._proto.Height = h
 	} else if rwd._proto.Height == h {
