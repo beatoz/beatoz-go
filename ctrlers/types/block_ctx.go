@@ -307,23 +307,24 @@ func (bctx *BlockContext) GetBlockGasPool() *ethcore.GasPool {
 func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
-
 	_bctx := &struct {
-		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
-		BlockGasLimit int64                       `json:"blockGasLimit"`
-		BlockGasUsed  int64                       `json:"blockGasUsed"`
-		FeeSum        *uint256.Int                `json:"feeSum"`
-		TxsCnt        int                         `json:"txsCnt"`
-		EVMTxsCnt     int                         `json:"evmTxsCnt"`
-		AppHash       []byte                      `json:"appHash"`
+		BlockInfo      abcitypes.RequestBeginBlock `json:"blockInfo"`
+		BlockSizeLimit int64                       `json:"blockSizeLimit"`
+		BlockGasLimit  int64                       `json:"blockGasLimit"`
+		BlockGasUsed   int64                       `json:"blockGasUsed"`
+		FeeSum         *uint256.Int                `json:"feeSum"`
+		TxsCnt         int                         `json:"txsCnt"`
+		EVMTxsCnt      int                         `json:"evmTxsCnt"`
+		AppHash        []byte                      `json:"appHash"`
 	}{
-		BlockInfo:     bctx.blockInfo,
-		BlockGasLimit: bctx.blockGasLimit,
-		BlockGasUsed:  bctx.GetBlockGasUsed(),
-		FeeSum:        bctx.feeSum,
-		TxsCnt:        bctx.txsCnt,
-		EVMTxsCnt:     bctx.evmTxsCnt,
-		AppHash:       bctx.appHash,
+		BlockInfo:      bctx.blockInfo,
+		BlockSizeLimit: bctx.blockSizeLimit,
+		BlockGasLimit:  bctx.blockGasLimit,
+		BlockGasUsed:   bctx.GetBlockGasUsed(),
+		FeeSum:         bctx.feeSum,
+		TxsCnt:         bctx.txsCnt,
+		EVMTxsCnt:      bctx.evmTxsCnt,
+		AppHash:        bctx.appHash,
 	}
 
 	return jsonx.Marshal(_bctx)
@@ -334,19 +335,21 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	defer bctx.mtx.Unlock()
 
 	_bctx := &struct {
-		BlockInfo     abcitypes.RequestBeginBlock `json:"blockInfo"`
-		BlockGasLimit int64                       `json:"blockGasLimit"`
-		BlockGasUsed  int64                       `json:"blockGasUsed"`
-		FeeSum        *uint256.Int                `json:"feeSum"`
-		TxsCnt        int                         `json:"txsCnt"`
-		EVMTxsCnt     int                         `json:"evmTxsCnt"`
-		AppHash       []byte                      `json:"appHash"`
+		BlockInfo      abcitypes.RequestBeginBlock `json:"blockInfo"`
+		BlockSizeLimit int64                       `json:"blockSizeLimit"`
+		BlockGasLimit  int64                       `json:"blockGasLimit"`
+		BlockGasUsed   int64                       `json:"blockGasUsed"`
+		FeeSum         *uint256.Int                `json:"feeSum"`
+		TxsCnt         int                         `json:"txsCnt"`
+		EVMTxsCnt      int                         `json:"evmTxsCnt"`
+		AppHash        []byte                      `json:"appHash"`
 	}{}
 
 	if err := jsonx.Unmarshal(bz, _bctx); err != nil {
 		return err
 	}
 	bctx.blockInfo = _bctx.BlockInfo
+	bctx.blockSizeLimit = _bctx.BlockSizeLimit
 	bctx.blockGasLimit = _bctx.BlockGasLimit
 	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(bctx.blockGasLimit - _bctx.BlockGasUsed))
 	bctx.feeSum = _bctx.FeeSum
