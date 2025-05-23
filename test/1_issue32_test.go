@@ -46,7 +46,7 @@ func TestIssue32(t *testing.T) {
 	receiverHelper1 := newAcctObj(randRecvAcct1)
 	allAcctHelpers = append(allAcctHelpers, receiverHelper1)
 
-	fmt.Printf("TestIssue32 - sender count (goroutine count): %v\n", senderCnt)
+	fmt.Printf("TestIssue32 - sender count (goroutine count): %v\nWait...\n", senderCnt)
 	for _, v := range senderAcctObjs {
 		wg.Add(1)
 		//go bulkTransferSync(t, &wg, v, []*acctObj{receiverHelper, receiverHelper1}, 50) // 50 txs

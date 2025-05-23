@@ -179,11 +179,11 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(xerr)
 	}
 
-	if xerr := ctrler.govCtrler.InitLedger(&appState); xerr != nil {
+	if xerr := ctrler.govCtrler.InitLedger(appState); xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
-	if xerr := ctrler.acctCtrler.InitLedger(&appState); xerr != nil {
+	if xerr := ctrler.acctCtrler.InitLedger(appState); xerr != nil {
 		ctrler.logger.Error("BeatozApp", "error", xerr)
 		panic(xerr)
 	}
