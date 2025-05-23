@@ -6,6 +6,7 @@ import (
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	tmcfg "github.com/tendermint/tendermint/config"
@@ -33,26 +34,22 @@ func Test_InitialAmounts(t *testing.T) {
 		tmcfg.EnsureRoot(config.RootDir)
 
 		// gloval variables
-		beatozChainID = "init-test-chain-id"
-		holderCnt = rand.Intn(100) + 1
-		privValCnt = rand.Intn(100) + 1
-		assumedBlockInterval = fmt.Sprintf("%ds", rand.Int31n(3600)+1)
-		inflationCycleBlocks = rand.Int63n(types.WeekSeconds*8) + 1
-		maxTotalSupply = rand.Int63n(1000) + 100
-		initTotalSupply = rand.Int63n(1000) + 100
-		initVotingPower = rand.Int63n(1000) + 100
-
-		vsecrets := make([][]byte, privValCnt)
-		for i, _ := range vsecrets {
-			vsecrets[i] = []byte{0x1}
-		}
-		hsecrets := make([][]byte, holderCnt)
-		for i, _ := range hsecrets {
-			hsecrets[i] = []byte{0x1}
+		params := &InitParams{
+			ChainID:              "init-test-chain-id",
+			ValCnt:               rand.Intn(100) + 1,
+			ValSecret:            bytes.RandBytes(12),
+			HolderCnt:            rand.Intn(100) + 1,
+			HolderSecret:         bytes.RandBytes(12),
+			BlockGasLimit:        rand.Int63n(36_000_000),
+			AssumedBlockInterval: fmt.Sprintf("%ds", rand.Int31n(3600)+1),
+			InflationCycleBlocks: rand.Int63n(types.WeekSeconds*8) + 1,
+			MaxTotalSupply:       rand.Int63n(1000) + 100,
+			InitTotalSupply:      rand.Int63n(1000) + 100,
+			InitVotingPower:      rand.Int63n(1000) + 100,
 		}
 
-		err := InitFilesWith(beatozChainID, config, privValCnt, nil, holderCnt, nil)
-		if initTotalSupply > maxTotalSupply || initVotingPower > initTotalSupply {
+		err := InitFilesWith(config, params)
+		if params.InitTotalSupply > params.MaxTotalSupply || params.InitVotingPower > params.InitTotalSupply {
 			require.Error(t, err)
 			failCase++
 			continue
@@ -78,7 +75,7 @@ func Test_InitialAmounts(t *testing.T) {
 
 		//
 		// chain id
-		require.Equal(t, beatozChainID, genDoc.ChainID)
+		require.Equal(t, params.ChainID, genDoc.ChainID)
 
 		appState := genesis.GenesisAppState{}
 		require.NoError(t, jsonx.Unmarshal(genDoc.AppState, &appState))
@@ -89,24 +86,24 @@ func Test_InitialAmounts(t *testing.T) {
 		for _, val := range genDoc.Validators {
 			actualInitPower += val.Power
 		}
-		require.Equal(t, initVotingPower, actualInitPower)
+		require.Equal(t, params.InitVotingPower, actualInitPower)
 
 		//
 		// initial supply
-		actualInitSupply := uint256.NewInt(0)
+		actualInitSupply := uint256.NewInt(uint64(actualInitPower))
 		for _, holder := range appState.AssetHolders {
 			_ = actualInitSupply.Add(actualInitSupply, holder.Balance)
 		}
-		require.Equal(t, types2.ToFons(uint64(initTotalSupply)).Dec(), actualInitSupply.Dec())
+		require.Equal(t, types2.ToFons(uint64(params.InitTotalSupply)).Dec(), actualInitSupply.Dec())
 
 		//
 		// GovParams
 		govParams := appState.GovParams
-		bintv, err := time.ParseDuration(assumedBlockInterval)
+		bintv, err := time.ParseDuration(params.AssumedBlockInterval)
 		require.NoError(t, err)
-		require.Equal(t, int32(bintv.Seconds()), govParams.AssumedBlockInterval(), assumedBlockInterval)
-		require.Equal(t, inflationCycleBlocks, govParams.InflationCycleBlocks())
-		require.Equal(t, types2.ToFons(uint64(maxTotalSupply)).Dec(), govParams.MaxTotalSupply().Dec())
+		require.Equal(t, int32(bintv.Seconds()), govParams.AssumedBlockInterval(), params.AssumedBlockInterval)
+		require.Equal(t, params.InflationCycleBlocks, govParams.InflationCycleBlocks())
+		require.Equal(t, types2.ToFons(uint64(params.MaxTotalSupply)).Dec(), govParams.MaxTotalSupply().Dec())
 
 		require.NoError(t, os.RemoveAll(config.RootDir))
 

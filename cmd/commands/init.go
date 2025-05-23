@@ -19,18 +19,7 @@ import (
 )
 
 var (
-	beatozChainID = "mainnet"
-	holderCnt     = 10
-	privValCnt    = 1
-
-	blockGasLimit        = int64(36_000_000)
-	assumedBlockInterval = "7s"
-	inflationCycleBlocks = int64(86_400)
-	maxTotalSupply       = int64(700_000_000) // => 700_000_000 * 10^18
-	initTotalSupply      = int64(350_000_000)
-	initVotingPower      = int64(30_000_000)
-
-	privValSecretFeederAddr string
+	initParams = DefaultIniParams()
 )
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.
@@ -48,14 +37,14 @@ func NewInitFilesCmd() *cobra.Command {
 func AddInitFlags(cmd *cobra.Command) {
 	// bind flags
 	cmd.Flags().StringVar(
-		&beatozChainID,
+		&initParams.ChainID,
 		"chain_id",
-		beatozChainID, // default name
+		initParams.ChainID, // default name
 		"the id of chain to generate (e.g. mainnet, testnet, devnet and others)")
 	cmd.Flags().IntVar(
-		&holderCnt,
+		&initParams.HolderCnt,
 		"holders",
-		holderCnt, // default value is 10
+		initParams.HolderCnt, // default value is 10
 		"the number of holder's account files to be generated.\n"+
 			"if you create a new genesis of your own blockchain, "+
 			"you need to generate accounts of genesis holders and "+
@@ -63,9 +52,9 @@ func AddInitFlags(cmd *cobra.Command) {
 			"if `--chain_id` is `mainnet`, the holder's accounts is not generated.",
 	)
 	cmd.Flags().IntVar(
-		&privValCnt,
+		&initParams.ValCnt,
 		"priv_validator_cnt",
-		privValCnt, // default value is 1
+		initParams.ValCnt, // default value is 1
 		"the number of validators on BEATOZ network created.\n"+
 			"if you create a new genesis of your own blockchain, "+
 			"you need to generate validator's accounts and\n"+
@@ -73,44 +62,44 @@ func AddInitFlags(cmd *cobra.Command) {
 			"if there is more than one validator, the rest will be created in the $BEATOZHOME/walkeys/vals directory.",
 	)
 	cmd.Flags().Int64Var(
-		&blockGasLimit,
+		&initParams.BlockGasLimit,
 		"block_gas_limit",
-		blockGasLimit,
+		initParams.BlockGasLimit,
 		"the maximum gas that can be used in one block.\n"+
 			"this value is deterministically adjusted based on the gas usage in the blockchain network.\n"+
 			"however, it cannot exceed the `maxBlockGas` of Governance Parameters.",
 	)
 	cmd.Flags().StringVar(
-		&assumedBlockInterval,
+		&initParams.AssumedBlockInterval,
 		"assumed_block_interval",
-		assumedBlockInterval,
+		initParams.AssumedBlockInterval,
 		"assumed time between blocks in seconds, used for estimating time from block count.\n"+
 			"It is not based on actual block production timing.\n"+
 			"Instead, it is used as a constant reference to estimate time from the number of blocks produced.")
 	cmd.Flags().Int64Var(
-		&inflationCycleBlocks,
+		&initParams.InflationCycleBlocks,
 		"inflation_cycle_blocks",
-		inflationCycleBlocks,
+		initParams.InflationCycleBlocks,
 		"the number of blocks required to trigger a new inflation event.\n"+
 			"This determines the frequency of inflation based on block count, not real time.",
 	)
 	cmd.Flags().Int64Var(
-		&maxTotalSupply,
+		&initParams.MaxTotalSupply,
 		"max_total_supply",
-		maxTotalSupply,
+		initParams.MaxTotalSupply,
 		"upper limit of total supply; "+
 			"total supply will never exceed this value.",
 	)
 	cmd.Flags().Int64Var(
-		&initTotalSupply,
+		&initParams.InitTotalSupply,
 		"init_total_supply",
-		initTotalSupply,
-		"initial total supply at genesis, shared equally by all holders",
+		initParams.InitTotalSupply,
+		"initial total supply at genesis, shared equally by all holders; it includes the initial voting power",
 	)
 	cmd.Flags().Int64Var(
-		&initVotingPower,
+		&initParams.InitVotingPower,
 		"init_voting_power",
-		initVotingPower,
+		initParams.InitVotingPower,
 		"initial voting power at genesis, shared equally by all validators",
 	)
 }
@@ -137,17 +126,16 @@ func initFiles(cmd *cobra.Command, args []string) error {
 		libs.ClearCredential(s1)
 	}()
 
-	return InitFilesWith(beatozChainID, rootConfig, privValCnt, s0, holderCnt, s1)
+	initParams.ValSecret = s0
+	initParams.HolderSecret = s1
+
+	return InitFilesWith(rootConfig, initParams)
 }
 
-func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte, hcnt int, hsecret []byte) error {
-	if initTotalSupply > maxTotalSupply {
-		return fmt.Errorf("init_total_supply (%d) cannot exceed max_total_supply (%d)", initTotalSupply, maxTotalSupply)
+func InitFilesWith(config *cfg.Config, params *InitParams) error {
+	if err := params.Validate(); err != nil {
+		return err
 	}
-	if initVotingPower > initTotalSupply {
-		return fmt.Errorf("init_voting_power (%d) cannot exceed init_total_supply (%d)", initVotingPower, initTotalSupply)
-	}
-
 	// private validator
 	privValKeyFile := config.PrivValidatorKeyFile()
 	privValStateFile := config.PrivValidatorStateFile()
@@ -159,20 +147,20 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 	}
 
 	var pvs []*acrypto.SFilePV
-	for i := 0; i < vcnt; i++ {
+	for i := 0; i < params.ValCnt; i++ {
 		var pv *acrypto.SFilePV
 
 		_keyFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValKeyFile), filepath.Ext(privValKeyFile)), i, filepath.Ext(privValKeyFile))
 		_keyStateFilePath := fmt.Sprintf("%s/%s%d%s", defaultValDirPath, strings.TrimSuffix(filepath.Base(privValStateFile), filepath.Ext(privValStateFile)), i, filepath.Ext(_keyFilePath))
 
 		if tmos.FileExists(_keyFilePath) {
-			pv = acrypto.LoadSFilePV(_keyFilePath, _keyStateFilePath, vsecret)
+			pv = acrypto.LoadSFilePV(_keyFilePath, _keyStateFilePath, params.ValSecret)
 			logger.Info("Found private validator", "keyFile", _keyFilePath,
 				"stateFile", _keyStateFilePath)
 			//pv.SaveWith(secret) // encrypt with new driven key.
 		} else {
 			pv = acrypto.GenSFilePV(_keyFilePath, _keyStateFilePath)
-			pv.SaveWith(vsecret)
+			pv.SaveWith(params.ValSecret)
 			logger.Info("Generated private validator", "keyFile", _keyFilePath,
 				"stateFile", _keyStateFilePath)
 		}
@@ -209,12 +197,12 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 	} else {
 		var err error
 		var genDoc *tmtypes.GenesisDoc
-		if chainID == "mainnet" {
-			if genDoc, err = genesis.MainnetGenesisDoc(chainID); err != nil {
+		if params.ChainID == "mainnet" {
+			if genDoc, err = genesis.MainnetGenesisDoc(params.ChainID); err != nil {
 				return err
 			}
-		} else if chainID == "testnet" {
-			if genDoc, err = genesis.TestnetGenesisDoc(chainID); err != nil {
+		} else if params.ChainID == "testnet" {
+			if genDoc, err = genesis.TestnetGenesisDoc(params.ChainID); err != nil {
 				return err
 			}
 		} else { // anything (e.g. loclanet)
@@ -225,8 +213,8 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 			}
 			//
 			// Initialize validators at genesis
-			pow := initVotingPower / int64(len(pvs))
-			rpow := initVotingPower % int64(len(pvs))
+			pow := params.InitVotingPower / int64(len(pvs))
+			rpow := params.InitVotingPower % int64(len(pvs))
 			var valset []tmtypes.GenesisValidator
 			for i, pv := range pvs {
 				if i == len(pvs)-1 {
@@ -246,14 +234,15 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 
 			//
 			// Initialize asset holders at genesis
-			walkeys, err := acrypto.CreateWalletKeyFiles(hsecret, hcnt, defaultWalkeyDirPath)
+			walkeys, err := acrypto.CreateWalletKeyFiles(params.HolderSecret, params.HolderCnt, defaultWalkeyDirPath)
 			if err != nil {
 				return err
 			}
 			logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
 
-			amt := initTotalSupply / int64(len(walkeys))
-			ramt := initTotalSupply % int64(len(walkeys))
+			realInitSupply := params.InitTotalSupply - params.InitVotingPower
+			amt := realInitSupply / int64(len(walkeys))
+			ramt := realInitSupply % int64(len(walkeys))
 			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
 			for i, wk := range walkeys {
 				if i == len(walkeys)-1 {
@@ -268,19 +257,19 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 
 			//
 			// Create Governance Parameters at genesis
-			blockInterval, err := time.ParseDuration(assumedBlockInterval)
+			blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
 			if err != nil {
 				return err
 			}
 			govParams := types.NewGovParams(int(blockInterval.Seconds()))
-			govParams.GetValues().InflationCycleBlocks = inflationCycleBlocks
-			govParams.GetValues().XMaxTotalSupply = btztypes.ToFons(uint64(maxTotalSupply)).Bytes()
+			govParams.GetValues().InflationCycleBlocks = params.InflationCycleBlocks
+			govParams.GetValues().XMaxTotalSupply = btztypes.ToFons(uint64(params.MaxTotalSupply)).Bytes()
 
-			genDoc, err = genesis.NewGenesisDoc(chainID, valset, holders, govParams)
+			genDoc, err = genesis.NewGenesisDoc(params.ChainID, valset, holders, govParams)
 			if err != nil {
 				return err
 			}
-			genDoc.ConsensusParams.Block.MaxGas = blockGasLimit
+			genDoc.ConsensusParams.Block.MaxGas = params.BlockGasLimit
 		}
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err
@@ -288,5 +277,43 @@ func InitFilesWith(chainID string, config *cfg.Config, vcnt int, vsecret []byte,
 		logger.Info("Generated genesis file", "path", genFile)
 	}
 
+	return nil
+}
+
+type InitParams struct {
+	ChainID              string
+	ValCnt               int
+	ValSecret            []byte
+	HolderCnt            int
+	HolderSecret         []byte
+	BlockGasLimit        int64
+	AssumedBlockInterval string
+	InflationCycleBlocks int64
+	MaxTotalSupply       int64
+	InitTotalSupply      int64
+	InitVotingPower      int64
+}
+
+func DefaultIniParams() *InitParams {
+	return &InitParams{
+		ChainID:              "mainnet",
+		ValCnt:               1,
+		HolderCnt:            10,
+		BlockGasLimit:        int64(36_000_000),
+		AssumedBlockInterval: "7s",
+		InflationCycleBlocks: int64(86_400),
+		MaxTotalSupply:       int64(700_000_000),
+		InitTotalSupply:      int64(350_000_000),
+		InitVotingPower:      int64(35_000_000),
+	}
+}
+
+func (params *InitParams) Validate() error {
+	if params.InitTotalSupply > params.MaxTotalSupply {
+		return fmt.Errorf("init_total_supply (%d) cannot exceed max_total_supply (%d)", params.InitTotalSupply, params.MaxTotalSupply)
+	}
+	if params.InitVotingPower > params.InitTotalSupply {
+		return fmt.Errorf("init_voting_power (%d) cannot exceed init_total_supply (%d)", params.InitVotingPower, params.InitTotalSupply)
+	}
 	return nil
 }
