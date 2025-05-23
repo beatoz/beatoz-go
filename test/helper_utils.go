@@ -87,7 +87,7 @@ func prepareTest(_peers []*PeerMock) {
 		}
 	}
 
-	fmt.Println("Init Holder count", len(wallets))
+	fmt.Println("Init Holder count", len(wallets), "Wait...")
 
 	//
 	// validator's balance is 0 at now,

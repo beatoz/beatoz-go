@@ -1,6 +1,8 @@
 package types
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -96,14 +98,62 @@ func (govParams *GovParams) MarshalJSON() ([]byte, error) {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return jsonx.Marshal(&govParams._v)
+	jz, err := jsonx.Marshal(&govParams._v)
+	if err != nil {
+		return nil, err
+	}
+
+	tmp := make(map[string]interface{})
+	if err := jsonx.Unmarshal(jz, &tmp); err != nil {
+		return nil, err
+	}
+	for k, v := range tmp {
+		if k == "maxTotalSupply" || k == "gasPrice" {
+			// v is base64 string
+			_v, err := base64.StdEncoding.DecodeString(v.(string))
+			if err != nil {
+				return nil, err
+			}
+			tmp[k] = new(uint256.Int).SetBytes(_v).String() // decimal string
+		} else if k == "deadAddress" || k == "rewardPoolAddress" {
+			// v is base64 string
+			_v, err := base64.StdEncoding.DecodeString(v.(string))
+			if err != nil {
+				return nil, err
+			}
+			tmp[k] = types.Address(_v).String()
+		}
+	}
+
+	return jsonx.Marshal(tmp)
 }
 
 func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return jsonx.Unmarshal(d, &govParams._v)
+	tmp := make(map[string]interface{})
+	if err := jsonx.Unmarshal(d, &tmp); err != nil {
+		return err
+	}
+
+	for k, v := range tmp {
+		if k == "maxTotalSupply" || k == "gasPrice" {
+			tmp[k] = base64.StdEncoding.EncodeToString(uint256.MustFromDecimal(v.(string)).Bytes())
+		} else if k == "deadAddress" || k == "rewardPoolAddress" {
+			_v, err := hex.DecodeString(v.(string))
+			if err != nil {
+				return err
+			}
+			tmp[k] = base64.StdEncoding.EncodeToString(_v)
+		}
+	}
+	jz, err := jsonx.Marshal(tmp)
+	if err != nil {
+		return err
+	}
+
+	return jsonx.Unmarshal(jz, &govParams._v)
 }
 
 func uppercaseFirstIfUpper(s string) string {

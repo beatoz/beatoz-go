@@ -87,7 +87,6 @@ func Test_InitialAmounts(t *testing.T) {
 		}
 		require.Equal(t, params.InitVotingPower, actualInitPower)
 
-		fmt.Println("actualInitPower", actualInitPower)
 		//
 		// initial supply
 		actualInitSupply := types2.ToFons(uint64(actualInitPower))
