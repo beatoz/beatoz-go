@@ -199,30 +199,30 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 
 		// Weight64ByPowerChunks
 		start = time.Now()
-		w_w64pc := Scaled64PowerChunk(powChunks, currHeight, powerRipeningCycle, tau)
+		w_w64pc := Scaled64PowerChunks(powChunks, currHeight, powerRipeningCycle, tau)
 		_totalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
 		w_w64pc, _ = w_w64pc.QuoRem(_totalSupply, GetDivisionPrecision())
 		w_w64pc = w_w64pc.Truncate(GetGuaranteedPrecision())
 		dur5 += time.Since(start)
-		//fmt.Println("Scaled64PowerChunk return", w_w64pc)
+		//fmt.Println("Scaled64PowerChunks return", w_w64pc)
 
 		// Weight64ByPowerChunks
 		rdx := rand.Intn(len(powChunks))
 		start = time.Now()
-		w_w64pc_patial0 := Scaled64PowerChunk(powChunks[:rdx], currHeight, powerRipeningCycle, tau)
-		w_w64pc_patial1 := Scaled64PowerChunk(powChunks[rdx:], currHeight, powerRipeningCycle, tau)
+		w_w64pc_patial0 := Scaled64PowerChunks(powChunks[:rdx], currHeight, powerRipeningCycle, tau)
+		w_w64pc_patial1 := Scaled64PowerChunks(powChunks[rdx:], currHeight, powerRipeningCycle, tau)
 		w_w64pc_patial := w_w64pc_patial0.Add(w_w64pc_patial1)
 		w_w64pc_patial, _ = w_w64pc_patial.QuoRem(_totalSupply, GetDivisionPrecision())
 		w_w64pc_patial = w_w64pc_patial.Truncate(GetGuaranteedPrecision())
 		dur6 += time.Since(start)
-		//fmt.Println("Scaled64PowerChunk return", w_w64pc)
+		//fmt.Println("Scaled64PowerChunks return", w_w64pc)
 
 		require.True(t, w_sumwi.LessThanOrEqual(ctrlertypes.DecimalOne), "SumWi", w_sumwi, "nth", n)
 		require.True(t, w_wa.LessThanOrEqual(ctrlertypes.DecimalOne), "Wa", w_wa, "nth", n)
 		require.True(t, w_waex.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx", w_waex, "nth", n)
 		require.True(t, w_waex64.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64", w_waex64, "nth", n)
 		require.True(t, w_waex64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64ByPowerChunk", w_waex64pc, "nth", n)
-		require.True(t, w_w64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "By Scaled64PowerChunk", w_w64pc, "nth", n)
+		require.True(t, w_w64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "By Scaled64PowerChunks", w_w64pc, "nth", n)
 		require.True(t, w_w64pc_patial.LessThanOrEqual(ctrlertypes.DecimalOne), "Weight64ByPowerChunkPartially", w_w64pc_patial, "nth", n)
 
 		// w_sumwi has error, when the height is too small (less than about 500).

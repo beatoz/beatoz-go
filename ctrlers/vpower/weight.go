@@ -173,11 +173,12 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 	return q
 }
 
-// Scaled64PowerChunk calculates the voting power weight not applied to the total supply.
+// Scaled64PowerChunks calculates the voting power weight not applied to the total supply.
 // `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power}`
-func Scaled64PowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
+func Scaled64PowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
+	_ripeningCycle := decimal.NewFromInt(ripeningCycle)
 
 	_maturedPower := int64(0)
 	risingPower := decimal.Zero
@@ -189,13 +190,29 @@ func Scaled64PowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 			_maturedPower += pc.Power
 		} else {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
-			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
+			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(_ripeningCycle, GetDivisionPrecision())
 			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
-		//fmt.Println("Scaled64PowerChunk", "power", pc.Power, "height", pc.Height, "dur", dur)
+		//fmt.Println("Scaled64PowerChunks", "power", pc.Power, "height", pc.Height, "dur", dur)
 	}
 
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
 	return decWightedPower
+}
+
+func Scaled64PowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
+	_tau := decimal.New(int64(tau), -3)
+	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
+	_ripeningCycle := decimal.NewFromInt(ripeningCycle)
+
+	dur := currHeight - pc.Height
+	if dur >= ripeningCycle {
+		// mature power
+		return decimal.NewFromInt(pc.Power)
+	} else {
+		//  (((tau * dur) / ripeningCycle) + keppa) * power_i
+		ret, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(_ripeningCycle, GetDivisionPrecision())
+		return ret.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
+	}
 }
