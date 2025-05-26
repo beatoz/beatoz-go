@@ -2,7 +2,6 @@ package vpower
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/libs/fixedutil"
 	"github.com/robaho/fixed"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
