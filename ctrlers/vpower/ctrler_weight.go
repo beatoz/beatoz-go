@@ -13,7 +13,7 @@ import (
 func (ctrler *VPowerCtrler) ComputeWeight(
 	height, inflationCycle, ripeningBlocks int64, tau int32,
 	totalSupply *uint256.Int,
-) (*ctrlertypes.Weight, xerrors.XError) {
+) (*ctrlertypes.WeightResult, xerrors.XError) {
 
 	//var allPowChunks []*PowerChunkProto
 	var benefAddrs []types.Address

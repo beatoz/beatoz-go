@@ -111,7 +111,7 @@ func (mock *VPowerHandlerMock) PickAddress(i int) types.Address {
 	return mock.Delegatees[i].Address()
 }
 
-func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.Weight, xerrors.XError) {
+func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.WeightResult, xerrors.XError) {
 	mapWeightObjs := make(map[string]*struct {
 		isval bool
 		w     decimal.Decimal

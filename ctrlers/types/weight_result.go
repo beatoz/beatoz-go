@@ -18,25 +18,25 @@ var (
 	DecimalZero = decimal.Zero
 )
 
-type Weight struct {
+type WeightResult struct {
 	sumWeight     decimal.Decimal
 	valsWeight    decimal.Decimal
 	beneficiaries []*beneficiary
 }
 
-func NewWeight() *Weight {
-	return &Weight{sumWeight: decimal.Zero, valsWeight: decimal.Zero}
+func NewWeight() *WeightResult {
+	return &WeightResult{sumWeight: decimal.Zero, valsWeight: decimal.Zero}
 }
 
-func (w *Weight) SumWeight() decimal.Decimal {
+func (w *WeightResult) SumWeight() decimal.Decimal {
 	return w.sumWeight
 }
 
-func (w *Weight) ValWeight() decimal.Decimal {
+func (w *WeightResult) ValWeight() decimal.Decimal {
 	return w.valsWeight
 }
 
-func (w *Weight) Add(addr types.Address, weight, signWeight decimal.Decimal, isVal bool) {
+func (w *WeightResult) Add(addr types.Address, weight, signWeight decimal.Decimal, isVal bool) {
 	w.sumWeight = w.sumWeight.Add(weight)
 	if isVal {
 		w.valsWeight = w.valsWeight.Add(weight)
@@ -44,7 +44,7 @@ func (w *Weight) Add(addr types.Address, weight, signWeight decimal.Decimal, isV
 	w.beneficiaries = append(w.beneficiaries, &beneficiary{addr, weight, signWeight, isVal})
 }
 
-func (w *Weight) Beneficiaries() []*beneficiary {
+func (w *WeightResult) Beneficiaries() []*beneficiary {
 	return w.beneficiaries
 }
 
