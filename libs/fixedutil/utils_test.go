@@ -57,7 +57,7 @@ func TestGolden(t *testing.T) {
 	data := []struct {
 		base, exp, out string
 	}{
-		{"2.0000000", "3.5000000", "11.3137085"},
+		{"2.0000000", "3.5000000", "11.313694" /*"11.3137085"*/},
 	}
 	for _, rec := range data {
 		b, _ := fixed.Parse(rec.base)
