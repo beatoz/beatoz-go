@@ -77,7 +77,7 @@ func (s *StakeHandlerMock) PickAddress(i int) types.Address {
 	return s.Delegatees[i].Address()
 }
 
-func (s *StakeHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.WeightResult, xerrors.XError) {
+func (s *StakeHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (ctrlertypes.IWeightResult, xerrors.XError) {
 	return nil, nil
 }
 

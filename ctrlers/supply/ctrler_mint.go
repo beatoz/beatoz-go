@@ -3,6 +3,7 @@ package supply
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -101,7 +102,13 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		waAll := retWeight.SumWeight()  //.Truncate(precision) // is too expensive
 		waVals := retWeight.ValWeight() //.Truncate(precision)
 
-		totalSupply := Si(bctx.Height(), int64(bctx.GovHandler.AssumedBlockInterval()), lastAdjustedHeight, lastAdjustedSupply, bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(), waAll).Floor()
+		totalSupply := Si(
+			bctx.Height(),
+			int64(bctx.GovHandler.AssumedBlockInterval()),
+			lastAdjustedHeight, lastAdjustedSupply,
+			bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(),
+			waAll,
+		).Floor()
 		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
 		if addedSupply.Sign() < 0 {
 			respCh <- &respMint{
@@ -110,6 +117,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			continue
 		}
 
+		decWaAll, _ := waAll.ToDecimal()
+		decWaVals, _ := waVals.ToDecimal()
 		rwdToVals := addedSupply.Mul(valRate).Floor()
 		rwdToAll := addedSupply.Sub(rwdToVals)
 
@@ -123,13 +132,14 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			remainder := decimal.Zero
 
 			for i, benef := range beneficiaries {
-				wi := benef.Weight() //.Truncate(precision) // Truncate is too expensive.
+				//.Truncate(precision) // Truncate is too expensive.
+				decWi, _ := benef.Weight().ToDecimal()
 
 				// for all delegators
-				rwd, _ := rwdToAll.Mul(wi).QuoRem(waAll, int32(decimal.DivisionPrecision))
+				rwd, _ := rwdToAll.Mul(decWi).QuoRem(decWaAll, int32(decimal.DivisionPrecision))
 				// for only validators
 				if benef.IsValidator() {
-					_rwd, _ := rwdToVals.Mul(wi).QuoRem(waVals, int32(decimal.DivisionPrecision))
+					_rwd, _ := rwdToVals.Mul(decWi).QuoRem(decWaVals, int32(decimal.DivisionPrecision))
 					rwd = rwd.Add(_rwd)
 				}
 
@@ -137,7 +147,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 				rwd = rwd.Add(remainder)
 
 				// Apply `benef.singW` to `rwd`
-				rwd = rwd.Mul(benef.SignRate())
+				sw, _ := benef.SignRate().ToDecimal()
+				rwd = rwd.Mul(sw)
 
 				rewards[i] = &mintedReward{
 					addr: benef.Address(),
@@ -160,18 +171,20 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 }
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
+func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
-	_lambda := decimal.New(int64(lambda), -3)
-	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
-	expWHid := wa.Mul(H(height-adjustedHeight, blockIntv))
-	numer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
-	denom := decLambdaAddOne.Pow(expWHid)
+	_lambda := fxnum.Permil(int(lambda))
+	fxLambdaAddOne := _lambda.Add(fxnum.ONE)
 
+	fxWHid := wa.Mul(H(height-adjustedHeight, blockIntv))
+	fxDenom := fxLambdaAddOne.Pow(fxWHid)
+	decDenom, _ := fxDenom.ToDecimal()
+
+	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
 	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
-	return decSmax.Sub(numer.Div(denom))
+	return decSmax.Sub(decNumer.Div(decDenom))
 }
 
 // H returns the normalized block time corresponding to the given block height.
@@ -179,6 +192,6 @@ func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uin
 // It calculates how far along the blockchain is relative to a predefined reference period.
 // For example, if the reference period is one year, a return value of 1.0 indicates that
 // exactly one reference period has elapsed.
-func H(height, blockIntvSec int64) decimal.Decimal {
-	return decimal.NewFromInt(height).Mul(decimal.NewFromInt(blockIntvSec)).Div(decimal.NewFromInt(ctrlertypes.YearSeconds))
+func H(height, blockIntvSec int64) fxnum.FxNum {
+	return fxnum.FromInt(height).Mul(fxnum.FromInt(blockIntvSec)).Div(fxnum.FromInt(ctrlertypes.YearSeconds))
 }

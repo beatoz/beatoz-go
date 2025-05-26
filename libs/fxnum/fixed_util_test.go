@@ -1,4 +1,4 @@
-package fixedutil
+package fxnum
 
 import (
 	"fmt"
@@ -95,7 +95,7 @@ func TestGolden_Fixed(t *testing.T) {
 			OS:         Ubuntu 22.04.5 LTS
 			Arch:       amd64 (x86_64)
 			Go Version: go version go1.23.3 linux/amd64
-			fixedutil setting: lnTerms=32, expTerms=32
+			fxnum setting: lnTerms=32, expTerms=32
 			FixedPow(fixed.NewI(2,0), fixed.NewI(35,1)) → 11.313694
 
 			"11.3137085" computed by `shopspring/decimal` in iMac

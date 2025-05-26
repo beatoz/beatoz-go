@@ -1,12 +1,23 @@
 package vpower
 
 import (
-	"github.com/beatoz/beatoz-go/libs/fixedutil"
+	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/holiman/uint256"
 	"github.com/robaho/fixed"
 )
 
-func FixedWeightedPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) fixed.Fixed {
-	_tau := fixed.NewI(int64(tau), 0).Div(fixedutil.PermilBase)
+// decimalWeightOfPowerChunks calculates the voting power weight not applied.
+// `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / totalSupply`
+func fixedWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, totalSupply *uint256.Int) fixed.Fixed {
+	totalPower, _ := types.AmountToPower(totalSupply)
+	fixedSupplyPower := fixed.NewI(totalPower, 0)
+
+	fixedScaledPower := fixedScaledPowerChunks(powerChunks, currHeight, ripeningCycle, tau)
+	return fixedScaledPower.Div(fixedSupplyPower)
+}
+
+func fixedScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) fixed.Fixed {
+	_tau := fixed.NewI(int64(tau), 0).Div(fixed.NewI(1000, 0))
 	_keppa := fixed.NewI(1, 0).Sub(_tau)
 	_ripeningCycle := fixed.NewI(ripeningCycle, 0)
 
@@ -23,14 +34,14 @@ func FixedWeightedPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 			w_riging := _tau.Mul(fixed.NewI(dur, 0)).Div(_ripeningCycle).Add(_keppa).Mul(fixed.NewI(pc.Power, 0))
 			_risingPower = _risingPower.Add(w_riging)
 		}
-		//fmt.Println("Scaled64PowerChunks", "power", pc.Power, "height", pc.Height, "dur", dur)
+		//fmt.Println("fixedScaledPowerChunks", "power", pc.Power, "height", pc.Height, "dur", dur)
 	}
 
 	return _risingPower.Add(fixed.NewI(maturedPower, 0))
 }
 
-func FixedWeightedPowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int64, tau int32) fixed.Fixed {
-	_tau := fixed.NewI(int64(tau), 0).Div(fixedutil.PermilBase)
+func fixedScaledPowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int64, tau int32) fixed.Fixed {
+	_tau := fixed.NewI(int64(tau), 0).Div(fixed.NewI(1000, 0))
 	_keppa := fixed.NewI(1, 0).Sub(_tau)
 	_ripeningCycle := fixed.NewI(ripeningCycle, 0)
 

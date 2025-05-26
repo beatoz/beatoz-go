@@ -105,7 +105,7 @@ type IVPowerHandler interface {
 	ITrxHandler
 	IBlockHandler
 	IStakeHandler
-	ComputeWeight(int64, int64, int64, int32, *uint256.Int) (*WeightResult, xerrors.XError)
+	ComputeWeight(int64, int64, int64, int32, *uint256.Int) (IWeightResult, xerrors.XError)
 }
 
 type ISupplyHandler interface {

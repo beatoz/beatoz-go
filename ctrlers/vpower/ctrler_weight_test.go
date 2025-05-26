@@ -3,9 +3,7 @@ package vpower
 import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
-	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/types"
-	"github.com/shopspring/decimal"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/stretchr/testify/require"
 	"math/rand"
 	"os"
@@ -14,8 +12,6 @@ import (
 
 func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
-
-	totalSupply := types.ToFons(uint64(350_000_000))
 
 	ctrler, lastValUps0, valWallets0, xerr := initLedger(config)
 	require.NoError(t, xerr)
@@ -36,7 +32,7 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		})
 	}
 	for h := int64(2); h <= govMock.RipeningBlocks()*2; h += govMock.InflationCycleBlocks() {
-		for i := mocks.CurrBlockCtx().Height(); i < h-1; i++ {
+		for i := mocks.CurrBlockCtx().Height(); i < h; i++ {
 			require.NoError(t, mocks.DoCommit(ctrler))
 		}
 
@@ -62,10 +58,10 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
 		// compute weight
-		// WaEx64ByPowerChunks
-		w_waex64pc := WaEx64ByPowerChunk(powChunks0, h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
-		//fmt.Println("--- WaEx64ByPowerChunk return", w_waex64pc)
-		w_waex64pc = w_waex64pc.Truncate(GetGuaranteedPrecision())
+		// fxnumWeightOfPowerChunks
+		w_waex64pc := fxnumWeightOfPowerChunks(powChunks0, h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
+		//fmt.Println("--- decimalWeightOfPowerChunks return", w_waex64pc)
+		w_waex64pc = w_waex64pc.Truncate(fxnum.GetWantPrecision())
 
 		// ComputeWeight
 		weightComputed, xerr := ctrler.ComputeWeight(
@@ -76,29 +72,29 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 			totalSupply)
 		require.NoError(t, xerr)
 
-		expectedSumWeights, expectedValsSumWeights := decimal.Zero, decimal.Zero
+		expectedSumWeights, expectedValsSumWeights := fxnum.ZERO, fxnum.ZERO
 		for _, benef := range weightComputed.Beneficiaries() {
 			expectedSumWeights = expectedSumWeights.Add(benef.Weight())
 			if benef.IsValidator() {
 				expectedValsSumWeights = expectedValsSumWeights.Add(benef.Weight())
 			}
 		}
-		require.Equal(t, expectedSumWeights, weightComputed.SumWeight())
-		require.Equal(t, expectedValsSumWeights, weightComputed.ValWeight())
+		require.Equal(t, expectedSumWeights, weightComputed.SumWeight(), expectedSumWeights.String(), weightComputed.SumWeight().String())
+		require.Equal(t, expectedValsSumWeights, weightComputed.ValWeight(), expectedValsSumWeights.String(), weightComputed.ValWeight().String())
 
 		//fmt.Println("--- ComputeWeight return", weightComputed.SumWeight())
-		w_computed := weightComputed.SumWeight().Truncate(GetGuaranteedPrecision())
+		w_computed := weightComputed.SumWeight().Truncate(fxnum.GetWantPrecision())
 
-		sumIndW := decimal.Zero
+		sumIndW := fxnum.New(0, 0)
 		for _, b := range weightComputed.Beneficiaries() {
 			sumIndW = sumIndW.Add(b.Weight())
 		}
-		sumIndW = sumIndW.Truncate(GetGuaranteedPrecision())
+		sumIndW = sumIndW.Truncate(fxnum.GetWantPrecision())
 
+		require.True(t, w_waex64pc.LessThanOrEqual(fxnum.ONE), "fxnumWeightOfPowerChunks", w_waex64pc, "height", h)
+		require.True(t, w_computed.LessThanOrEqual(fxnum.ONE), "ComputeWeight", w_computed, "height", h)
 		require.Equal(t, w_computed.String(), sumIndW.String())
-		require.True(t, w_waex64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64ByPowerChunks", w_waex64pc, "height", h)
-		require.True(t, w_computed.LessThanOrEqual(ctrlertypes.DecimalOne), "ComputeWeight", w_computed, "height", h)
-		require.Equal(t, w_waex64pc.String(), w_computed.String(), fmt.Sprintf("WaEx64ByPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, h))
+		require.Equal(t, w_waex64pc.String(), w_computed.String(), fmt.Sprintf("fxnumWeightOfPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, h))
 
 		//fmt.Printf("Block[%v] the %v delegate txs are executed and the weight is %v <> %v\n", h, cnt, w_waex64pc, w_computed)
 	}

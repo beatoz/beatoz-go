@@ -4,12 +4,12 @@ import (
 	"encoding/hex"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
-	"github.com/shopspring/decimal"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"math/rand"
 	"sort"
@@ -111,10 +111,10 @@ func (mock *VPowerHandlerMock) PickAddress(i int) types.Address {
 	return mock.Delegatees[i].Address()
 }
 
-func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (*ctrlertypes.WeightResult, xerrors.XError) {
+func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (ctrlertypes.IWeightResult, xerrors.XError) {
 	mapWeightObjs := make(map[string]*struct {
 		isval bool
-		w     decimal.Decimal
+		w     fxnum.FxNum
 	})
 
 	for k, vpow := range mock.mapVPowers {
@@ -132,12 +132,12 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlo
 			// toAddr is not validator
 			continue
 		}
-		_w := vpower.WaEx64ByPowerChunk(vpow.PowerChunks, height, ripeningBlocks, tau, totalSupply)
+		_w := vpower.FxNumWeightOfPowerChunks(vpow.PowerChunks, height, ripeningBlocks, tau, totalSupply)
 		wobj, ok := mapWeightObjs[fromAddrStr]
 		if !ok {
 			wobj = &struct {
 				isval bool
-				w     decimal.Decimal
+				w     fxnum.FxNum
 			}{
 				isval: fromAddrStr == toAddrStr, // reach at here when toAddrStr is validator
 				w:     _w,
@@ -147,10 +147,10 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlo
 		mapWeightObjs[fromAddrStr] = wobj
 	}
 
-	weightInfo := ctrlertypes.NewWeight()
+	weightInfo := vpower.NewWeight()
 	for k, wo := range mapWeightObjs {
 		addr, _ := hex.DecodeString(k)
-		weightInfo.Add(addr, wo.w, decimal.NewFromInt(1), wo.isval)
+		weightInfo.Add(addr, wo.w, fxnum.FromInt(1), wo.isval)
 	}
 
 	return weightInfo, nil

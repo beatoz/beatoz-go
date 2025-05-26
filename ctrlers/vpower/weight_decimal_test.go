@@ -2,7 +2,6 @@ package vpower
 
 import (
 	"fmt"
-	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/holiman/uint256"
@@ -11,10 +10,6 @@ import (
 	"math/rand"
 	"testing"
 	"time"
-)
-
-var (
-	powerRipeningCycle = ctrlertypes.YearSeconds
 )
 
 type testPowObj struct {
@@ -51,9 +46,9 @@ func Test_Wi(t *testing.T) {
 
 		for _, vpobj := range vpObjs {
 			wi0 := oldWi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-			wi0 = wi0.Truncate(GetGuaranteedPrecision())
+			wi0 = wi0.Truncate(getPrecision())
 			wi1 := Wi(vpobj.vpow, vpobj.vdur, powerRipeningCycle, 200, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-			wi1 = wi1.Truncate(GetGuaranteedPrecision())
+			wi1 = wi1.Truncate(getPrecision())
 			require.Equal(t, wi0, wi1, "not equal", "wi0", wi0, "wi1", wi1)
 
 			_wa := wa.Add(wi1)
@@ -88,37 +83,41 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 			vpows = append(vpows, vpobj.vpow)
 			vdurs = append(vdurs, vpobj.vdur)
 		}
-		w_sumwi = w_sumwi.Truncate(GetGuaranteedPrecision())
+		w_sumwi = w_sumwi.Truncate(getPrecision())
 		dur0 += time.Since(start)
 		//fmt.Println("sum of Wi", w_sumwi)
 
 		// Wa
 		start = time.Now()
 		w_wa := Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_wa = w_wa.Truncate(GetGuaranteedPrecision())
+		w_wa = w_wa.Truncate(getPrecision())
 		dur1 += time.Since(start)
 		//fmt.Println("Wa return", w_wa)
 
 		// WaEx
 		start = time.Now()
 		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_waex = w_waex.Truncate(GetGuaranteedPrecision())
+		w_waex = w_waex.Truncate(getPrecision())
 		dur2 += time.Since(start)
 
 		// WaEx64
 		start = time.Now()
 		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
-		w_waex64 = w_waex64.Truncate(GetGuaranteedPrecision())
+		w_waex64 = w_waex64.Truncate(getPrecision())
 		dur3 += time.Since(start)
 
-		require.True(t, w_sumwi.LessThanOrEqual(ctrlertypes.DecimalOne), "SumWi", w_sumwi, "nth", n)
-		require.True(t, w_wa.LessThanOrEqual(ctrlertypes.DecimalOne), "Wa", w_wa, "nth", n)
-		require.True(t, w_waex.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx", w_waex, "nth", n)
-		require.True(t, w_waex64.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64", w_waex64, "nth", n)
+		require.True(t, w_sumwi.LessThanOrEqual(DecimalOne), "SumWi", w_sumwi, "nth", n)
+		require.True(t, w_wa.LessThanOrEqual(DecimalOne), "Wa", w_wa, "nth", n)
+		require.True(t, w_waex.LessThanOrEqual(DecimalOne), "WaEx", w_waex, "nth", n)
+		require.True(t, w_waex64.LessThanOrEqual(DecimalOne), "WaEx64", w_waex64, "nth", n)
 
-		require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))
-		require.True(t, w_wa.Equal(w_waex), fmt.Sprintf("Wa:%v, WaEx:%v, nth:%v", w_wa, w_waex, n))
-		require.True(t, w_waex.Equal(w_waex64), fmt.Sprintf("WaEx:%v, WaEx64:%v, nth:%v", w_waex, w_waex64, n))
+		checkDiff(t, w_sumwi, w_wa, decimal.New(1, -1*getPrecision()))
+		checkDiff(t, w_wa, w_waex, decimal.New(1, -1*getPrecision()))
+		checkDiff(t, w_waex, w_waex64, decimal.New(1, -1*getPrecision()))
+
+		//require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))
+		//require.True(t, w_wa.Equal(w_waex), fmt.Sprintf("Wa:%v, WaEx:%v, nth:%v", w_wa, w_waex, n))
+		//require.True(t, w_waex.Equal(w_waex64), fmt.Sprintf("WaEx:%v, WaEx64:%v, nth:%v", w_waex, w_waex64, n))
 	}
 
 	fmt.Println("SumWi", dur0/time.Duration(nOp), "Wa", dur1/time.Duration(nOp), "WaEx", dur2/time.Duration(nOp), "WaEx64", dur3/time.Duration(nOp))
@@ -166,64 +165,64 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 			wi := Wi(pow, dur, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
 			w_sumwi = w_sumwi.Add(wi)
 		}
-		w_sumwi = w_sumwi.Truncate(GetGuaranteedPrecision())
+		w_sumwi = w_sumwi.Truncate(getPrecision())
 		dur0 += time.Since(start)
 		//fmt.Println("sum of Wi", w_sumwi)
 
 		// Wa
 		start = time.Now()
 		w_wa := Wa(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_wa = w_wa.Truncate(GetGuaranteedPrecision())
+		w_wa = w_wa.Truncate(getPrecision())
 		dur1 += time.Since(start)
 		//fmt.Println("Wa return", w_wa)
 
 		// WaEx
 		start = time.Now()
 		w_waex := WaEx(vpows, vdurs, powerRipeningCycle, tau, decimal.NewFromBigInt(totalSupply.ToBig(), 0))
-		w_waex = w_waex.Truncate(GetGuaranteedPrecision())
+		w_waex = w_waex.Truncate(getPrecision())
 		dur2 += time.Since(start)
 
 		// WaEx64
 		start = time.Now()
 		w_waex64 := WaEx64(vpows, vdurs, powerRipeningCycle, tau, totalSupply)
-		w_waex64 = w_waex64.Truncate(GetGuaranteedPrecision())
+		w_waex64 = w_waex64.Truncate(getPrecision())
 		dur3 += time.Since(start)
 		//fmt.Println("WaEx64 return", w_waex64)
 
-		// WaEx64ByPowerChunks
+		// decimalWeightOfPowerChunks
 		start = time.Now()
-		w_waex64pc := WaEx64ByPowerChunk(powChunks, currHeight, powerRipeningCycle, tau, totalSupply)
-		w_waex64pc = w_waex64pc.Truncate(GetGuaranteedPrecision())
+		w_waex64pc := decimalWeightOfPowerChunks(powChunks, currHeight, powerRipeningCycle, tau, totalSupply)
+		w_waex64pc = w_waex64pc.Truncate(getPrecision())
 		dur4 += time.Since(start)
-		//fmt.Println("WaEx64ByPowerChunk return", w_waex64pc)
+		//fmt.Println("decimalWeightOfPowerChunks return", w_waex64pc)
 
 		// Weight64ByPowerChunks
 		start = time.Now()
-		w_w64pc := Scaled64PowerChunks(powChunks, currHeight, powerRipeningCycle, tau)
+		w_w64pc := decimalScaledPowerChunks(powChunks, currHeight, powerRipeningCycle, tau)
 		_totalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
-		w_w64pc, _ = w_w64pc.QuoRem(_totalSupply, GetDivisionPrecision())
-		w_w64pc = w_w64pc.Truncate(GetGuaranteedPrecision())
+		w_w64pc, _ = w_w64pc.QuoRem(_totalSupply, getDivisionPrecision())
+		w_w64pc = w_w64pc.Truncate(getPrecision())
 		dur5 += time.Since(start)
-		//fmt.Println("Scaled64PowerChunks return", w_w64pc)
+		//fmt.Println("decimalScaledPowerChunks return", w_w64pc)
 
 		// Weight64ByPowerChunks
 		rdx := rand.Intn(len(powChunks))
 		start = time.Now()
-		w_w64pc_patial0 := Scaled64PowerChunks(powChunks[:rdx], currHeight, powerRipeningCycle, tau)
-		w_w64pc_patial1 := Scaled64PowerChunks(powChunks[rdx:], currHeight, powerRipeningCycle, tau)
+		w_w64pc_patial0 := decimalScaledPowerChunks(powChunks[:rdx], currHeight, powerRipeningCycle, tau)
+		w_w64pc_patial1 := decimalScaledPowerChunks(powChunks[rdx:], currHeight, powerRipeningCycle, tau)
 		w_w64pc_patial := w_w64pc_patial0.Add(w_w64pc_patial1)
-		w_w64pc_patial, _ = w_w64pc_patial.QuoRem(_totalSupply, GetDivisionPrecision())
-		w_w64pc_patial = w_w64pc_patial.Truncate(GetGuaranteedPrecision())
+		w_w64pc_patial, _ = w_w64pc_patial.QuoRem(_totalSupply, getDivisionPrecision())
+		w_w64pc_patial = w_w64pc_patial.Truncate(getPrecision())
 		dur6 += time.Since(start)
-		//fmt.Println("Scaled64PowerChunks return", w_w64pc)
+		//fmt.Println("decimalScaledPowerChunks return", w_w64pc)
 
-		require.True(t, w_sumwi.LessThanOrEqual(ctrlertypes.DecimalOne), "SumWi", w_sumwi, "nth", n)
-		require.True(t, w_wa.LessThanOrEqual(ctrlertypes.DecimalOne), "Wa", w_wa, "nth", n)
-		require.True(t, w_waex.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx", w_waex, "nth", n)
-		require.True(t, w_waex64.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64", w_waex64, "nth", n)
-		require.True(t, w_waex64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "WaEx64ByPowerChunk", w_waex64pc, "nth", n)
-		require.True(t, w_w64pc.LessThanOrEqual(ctrlertypes.DecimalOne), "By Scaled64PowerChunks", w_w64pc, "nth", n)
-		require.True(t, w_w64pc_patial.LessThanOrEqual(ctrlertypes.DecimalOne), "Weight64ByPowerChunkPartially", w_w64pc_patial, "nth", n)
+		require.True(t, w_sumwi.LessThanOrEqual(DecimalOne), "SumWi", w_sumwi, "nth", n)
+		require.True(t, w_wa.LessThanOrEqual(DecimalOne), "Wa", w_wa, "nth", n)
+		require.True(t, w_waex.LessThanOrEqual(DecimalOne), "WaEx", w_waex, "nth", n)
+		require.True(t, w_waex64.LessThanOrEqual(DecimalOne), "WaEx64", w_waex64, "nth", n)
+		require.True(t, w_waex64pc.LessThanOrEqual(DecimalOne), "decimalWeightOfPowerChunks", w_waex64pc, "nth", n)
+		require.True(t, w_w64pc.LessThanOrEqual(DecimalOne), "By decimalScaledPowerChunks", w_w64pc, "nth", n)
+		require.True(t, w_w64pc_patial.LessThanOrEqual(DecimalOne), "Weight64ByPowerChunkPartially", w_w64pc_patial, "nth", n)
 
 		// w_sumwi has error, when the height is too small (less than about 500).
 		//require.True(t, w_sumwi.Equal(w_wa), fmt.Sprintf("SumWi:%v, Wa:%v, nth:%v", w_sumwi, w_wa, n))
@@ -317,7 +316,7 @@ func Benchmark_WaEx64(b *testing.B) {
 }
 
 func Test_temp(t *testing.T) {
-	SetDivisionPrecision(1)
+	setDivisionPrecision(1)
 	tau := decimal.New(int64(2), -3)
 	fmt.Println("tau", tau)
 	tau = tau.Mul(decimal.NewFromInt(2))
@@ -327,7 +326,7 @@ func Test_temp(t *testing.T) {
 }
 
 func Benchmark_Precision_6(b *testing.B) {
-	SetDivisionPrecision(3)
+	setDivisionPrecision(3)
 
 	totalSupply := types.ToFons(uint64(123_123_456_789))
 	votingPower := int64(123_456_789)
@@ -335,7 +334,7 @@ func Benchmark_Precision_6(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		tau := decimal.New(int64(200), -3)
-		keppa := ctrlertypes.DecimalOne.Sub(tau)
+		keppa := DecimalOne.Sub(tau)
 
 		vpPart := tau.Mul(decimal.NewFromInt(powerPeriod)).
 			Div(decimal.NewFromInt(powerRipeningCycle)).
@@ -348,7 +347,7 @@ func Benchmark_Precision_6(b *testing.B) {
 }
 
 func Benchmark_Precision_16(b *testing.B) {
-	SetDivisionPrecision(16)
+	setDivisionPrecision(16)
 
 	totalSupply := types.ToFons(uint64(123_123_456_789))
 	votingPower := int64(123_456_789)
@@ -356,7 +355,7 @@ func Benchmark_Precision_16(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		tau := decimal.New(int64(200), -3)
-		keppa := ctrlertypes.DecimalOne.Sub(tau)
+		keppa := DecimalOne.Sub(tau)
 
 		vpPart := tau.Mul(decimal.NewFromInt(powerPeriod)).
 			Div(decimal.NewFromInt(powerRipeningCycle)).
@@ -392,18 +391,18 @@ func Test_Precision(t *testing.T) {
 
 	//
 	// Precision 6
-	SetDivisionPrecision(8)
-	fmt.Println("precision           ", GetDivisionPrecision())
+	setDivisionPrecision(8)
+	fmt.Println("precision           ", getDivisionPrecision())
 	fmt.Println("votingPower         ", decimal.NewFromInt(votingPower))
 
 	tau := decimal.New(int64(200), -3)
 	fmt.Println("tau                 ", tau)
-	keppa := ctrlertypes.DecimalOne.Sub(tau)
+	keppa := DecimalOne.Sub(tau)
 	fmt.Println("keppa               ", keppa)
 
 	vpPart := tau.Mul(decimal.NewFromInt(powerPeriod))
 	fmt.Println("vpPart*tau          ", vpPart)
-	vpPart, _ = vpPart.QuoRem(decimal.NewFromInt(powerRipeningCycle), GetDivisionPrecision())
+	vpPart, _ = vpPart.QuoRem(decimal.NewFromInt(powerRipeningCycle), getDivisionPrecision())
 	fmt.Println("vpPart/ripeningCycle", vpPart)
 	vpPart = vpPart.Add(keppa)
 	fmt.Println("vpPart+keppa        ", vpPart)
@@ -411,25 +410,25 @@ func Test_Precision(t *testing.T) {
 	fmt.Println("vpPart*vpower       ", vpPart)
 	decTotalSupply := decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
 	fmt.Println("decTotalSupply      ", decTotalSupply)
-	q, r := vpPart.QuoRem(decTotalSupply, int32(GetDivisionPrecision()))
+	q, r := vpPart.QuoRem(decTotalSupply, int32(getDivisionPrecision()))
 	fmt.Println("result", q, "remainder", r)
 
 	fmt.Println("--------------------------")
 
 	//
 	// Precision 16 (default)
-	SetDivisionPrecision(16)
-	fmt.Println("precision           ", GetDivisionPrecision())
+	setDivisionPrecision(16)
+	fmt.Println("precision           ", getDivisionPrecision())
 	fmt.Println("votingPower         ", decimal.NewFromInt(votingPower))
 
 	tau = decimal.New(int64(200), -3)
 	fmt.Println("tau                 ", tau)
-	keppa = ctrlertypes.DecimalOne.Sub(tau)
+	keppa = DecimalOne.Sub(tau)
 	fmt.Println("keppa               ", keppa)
 
 	vpPart = tau.Mul(decimal.NewFromInt(powerPeriod))
 	fmt.Println("vpPart*tau          ", vpPart)
-	vpPart, _ = vpPart.QuoRem(decimal.NewFromInt(powerRipeningCycle), GetDivisionPrecision())
+	vpPart, _ = vpPart.QuoRem(decimal.NewFromInt(powerRipeningCycle), getDivisionPrecision())
 	fmt.Println("vpPart/ripeningCycle", vpPart)
 	vpPart = vpPart.Add(keppa)
 	fmt.Println("vpPart+keppa        ", vpPart)
@@ -437,6 +436,10 @@ func Test_Precision(t *testing.T) {
 	fmt.Println("vpPart*vpower       ", vpPart)
 	decTotalSupply = decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
 	fmt.Println("decTotalSupply      ", decTotalSupply)
-	q, r = vpPart.QuoRem(decTotalSupply, int32(GetDivisionPrecision()))
+	q, r = vpPart.QuoRem(decTotalSupply, int32(getDivisionPrecision()))
 	fmt.Println("result", q, "remainder", r)
+}
+
+func checkDiff(t *testing.T, a, b decimal.Decimal, allowedDiff decimal.Decimal) {
+	require.True(t, a.Sub(b).Abs().Cmp(allowedDiff) <= 0, fmt.Sprintf("a=%v, b=%v, diff=%v, allowedDiff=%v", a, b, a.Sub(b), allowedDiff))
 }

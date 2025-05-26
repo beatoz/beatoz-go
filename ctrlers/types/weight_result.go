@@ -1,8 +1,8 @@
 package types
 
 import (
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/beatoz/beatoz-go/types"
-	"github.com/shopspring/decimal"
 )
 
 const (
@@ -13,60 +13,36 @@ const (
 	YearSeconds         = DaySeconds * 365
 )
 
-var (
-	DecimalOne  = decimal.NewFromInt(1)
-	DecimalZero = decimal.Zero
-)
-
-type WeightResult struct {
-	sumWeight     decimal.Decimal
-	valsWeight    decimal.Decimal
-	beneficiaries []*beneficiary
+type IWeightResult interface {
+	SumWeight() fxnum.FxNum
+	ValWeight() fxnum.FxNum
+	Add(addr types.Address, weight, signWeight fxnum.FxNum, isVal bool)
+	Beneficiaries() []*Beneficiary
 }
 
-func NewWeight() *WeightResult {
-	return &WeightResult{sumWeight: decimal.Zero, valsWeight: decimal.Zero}
-}
-
-func (w *WeightResult) SumWeight() decimal.Decimal {
-	return w.sumWeight
-}
-
-func (w *WeightResult) ValWeight() decimal.Decimal {
-	return w.valsWeight
-}
-
-func (w *WeightResult) Add(addr types.Address, weight, signWeight decimal.Decimal, isVal bool) {
-	w.sumWeight = w.sumWeight.Add(weight)
-	if isVal {
-		w.valsWeight = w.valsWeight.Add(weight)
-	}
-	w.beneficiaries = append(w.beneficiaries, &beneficiary{addr, weight, signWeight, isVal})
-}
-
-func (w *WeightResult) Beneficiaries() []*beneficiary {
-	return w.beneficiaries
-}
-
-type beneficiary struct {
+type Beneficiary struct {
 	addr        types.Address
-	weight      decimal.Decimal
-	signingRate decimal.Decimal
+	weight      fxnum.FxNum
+	signingRate fxnum.FxNum
 	isVal       bool
 }
 
-func (b *beneficiary) Address() types.Address {
+func NewBeneficiary(addr types.Address, weight, signWeight fxnum.FxNum, isVal bool) *Beneficiary {
+	return &Beneficiary{addr, weight, signWeight, isVal}
+}
+
+func (b *Beneficiary) Address() types.Address {
 	return b.addr
 }
 
-func (b *beneficiary) Weight() decimal.Decimal {
+func (b *Beneficiary) Weight() fxnum.FxNum {
 	return b.weight
 }
 
-func (b *beneficiary) SignRate() decimal.Decimal {
+func (b *Beneficiary) SignRate() fxnum.FxNum {
 	return b.signingRate
 }
 
-func (b *beneficiary) IsValidator() bool {
+func (b *Beneficiary) IsValidator() bool {
 	return b.isVal
 }

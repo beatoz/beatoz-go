@@ -112,7 +112,7 @@ func Test_TxFeeProcessing(t *testing.T) {
 				require.NoError(t, xerr)
 
 				wa := weightInfo.SumWeight() //.Truncate(precision)
-				//wa := vpower.WaEx64ByPowerChunk(vpowMock.PowerChunks, currHeight, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
+				//wa := vpower.FxNumWeightOfPowerChunks(vpowMock.PowerChunks, currHeight, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 				//wa = wa.Truncate(precision)
 
 				si := Si(currHeight, int64(govMock.AssumedBlockInterval()), _adjustHeight, _adjustSupplyAmt, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
