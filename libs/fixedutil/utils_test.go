@@ -3,6 +3,7 @@ package fixedutil
 import (
 	"fmt"
 	"github.com/robaho/fixed"
+	"github.com/stretchr/testify/require"
 	"math"
 	"testing"
 	"testing/quick"
@@ -15,7 +16,6 @@ func TestFixedOpsDeterministic(t *testing.T) {
 		{"2.0000000", "3.5000000"},
 		{"1.2345678", "0.8765432"},
 		{"10.0000000", "1.0000000"},
-		// …원하는 모든 경계/샘플 케이스…
 	}
 	for _, c := range cases {
 		b, _ := fixed.Parse(c.base)
@@ -57,7 +57,15 @@ func TestGolden(t *testing.T) {
 	data := []struct {
 		base, exp, out string
 	}{
-		{"2.0000000", "3.5000000", "11.313694" /*"11.3137085"*/},
+		/*
+			OS:         Ubuntu 22.04 LTS (GitHub Actions's ubuntu-latest Runner)
+			Arch:       amd64 (x86_64)
+			Go Version: 1.21
+			fixedutil setting: lnTerms=32, expTerms=32
+
+			FixedPow(fixed.NewI(2,0), fixed.NewI(35,1)) → "11.3137085"
+		*/
+		{"2.0000000", "3.5000000", "11.3137085"},
 	}
 	for _, rec := range data {
 		b, _ := fixed.Parse(rec.base)
@@ -87,16 +95,26 @@ func TestNonDetPow(t *testing.T) {
 	*/
 
 	inputs := []struct {
-		x, y float64
+		x, y     float64
+		expected string
 	}{
-		{1.2345678, 0.8765432},
-		{2.7182818, 1.6180339},
-		{10.0000000, 0.1234567},
-		{5.0000000, 2.5000000},
+		{1.2345678, 0.8765432, "0"},
+		{2.7182818, 1.6180339, "0"},
+		{10.0000000, 0.1234567, "0"},
+		{5.0000000, 2.5000000, "0"},
 	}
 
 	for _, in := range inputs {
 		r := NonDetPow(in.x, in.y)
 		fmt.Printf("NonDetPow(%.7f, %.7f) = %.15f\n", in.x, in.y, r)
+	}
+
+	for _, in := range inputs {
+		fixedX := fixed.NewI(int64(in.x*1e7), 7)
+		fixedY := fixed.NewI(int64(in.y*1e7), 7)
+
+		fixedR, err := FixedPow(fixedX, fixedY)
+		require.NoError(t, err)
+		fmt.Printf("FixedPow(%v, %v) = %v\n", fixedX, fixedY, fixedR)
 	}
 }
