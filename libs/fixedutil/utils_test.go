@@ -75,6 +75,17 @@ func NonDetPow(x, y float64) float64 {
 }
 
 func TestNonDetPow(t *testing.T) {
+	/*
+		- Model: iMac, Retina 5K, 27-inch, 2020.
+		- CPU: 3.8 GHz 8코어 Intel Core i7
+		- OS: macOS Sequoia 15.4.1(24E263)
+
+		NonDetPow(1.2345678, 0.8765432) = 1.202864764209711
+		NonDetPow(2.7182818, 1.6180339) = 5.043165110348398
+		NonDetPow(10.0000000, 0.1234567) = 1.328791067482019
+		NonDetPow(5.0000000, 2.5000000) = 55.901699437494734
+	*/
+
 	inputs := []struct {
 		x, y float64
 	}{
