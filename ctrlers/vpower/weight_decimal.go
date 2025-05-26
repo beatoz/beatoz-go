@@ -148,6 +148,7 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, totalSupply *uin
 func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, totalSupply *uint256.Int) decimal.Decimal {
 	_tau := decimal.New(int64(tau), -3)
 	_keppa := ctrlertypes.DecimalOne.Sub(_tau)
+	_ripeningCycle := decimal.NewFromInt(ripeningCycle)
 
 	_maturedPower := int64(0)
 	risingPower := decimal.Zero
@@ -159,7 +160,7 @@ func WaEx64ByPowerChunk(powerChunks []*PowerChunkProto, currHeight, ripeningCycl
 			_maturedPower += pc.Power
 		} else {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
-			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(decimal.NewFromInt(ripeningCycle), GetDivisionPrecision())
+			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(_ripeningCycle, GetDivisionPrecision())
 			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
