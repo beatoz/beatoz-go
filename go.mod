@@ -3,7 +3,7 @@ module github.com/beatoz/beatoz-go
 go 1.22.5
 
 require (
-	github.com/beatoz/beatoz-sdk-go v0.2.2
+	github.com/beatoz/beatoz-sdk-go v0.2.3
 	github.com/beatoz/sfeeder v0.0.1
 	github.com/containerd/continuity v0.3.0
 	github.com/cosmos/iavl v1.3.0
@@ -11,6 +11,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/holiman/uint256 v1.3.1
 	github.com/json-iterator/go v1.1.12
+	github.com/robaho/fixed v0.0.0-20250130054609-fd0e46fcd988
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.13.0
@@ -88,7 +89,6 @@ require (
 	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/robaho/fixed v0.0.0-20250130054609-fd0e46fcd988 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
@@ -117,5 +117,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/beatoz/beatoz-sdk-go => ../beatoz-sdk-go
