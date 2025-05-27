@@ -69,7 +69,7 @@ func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xe
 
 func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 
-	// block<height> 시점의 stateDB 와 account ledger(acctCtrler) 를 갖는 `stateDBWrapper` 획득
+	// Get the stateDB at block<height> and the `stateDBWrapper` that has account ledger(acctCtrler)
 	state, xerr := ctrler.MemStateAt(height)
 	if xerr != nil {
 		return nil, xerr
