@@ -187,7 +187,20 @@ func testEstimateGas(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, 0 < estimatedGas)
 
-	retTx, err := evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), estimatedGas /*contractGas*/, defGasPrice, uint256.NewInt(0), bzweb3)
+	// expect error
+	wrongGas := estimatedGas - 10
+	fmt.Println("estimatedGas", estimatedGas, "wrongGas", wrongGas)
+	retTx, err := evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), wrongGas, defGasPrice, uint256.NewInt(0), bzweb3)
+	require.NoError(t, err)
+	// In CheckTx, the evm tx is not fully executed,
+	// So, the error, out of gas, doesn't occur.
+	//require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
+	//require.Equal(t, int64(0), retTx.CheckTx.GasUsed)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)
+	require.Equal(t, int64(0), retTx.DeliverTx.GasUsed)
+
+	// success
+	retTx, err = evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), estimatedGas, defGasPrice, uint256.NewInt(0), bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)

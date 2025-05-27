@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -133,11 +132,10 @@ func Test_Transfer(t *testing.T) {
 
 	require.NoError(t, mocks.DoBeginBlock(erc20EVM))
 
-	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
-		govMock, &acctHandler, nil, nil, nil)
-	_, xerr = erc20EVM.BeginBlock(bctx)
+	estimatedGas, xerr := estimateGas(abiERC20Contract, fromAcct.Address, erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
+		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
+	fmt.Println("Test_Transfer estimatedGas", estimatedGas)
 
 	ret, xerr = execMethod(
 		abiERC20Contract,
@@ -188,10 +186,8 @@ func Test_EstimateGas(t *testing.T) {
 	require.NoError(t, xerr)
 
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
-	toAcct := acctHandler.walletsArr[1].GetAccount()
+	toAcct := acctHandler.walletsArr[2].GetAccount()
 	queryAcct := web3.NewWallet(nil)
-
-	require.NoError(t, mocks.DoBeginBlock(erc20EVM))
 
 	ret, xerr := callMethod(abiERC20Contract, queryAcct.Address(), erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
 		"balanceOf", toAddrArr(fromAcct.Address))
@@ -203,17 +199,22 @@ func Test_EstimateGas(t *testing.T) {
 	require.NoError(t, xerr)
 	fmt.Println("(BEFORE) balanceOf", toAcct.Address, ret[0], "nonce", state.GetNonce(fromAcct.Address.Array20()))
 
+	require.NoError(t, mocks.DoBeginBlock(erc20EVM))
+
 	estimatedGas, xerr := estimateGas(abiERC20Contract, fromAcct.Address, erc20ContAddr, erc20EVM.lastBlockHeight, time.Now().Unix(),
 		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
 	require.NoError(t, xerr)
-	fmt.Println("estimatedGas", estimatedGas)
+	fmt.Println("Test_EstimateGas estimatedGas", estimatedGas)
 
-	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: erc20EVM.lastBlockHeight + 1}},
-		govMock, &acctHandler, nil, nil, nil)
-	_, xerr = erc20EVM.BeginBlock(bctx)
-	require.NoError(t, xerr)
+	// fail: out of gas
+	ret, xerr = execMethod(
+		abiERC20Contract,
+		fromAcct.Address, erc20ContAddr,
+		fromAcct.GetNonce(), estimatedGas-1, uint256.NewInt(10_000_000_000), uint256.NewInt(0),
+		"transfer", toAddrArr(toAcct.Address), toWei(100000000))
+	require.Error(t, xerr)
 
+	// success
 	ret, xerr = execMethod(
 		abiERC20Contract,
 		fromAcct.Address, erc20ContAddr,
@@ -297,10 +298,7 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPri
 	fromAcct := acctHandler.FindAccount(from, true)
 	toAcct := acctHandler.FindAccount(to, true)
 
-	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: 1, Time: time.Now()}},
-		govMock, &acctHandler, nil, nil, nil)
-
+	bctx := mocks.CurrBlockCtx()
 	txctx := &ctrlertypes.TrxContext{
 		BlockContext: bctx,
 		Tx:           web3.NewTrxContract(from, to, nonce, gas, gasPrice, amt, input),
@@ -311,12 +309,13 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPri
 		Receiver:     toAcct,
 		GasUsed:      0,
 	}
-	xerr := erc20EVM.ExecuteTrx(txctx)
-	if xerr != nil {
+
+	if xerr := erc20EVM.ValidateTrx(txctx); xerr != nil {
 		return nil, xerr
 	}
-
-	fmt.Println("execMethod", methodName, "used_gas", txctx.GasUsed)
+	if xerr := erc20EVM.ExecuteTrx(txctx); xerr != nil {
+		return nil, xerr
+	}
 
 	retUnpack, err := abiObj.Unpack(methodName, txctx.RetData)
 	if err != nil {
