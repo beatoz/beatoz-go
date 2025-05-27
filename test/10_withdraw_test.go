@@ -1,9 +1,7 @@
 package test
 
 import (
-	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -26,9 +24,9 @@ func Test_Withdraw(t *testing.T) {
 
 	rwd, err := bweb3.QueryReward(w.Address(), 0)
 	require.NoError(t, err)
-	jz, err := jsonx.MarshalIndent(rwd, "", "  ")
-	require.NoError(t, err)
-	fmt.Println(string(jz))
+	//jz, err := jsonx.MarshalIndent(rwd, "", "  ")
+	//require.NoError(t, err)
+	//fmt.Println(string(jz))
 
 	cumulatedRwd := uint256.MustFromDecimal(rwd.Cumulated)
 	withdrawReqAmt := new(uint256.Int).Div(cumulatedRwd, uint256.NewInt(2))
@@ -51,21 +49,21 @@ func Test_Withdraw(t *testing.T) {
 
 	rwd, err = bweb3.QueryReward(w.Address(), 0)
 	require.NoError(t, err)
-	jz, err = jsonx.MarshalIndent(rwd, "", "  ")
-	require.NoError(t, err)
+	//jz, err = jsonx.MarshalIndent(rwd, "", "  ")
+	//require.NoError(t, err)
 	require.Equal(t, withdrawReqAmt.Dec(), rwd.Withdrawn)
-	fmt.Println(string(jz))
+	//fmt.Println(string(jz))
 
 	n, err := waitBlock(rwd.Height + govParams.InflationCycleBlocks() + 1)
 	require.NoError(t, err)
-	fmt.Println("last.height", n)
+	//fmt.Println("last.height", n)
 
 	for h := rwd.Height; h < n; h++ {
 		rwd, err = bweb3.QueryReward(w.Address(), h)
 		require.NoError(t, err, "try.height", h)
-		jz, err = jsonx.MarshalIndent(rwd, "", "  ")
-		require.NoError(t, err)
-		fmt.Println("current height", h, "reward", string(jz))
+		//jz, err = jsonx.MarshalIndent(rwd, "", "  ")
+		//require.NoError(t, err)
+		//fmt.Println("current height", h, "reward", string(jz))
 	}
 }
 

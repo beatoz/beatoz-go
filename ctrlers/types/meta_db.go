@@ -1,18 +1,13 @@
 package types
 
 import (
-	"encoding/binary"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"
 )
 
 const (
-	keyChainID      = "ci"
-	keyBlockHeight  = "bh"
 	keyBlockContext = "bc"
-	keyBlockAppHash = "ah"
-	keyRewardHash   = "rh"
 )
 
 type MetaDB struct {
@@ -41,48 +36,6 @@ func (stdb *MetaDB) Close() error {
 
 	stdb.cache = map[string][]byte{}
 	return stdb.db.Close()
-}
-
-func (stdb *MetaDB) ChainID() string {
-	v := stdb.get(keyChainID)
-	if v == nil {
-		return ""
-	}
-	return string(v)
-}
-
-func (stdb *MetaDB) PutChainID(chainId string) error {
-	return stdb.put(keyChainID, []byte(chainId))
-}
-
-func (stdb *MetaDB) LastBlockHeight() int64 {
-	v := stdb.get(keyBlockHeight)
-	if v == nil {
-		return 0
-	}
-	return int64(binary.BigEndian.Uint64(v))
-}
-
-func (stdb *MetaDB) PutLastBlockHeight(bh int64) error {
-	v := make([]byte, 8)
-	binary.BigEndian.PutUint64(v, uint64(bh))
-	return stdb.put(keyBlockHeight, v)
-}
-
-func (stdb *MetaDB) LastBlockAppHash() []byte {
-	return stdb.get(keyBlockAppHash)
-}
-
-func (stdb *MetaDB) PutLastBlockAppHash(v []byte) error {
-	return stdb.put(keyBlockAppHash, v)
-}
-
-func (stdb *MetaDB) LastRewardHash() []byte {
-	return stdb.get(keyRewardHash)
-}
-
-func (stdb *MetaDB) PutLastRewardHash(v []byte) error {
-	return stdb.put(keyRewardHash, v)
 }
 
 func (stdb *MetaDB) LastBlockContext() *BlockContext {

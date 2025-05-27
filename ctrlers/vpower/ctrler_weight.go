@@ -3,25 +3,26 @@ package vpower
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
-	"github.com/shopspring/decimal"
 )
 
 func (ctrler *VPowerCtrler) ComputeWeight(
 	height, inflationCycle, ripeningBlocks int64, tau int32,
 	totalSupply *uint256.Int,
-) (*ctrlertypes.Weight, xerrors.XError) {
+) (ctrlertypes.IWeightResult, xerrors.XError) {
 
 	//var allPowChunks []*PowerChunkProto
 	var benefAddrs []types.Address
 	var mapBenefPowChunks = make(map[string]*struct {
 		val   bool
 		pcs   []*PowerChunkProto
-		signW decimal.Decimal
+		signW fxnum.FxNum
 	})
+	var allPowChunks []*PowerChunkProto
 
 	ledger, xerr := ctrler.vpowerState.ImitableLedgerAt(max(height-1, 1))
 	if xerr != nil {
@@ -40,8 +41,8 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 			ptr, _ := item.(*BlockCount)
 			c = *ptr
 		}
-		signRate, _ := decimal.NewFromInt(int64(c)).QuoRem(decimal.NewFromInt(inflationCycle), GetDivisionPrecision())
-		signRate = decimal.NewFromInt(1).Sub(signRate) // = 1 - missedBlock/inflationCycle
+		signRate, _ := fxnum.FromInt(int64(c)).QuoRem(fxnum.FromInt(inflationCycle), fxnum.GetDivisionPrecision())
+		signRate = fxnum.FromInt(1).Sub(signRate) // = 1 - missedBlock/inflationCycle
 
 		for _, from := range val.Delegators {
 			vpow, xerr := ctrler.readVPower(from, val.addr, true)
@@ -56,7 +57,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 				mapBenefPowChunks[_mapKey] = &struct {
 					val   bool
 					pcs   []*PowerChunkProto
-					signW decimal.Decimal
+					signW fxnum.FxNum
 				}{
 					val:   bytes.Equal(from, val.addr),
 					pcs:   vpow.PowerChunks,
@@ -66,18 +67,46 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 				b.pcs = append(b.pcs, vpow.PowerChunks...)
 			}
 
-			//allPowChunks = append(allPowChunks, vpow.PowerChunks...)
+			allPowChunks = append(allPowChunks, vpow.PowerChunks...)
 		}
 	}
 
-	weightInfo := ctrlertypes.NewWeight()
-	for _, addr := range benefAddrs {
-		benefPowChunks := mapBenefPowChunks[addr.String()]
-		benefW := WaEx64ByPowerChunk(
-			benefPowChunks.pcs,
-			height, ripeningBlocks, tau, totalSupply)
-		weightInfo.Add(addr, benefW, benefPowChunks.signW, benefPowChunks.val)
-	}
+	var weightInfo *fxnumWeight
 
+	//{
+	//	weightInfo = NewWeight()
+	//	start := time.Now()
+	//	for _, addr := range benefAddrs {
+	//		benefPowChunks := mapBenefPowChunks[addr.String()]
+	//		benefW := fxnumWeightOfPowerChunks(
+	//			benefPowChunks.pcs,
+	//			height, ripeningBlocks, tau, totalSupply)
+	//		weightInfo.Add(addr, benefW, benefPowChunks.signW, benefPowChunks.val)
+	//	}
+	//	since := time.Since(start)
+	//	fmt.Println("time1", since)
+	//}
+
+	{
+		weightInfo = NewWeight()
+		supplyInPower, _ := ctrlertypes.AmountToPower(totalSupply)
+		fxSupplyPower := fxnum.FromInt(supplyInPower)
+
+		allScaledPower := fxnumScaledPowerChunks(allPowChunks, height, ripeningBlocks, tau)
+		allWeight := allScaledPower.Div(fxSupplyPower)
+
+		for i, addr := range benefAddrs {
+			benefPowChunks := mapBenefPowChunks[addr.String()]
+			if i == len(benefAddrs)-1 {
+				benefWeight := allWeight.Sub(weightInfo.sumWeight)
+				weightInfo.Add(addr, benefWeight, benefPowChunks.signW, benefPowChunks.val)
+			} else {
+				benefScaledPower := fxnumScaledPowerChunks(benefPowChunks.pcs, height, ripeningBlocks, tau)
+				benefWeight := allWeight.Mul(benefScaledPower).Div(allScaledPower)
+				weightInfo.Add(addr, benefWeight, benefPowChunks.signW, benefPowChunks.val)
+			}
+		}
+		weightInfo.sumWeight = allWeight
+	}
 	return weightInfo, nil
 }

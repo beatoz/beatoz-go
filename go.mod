@@ -3,7 +3,7 @@ module github.com/beatoz/beatoz-go
 go 1.22.5
 
 require (
-	github.com/beatoz/beatoz-sdk-go v0.2.2
+	github.com/beatoz/beatoz-sdk-go v0.2.3
 	github.com/beatoz/sfeeder v0.0.1
 	github.com/containerd/continuity v0.3.0
 	github.com/cosmos/iavl v1.3.0
@@ -11,6 +11,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/holiman/uint256 v1.3.1
 	github.com/json-iterator/go v1.1.12
+	github.com/robaho/fixed v0.0.0-20250130054609-fd0e46fcd988
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.13.0

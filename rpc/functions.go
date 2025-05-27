@@ -159,5 +159,8 @@ func TxSearch(
 }
 
 func Validators(ctx *tmrpctypes.Context, heightPtr *int64, pagePtr, perPagePtr *int) (*tmrpccoretypes.ResultValidators, error) {
+	if heightPtr != nil && *heightPtr == 0 {
+		heightPtr = nil
+	}
 	return tmrpccore.Validators(ctx, heightPtr, pagePtr, perPagePtr)
 }
