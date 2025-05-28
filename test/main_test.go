@@ -22,7 +22,7 @@ func test_on_internal_node(m *testing.M) {
 	wg.Add(1)
 	go func() {
 
-		runPeers(1)
+		runPeers(3)
 
 		wg.Done()
 	}()

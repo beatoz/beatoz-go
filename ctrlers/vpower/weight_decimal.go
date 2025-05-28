@@ -30,7 +30,7 @@ func decimalScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 		if dur >= ripeningCycle {
 			// mature power
 			_maturedPower += pc.Power
-		} else {
+		} else if dur >= 1 {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
 			decW, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(_ripeningCycle, getDivisionPrecision())
 			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
@@ -52,11 +52,12 @@ func decimalScaledPowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int6
 	if dur >= ripeningCycle {
 		// mature power
 		return decimal.NewFromInt(pc.Power)
-	} else {
+	} else if dur >= 1 {
 		//  (((tau * dur) / ripeningCycle) + keppa) * power_i
 		ret, _ := _tau.Mul(decimal.NewFromInt(dur)).QuoRem(_ripeningCycle, getDivisionPrecision())
 		return ret.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 	}
+	return decimal.Zero
 }
 
 // Wa calculates the total voting power weight of all validators and delegators.
@@ -68,6 +69,9 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decima
 	_keppa := DecimalOne.Sub(_tau)      // keppa = 1 - tau
 
 	for i, pow := range pows {
+		if vpdurs[i] <= 0 {
+			continue
+		}
 		vpAmt := decimal.New(pow, int32(types.DECIMAL))
 		sumPowAmt = sumPowAmt.Add(vpAmt)
 
@@ -86,6 +90,10 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply decima
 }
 
 func oldWi(pow, vdur, ripeningCycle int64, tau int32, totalSupply decimal.Decimal) decimal.Decimal {
+	if vdur == 0 {
+		return decimal.Zero
+	}
+
 	decDur := DecimalOne
 	if vdur < ripeningCycle {
 		decDur, _ = decimal.NewFromInt(vdur).QuoRem(decimal.NewFromInt(ripeningCycle), getDivisionPrecision())
@@ -134,7 +142,7 @@ func WaEx(pows, vpdurs []int64, ripeningCycle int64, tau int32, totalSupply deci
 		if vpdurs[i] >= ripeningCycle {
 			// mature power
 			_maturedPower += pow
-		} else {
+		} else if vpdurs[i] >= 1 {
 			decDur, _ := decimal.NewFromInt(vpdurs[i]).QuoRem(decimal.NewFromInt(ripeningCycle), getDivisionPrecision()) // dur = vpdur / ripeningCycle
 			decCo := _tau.Mul(decDur).Add(_keppa)                                                                        // tau * (vpdur / ripeningCycle) + keppa
 			decV := decimal.NewFromInt(pow)
@@ -159,7 +167,7 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, totalSupply *uin
 		if durs[i] >= ripeningCycle {
 			// mature power
 			_maturedPower += pow
-		} else {
+		} else if durs[i] >= 1 {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
 			decW, _ := _tau.Mul(decimal.NewFromInt(durs[i])).QuoRem(decimal.NewFromInt(ripeningCycle), getDivisionPrecision())
 			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pow))
