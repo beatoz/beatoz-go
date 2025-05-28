@@ -11,8 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmrpccore "github.com/tendermint/tendermint/rpc/core"
-	"math"
+	"time"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
@@ -25,13 +24,12 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 		height = ctrler.lastBlockHeight
 	}
 
-	block, err := tmrpccore.Block(nil, &height)
-	if err != nil {
-		return nil, xerrors.From(err)
-	}
-	btm := block.Block.Time.Unix()
+	//_, err := tmrpccore.Block(nil, &height)
+	//if err != nil {
+	//	return nil, xerrors.From(err)
+	//}
 
-	execRet, xerr := ctrler.callVM(from, to, data, height, btm)
+	execRet, xerr := ctrler.callVM(from, to, data, height, time.Now().Unix())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -69,7 +67,7 @@ func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xe
 
 func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 
-	// block<height> 시점의 stateDB 와 account ledger(acctCtrler) 를 갖는 `stateDBWrapper` 획득
+	// Get the stateDB at block<height> and the `stateDBWrapper` that has account ledger(acctCtrler)
 	state, xerr := ctrler.MemStateAt(height)
 	if xerr != nil {
 		return nil, xerr
@@ -87,8 +85,8 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, 0, math.MaxUint64/2, uint256.NewInt(0), uint256.NewInt(0), data, true)
-	blockContext := evmBlockContext(sender, height, blockTime, math.MaxUint64/2)
+	vmmsg := evmMessage(sender, toAddr, 0, 3000000, uint256.NewInt(0), uint256.NewInt(0), data, true)
+	blockContext := evmBlockContext(sender, height, blockTime, 3000000)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})

@@ -33,7 +33,7 @@ func fxnumScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripening
 		if dur >= ripeningCycle {
 			// mature power
 			maturedPower += pc.Power
-		} else {
+		} else if dur >= 1 {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
 			w_riging := _tau.Mul(fxnum.FromInt(dur)).Div(_ripeningCycle).Add(_keppa).Mul(fxnum.FromInt(pc.Power))
 			_risingPower = _risingPower.Add(w_riging)
@@ -52,8 +52,9 @@ func fxnumScaledPowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int64,
 	dur := currHeight - pc.Height
 	if dur >= ripeningCycle {
 		return fxnum.FromInt(pc.Power)
-	} else {
+	} else if dur >= 1 {
 		//  (((tau * dur) / ripeningCycle) + keppa) * power_i
 		return _tau.Mul(fxnum.FromInt(dur)).Div(_ripeningCycle).Add(_keppa).Mul(fxnum.FromInt(pc.Power))
 	}
+	return fxnum.ZERO
 }
