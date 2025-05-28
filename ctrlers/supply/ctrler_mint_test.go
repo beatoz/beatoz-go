@@ -4,8 +4,11 @@ import (
 	"fmt"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
+	"github.com/robaho/fixed"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -148,4 +151,57 @@ func absDiff(x, y *uint256.Int) *uint256.Int {
 		result.Sub(x, y)
 	}
 	return result
+}
+
+type testData struct {
+	atHeight            int64
+	weight              string
+	adjustedHeight      int64
+	adjustedSupply      string
+	expectedTotalSupply string
+}
+
+var sampleData = []testData{
+	{604800, "0.0182625", 1, "350000000000000000000000000", "350031213531848000000000000"},
+	{7862400, "0.1498358", 3775312, "90090972755328500000000000", "93099438518382400000000000"},
+	{15120000, "0.3155568", 3775312, "93099438518382400000000000", "110391615576530000000000000"},
+	{22377600, "0.5051176", 3775312, "110391615576530000000000000", "153471552699752000000000000"},
+	{29635200, "0.6561728", 9908459, "78849958256933700000000000", "140494611359761000000000000"},
+	{36892800, "0.7469144", 9908459, "140494611359761000000000000", "224527706888588000000000000"},
+	{44150400, "0.7984154", 9908459, "224527706888588000000000000", "318712632693887000000000000"},
+}
+
+// 7e26 - ((7e26-35e25)/((1.29)^( 0.0182625*((604800-1)/31536000))))
+// 3500312135937438179901169673800766242360022212667536399889505 from wolframalpha
+// 350031213593743817990116967.3800766 (chatgpt, precision7, fixed, final round) <- 350031213593743817990116967.38007662423600222126675363998895050575599794509825908
+// 350031217215424384144934271.8629498 (chatgpt, precision7, fixed, round)
+// 350031217215424384144934271 (fixed)
+// 350031213511584579350750774 (decimal)
+func Test_Si(t *testing.T) {
+	maxSupply := uint256.MustFromDecimal("700000000000000000000000000")
+	//initSupply := types.PowerToAmount(350_000_000)
+	lambda := int32(290)
+	//ripening := types.YearSeconds
+
+	fmt.Println("DivisionPrecision", decimal.DivisionPrecision)
+	decimal.DivisionPrecision = 7
+	for _, data := range sampleData {
+		atHeight := data.atHeight
+		weight := fxnum.FxNum{
+			Fixed: fixed.NewS(data.weight),
+		}
+		adjustedHeight := data.adjustedHeight
+		adjustedSupply := uint256.MustFromDecimal(data.adjustedSupply)
+		expected := uint256.MustFromDecimal(data.expectedTotalSupply)
+
+		fxTotal := Si(atHeight, 1, adjustedHeight, adjustedSupply, maxSupply, lambda, weight).Floor()
+		u256Total := uint256.MustFromBig(fxTotal.BigInt())
+
+		decW, err := decimal.NewFromString(data.weight)
+		require.NoError(t, err)
+		decTotal := decimalSi(atHeight, 1, adjustedHeight, adjustedSupply, maxSupply, lambda, decW).Floor()
+		//require.Equal(t, expectedTotalSupply.Dec(), total.String())
+		fmt.Println("---\ndiff", absDiff(u256Total, expected).Dec(), "expected", expected.String())
+		fmt.Println("diff", absDiff(u256Total, uint256.MustFromBig(decTotal.BigInt())), "actual", u256Total.String(), "decimal", decTotal.String())
+	}
 }
