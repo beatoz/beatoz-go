@@ -6,6 +6,7 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 	"math"
 	"runtime"
 	"strconv"
@@ -158,12 +159,15 @@ func TestNonDetPow(t *testing.T) {
 	}
 
 	fmt.Printf("System: %s, %s, %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
-	cpuInfo, _ := cpu.Info()
-	if cpuInfo != nil {
+	cpuInfo, err := cpu.Info()
+	if err != nil {
+		modelName, _ := unix.Sysctl("machdep.cpu.brand_string")
+		cores, _ := unix.SysctlUint32("machdep.cpu.core_count")
+		fmt.Printf("%v, %v Cores\n", modelName, cores)
+	} else {
 		for _, info := range cpuInfo {
 			fmt.Printf("%v, %v Cores\n", info.ModelName, info.Cores)
 		}
-
 	}
 
 	for _, in := range inputs {
