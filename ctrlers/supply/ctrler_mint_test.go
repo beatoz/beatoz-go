@@ -240,12 +240,14 @@ func Test_Annual_Si(t *testing.T) {
 			powChunks, h,
 			govMock.RipeningBlocks(),
 			govMock.BondingBlocksWeightPermil(),
-			adjustedSupply) // test using adjustedSupply not totalSupply
+			totalSupply)
+
 		decTotalSupply := Si(h,
 			1, adjustedHeight, adjustedSupply,
 			govMock.MaxTotalSupply(),
 			govMock.InflationWeightPermil(),
 			vw).Floor()
+
 		totalSupply = uint256.MustFromBig(decTotalSupply.BigInt())
 		if !burned {
 			require.True(t, totalSupply.Gt(preSupply), fmt.Sprintf("height %d: %v <= %v", h, totalSupply, preSupply))
