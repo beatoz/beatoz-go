@@ -217,33 +217,56 @@ func Test_Annual_Si(t *testing.T) {
 		{Height: 1, Power: 42_000_000},
 	}
 
-	govMock.GetValues().InflationWeightPermil = 2000
+	govMock.GetValues().InflationWeightPermil = 900
 	fmt.Println("tau", govMock.BondingBlocksWeightPermil())
 	fmt.Println("lamda", govMock.InflationWeightPermil())
 
-	preDecSupply := decimal.Zero
-	for h := types.YearSeconds; h < types.YearSeconds*50; h += types.YearSeconds {
+	heightYears := int64(0)
+	preSupply := totalSupply.Clone()
+	for h := govMock.InflationCycleBlocks(); h < types.YearSeconds*40; h += govMock.InflationCycleBlocks() {
+		burned := false
+		if h == govMock.InflationCycleBlocks()*110 {
+			// burn x %
+			burnRate := decimal.NewFromFloat(0.9)
+			adjustedSupply = uint256.MustFromBig(decimal.NewFromBigInt(totalSupply.ToBig(), 0).Mul(burnRate).BigInt())
+			adjustedHeight = h - 100 // burned before 100 blocks
+			totalSupply = adjustedSupply.Clone()
+			b, f := types2.FromFons(adjustedSupply)
+			fmt.Printf("Burn - adjustedHeight: %d, adjustedSupply: %v.%v \n", adjustedHeight, b, f)
+			burned = true
+		}
+
 		vw := vpower.FxNumWeightOfPowerChunks(
 			powChunks, h,
 			govMock.RipeningBlocks(),
 			govMock.BondingBlocksWeightPermil(),
-			adjustedSupply) // test for adjustedSupply not totalSupply
-		_totalSupply := Si(h,
+			adjustedSupply) // test using adjustedSupply not totalSupply
+		decTotalSupply := Si(h,
 			1, adjustedHeight, adjustedSupply,
 			govMock.MaxTotalSupply(),
 			govMock.InflationWeightPermil(),
 			vw).Floor()
-
-		if preDecSupply.IsZero() {
-			preDecSupply = _totalSupply
-		} else {
-			require.True(t, _totalSupply.GreaterThan(preDecSupply), fmt.Sprintf("height %d: %v <= %v", h, _totalSupply, preDecSupply))
-			preDecSupply = _totalSupply
+		totalSupply = uint256.MustFromBig(decTotalSupply.BigInt())
+		if !burned {
+			require.True(t, totalSupply.Gt(preSupply), fmt.Sprintf("height %d: %v <= %v", h, totalSupply, preSupply))
 		}
 
-		totalSupply = uint256.MustFromBig(_totalSupply.BigInt())
+		hY := H(h-adjustedHeight, 1)
+		heightYears = hY.Int()
+		b, f := types2.FromFons(preSupply)
+		b0, f0 := types2.FromFons(totalSupply)
+		diff := new(uint256.Int).Sub(totalSupply, preSupply)
+		sign := "-"
+		if diff.Sign() < 0 {
+			sign = "-"
+			_ = diff.Abs(diff)
+		} else if diff.Sign() > 0 {
+			sign = "+"
+		}
+		b1, f1 := types2.FromFons(diff)
+		fmt.Printf("year: %2d, height: %10v, preSupply: %v.%018v, totalSupply: %v.%018v, weight: %s, diff(%s): %v.%018v\n",
+			heightYears, h, b, f, b0, f0, vw.StringN(7), sign, b1, f1)
 
-		btoz, fons := types2.FromFons(totalSupply)
-		fmt.Printf("year[%02d]: totalSupply: %v.%018v, weight: %v, H:%v\n", h/types.YearSeconds, btoz, fons, vw, H(h, adjustedHeight))
+		preSupply = totalSupply.Clone()
 	}
 }
