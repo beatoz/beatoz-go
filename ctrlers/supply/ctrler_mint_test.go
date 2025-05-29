@@ -4,7 +4,9 @@ import (
 	"fmt"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/libs/fxnum"
+	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/robaho/fixed"
@@ -203,5 +205,45 @@ func Test_Si(t *testing.T) {
 		//require.Equal(t, expectedTotalSupply.Dec(), total.String())
 		fmt.Println("---\ndiff", absDiff(u256Total, expected).Dec(), "expected", expected.String())
 		fmt.Println("diff", absDiff(u256Total, uint256.MustFromBig(decTotal.BigInt())), "actual", u256Total.String(), "decimal", decTotal.String())
+	}
+}
+
+func Test_Annual_Si(t *testing.T) {
+	adjustedHeight := int64(1)
+	adjustedSupply := uint256.MustFromDecimal("350000000000000000000000000")
+	totalSupply := adjustedSupply.Clone()
+
+	powChunks := []*vpower.PowerChunkProto{
+		{Height: 1, Power: 42_000_000},
+	}
+
+	govMock.GetValues().InflationWeightPermil = 2000
+	fmt.Println("tau", govMock.BondingBlocksWeightPermil())
+	fmt.Println("lamda", govMock.InflationWeightPermil())
+
+	preDecSupply := decimal.Zero
+	for h := types.YearSeconds; h < types.YearSeconds*50; h += types.YearSeconds {
+		vw := vpower.FxNumWeightOfPowerChunks(
+			powChunks, h,
+			govMock.RipeningBlocks(),
+			govMock.BondingBlocksWeightPermil(),
+			adjustedSupply) // test for adjustedSupply not totalSupply
+		_totalSupply := Si(h,
+			1, adjustedHeight, adjustedSupply,
+			govMock.MaxTotalSupply(),
+			govMock.InflationWeightPermil(),
+			vw).Floor()
+
+		if preDecSupply.IsZero() {
+			preDecSupply = _totalSupply
+		} else {
+			require.True(t, _totalSupply.GreaterThan(preDecSupply), fmt.Sprintf("height %d: %v <= %v", h, _totalSupply, preDecSupply))
+			preDecSupply = _totalSupply
+		}
+
+		totalSupply = uint256.MustFromBig(_totalSupply.BigInt())
+
+		btoz, fons := types2.FromFons(totalSupply)
+		fmt.Printf("year[%02d]: totalSupply: %v.%018v, weight: %v, H:%v\n", h/types.YearSeconds, btoz, fons, vw, H(h, adjustedHeight))
 	}
 }
