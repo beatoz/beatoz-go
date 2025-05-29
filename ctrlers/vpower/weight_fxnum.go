@@ -6,18 +6,18 @@ import (
 	"github.com/holiman/uint256"
 )
 
-func FxNumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, totalSupply *uint256.Int) fxnum.FxNum {
-	return fxnumWeightOfPowerChunks(powerChunks, currHeight, ripeningCycle, tau, totalSupply)
+func FxNumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, baseSupply *uint256.Int) fxnum.FxNum {
+	return fxnumWeightOfPowerChunks(powerChunks, currHeight, ripeningCycle, tau, baseSupply)
 }
 
 // fxnumWeightOfPowerChunks calculates the voting power weight not applied.
 // `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / totalSupply`
-func fxnumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, totalSupply *uint256.Int) fxnum.FxNum {
-	totalPower, _ := types.AmountToPower(totalSupply)
-	fxSupplyPower := fxnum.FromInt(totalPower)
+func fxnumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, baseSupply *uint256.Int) fxnum.FxNum {
+	basePower, _ := types.AmountToPower(baseSupply)
+	fxBasePower := fxnum.FromInt(basePower)
 
 	fxScaledPower := fxnumScaledPowerChunks(powerChunks, currHeight, ripeningCycle, tau)
-	return fxScaledPower.Div(fxSupplyPower)
+	return fxScaledPower.Div(fxBasePower)
 }
 
 func fxnumScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) fxnum.FxNum {

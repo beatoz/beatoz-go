@@ -89,7 +89,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			bctx.GovHandler.InflationCycleBlocks(),
 			bctx.GovHandler.RipeningBlocks(),
 			bctx.GovHandler.BondingBlocksWeightPermil(),
-			lastTotalSupply,
+			lastTotalSupply, // todo: Decide whether to use `lastTotalSupply` or the `lastAdjustedSupply`.
 		)
 		if xerr != nil {
 			respCh <- &respMint{
