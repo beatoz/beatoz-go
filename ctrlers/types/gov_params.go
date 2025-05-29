@@ -53,7 +53,7 @@ func NewGovParams(interval int) *GovParams {
 			InflationWeightPermil:     390,                                                            // 0.390
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
-			RipeningBlocks:            WeekSeconds / int64(interval),                                  // one year blocks
+			RipeningBlocks:            YearSeconds / int64(interval),                                  // one year blocks
 			XRewardPoolAddress:        types.ZeroAddress(),                                            // zero address
 			XDeadAddress:              types.DeadAddress(),                                            // zero address
 			ValidatorRewardRate:       30,                                                             // 30%

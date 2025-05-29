@@ -187,11 +187,30 @@ func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uin
 	return decSmax.Sub(decNumer.Div(decDenom))
 }
 
+func decimalSi(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
+	if height < adjustedHeight {
+		panic("the height should be greater than the adjusted height ")
+	}
+	_lambda := decimal.New(int64(lambda), -3)
+	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
+
+	decWHid := wa.Mul(decimalH(height-adjustedHeight, blockIntv))
+	decDenom := decLambdaAddOne.Pow(decWHid)
+
+	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
+	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
+	return decSmax.Sub(decNumer.Div(decDenom))
+}
+
 // H returns the normalized block time corresponding to the given block height.
 // (`ret = current_height * block_interval_sec / one_year_seconds`)
 // It calculates how far along the blockchain is relative to a predefined reference period.
 // For example, if the reference period is one year, a return value of 1.0 indicates that
 // exactly one reference period has elapsed.
 func H(height, blockIntvSec int64) fxnum.FxNum {
-	return fxnum.FromInt(height).Mul(fxnum.FromInt(blockIntvSec)).Div(fxnum.FromInt(ctrlertypes.YearSeconds))
+	return fxnum.FromInt(height * blockIntvSec).Div(fxnum.FromInt(ctrlertypes.YearSeconds))
+}
+
+func decimalH(height, blockIntvSec int64) decimal.Decimal {
+	return decimal.NewFromInt(height * blockIntvSec).Div(decimal.NewFromInt(ctrlertypes.YearSeconds))
 }
