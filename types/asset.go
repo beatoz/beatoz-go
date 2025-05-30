@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"github.com/holiman/uint256"
 )
 
@@ -41,4 +42,9 @@ func ToBTOZ(sau *uint256.Int) uint64 {
 	r := new(uint256.Int)
 	q, _ := new(uint256.Int).DivMod(sau, oneCoinInFons, r)
 	return q.Uint64()
+}
+
+func FormattedString(sau *uint256.Int) string {
+	q, r := FromFons(sau)
+	return fmt.Sprintf("%d.%018d", q, r)
 }
