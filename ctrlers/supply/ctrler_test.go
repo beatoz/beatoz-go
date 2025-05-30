@@ -26,8 +26,7 @@ func init() {
 	config = btzcfg.DefaultConfig()
 	config.SetRoot(rootDir)
 
-	govMock = govmock.NewGovHandlerMock(types.DefaultGovParams())
-	govMock.GetValues().InflationCycleBlocks = types.WeekSeconds
+	govMock = govmock.NewGovHandlerMock(types.NewGovParams(1))
 	acctMock = acctmock.NewAcctHandlerMock(1000)
 	//acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
 	//	w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
