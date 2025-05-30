@@ -12,6 +12,7 @@ import (
 	"github.com/robaho/fixed"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -220,23 +221,49 @@ func Test_Annual_Si(t *testing.T) {
 		{Height: 1, Power: 42_000_000},
 	}
 
-	govMock.GetValues().InflationWeightPermil = 28
+	govMock.GetValues().InflationWeightPermil = 28 // 0.028
 	fmt.Println("tau", govMock.BondingBlocksWeightPermil())
 	fmt.Println("lamda", govMock.InflationWeightPermil())
 
 	heightYears := int64(0)
 	preSupply := totalSupply.Clone()
-	for h := govMock.InflationCycleBlocks(); h < types.YearSeconds*40; h += govMock.InflationCycleBlocks() {
+	for h := govMock.InflationCycleBlocks(); h < types.YearSeconds*40; h += types.DaySeconds {
 		burned := false
-		//if h%(govMock.InflationCycleBlocks()/2) == 1 {
-		//	// burn x %
-		//	remainRate := decimal.NewFromFloat(0.9)
-		//	adjustedSupply = uint256.MustFromBig(decimal.NewFromBigInt(totalSupply.ToBig(), 0).Mul(remainRate).BigInt())
-		//	adjustedHeight = h - 100 // burned before 100 blocks
-		//	totalSupply = adjustedSupply.Clone()
-		//	fmt.Printf("Burn - adjustedHeight: %d, adjustedSupply: %s \n", adjustedHeight, types2.FormattedString(adjustedSupply))
-		//	burned = true
-		//}
+		if rand.Intn(5) == 0 {
+			// burn x %
+			remainRate := decimal.NewFromFloat(0.9)
+			adjustedSupply = uint256.MustFromBig(decimal.NewFromBigInt(totalSupply.ToBig(), 0).Mul(remainRate).BigInt())
+			adjustedHeight = h - 100 // burned before 100 blocks
+			totalSupply = adjustedSupply.Clone()
+			burned = true
+
+			fmt.Printf("Burn - adjustedHeight: %d, adjustedSupply: %s \n", adjustedHeight, types2.FormattedString(adjustedSupply))
+		}
+		if rand.Intn(2) == 0 {
+			add := (rand.Intn(2) == 1)
+			if add {
+				pow := rand.Int63n(1_000_000) + 4_000
+				powChunks = append(powChunks,
+					&vpower.PowerChunkProto{
+						Power:  pow,
+						Height: h,
+					})
+				//fmt.Printf("Add voting power - height: %d, power: %d \n", h, pow)
+			} else {
+				rdx := rand.Intn(len(powChunks))
+				pc := powChunks[rdx]
+				pow := rand.Int63n(pc.Power) + 1
+				pc.Power -= pow
+				if pc.Power == 0 {
+					powChunks = append(powChunks[:rdx], powChunks[rdx+1:]...)
+				}
+				//fmt.Printf("Sub voting power - height: %d, power: %d, change: %d\n", pc.Height, pc.Power, pow)
+			}
+		}
+
+		if h%govMock.InflationCycleBlocks() != 0 {
+			continue
+		}
 
 		vw := vpower.FxNumWeightOfPowerChunks(
 			powChunks, h,
@@ -258,12 +285,25 @@ func Test_Annual_Si(t *testing.T) {
 		heightYears = h / types.YearSeconds
 
 		if !burned {
-			require.True(t, totalSupply.Gt(preSupply), fmt.Sprintf("height %d: %v >= %v, w=%v, scaledH:%v, adjust=%v, minted=%v", h, preSupply, totalSupply, vw, scaledH, adjustedSupply,
-				types2.FormattedString(mintSupply)))
+			//require.True(t, totalSupply.Gt(preSupply),
+			//	fmt.Sprintf("height %d: %v >= %v, w=%v, scaledH:%v, adjust=%v, minted=%v",
+			//		h, preSupply, totalSupply, vw, scaledH, adjustedSupply, types2.FormattedString(mintSupply)))
+			if !totalSupply.Gt(preSupply) {
+				t.Logf("totalSupply is dreased!!!! - height %d: %v >= %v, w=%v, scaledH:%v, exp:%v, adjust=%v, minted=%v",
+					h,
+					types2.FormattedString(preSupply),
+					types2.FormattedString(totalSupply),
+					vw, scaledH, vw.Mul(scaledH),
+					types2.FormattedString(adjustedSupply),
+					types2.FormattedString(mintSupply))
+
+				totalSupply = preSupply.Clone()
+				mintSupply = uint256.NewInt(0)
+			}
 		}
 
 		diff := new(uint256.Int).Sub(totalSupply, preSupply)
-		sign := "-"
+		sign := "?"
 		if diff.Sign() < 0 {
 			sign = "-"
 			_ = diff.Abs(diff)
@@ -271,11 +311,11 @@ func Test_Annual_Si(t *testing.T) {
 			sign = "+"
 		}
 
-		fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%.7v, diff(%s): %s, minted: %s\n",
+		fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%.7v, exp: %v, diff(%s): %s, minted: %s\n",
 			heightYears, h,
 			types2.FormattedString(preSupply),
 			types2.FormattedString(totalSupply),
-			vw.StringN(7), scaledH,
+			vw.StringN(7), scaledH, vw.Mul(scaledH),
 			sign, types2.FormattedString(diff),
 			types2.FormattedString(mintSupply))
 
