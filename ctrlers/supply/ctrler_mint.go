@@ -172,6 +172,10 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 // Si returns the total supply amount determined by the issuance formula of block 'height'.
 func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	return decimalSi(height, blockIntv, adjustedHeight, adjustedSupply, smax, lambda, wa)
+}
+
+func fxnumSi(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
@@ -187,17 +191,17 @@ func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uin
 	return decSmax.Sub(decNumer.Div(decDenom))
 }
 
-func decimalSi(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
+func decimalSi(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
 	if height < adjustedHeight {
 		panic("the height should be greater than the adjusted height ")
 	}
 	_lambda := decimal.New(int64(lambda), -3)
 	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
-
-	decWHid := wa.Mul(decimalH(height-adjustedHeight, blockIntv))
-	decDenom := decLambdaAddOne.Pow(decWHid)
-
+	decWa, _ := wa.ToDecimal()
 	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
+
+	decWHid := decWa.Mul(decimalH(height-adjustedHeight, blockIntv))
+	decDenom := decLambdaAddOne.Pow(decWHid)
 	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
 	return decSmax.Sub(decNumer.Div(decDenom))
 }
