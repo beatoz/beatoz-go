@@ -45,6 +45,14 @@ func FromInt(val int64) FxNum {
 	return FxNum{decimal.NewFromInt(val)}
 }
 
+func FromFloat(val float64) FxNum {
+	return FxNum{decimal.NewFromFloat(val)}
+}
+
+func FromString(val string) FxNum {
+	return FxNum{decimal.NewFromString(val)}
+}
+
 func (x FxNum) Add(o FxNum) FxNum {
 	return FxNum{x.Decimal.Add(o.Decimal)}
 }
@@ -74,6 +82,9 @@ func (x FxNum) Truncate(precision int32) FxNum {
 	return FxNum{x.Decimal.Truncate(precision)}
 }
 
+func (x FxNum) Equal(o FxNum) bool {
+	return x.Decimal.Equal(o.Decimal)
+}
 func (x FxNum) GreaterThan(o FxNum) bool {
 	return x.Decimal.GreaterThan(o.Decimal)
 }

@@ -41,6 +41,14 @@ func FromInt(val int64) FxNum {
 	return New(val, 0)
 }
 
+func FromFloat(val float64) FxNum {
+	return FxNum{fixed.NewF(val)}
+}
+
+func FromString(val string) FxNum {
+	return FxNum{fixed.NewS(val)}
+}
+
 func (x FxNum) Add(o FxNum) FxNum {
 	return FxNum{x.Fixed.Add(o.Fixed)}
 }
@@ -66,6 +74,9 @@ func (x FxNum) Pow(o FxNum) FxNum {
 	return FxNum{ret}
 }
 
+func (x FxNum) Equal(o FxNum) bool {
+	return x.Fixed.Equal(o.Fixed)
+}
 func (x FxNum) Truncate(precision int32) FxNum {
 	fxPrec := FromInt(int64(math.Pow10(int(precision))))
 	_x := x.Div(fxPrec)
