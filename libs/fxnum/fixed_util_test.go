@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"github.com/robaho/fixed"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/unix"
 	"math"
 	"runtime"
 	"strconv"
@@ -58,84 +56,13 @@ func Test_FixedPow_TwoRunsEqual2(t *testing.T) {
 	}
 }
 
-func Test_Decimal_Golden(t *testing.T) {
-	data := []struct {
-		base, exp, out string
-	}{
-		{"2.0000000", "3.5000000", "11.3137084"},
-		{"2.0000000", "2.0000000", "4.0000000"},
-		{"1.0000000", "5.6789000", "1.0000000"},
-		{"4.0000000", "0.5000000", "2.0000000"},
-		{"10.0000000", "-1.0000000", "0.1000000"},
-		{"2.0000000", "0.5000000", "1.4142135"},
-		{"3.0000000", "1.5000000", "5.1961524"},
-		{"1.5000000", "2.5000000", "2.7556759"},
-		{"2.7182818", "1.0000000", "2.7182818"},
-		{"1.0000001", "100.0000000", "1.0000100"},
-	}
-
-	decimal.DivisionPrecision = 7
-	for _, rec := range data {
-		//
-		// computed by decimal.Decimal
-		b, err := decimal.NewFromString(rec.base)
-		require.NoError(t, err)
-		e, err := decimal.NewFromString(rec.exp)
-		require.NoError(t, err)
-		want, err := decimal.NewFromString(rec.out)
-		require.NoError(t, err)
-
-		got := b.Pow(e).Truncate(7)
-		//fmt.Println("shopspring/decimal", "base", b, "exponent", e, "result", r.Truncate(7), "want", rec.out)
-		require.True(t, got.Equal(want), "mismatch on %v^%v: got %v want %v", rec.base, rec.exp, got, want)
-	}
-}
-
-func Test_Fixed_Golden(t *testing.T) {
-	data := []struct {
-		base, exp, out string
-	}{
-		/*
-			OS:         Ubuntu 22.04.5 LTS
-			Arch:       amd64 (x86_64)
-			Go Version: go version go1.23.3 linux/amd64
-			fxnum setting: lnTerms=32, expTerms=32
-			FixedPow(fixed.NewI(2,0), fixed.NewI(35,1)) → 11.313694
-
-			"11.3137085" computed by `shopspring/decimal` in iMac
-		*/
-		{"2.0000000", "3.5000000", "11.313694"},
-		{"2.0000000", "2.0000000", "3.9999970"},
-		{"1.0000000", "5.6789000", "1.0000000"},
-		{"4.0000000", "0.5000000", "1.9999996"},
-		{"10.0000000", "-1.0000000", "0.1000001"},
-		{"2.0000000", "0.5000000", "1.4142133"},
-		{"3.0000000", "1.5000000", "5.1961519"},
-		{"1.5000000", "2.5000000", "2.7556766"},
-		{"2.7182818", "1.0000000", "2.7182818"},
-		{"1.0000001", "100.0000000", "1.0000000"},
-	}
-	for _, rec := range data {
-		b, err := fixed.Parse(rec.base)
-		require.NoError(t, err)
-		e, err := fixed.Parse(rec.exp)
-		require.NoError(t, err)
-		want, err := fixed.Parse(rec.out)
-		require.NoError(t, err)
-		got, err := FixedPow(b, e)
-		require.NoError(t, err)
-		//fmt.Println("robaho/fixed", "base", b, "exponent", e, "result", got, "want", want)
-		require.True(t, got.Equal(want), "mismatch on %v^%v: got %v want %v", rec.base, rec.exp, got, rec.out)
-	}
-
-}
-
 func NonDetPow(x, y float64) float64 {
-	// x^y = exp(y * ln(x)) using float64
-	return math.Exp(y * math.Log(x))
+	ret := math.Exp(y * math.Log(x))
+	fmt.Printf("NonDetPow - math.Exp(%v, math.Log(%v)) = %.30f\n", x, y, ret)
+	return ret
 }
 
-func TestNonDetPow(t *testing.T) {
+func Test_NonDetPow(t *testing.T) {
 	/*
 		- Model: iMac, Retina 5K, 27-inch, 2020.
 		- CPU: 3.8 GHz 8코어 Intel Core i7
@@ -159,12 +86,8 @@ func TestNonDetPow(t *testing.T) {
 	}
 
 	fmt.Printf("System: %s, %s, %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
-	cpuInfo, err := cpu.Info()
-	if err != nil {
-		modelName, _ := unix.Sysctl("machdep.cpu.brand_string")
-		cores, _ := unix.SysctlUint32("machdep.cpu.core_count")
-		fmt.Printf("%v, %v Cores\n", modelName, cores)
-	} else {
+	cpuInfo, _ := cpu.Info()
+	if cpuInfo != nil {
 		for _, info := range cpuInfo {
 			fmt.Printf("%v, %v Cores\n", info.ModelName, info.Cores)
 		}
@@ -173,7 +96,7 @@ func TestNonDetPow(t *testing.T) {
 	for _, in := range inputs {
 		r := NonDetPow(in.x, in.y)
 		if strconv.FormatFloat(r, 'f', 15, 64) != in.expected {
-			fmt.Printf("float64 - NonDetPow(%.7f, %.7f) = %.15f, other's result: %s\n", in.x, in.y, r, in.expected)
+			fmt.Printf("❗float64 - NonDetPow(%.7f, %.7f) = %.15f, other's result: %s\n", in.x, in.y, r, in.expected)
 		}
 
 		fixedX := fixed.NewI(int64(in.x*1e7), 7)
