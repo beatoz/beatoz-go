@@ -43,7 +43,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		}
 
 		//
-		// Auto burn: transfer the remaining fee to DEAD Address
+		// Auto burn(dead): transfer the remaining fee to DEAD Address
 		//
 		// this is not burning.
 		// it is just to transfer to the zero address.
@@ -59,7 +59,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		evts = append(evts, abcitypes.Event{
 			Type: "supply.txfee",
 			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte("burn"), Value: []byte(deadAmt.Dec()), Index: false},
+				{Key: []byte("dead"), Value: []byte(deadAmt.Dec()), Index: false},
 				{Key: []byte("reward"), Value: []byte(rwdAmt.Dec()), Index: false},
 			},
 		})

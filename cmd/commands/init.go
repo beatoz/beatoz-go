@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	initParams = DefaultIniParams()
+	initParams = DefaultInitParams()
 )
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.
@@ -294,7 +294,7 @@ type InitParams struct {
 	InitVotingPower      int64
 }
 
-func DefaultIniParams() *InitParams {
+func DefaultInitParams() *InitParams {
 	return &InitParams{
 		ChainID:              "mainnet",
 		ValCnt:               1,

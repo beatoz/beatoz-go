@@ -92,7 +92,7 @@ func (peer *PeerMock) SetPass(pass []byte) {
 }
 
 func (peer *PeerMock) Init(valCnt int) error {
-	initParams := commands.DefaultIniParams()
+	initParams := commands.DefaultInitParams()
 	initParams.ChainID = peer.ChainID
 	initParams.ValCnt = valCnt
 	initParams.ValSecret = peer.Pass

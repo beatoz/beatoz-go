@@ -14,12 +14,6 @@ import (
 	"testing"
 )
 
-//
-// The test code can not be executed alone,
-// because the validator's balance is 0.
-// To run this test code,
-// the validator should receive any amount by running other test code.
-
 func TestQueryValidators(t *testing.T) {
 	require.NoError(t, checkValidatorSet(1))
 }
