@@ -80,7 +80,6 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		bctx := req.bctx
 		lastTotalSupply := req.lastTotalSupply
-		lastAdjustedSupply := req.lastAdjustedSupply
 		lastAdjustedHeight := req.lastAdjustedHeight
 
 		// 1. compute voting power weight
@@ -89,7 +88,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			bctx.GovHandler.InflationCycleBlocks(),
 			bctx.GovHandler.RipeningBlocks(),
 			bctx.GovHandler.BondingBlocksWeightPermil(),
-			lastTotalSupply,
+			lastTotalSupply, // todo: Decide whether to use `lastTotalSupply` or the `lastAdjustedSupply`.
 		)
 		if xerr != nil {
 			respCh <- &respMint{
@@ -102,14 +101,12 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		waAll := retWeight.SumWeight()  //.Truncate(precision) // is too expensive
 		waVals := retWeight.ValWeight() //.Truncate(precision)
 
-		totalSupply := Si(
-			bctx.Height(),
-			int64(bctx.GovHandler.AssumedBlockInterval()),
-			lastAdjustedHeight, lastAdjustedSupply,
+		addedSupply := Sd(
+			heightYears(bctx.Height()-lastAdjustedHeight, bctx.GovHandler.AssumedBlockInterval()),
+			lastTotalSupply,
 			bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(),
 			waAll,
-		).Floor()
-		addedSupply := totalSupply.Sub(decimal.NewFromBigInt(lastTotalSupply.ToBig(), 0))
+		)
 		if addedSupply.Sign() < 0 {
 			respCh <- &respMint{
 				xerr: xerrors.From(fmt.Errorf("critical error: calculated additional issuance amount must not be negative (got %v)", addedSupply)),
@@ -170,47 +167,66 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 	}
 }
 
-// Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
-	if height < adjustedHeight {
-		panic("the height should be greater than the adjusted height ")
-	}
-	_lambda := fxnum.Permil(int(lambda))
-	fxLambdaAddOne := _lambda.Add(fxnum.ONE)
-
-	fxWHid := wa.Mul(H(height-adjustedHeight, blockIntv))
-	fxDenom := fxLambdaAddOne.Pow(fxWHid)
-	decDenom, _ := fxDenom.ToDecimal()
-
-	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
-	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
-	return decSmax.Sub(decNumer.Div(decDenom))
-}
-
-func decimalSi(height, blockIntv int64, adjustedHeight int64, adjustedSupply, smax *uint256.Int, lambda int32, wa decimal.Decimal) decimal.Decimal {
-	if height < adjustedHeight {
-		panic("the height should be greater than the adjusted height ")
-	}
-	_lambda := decimal.New(int64(lambda), -3)
-	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
-
-	decWHid := wa.Mul(decimalH(height-adjustedHeight, blockIntv))
-	decDenom := decLambdaAddOne.Pow(decWHid)
-
-	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustedSupply).ToBig(), 0)
-	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
-	return decSmax.Sub(decNumer.Div(decDenom))
-}
-
-// H returns the normalized block time corresponding to the given block height.
+// scaledHeight returns the normalized block time corresponding to the given block height.
 // (`ret = current_height * block_interval_sec / one_year_seconds`)
 // It calculates how far along the blockchain is relative to a predefined reference period.
 // For example, if the reference period is one year, a return value of 1.0 indicates that
 // exactly one reference period has elapsed.
-func H(height, blockIntvSec int64) fxnum.FxNum {
-	return fxnum.FromInt(height * blockIntvSec).Div(fxnum.FromInt(ctrlertypes.YearSeconds))
+func scaledHeight(height, base int64) fxnum.FxNum {
+	return fxnum.FromInt(height).Div(fxnum.FromInt(base))
 }
 
-func decimalH(height, blockIntvSec int64) decimal.Decimal {
-	return decimal.NewFromInt(height * blockIntvSec).Div(decimal.NewFromInt(ctrlertypes.YearSeconds))
+func heightYears(height int64, intval int32) fxnum.FxNum {
+	return scaledHeight(height*int64(intval), ctrlertypes.YearSeconds)
+}
+
+func Sd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	return decimalSd(scaledHeight, lastSupply, smax, lambda, wa)
+}
+
+func decimalSd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+
+	_lambda := decimal.New(int64(lambda), -3)
+	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
+	decScaledH, _ := scaledHeight.ToDecimal()
+	decWa, _ := wa.ToDecimal()
+	decExp := decWa.Mul(decScaledH)
+
+	part1 := decimal.NewFromInt(1).Sub(decLambdaAddOne.Pow(decExp.Neg()))
+	part0 := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, lastSupply).ToBig(), 0)
+	return part0.Mul(part1)
+}
+
+// DEPRECATED
+// Si returns the total supply amount determined by the issuance formula of block 'height'.
+func Si(scaledHeight fxnum.FxNum, adjustSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	return decimalSi(scaledHeight, adjustSupply, smax, lambda, wa)
+}
+
+// DEPRECATED
+func decimalSi(scaledHeight fxnum.FxNum, adjustSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	_lambda := decimal.New(int64(lambda), -3)
+	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
+	decScaledH, _ := scaledHeight.ToDecimal()
+	decWa, _ := wa.ToDecimal()
+	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustSupply).ToBig(), 0)
+
+	decWHid := decWa.Mul(decScaledH)
+	decDenom := decLambdaAddOne.Pow(decWHid)
+	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
+	return decSmax.Sub(decNumer.Div(decDenom))
+}
+
+// DEPRECATED
+func fxnumSi(scaledHeight fxnum.FxNum, adjustSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	_lambda := fxnum.Permil(int(lambda))
+	fxLambdaAddOne := _lambda.Add(fxnum.ONE)
+
+	fxWHid := wa.Mul(scaledHeight)
+	fxDenom := fxLambdaAddOne.Pow(fxWHid)
+
+	decDenom, _ := fxDenom.ToDecimal()
+	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustSupply).ToBig(), 0)
+	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
+	return decSmax.Sub(decNumer.Div(decDenom))
 }

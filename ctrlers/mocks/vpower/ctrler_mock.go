@@ -56,6 +56,39 @@ func NewVPowerHandlerMock(dgteeWals []*web3.Wallet, valCnt int) *VPowerHandlerMo
 	}
 }
 
+func NewVPowerHandlerMockWithPower(dgteeWals []*web3.Wallet, valCnt int, powerPerVal int64) *VPowerHandlerMock {
+	valsCnt := valCnt
+	delegatees := make([]*vpower.Delegatee, len(dgteeWals))
+	mapVPowers := make(map[string]*vpower.VPower)
+
+	sumPower := int64(0)
+	for i, w := range dgteeWals {
+		dgtee := vpower.NewDelegatee(w.GetPubKey())
+		delegatees[i] = dgtee
+
+		pow := powerPerVal
+		vpow := vpower.NewVPower(w.Address(), w.Address()) // self bonding
+		vpow.AddPowerWithTxHash(pow, 1, bytes.ZeroBytes(32))
+
+		mapVPowers[w.Address().String()+dgtee.Address().String()] = vpow
+		dgtee.AddPower(w.Address(), pow)
+		dgtee.AddDelegator(w.Address())
+
+		sumPower += pow
+	}
+	sort.Slice(delegatees, func(i, j int) bool {
+		return delegatees[i].SumPower > delegatees[j].SumPower
+	})
+
+	return &VPowerHandlerMock{
+		ValCnt:     valsCnt,
+		Delegatees: delegatees,
+		validators: delegatees[:valCnt],
+		mapVPowers: mapVPowers,
+		totalPower: sumPower,
+	}
+}
+
 func (mock *VPowerHandlerMock) Validators() ([]*abcitypes.Validator, int64) {
 	totalPower := int64(0)
 	vals := make([]*abcitypes.Validator, len(mock.validators))
@@ -142,8 +175,9 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlo
 				isval: fromAddrStr == toAddrStr, // reach at here when toAddrStr is validator
 				w:     _w,
 			}
+		} else {
+			wobj.w = wobj.w.Add(_w)
 		}
-		wobj.w = wobj.w.Add(_w)
 		mapWeightObjs[fromAddrStr] = wobj
 	}
 

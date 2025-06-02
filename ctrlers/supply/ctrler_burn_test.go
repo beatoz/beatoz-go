@@ -100,7 +100,6 @@ func Test_TxFeeProcessing(t *testing.T) {
 			// apply inflation
 			if currHeight%govMock.InflationCycleBlocks() == 0 {
 				_totalSupplyAmt := ctrler.lastTotalSupply.GetTotalSupply()
-				_adjustSupplyAmt := ctrler.lastTotalSupply.GetAdjustSupply()
 				_adjustHeight := ctrler.lastTotalSupply.GetAdjustHeight()
 
 				weightInfo, xerr := vpowMock.ComputeWeight(
@@ -115,10 +114,15 @@ func Test_TxFeeProcessing(t *testing.T) {
 				//wa := vpower.FxNumWeightOfPowerChunks(vpowMock.PowerChunks, currHeight, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 				//wa = wa.Truncate(precision)
 
-				si := Si(currHeight, int64(govMock.AssumedBlockInterval()), _adjustHeight, _adjustSupplyAmt, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
+				sd := Sd(
+					heightYears(currHeight-_adjustHeight, govMock.AssumedBlockInterval()),
+					_totalSupplyAmt,
+					govMock.MaxTotalSupply(),
+					govMock.InflationWeightPermil(),
+					wa,
+				).Floor()
 				//expectedTotalSupply = uint256.MustFromBig(si.BigInt())
-				newTotalSupply := uint256.MustFromBig(si.BigInt())
-				addedAmt := new(uint256.Int).Sub(newTotalSupply, _totalSupplyAmt)
+				addedAmt := uint256.MustFromBig(sd.BigInt())
 				expectedTotalSupply = new(uint256.Int).Add(expectedTotalSupply, addedAmt)
 				//fmt.Println("expected inflation amount", expectedTotalSupply, "last.total", ctrler.lastTotalSupply.totalSupply, "last.adjust", ctrler.lastTotalSupply.adjustSupply, "adjust.height", ctrler.lastTotalSupply.GetAdjustHeight())
 			}

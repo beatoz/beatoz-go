@@ -50,7 +50,7 @@ func NewGovParams(interval int) *GovParams {
 			MinSignedBlocks:           500,
 			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
-			InflationWeightPermil:     390,                                                            // 0.390
+			InflationWeightPermil:     3,                                                              // 0.003
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
 			RipeningBlocks:            YearSeconds / int64(interval),                                  // one year blocks

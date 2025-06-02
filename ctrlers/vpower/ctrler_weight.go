@@ -12,7 +12,7 @@ import (
 
 func (ctrler *VPowerCtrler) ComputeWeight(
 	height, inflationCycle, ripeningBlocks int64, tau int32,
-	totalSupply *uint256.Int,
+	baseSupply *uint256.Int,
 ) (ctrlertypes.IWeightResult, xerrors.XError) {
 
 	//var allPowChunks []*PowerChunkProto
@@ -80,7 +80,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 	//		benefPowChunks := mapBenefPowChunks[addr.String()]
 	//		benefW := fxnumWeightOfPowerChunks(
 	//			benefPowChunks.pcs,
-	//			height, ripeningBlocks, tau, totalSupply)
+	//			height, ripeningBlocks, tau, baseSupply)
 	//		weightInfo.Add(addr, benefW, benefPowChunks.signW, benefPowChunks.val)
 	//	}
 	//	since := time.Since(start)
@@ -89,7 +89,8 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 
 	{
 		weightInfo = NewWeight()
-		supplyInPower, _ := ctrlertypes.AmountToPower(totalSupply)
+
+		supplyInPower, _ := ctrlertypes.AmountToPower(baseSupply)
 		fxSupplyPower := fxnum.FromInt(supplyInPower)
 
 		allScaledPower := fxnumScaledPowerChunks(allPowChunks, height, ripeningBlocks, tau)
