@@ -5,7 +5,7 @@ import (
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
-	types2 "github.com/beatoz/beatoz-go/types"
+	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
@@ -18,7 +18,7 @@ import (
 func Test_Mint(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	initSupply := types.PowerToAmount(350_000_000)
+	initSupply := btztypes.PowerToAmount(350_000_000)
 	adjustedHeight := int64(1)
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
@@ -131,7 +131,7 @@ var expectedSupplys = []struct {
 
 func Test_Sd(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
-	initSupply := types.PowerToAmount(350_000_000)
+	initSupply := btztypes.PowerToAmount(350_000_000)
 	adjustedHeight := int64(1)
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
@@ -181,13 +181,13 @@ func Test_Sd(t *testing.T) {
 		_ = totalSupply.Add(totalSupply, mintSupply)
 
 		//fmt.Println("height", currHeight,
-		//	"preSupply", types2.FormattedString(preSupply),
-		//	"totalSupply", types2.FormattedString(totalSupply),
-		//	"mintSupply", types2.FormattedString(mintSupply),
+		//	"preSupply", btztypes.FormattedString(preSupply),
+		//	"totalSupply", btztypes.FormattedString(totalSupply),
+		//	"mintSupply", btztypes.FormattedString(mintSupply),
 		//	"scaledH", scaledH, "wa", wa, "decSd", decSd)
 		for _, expect := range expectedSupplys {
 			if expect.height == currHeight {
-				require.LessOrEqual(t, absDiff64(expect.supply, int64(types2.ToBTOZ(totalSupply))), int64(2))
+				require.LessOrEqual(t, absDiff64(expect.supply, int64(btztypes.FromGrans(totalSupply))), int64(2))
 			}
 		}
 
@@ -224,10 +224,10 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 
 			fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
 				currHeight/types.YearSeconds, currHeight,
-				types2.FormattedString(preSupply),
-				types2.FormattedString(totalSupply),
+				btztypes.FormattedString(preSupply),
+				btztypes.FormattedString(totalSupply),
 				"0", "0", "0",
-				types2.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
+				btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
 
 		}
 		// bonding/unbonding
@@ -282,14 +282,14 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 		if !burned {
 			//require.True(t, totalSupply.Gt(preSupply),
 			//	fmt.Sprintf("height %d: %v >= %v, w=%v, scaledH:%v, adjust=%v, minted=%v",
-			//		currHeight, preSupply, totalSupply, vw, scaledH, adjustedSupply, types2.FormattedString(mintSupply)))
+			//		currHeight, preSupply, totalSupply, vw, scaledH, adjustedSupply, btztypes.FormattedString(mintSupply)))
 			if totalSupply.Lt(preSupply) {
 				t.Logf("totalSupply is dereased!!!! - height %d: %v >= %v, w=%v, scaledH:%v, exp:%v, minted=%v",
 					currHeight,
-					types2.FormattedString(preSupply),
-					types2.FormattedString(totalSupply),
+					btztypes.FormattedString(preSupply),
+					btztypes.FormattedString(totalSupply),
 					vw, scaledH, vw.Mul(scaledH),
-					types2.FormattedString(mintSupply))
+					btztypes.FormattedString(mintSupply))
 			}
 			burned = false
 		}
@@ -298,17 +298,17 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 			// log annual total supply
 			currHeightYear := currHeight / types.YearSeconds
 			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) / types.YearSeconds
-			m, _ := types2.FromFons(totalSupply)
+			m, _ := btztypes.FromGransRem(totalSupply)
 			if currHeightYear != nextHeightYear || m >= 693_000_000 {
 
 				fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
 					currHeightYear, currHeight,
-					types2.FormattedString(preSupply),
-					types2.FormattedString(totalSupply),
+					btztypes.FormattedString(preSupply),
+					btztypes.FormattedString(totalSupply),
 					vw.StringN(7), scaledH.StringN(7), vw.Mul(scaledH).StringN(7),
-					types2.FormattedString(mintSupply))
+					btztypes.FormattedString(mintSupply))
 				if m >= 693_000_000 { // 99% of 700_000_000 (max)
-					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", types2.FormattedString(totalSupply), currHeightYear, currHeight)
+					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", btztypes.FormattedString(totalSupply), currHeightYear, currHeight)
 					break
 				}
 			}
@@ -350,10 +350,10 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 
 			fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
 				currHeight/types.YearSeconds, currHeight,
-				types2.FormattedString(preSupply),
-				types2.FormattedString(totalSupply),
+				btztypes.FormattedString(preSupply),
+				btztypes.FormattedString(totalSupply),
 				"0", "0", "0",
-				types2.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
+				btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
 		}
 		// bonding/unbonding
 		//if rand.Intn(7) == 0 {
@@ -408,14 +408,14 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 		if !burned {
 			//require.True(t, totalSupply.Gt(preSupply),
 			//	fmt.Sprintf("height %d: %v >= %v, w=%v, scaledH:%v, adjust=%v, minted=%v",
-			//		h, preSupply, totalSupply, vw, scaledH, adjustedSupply, types2.FormattedString(mintSupply)))
+			//		h, preSupply, totalSupply, vw, scaledH, adjustedSupply, btztypes.FormattedString(mintSupply)))
 			if totalSupply.Lt(preSupply) {
 				t.Logf("totalSupply is dereased!!!! - height %d: %v >= %v, w=%v, scaledH:%v, exp:%v, minted=%v",
 					currHeight,
-					types2.FormattedString(preSupply),
-					types2.FormattedString(totalSupply),
+					btztypes.FormattedString(preSupply),
+					btztypes.FormattedString(totalSupply),
 					vw, scaledH, vw.Mul(scaledH),
-					types2.FormattedString(mintSupply))
+					btztypes.FormattedString(mintSupply))
 			}
 			burned = false
 		}
@@ -424,18 +424,18 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 			// log annual total supply
 			currHeightYear := currHeight / types.YearSeconds
 			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) / types.YearSeconds
-			m, _ := types2.FromFons(totalSupply)
+			m, _ := btztypes.FromGransRem(totalSupply)
 			if currHeightYear != nextHeightYear || m >= 693_000_000 {
 
 				fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
 					currHeightYear, currHeight,
-					types2.FormattedString(preSupply),
-					types2.FormattedString(totalSupply),
+					btztypes.FormattedString(preSupply),
+					btztypes.FormattedString(totalSupply),
 					vw.StringN(7), scaledH.StringN(7), vw.Mul(scaledH).StringN(7),
-					types2.FormattedString(mintSupply))
+					btztypes.FormattedString(mintSupply))
 
 				if m >= 693_000_000 { // 99% of 700_000_000 (max)
-					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", types2.FormattedString(totalSupply), currHeightYear, currHeight)
+					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", btztypes.FormattedString(totalSupply), currHeightYear, currHeight)
 					break
 				}
 			}

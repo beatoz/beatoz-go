@@ -2,6 +2,7 @@ package test
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,7 @@ func TestSetDoc(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 
-	expectedBalance := new(uint256.Int).Sub(oriBalance, types.GasToFee(txRet.TxResult.GasUsed, defGasPrice))
+	expectedBalance := new(uint256.Int).Sub(oriBalance, types2.GasToFee(txRet.TxResult.GasUsed, defGasPrice))
 	require.NoError(t, w.SyncAccount(bzweb3))
 	require.Equal(t, expectedBalance.Dec(), w.GetBalance().Dec())
 	require.Equal(t, name, w.GetAccount().Name)

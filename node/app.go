@@ -459,7 +459,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddFee(types2.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -536,7 +536,7 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddFee(types2.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -703,7 +703,7 @@ func checkRequestInitChain(req abcitypes.RequestInitChain) (*genesis.GenesisAppS
 	for _, val := range req.Validators {
 		genVotinPower += val.Power
 	}
-	genVotingPowerAmt := types2.ToFons(uint64(genVotinPower))
+	genVotingPowerAmt := types2.PowerToAmount(genVotinPower)
 
 	genAppState := &genesis.GenesisAppState{}
 	if err := jsonx.Unmarshal(req.AppStateBytes, genAppState); err != nil {

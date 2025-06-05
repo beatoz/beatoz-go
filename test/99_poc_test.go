@@ -250,7 +250,7 @@ func TestPoC2(t *testing.T) {
 	// the balance of victimAddress no longer matches the expected value below.
 
 	// require.Equal(t, "10000000000000001", victimAcData.Balance)
-	_usedFee := types2.GasToFee(_usedGas, defGasPrice)
+	_usedFee := types.GasToFee(_usedGas, defGasPrice)
 	_deadFee := new(uint256.Int).Mul(_usedFee, uint256.NewInt(uint64(100-defGovParams.TxFeeRewardRate())))
 	_deadFee = new(uint256.Int).Div(_deadFee, uint256.NewInt(100))
 	expectedBalance := uint256.MustFromDecimal(beforeBalance)

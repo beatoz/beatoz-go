@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	totalSupply        = types2.ToFons(700_000_000)
+	totalSupply        = types2.ToGrans(700_000_000)
 	powerChunks        []*PowerChunkProto
 	powerRipeningCycle = types.YearSeconds
 )

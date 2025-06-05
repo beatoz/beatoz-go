@@ -164,7 +164,7 @@ func (ctrler *VPowerCtrler) _unfreezePowerChunk(refundHeight int64, acctHandler 
 		true,
 		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 			frozen, _ := item.(*FrozenVPower)
-			refundAmt := types2.PowerToAmount(frozen.RefundPower)
+			refundAmt := types.PowerToAmount(frozen.RefundPower)
 
 			// key = prefix(1) | height(8) | from_address(20)
 			from := key[9:29]

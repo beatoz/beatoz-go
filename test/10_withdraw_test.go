@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
-	"github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -19,7 +18,7 @@ import (
 func Test_TxFeeProcessing(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	initSupply := types.PowerToAmount(350_000_000)
+	initSupply := btztypes.PowerToAmount(350_000_000)
 
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
@@ -63,7 +62,7 @@ func Test_TxFeeProcessing(t *testing.T) {
 			// when the burning occurs.
 
 			gas := bytes.RandInt64N(500_000) + govMock.MinTrxGas()
-			fee := types.GasToFee(gas, govMock.GasPrice())
+			fee := btztypes.GasToFee(gas, govMock.GasPrice())
 			mocks.CurrBlockCtx().AddFee(fee)
 			expectedBurned = new(uint256.Int).Mul(fee, uint256.NewInt(uint64(100-govMock.TxFeeRewardRate())))
 			expectedBurned = new(uint256.Int).Div(expectedBurned, uint256.NewInt(100))

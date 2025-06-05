@@ -5,6 +5,7 @@ import (
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
@@ -17,7 +18,7 @@ import (
 func Test_Withdraw(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	initSupply := types.PowerToAmount(350_000_000)
+	initSupply := types2.PowerToAmount(350_000_000)
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
 
