@@ -23,7 +23,7 @@ func TestIncorrectProposal(t *testing.T) {
 	if validatorWallet.GetBalance().IsZero() {
 		sender := randCommonWallet()
 		require.NoError(t, sender.Unlock([]byte("1111")))
-		require.NoError(t, transferFrom(sender, validatorWallet.Address(), types2.ToFons(1000), bzweb3))
+		require.NoError(t, transferFrom(sender, validatorWallet.Address(), types2.ToGrans(1000), bzweb3))
 	}
 
 	//
@@ -96,7 +96,7 @@ func TestProposalAndVoting(t *testing.T) {
 	if validatorWallet.GetBalance().IsZero() {
 		sender := randCommonWallet()
 		require.NoError(t, sender.Unlock([]byte("1111")))
-		require.NoError(t, transferFrom(sender, validatorWallet.Address(), types2.ToFons(1000), bzweb3))
+		require.NoError(t, transferFrom(sender, validatorWallet.Address(), types2.ToGrans(1000), bzweb3))
 	}
 
 	currGovParams, xerr := bzweb3.GetGovParams()

@@ -250,7 +250,7 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 				}
 				holders[i] = &genesis.GenesisAssetHolder{
 					Address: wk.Address,
-					Balance: btztypes.ToFons(uint64(amt)), // amt * 10^18
+					Balance: btztypes.ToGrans(amt), // amt * 10^18
 				}
 			}
 			logger.Debug("GenesisAssetHolder", "holders count", len(holders))
@@ -263,7 +263,7 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 			}
 			govParams := types.NewGovParams(int(blockInterval.Seconds()))
 			govParams.GetValues().InflationCycleBlocks = params.InflationCycleBlocks
-			govParams.GetValues().XMaxTotalSupply = btztypes.ToFons(uint64(params.MaxTotalSupply)).Bytes()
+			govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
 
 			genDoc, err = genesis.NewGenesisDoc(params.ChainID, valset, holders, govParams)
 			if err != nil {

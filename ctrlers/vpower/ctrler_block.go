@@ -29,7 +29,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 			}
 
 			// apply to SupplyHandler.lastTotalSupply.
-			if xerr := bctx.SupplyHandler.Burn(bctx, ctrlertypes.PowerToAmount(slashed)); xerr != nil {
+			if xerr := bctx.SupplyHandler.Burn(bctx, types.PowerToAmount(slashed)); xerr != nil {
 				return nil, xerr
 			}
 

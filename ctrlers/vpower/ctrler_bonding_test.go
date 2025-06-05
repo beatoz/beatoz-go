@@ -588,7 +588,7 @@ func Test_Freezing(t *testing.T) {
 				require.NotNil(t, acct)
 
 				expectedBalances = append(expectedBalances,
-					new(uint256.Int).Add(acct.Balance, ctrlertypes.PowerToAmount(frozen.RefundPower)))
+					new(uint256.Int).Add(acct.Balance, types.PowerToAmount(frozen.RefundPower)))
 
 				return nil
 			}, true)
@@ -790,7 +790,7 @@ func makeBondingTrxCtx(fromAcct *web3.Wallet, to types.Address, power int64, hei
 		to,
 		fromAcct.GetNonce(),
 		govMock.MinTrxGas(), govMock.GasPrice(),
-		types.ToFons(uint64(power)),
+		types.PowerToAmount(power),
 	)
 	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainID); err != nil {
 		return nil, xerrors.From(err)

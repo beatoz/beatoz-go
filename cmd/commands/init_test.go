@@ -89,11 +89,11 @@ func Test_InitialAmounts(t *testing.T) {
 
 		//
 		// initial supply
-		actualInitSupply := types2.ToFons(uint64(actualInitPower))
+		actualInitSupply := types2.PowerToAmount(actualInitPower)
 		for _, holder := range appState.AssetHolders {
 			_ = actualInitSupply.Add(actualInitSupply, holder.Balance)
 		}
-		require.Equal(t, types2.ToFons(uint64(params.InitTotalSupply)).Dec(), actualInitSupply.Dec())
+		require.Equal(t, types2.ToGrans(params.InitTotalSupply).Dec(), actualInitSupply.Dec())
 
 		//
 		// GovParams
@@ -102,7 +102,7 @@ func Test_InitialAmounts(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, int32(bintv.Seconds()), govParams.AssumedBlockInterval(), params.AssumedBlockInterval)
 		require.Equal(t, params.InflationCycleBlocks, govParams.InflationCycleBlocks())
-		require.Equal(t, types2.ToFons(uint64(params.MaxTotalSupply)).Dec(), govParams.MaxTotalSupply().Dec())
+		require.Equal(t, types2.ToGrans(params.MaxTotalSupply).Dec(), govParams.MaxTotalSupply().Dec())
 
 		require.NoError(t, os.RemoveAll(config.RootDir))
 

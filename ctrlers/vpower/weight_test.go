@@ -2,7 +2,7 @@ package vpower
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"

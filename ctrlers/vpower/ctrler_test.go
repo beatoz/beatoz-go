@@ -32,7 +32,7 @@ func init() {
 	config.SetRoot(rootDir)
 	acctMock = acct.NewAcctHandlerMock(1000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {
-		w.GetAccount().SetBalance(btztypes.ToFons(1_000_000_000))
+		w.GetAccount().SetBalance(btztypes.ToGrans(1_000_000_000))
 		return true
 	})
 

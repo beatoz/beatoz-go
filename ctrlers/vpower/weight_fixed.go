@@ -1,7 +1,7 @@
 package vpower
 
 import (
-	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/holiman/uint256"
 	"github.com/robaho/fixed"
 )

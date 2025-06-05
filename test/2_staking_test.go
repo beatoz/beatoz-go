@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	rtypes0 "github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -32,7 +31,7 @@ func TestStaking(t *testing.T) {
 	//
 	// too small amount
 	power := govParams.MinValidatorPower() - 1
-	powAmt := ctrlertypes.PowerToAmount(power)
+	powAmt := rtypes0.PowerToAmount(power)
 
 	ret, err := newValWal.StakingCommit(newValWal.Address(), defGas, defGasPrice, powAmt, bzweb3)
 	require.NoError(t, err)
@@ -42,7 +41,7 @@ func TestStaking(t *testing.T) {
 	//
 	// sufficient amount
 	power = govParams.MinValidatorPower()
-	powAmt = ctrlertypes.PowerToAmount(power)
+	powAmt = rtypes0.PowerToAmount(power)
 
 	ret, err = newValWal.StakingCommit(newValWal.Address(), defGas, defGasPrice, powAmt, bzweb3)
 	require.NoError(t, err)
@@ -92,7 +91,7 @@ func TestMinValidatorPower(t *testing.T) {
 	require.NoError(t, valWal.SyncAccount(bzweb3))
 	require.NoError(t, valWal.Unlock(peers[0].Pass))
 	power := int64(1)
-	powAmt := ctrlertypes.PowerToAmount(power)
+	powAmt := rtypes0.PowerToAmount(power)
 	ret, err := valWal.StakingSync(valWal.Address(), defGas, defGasPrice, powAmt, bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log, "power", power, "balance", valWal.GetBalance().Dec())
@@ -113,7 +112,7 @@ func TestDelegating(t *testing.T) {
 	require.NoError(t, err)
 
 	stakePower := govParams.MinDelegatorPower()
-	stakeAmt := ctrlertypes.PowerToAmount(stakePower)
+	stakeAmt := rtypes0.PowerToAmount(stakePower)
 
 	delegator := randCommonWallet()
 	require.NoError(t, delegator.SyncAccount(bzweb3))
@@ -149,7 +148,7 @@ func TestMinDelegatorPower(t *testing.T) {
 	valWal := peers[0].PrivValWallet()
 
 	// not allowed
-	powAmt := rtypes0.ToFons(bytes2.RandUint64N(uint64(govParams.MinDelegatorPower()))) // < MinDelegatorPower
+	powAmt := rtypes0.PowerToAmount(bytes2.RandInt64N(govParams.MinDelegatorPower())) // < MinDelegatorPower
 	ret, err := delegator.StakingSync(valWal.Address(), defGas, defGasPrice, powAmt, bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
@@ -176,7 +175,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	// max...
 	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfPowerRate())
 	maxAllowedPower = maxAllowedPower - valStakes.TotalPower
-	maxAllowedAmt := ctrlertypes.PowerToAmount(maxAllowedPower)
+	maxAllowedAmt := rtypes0.PowerToAmount(maxAllowedPower)
 
 	// at now, peers[0] has maximum power.
 	ret, err := delegator.StakingSync(valWal.Address(), defGas, defGasPrice, maxAllowedAmt, bzweb3)
@@ -187,7 +186,7 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 
 	//
 	// not allowed delegating, because peers[0] is already delegated by maximum power.
-	ret, err = delegator.StakingSync(valWal.Address(), defGas, defGasPrice, rtypes0.ToFons(4000), bzweb3)
+	ret, err = delegator.StakingSync(valWal.Address(), defGas, defGasPrice, rtypes0.ToGrans(4000), bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
 	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)

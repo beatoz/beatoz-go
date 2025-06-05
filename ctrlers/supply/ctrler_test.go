@@ -6,6 +6,7 @@ import (
 	acctmock "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,7 @@ func init() {
 func Test_InitLedger(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	intiSupply := types.PowerToAmount(350_000_000)
+	intiSupply := types2.PowerToAmount(350_000_000)
 	ctrler, xerr := initLedger(intiSupply)
 	require.NoError(t, xerr)
 	require.Equal(t, intiSupply.Dec(), ctrler.lastTotalSupply.GetTotalSupply().Dec())

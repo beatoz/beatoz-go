@@ -90,7 +90,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 	{
 		weightInfo = NewWeight()
 
-		supplyInPower, _ := ctrlertypes.AmountToPower(baseSupply)
+		supplyInPower, _ := types.AmountToPower(baseSupply)
 		fxSupplyPower := fxnum.FromInt(supplyInPower)
 
 		allScaledPower := fxnumScaledPowerChunks(allPowChunks, height, ripeningBlocks, tau)

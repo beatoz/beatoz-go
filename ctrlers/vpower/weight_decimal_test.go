@@ -37,7 +37,7 @@ func initTestObjs(maxPow int64) []testPowObj {
 
 // Test_Wi tests that the sum of Wi is not greater than `1` for any value of the voting power.
 func Test_Wi(t *testing.T) {
-	totalSupply := types.ToFons(uint64(700_000_000))
+	totalSupply := types.ToGrans(700_000_000)
 
 	nOp := 1000
 	for idx := 0; idx < nOp; idx++ {
@@ -61,7 +61,7 @@ func Test_Wi(t *testing.T) {
 }
 
 func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
-	totalSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := types.ToGrans(350_000_000)
 	tau := int32(200) // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
@@ -124,7 +124,7 @@ func Test_SumWi_Wa_WaEx_WaEx64(t *testing.T) {
 }
 
 func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
-	totalSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := types.ToGrans(350_000_000)
 	tau := int32(200) // 0.200
 	nOp := 1000
 	dur0 := time.Duration(0)
@@ -245,7 +245,7 @@ func Test_WaEx64Pc_Weight64Pc(t *testing.T) {
 }
 
 func Benchmark_SumWi(b *testing.B) {
-	totalSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := types.ToGrans(350_000_000)
 	tau := int32(200) // 0.200
 
 	for i := 0; i < b.N; i++ {
@@ -262,7 +262,7 @@ func Benchmark_SumWi(b *testing.B) {
 }
 
 func Benchmark_Wa(b *testing.B) {
-	totalSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := types.ToGrans(350_000_000)
 	tau := int32(200)
 
 	for i := 0; i < b.N; i++ {
@@ -280,7 +280,7 @@ func Benchmark_Wa(b *testing.B) {
 }
 
 func Benchmark_WaEx(b *testing.B) {
-	totalSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := types.ToGrans(350_000_000)
 	tau := int32(200)
 
 	for i := 0; i < b.N; i++ {
@@ -298,7 +298,7 @@ func Benchmark_WaEx(b *testing.B) {
 }
 
 func Benchmark_WaEx64(b *testing.B) {
-	totalSupply := types.ToFons(uint64(350_000_000))
+	totalSupply := types.ToGrans(350_000_000)
 	tau := int32(200)
 
 	for i := 0; i < b.N; i++ {
@@ -328,7 +328,7 @@ func Test_temp(t *testing.T) {
 func Benchmark_Precision_6(b *testing.B) {
 	setDivisionPrecision(3)
 
-	totalSupply := types.ToFons(uint64(123_123_456_789))
+	totalSupply := types.ToGrans(123_123_456_789)
 	votingPower := int64(123_456_789)
 	powerPeriod := powerRipeningCycle / 3
 
@@ -349,7 +349,7 @@ func Benchmark_Precision_6(b *testing.B) {
 func Benchmark_Precision_16(b *testing.B) {
 	setDivisionPrecision(16)
 
-	totalSupply := types.ToFons(uint64(123_123_456_789))
+	totalSupply := types.ToGrans(123_123_456_789)
 	votingPower := int64(123_456_789)
 	powerPeriod := powerRipeningCycle / 3
 
@@ -368,7 +368,7 @@ func Benchmark_Precision_16(b *testing.B) {
 }
 
 func Benchmark_Decimal_NewExp(b *testing.B) {
-	totalSupply := types.ToFons(uint64(123_123_456_789))
+	totalSupply := types.ToGrans(123_123_456_789)
 
 	for i := 0; i < b.N; i++ {
 		_ = decimal.NewFromBigInt(totalSupply.ToBig(), -1*int32(types.DECIMAL))
@@ -376,7 +376,7 @@ func Benchmark_Decimal_NewExp(b *testing.B) {
 }
 
 func Benchmark_Decimal_NewDiv(b *testing.B) {
-	totalSupply := types.ToFons(uint64(123_123_456_789))
+	totalSupply := types.ToGrans(123_123_456_789)
 
 	for i := 0; i < b.N; i++ {
 		_ = decimal.NewFromBigInt(totalSupply.ToBig(), 0).Div(decimal.New(1, int32(types.DECIMAL)))

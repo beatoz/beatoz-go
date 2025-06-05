@@ -102,7 +102,7 @@ func Test_Fallback(t *testing.T) {
 
 	txctx = &ctrlertypes.TrxContext{
 		BlockContext: bctx,
-		Tx:           web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govMock.MinTrxGas()*10, govMock.GasPrice(), types.ToFons(100)),
+		Tx:           web3.NewTrxTransfer(fromAcct.Address, contAcct.Address, fromAcct.GetNonce(), govMock.MinTrxGas()*10, govMock.GasPrice(), types.ToGrans(100)),
 		TxIdx:        1,
 		TxHash:       bytes2.RandBytes(32),
 		Exec:         true,
@@ -118,10 +118,10 @@ func Test_Fallback(t *testing.T) {
 	_, _, xerr = fallbackEVM.Commit()
 	require.NoError(t, xerr)
 
-	gasAmt := ctrlertypes.GasToFee(txctx.GasUsed, govMock.GasPrice())
+	gasAmt := types.GasToFee(txctx.GasUsed, govMock.GasPrice())
 
-	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToFons(100))
-	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToFons(100))
+	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToGrans(100))
+	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToGrans(100))
 
 	//fmt.Println("sender", expectedBalance0.Dec(), "contract", expectedBalance1.Dec(), "gas", gasAmt.Dec())
 	require.Equal(t, expectedBalance0.Dec(), fromAcct.Balance.Dec())

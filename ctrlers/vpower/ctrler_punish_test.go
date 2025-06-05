@@ -88,7 +88,7 @@ func Test_Slash_Byzantine(t *testing.T) {
 func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	//totalSupply := types.ToFons(uint64(350_000_000))
+	//totalSupply := types.ToGrans(uint64(350_000_000))
 
 	ctrler, lastValUps0, valWallets0, xerr := initLedger(config)
 	require.NoError(t, xerr)
