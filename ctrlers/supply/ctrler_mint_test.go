@@ -6,6 +6,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	btztypes "github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/shopspring/decimal"
@@ -442,6 +443,20 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 		}
 
 		currHeight += types.DaySeconds
+	}
+}
+
+func Benchmark_AdjustHeight(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		smax := btztypes.ToGrans(700_000_000)
+		si := bytes.RandU256IntN(smax)
+		lastSi := bytes.RandU256IntN(si)
+		vp := bytes.RandInt64N(btztypes.FromGrans(lastSi))
+		b.StartTimer()
+
+		_ = adjustHeight(si, lastSi, smax, vp)
 	}
 }
 
