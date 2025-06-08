@@ -46,3 +46,14 @@ func Test_InitChain(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "6000000000000000000", genTotalSupply.Dec())
 }
+
+func Benchmark_CheckTx(b *testing.B) {
+	//btxcfg := config.DefaultConfig()
+	//btxcfg.SetRoot(filepath.Join(os.TempDir(), "bench-beatoz-app"))
+	//btzApp := NewBeatozApp(btxcfg, log.NewNopLogger())
+	//btzApp.Info()
+
+	for i := 0; i < b.N; i++ {
+
+	}
+}

@@ -9,12 +9,14 @@ import (
 )
 
 type TrxExecutor struct {
+	*TrxPreparer
 	logger log.Logger
 }
 
 func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 	return &TrxExecutor{
-		logger: logger,
+		TrxPreparer: newTrxPreparer(),
+		logger:      logger,
 	}
 }
 
