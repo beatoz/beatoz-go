@@ -207,16 +207,9 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 		}
 	}
 
-	prop, xerr := proposal.NewGovProposal(txpayload.OptType, ctx.TxHash,
+	prop := proposal.NewGovProposal(txpayload.OptType, ctx.TxHash,
 		txpayload.StartVotingHeight, txpayload.VotingPeriodBlocks,
 		totalVotingPower, txpayload.ApplyingHeight)
-	if xerr != nil {
-		return xerr
-	}
-
-	/*
-		voters, txpayload.Options...
-	*/
 
 	for _, v := range voters {
 		prop.AddVoter(v.Address, v.Power)
@@ -224,7 +217,7 @@ func (ctrler *GovCtrler) execProposing(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	for _, opt := range txpayload.Options {
 		prop.AddOption(opt)
 	}
-	if xerr = ctrler.govState.Set(v1.LedgerKeyProposal(prop.Header().TxHash), prop, ctx.Exec); xerr != nil {
+	if xerr := ctrler.govState.Set(v1.LedgerKeyProposal(prop.Header().TxHash), prop, ctx.Exec); xerr != nil {
 		return xerr
 	}
 

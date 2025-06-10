@@ -17,7 +17,7 @@ type GovProposal struct {
 	mtx sync.RWMutex
 }
 
-func NewGovProposal(propType int32, txhash bytes.HexBytes, startHeight, votingBlocks, totalVotingPower, applyingHeight int64) (*GovProposal, xerrors.XError) {
+func NewGovProposal(propType int32, txhash bytes.HexBytes, startHeight, votingBlocks, totalVotingPower, applyingHeight int64) *GovProposal {
 	endVotingHeight := startHeight + votingBlocks
 	return &GovProposal{
 		v: GovProposalProto{
@@ -33,7 +33,7 @@ func NewGovProposal(propType int32, txhash bytes.HexBytes, startHeight, votingBl
 			Options:     nil,
 			MajorOption: nil,
 		},
-	}, nil
+	}
 }
 
 func (prop *GovProposal) AddOption(opt []byte) {
@@ -62,20 +62,6 @@ func (prop *GovProposal) Encode() ([]byte, xerrors.XError) {
 	} else {
 		return bz, nil
 	}
-}
-
-func (prop *GovProposal) MarshalJSON() ([]byte, error) {
-	prop.mtx.RLock()
-	defer prop.mtx.RUnlock()
-
-	return jsonx.Marshal(&prop.v)
-}
-
-func (prop *GovProposal) UnmarshalJSON(bz []byte) error {
-	prop.mtx.Lock()
-	defer prop.mtx.Unlock()
-
-	return jsonx.Unmarshal(bz, &prop.v)
 }
 
 func (prop *GovProposal) Decode(k, v []byte) xerrors.XError {
@@ -216,4 +202,116 @@ func (prop *GovProposal) FindVoter(addr types.Address) *VoterProto {
 	defer prop.mtx.RUnlock()
 
 	return prop.v.Header.findVoter(addr)
+}
+
+func (prop *GovProposal) MarshalJSON() ([]byte, error) {
+	prop.mtx.RLock()
+	defer prop.mtx.RUnlock()
+
+	voters := make([]*voterObj, len(prop.v.Header.Voters))
+	for i, voter := range prop.v.Header.Voters {
+		voters[i] = &voterObj{
+			Address: voter.Address,
+			Power:   voter.Power,
+			Choice:  voter.Choice,
+		}
+	}
+
+	options := make([]*optionObj, len(prop.v.Options))
+	for i, opt := range prop.v.Options {
+		options[i] = &optionObj{
+			Option: string(opt.Option),
+			Votes:  opt.Votes,
+		}
+	}
+
+	var majorOption *optionObj
+	if prop.v.MajorOption != nil {
+		majorOption = &optionObj{
+			Option: string(prop.v.MajorOption.Option),
+			Votes:  prop.v.MajorOption.Votes,
+		}
+	}
+
+	propObj := proposalObj{
+		PropType:          prop.v.Header.PropType,
+		TxHash:            prop.v.Header.TxHash,
+		StartVotingHeight: prop.v.Header.StartVotingHeight,
+		EndVotingHeight:   prop.v.Header.EndVotingHeight,
+		ApplyHeight:       prop.v.Header.ApplyHeight,
+		TotalVotingPower:  prop.v.Header.TotalVotingPower,
+		MajorityPower:     prop.v.Header.MajorityPower,
+		Voters:            voters,
+		Options:           options,
+		MajorOption:       majorOption,
+	}
+
+	return jsonx.Marshal(&propObj)
+}
+
+func (prop *GovProposal) UnmarshalJSON(bz []byte) error {
+
+	var propObj proposalObj
+	if err := jsonx.Unmarshal(bz, &propObj); err != nil {
+		return err
+	}
+
+	prop.mtx.Lock()
+	defer prop.mtx.Unlock()
+
+	prop.v.Header = &GovProposalHeaderProto{}
+	prop.v.Header.PropType = propObj.PropType
+	prop.v.Header.TxHash = propObj.TxHash
+	prop.v.Header.StartVotingHeight = propObj.StartVotingHeight
+	prop.v.Header.EndVotingHeight = propObj.EndVotingHeight
+	prop.v.Header.ApplyHeight = propObj.ApplyHeight
+	prop.v.Header.TotalVotingPower = propObj.TotalVotingPower
+	prop.v.Header.MajorityPower = propObj.MajorityPower
+	prop.v.Header.Voters = make([]*VoterProto, len(propObj.Voters))
+	for i, voter := range propObj.Voters {
+		prop.v.Header.Voters[i] = &VoterProto{
+			Address: voter.Address,
+			Power:   voter.Power,
+			Choice:  voter.Choice,
+		}
+	}
+
+	prop.v.Options = make([]*VoteOptionProto, len(propObj.Options))
+	for i, opt := range propObj.Options {
+		prop.v.Options[i] = &VoteOptionProto{
+			Option: []byte(opt.Option),
+			Votes:  opt.Votes,
+		}
+	}
+	if propObj.MajorOption != nil {
+		prop.v.MajorOption = &VoteOptionProto{
+			Option: []byte(propObj.MajorOption.Option),
+			Votes:  propObj.MajorOption.Votes,
+		}
+	}
+	return nil
+}
+
+type voterObj struct {
+	Address bytes.HexBytes
+	Power   int64
+	Choice  int32
+}
+
+type optionObj struct {
+	Option string
+	Votes  int64
+}
+
+type proposalObj struct {
+	PropType          int32
+	TxHash            bytes.HexBytes
+	StartVotingHeight int64
+	EndVotingHeight   int64
+	ApplyHeight       int64
+	TotalVotingPower  int64
+	MajorityPower     int64
+	Voters            []*voterObj
+	Options           []*optionObj
+	MajorOption       *optionObj
 }

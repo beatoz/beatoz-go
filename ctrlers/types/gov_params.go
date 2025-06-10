@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"reflect"
 	"sync"
-	"unicode"
 )
 
 type GovParams struct {
@@ -149,40 +148,6 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 	}
 
 	return jsonx.Unmarshal(jz, &govParams._v)
-}
-
-func uppercaseFirstIfUpper(s string) string {
-	if s == "" {
-		return s
-	}
-
-	firstRune, size := utf8DecodeRuneInString(s)
-	if unicode.IsLower(firstRune) {
-		lower := unicode.ToUpper(firstRune)
-		return string(lower) + s[size:]
-	}
-	return s
-}
-
-func lowercaseFirstIfUpper(s string) string {
-	if s == "" {
-		return s
-	}
-
-	firstRune, size := utf8DecodeRuneInString(s)
-	if unicode.IsUpper(firstRune) {
-		lower := unicode.ToLower(firstRune)
-		return string(lower) + s[size:]
-	}
-	return s
-}
-
-// 안전한 utf8 첫 글자 추출 (rune, size)
-func utf8DecodeRuneInString(s string) (rune, int) {
-	if s == "" {
-		return rune(0), 0
-	}
-	return []rune(s)[0], len(string([]rune(s)[0]))
 }
 
 func (govParams *GovParams) Version() int32 {
