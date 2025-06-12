@@ -22,8 +22,8 @@ var (
 	GitCommit string
 
 	majorVer  uint64 = 0
-	minorVer  uint64 = 11
-	patchVer  uint64 = 1
+	minorVer  uint64 = 0
+	patchVer  uint64 = 0
 	commitVer uint64 = 0
 )
 

@@ -6,6 +6,7 @@ import (
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
+	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ func Test_Query_Reward(t *testing.T) {
 	protoVal := localGovMock.GetValues()
 	protoVal.InflationCycleBlocks = 10
 
-	initSupply := types.PowerToAmount(350_000_000)
+	initSupply := types2.PowerToAmount(350_000_000)
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
 

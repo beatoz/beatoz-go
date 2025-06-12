@@ -35,7 +35,7 @@ var (
 	smallGas         = defGas - 1
 	contractGas      = int64(3_000_000)
 	defGasPrice      = defGovParams.GasPrice()
-	baseFee          = ctrlertypes.GasToFee(defGas, defGasPrice)
+	baseFee          = btztypes.GasToFee(defGas, defGasPrice)
 	//smallFee         = uint256.NewInt(999_999_999_999_999)
 	defaultRpcNode *PeerMock
 )
@@ -98,7 +98,7 @@ func prepareTest(_peers []*PeerMock) {
 
 	for _, peer := range _peers {
 		w := peer.PrivValWallet()
-		ret, _ := sender.TransferCommit(w.Address(), defGas, defGasPrice, btztypes.ToFons(10_000_000), bzweb3)
+		ret, _ := sender.TransferCommit(w.Address(), defGas, defGasPrice, btztypes.ToGrans(10_000_000), bzweb3)
 		if ret.CheckTx.Code != xerrors.ErrCodeSuccess {
 			panic(ret.CheckTx.Code)
 		}

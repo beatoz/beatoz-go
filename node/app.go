@@ -97,12 +97,15 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 }
 
 func (ctrler *BeatozApp) Start() error {
+	ctrler.txExecutor.start()
 	return nil
 }
 
 func (ctrler *BeatozApp) Stop() error {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
+
+	ctrler.txExecutor.stop()
 
 	if err := ctrler.acctCtrler.Close(); err != nil {
 		return err
@@ -227,7 +230,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval)
+		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, time.Duration(ctrler.govCtrler.AssumedBlockInterval())*time.Second)
 		txctx, xerr := ctrlertypes.NewTrxContext(
 			req.Tx,
 			_bctx,
@@ -405,6 +408,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	}
 }
 
+// DEPRECATED
 func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 
 	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
@@ -459,7 +463,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddFee(types2.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -484,31 +488,45 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 	}
 }
 
-func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+// DEPRECATED
+func (ctrler *BeatozApp) DeliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
 	return ctrler.deliverTxSync(req)
 }
 
-// asyncPrepareTrxContext is called in TrxPreparer
-func (ctrler *BeatozApp) asyncPrepareTrxContext(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
-	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx,
-		true)
-	if xerr != nil {
-		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		ctrler.logger.Error("deliverTxSync", "error", xerr)
+func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
 
-		return nil, &abcitypes.ResponseDeliverTx{
-			Code: xerr.Code(),
-			Log:  xerr.Error(),
-		}
-	}
+	//
+	// Parallel tx processing.
+	// Just request to create `TrxContext` with `req RequestDeliverTx`.
+	// The executions for this `req RequestDeliverTx` will be done in `EncBlockSync`
+	ctrler.txExecutor.Add(
+		&req,
+		func(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
+			txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
+				ctrler.currBlockCtx,
+				true)
+			if xerr != nil {
+				xerr = xerrors.ErrDeliverTx.Wrap(xerr)
+				ctrler.logger.Error("asyncPrepareTrxContext", "error", xerr)
 
-	ctrler.currBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
+				return nil, &abcitypes.ResponseDeliverTx{
+					Code: xerr.Code(),
+					Log:  xerr.Error(),
+				}
+			}
 
-	return txctx, nil
+			ctrler.currBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
+			return txctx, nil
+		},
+	)
+
+	// this return value has no meaning.
+	return abcitypes.ResponseDeliverTx{}
 }
 
 // asyncExecTrxContext is called in parallel tx processing
@@ -536,7 +554,7 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(ctrlertypes.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddFee(types2.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -566,11 +584,47 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 		"height", req.Height)
 
 	ctrler.mtx.Lock()
-	defer func() {
-		ctrler.mtx.Unlock() // this was locked at BeginBlock
-		ctrler.logger.Debug("Finish BeatozApp::EndBlock",
-			"height", req.Height)
-	}()
+	defer ctrler.mtx.Unlock()
+
+	{
+		//
+		// Execute all transactions
+		//
+		client := ctrler.localClient.(*beatozLocalClient)
+
+		ctrler.txExecutor.TrxPreparer.Wait()
+		// for debugging
+		if ctrler.txExecutor.TrxPreparer.resultCount() != ctrler.currBlockCtx.TxsCnt() {
+			panic(fmt.Sprintf("error: len(client.deliverTxReqs)(%v) != txs count in block(%v)",
+				ctrler.txExecutor.TrxPreparer.resultCount(), ctrler.currBlockCtx.TxsCnt()))
+		}
+
+		// Execute every transaction in its own `TrxContext` sequentially
+		for idx, ret := range ctrler.txExecutor.TrxPreparer.resultList() {
+			// for debugging
+			if ret == nil {
+				panic(fmt.Sprintf("error: ret[%v] is nil. total result count: %v", idx, ctrler.txExecutor.TrxPreparer.resultCount()))
+			} else if idx != ret.idx {
+				panic(fmt.Sprintf("error: wrong transaction index. idx:%v, param.idx:%v", idx, ret.idx))
+			}
+
+			// `param.txctx` may be `nil`, which means an error occurred in generating `TrxContext`.
+			// The `ResponseDeliverTx` with the error for this tx (`param.reqDeliverTx`)
+			// already exists in `param.resDeliverTx` and it is written to blockchain as invalid tx.
+			if ret.txctx != nil {
+				ret.resDeliverTx = ctrler.asyncExecTrxContext(ret.txctx)
+			}
+
+			// the `client.Callback` will be called.
+			// this callback function is set before calling `client.DeliverTxAsync`
+			// in `execBlockOnProxyApp`(`github.com/tendermint/tendermint/state/execution.go`).
+			client.callback(
+				abcitypes.ToRequestDeliverTx(*ret.reqDeliverTx),
+				abcitypes.ToResponseDeliverTx(*ret.resDeliverTx),
+			)
+		}
+		ctrler.txExecutor.TrxPreparer.reset()
+	}
 
 	var beginBlockEvents []abcitypes.Event
 
@@ -703,7 +757,7 @@ func checkRequestInitChain(req abcitypes.RequestInitChain) (*genesis.GenesisAppS
 	for _, val := range req.Validators {
 		genVotinPower += val.Power
 	}
-	genVotingPowerAmt := types2.ToFons(uint64(genVotinPower))
+	genVotingPowerAmt := types2.PowerToAmount(genVotinPower)
 
 	genAppState := &genesis.GenesisAppState{}
 	if err := jsonx.Unmarshal(req.AppStateBytes, genAppState); err != nil {

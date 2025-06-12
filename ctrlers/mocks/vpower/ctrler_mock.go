@@ -112,7 +112,7 @@ func (mock *VPowerHandlerMock) IsValidator(addr types.Address) bool {
 }
 
 func (mock *VPowerHandlerMock) GetTotalAmount() *uint256.Int {
-	return ctrlertypes.PowerToAmount(mock.GetTotalPower())
+	return types.PowerToAmount(mock.GetTotalPower())
 }
 
 func (mock *VPowerHandlerMock) GetTotalPower() int64 {

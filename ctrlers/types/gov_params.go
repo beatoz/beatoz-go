@@ -12,12 +12,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"reflect"
 	"sync"
-	"unicode"
-)
-
-var (
-	//DEPRECATED
-	amountPerPower = uint256.NewInt(1_000000000_000000000) // 1BEATOZ == 1Power
 )
 
 type GovParams struct {
@@ -59,8 +53,8 @@ func NewGovParams(interval int) *GovParams {
 			ValidatorRewardRate:       30,                                                             // 30%
 			TxFeeRewardRate:           90,                                                             // 90%
 			SlashRate:                 50,                                                             // 50%
-			XGasPrice:                 uint256.NewInt(250_000_000_000).Bytes(),                        // 250e9 = 250 Gfons
-			MinTrxGas:                 4_000,                                                          // 4e3 * 25e10 = 1e15 = 0.001 BEATOZ
+			XGasPrice:                 uint256.NewInt(250_000_000_000).Bytes(),                        // 250e9 = 250 Ggrans
+			MinTrxGas:                 4_000,                                                          // 4e3 * 25e10 = 1e15 = 0.001 BTOZ
 			MaxTrxGas:                 30_000_000,
 			MaxBlockGas:               50_000_000,
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
@@ -154,40 +148,6 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 	}
 
 	return jsonx.Unmarshal(jz, &govParams._v)
-}
-
-func uppercaseFirstIfUpper(s string) string {
-	if s == "" {
-		return s
-	}
-
-	firstRune, size := utf8DecodeRuneInString(s)
-	if unicode.IsLower(firstRune) {
-		lower := unicode.ToUpper(firstRune)
-		return string(lower) + s[size:]
-	}
-	return s
-}
-
-func lowercaseFirstIfUpper(s string) string {
-	if s == "" {
-		return s
-	}
-
-	firstRune, size := utf8DecodeRuneInString(s)
-	if unicode.IsUpper(firstRune) {
-		lower := unicode.ToLower(firstRune)
-		return string(lower) + s[size:]
-	}
-	return s
-}
-
-// 안전한 utf8 첫 글자 추출 (rune, size)
-func utf8DecodeRuneInString(s string) (rune, int) {
-	if s == "" {
-		return rune(0), 0
-	}
-	return []rune(s)[0], len(string([]rune(s)[0]))
 }
 
 func (govParams *GovParams) Version() int32 {
@@ -406,37 +366,6 @@ func (govParams *GovParams) String() string {
 // utility methods
 func MaxTotalPower() int64 {
 	return tmtypes.MaxTotalVotingPower
-}
-
-// DEPRECATED
-func AmountToPower(amt *uint256.Int) (int64, xerrors.XError) {
-	// 1 VotingPower == 1 BEATOZ
-	_vp := new(uint256.Int).Div(amt, amountPerPower)
-	vp := int64(_vp.Uint64())
-	if vp < 0 {
-		return -1, xerrors.ErrOverFlow.Wrapf("voting power is converted as negative(%v) from amount(%v)", vp, amt.Dec())
-	}
-	return vp, nil
-}
-
-// DEPRECATED
-func PowerToAmount(power int64) *uint256.Int {
-	// 1 VotingPower == 1 BEATOZ = 10^18 amount
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(power)), amountPerPower)
-}
-
-// DEPRECATED
-func AmountPerPower() *uint256.Int {
-	return amountPerPower.Clone()
-}
-
-func FeeToGas(fee, price *uint256.Int) uint64 {
-	gas := new(uint256.Int).Div(fee, price)
-	return gas.Uint64()
-}
-
-func GasToFee(gas int64, price *uint256.Int) *uint256.Int {
-	return new(uint256.Int).Mul(uint256.NewInt(uint64(gas)), price)
 }
 
 func MergeGovParams(fromPrams, toParams *GovParams) {

@@ -5,6 +5,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 type requestParam struct {
@@ -30,7 +31,9 @@ type TrxPreparer struct {
 	reqCount     int
 	resultValues []*resultValue
 
-	mtx sync.RWMutex
+	started uint32 // atomic
+	stopped uint32 // atomic
+	mtx     sync.RWMutex
 }
 
 func newTrxPreparer() *TrxPreparer {
@@ -42,17 +45,18 @@ func newTrxPreparer() *TrxPreparer {
 }
 
 func (tp *TrxPreparer) start() {
-	for i := 0; i < len(tp.chReqParams); i++ {
-		tp.chReqParams[i] = make(chan *requestParam, 5000)
-		go trxPreparerRoutine(tp.chReqParams[i], tp.chDone, i)
+	if atomic.CompareAndSwapUint32(&tp.started, 0, 1) {
+		for i := 0; i < len(tp.chReqParams); i++ {
+			tp.chReqParams[i] = make(chan *requestParam, 5000)
+			go trxPreparerRoutine(tp.chReqParams[i], tp.chDone, i)
+		}
 	}
 }
 
 func (tp *TrxPreparer) stop() {
-	tp.mtx.Lock()
-	defer tp.mtx.Unlock()
-
-	close(tp.chDone)
+	if atomic.CompareAndSwapUint32(&tp.stopped, 0, 1) {
+		close(tp.chDone)
+	}
 }
 
 func (tp *TrxPreparer) reset() {
@@ -114,7 +118,7 @@ STOP:
 	for {
 		select {
 		case param := <-chReqParams:
-			_txctx, _resp := param.onPrepare(param.req, param.idx) //param.app.(*BeatozApp).asyncPrepareTrxContext(param.req, param.idx)
+			_txctx, _resp := param.onPrepare(param.req, param.idx) //.paramapp.(*BeatozApp).asyncPrepareTrxContext(param.req, param.idx)
 			param.onCompleted(&resultValue{param.idx, param.req, _resp, _txctx})
 		case <-done:
 			break STOP
