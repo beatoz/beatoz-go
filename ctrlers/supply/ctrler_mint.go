@@ -167,6 +167,33 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 	}
 }
 
+// DEPRECATED: adjustHeight returns the estimated height when the total supply was `si`.
+// return_height = {(si * YearSeconds) / (vpAmt * blockIntv)} * {ln((smax - preSi)/(smax-si)) / ln(1+lambda)}
+func adjustHeight(si, preSi, smax *uint256.Int, vp int64, lambda, blockIntv int32) int64 {
+	dLambdaAddOne := decimal.New(int64(lambda), -3)
+	dLambdaAddOne = dLambdaAddOne.Add(decimal.NewFromInt(1))
+	dsi := decimal.NewFromBigInt(si.ToBig(), 0)
+	d0 := decimal.NewFromInt(ctrlertypes.YearSeconds).Mul(dsi)
+	d0 = d0.Div(decimal.New(vp, 18).Mul(decimal.NewFromInt(int64(blockIntv))))
+
+	var err error
+	dlastSi := decimal.NewFromBigInt(preSi.ToBig(), 0)
+	dlog := decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dlastSi)
+	dlog = dlog.Div(decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dsi))
+	dlog, err = dlog.Ln(int32(decimal.DivisionPrecision))
+	if err != nil {
+		panic(err)
+	}
+	dLambdaAddOne, err = dLambdaAddOne.Ln(int32(decimal.DivisionPrecision))
+	if err != nil {
+		panic(err)
+	}
+	dlog = dlog.Div(dLambdaAddOne)
+
+	h := d0.Mul(dlog)
+	return h.IntPart()
+}
+
 // scaledHeight returns the normalized block time corresponding to the given block height.
 // (`ret = current_height * block_interval_sec / one_year_seconds`)
 // It calculates how far along the blockchain is relative to a predefined reference period.
@@ -185,15 +212,34 @@ func Sd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, w
 }
 
 func decimalSd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
-
-	_lambda := decimal.New(int64(lambda), -3)
-	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
+	decLambdaAddOne := decimal.New(int64(lambda), -3)
+	decLambdaAddOne = decLambdaAddOne.Add(decimal.New(1, 0))
 	decScaledH, _ := scaledHeight.ToDecimal()
 	decWa, _ := wa.ToDecimal()
 	decExp := decWa.Mul(decScaledH)
 
 	part1 := decimal.NewFromInt(1).Sub(decLambdaAddOne.Pow(decExp.Neg()))
 	part0 := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, lastSupply).ToBig(), 0)
+	return part0.Mul(part1)
+}
+
+// DEPRECATED
+func Sd2(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, inflaCycle int64, blockIntv, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	return decimalSd2(scaledHeight, lastSupply, smax, inflaCycle, blockIntv, lambda, wa)
+}
+
+// DEPRECATED
+func decimalSd2(scaledHeight fxnum.FxNum, sadjusted, smax *uint256.Int, inflaCycle int64, blockIntv, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	decLambdaAddOne := decimal.New(int64(lambda), -3)
+	decLambdaAddOne = decLambdaAddOne.Add(decimal.New(1, 0))
+	decScaledH, _ := scaledHeight.ToDecimal()
+	decScaledC, _ := heightYears(inflaCycle, blockIntv).ToDecimal()
+	decWa, _ := wa.ToDecimal()
+	decExp0 := decWa.Mul(decScaledH)
+	decExp1 := decWa.Mul(decScaledC)
+
+	part0 := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, sadjusted).ToBig(), 0).Div(decLambdaAddOne.Pow(decExp0))
+	part1 := decLambdaAddOne.Pow(decExp1).Sub(decimal.NewFromInt(1))
 	return part0.Mul(part1)
 }
 
