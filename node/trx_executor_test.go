@@ -1,10 +1,12 @@
 package node
 
 import (
+	"fmt"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
@@ -140,43 +142,21 @@ func Test_BlockGasLimit(t *testing.T) {
 	require.Equal(t, expected, adjusted)
 }
 
-//type acctHandlerMock struct{}
-//
-//func (a *acctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-//	return nil
-//}
-//
-//func (a *acctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-//	_ = ctx.Sender.AddBalance(ctx.Tx.Amount)
-//	_ = ctx.Receiver.SubBalance(ctx.Tx.Amount)
-//	return nil
-//}
-//
-//var _ ctrlertypes.IAccountHandler = (*acctHandlerMock)(nil)
-//var _ ctrlertypes.ITrxHandler = (*acctHandlerMock)(nil)
-//
-//func (a *acctHandlerMock) FindOrNewAccount(address types.Address, b bool) *ctrlertypes.Account {
-//	return a.FindAccount(address, b)
-//}
-//
-//func (a *acctHandlerMock) FindAccount(address types.Address, b bool) *ctrlertypes.Account {
-//	acct := ctrlertypes.NewAccount(address)
-//	acct.AddBalance(govMock.MinTrxFee())
-//	acct.AddBalance(uint256.NewInt(balance))
-//	return acct
-//}
-//
-//func (a *acctHandlerMock) Transfer(address types.Address, address2 types.Address, u *uint256.Int, b bool) xerrors.XError {
-//	panic("implement me")
-//}
-//
-//func (a *acctHandlerMock) Reward(address types.Address, u *uint256.Int, b bool) xerrors.XError {
-//	panic("implement me")
-//}
-//
-//func (a *acctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
-//	panic("implement me")
-//}
-//func (a *acctHandlerMock) SetAccount(account *ctrlertypes.Account, b bool) xerrors.XError {
-//	return nil
-//}
+func Test_Payer(t *testing.T) {
+	sender := acctMock.RandWallet() //
+	payer := web3.NewWallet(nil)
+	fmt.Println("payer address", payer.Address(), "balance", payer.GetBalance().Dec())
+	acctMock.AddWallet(payer) // payer has no balance
+
+	//
+	//
+	tx := web3.NewTrxTransfer(sender.Address(), types.RandAddress(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(balance))
+	_, _, err := sender.SignTrxRLP(tx, chainId)
+	require.NoError(t, err)
+	_, _, err = payer.SignPayerTrxRLP(tx, chainId)
+	require.NoError(t, err)
+
+	txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	require.NoError(t, xerr)
+	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInsufficientFund.Error())
+}

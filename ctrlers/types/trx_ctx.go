@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -19,6 +20,7 @@ type TrxContext struct {
 	SenderPubKey []byte
 	Sender       *Account
 	Receiver     *Account
+	Payer        *Account
 	GasUsed      int64
 	RetData      []byte
 	Events       []abcitypes.Event
@@ -60,12 +62,22 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 	}
 
 	//
-	// validation signature.
+	// verify signature.
 	_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.BlockContext.ChainID())
 	if xerr != nil {
 		return nil, xerr
 	}
 	txctx.SenderPubKey = pubKeyBytes
+
+	//
+	// verify payer's signature.
+	var payerAddr types.Address
+	if tx.PayerSig != nil {
+		payerAddr, _, xerr = VerifyPayerTrxRLP(tx, txctx.BlockContext.ChainID())
+		if xerr != nil {
+			return nil, xerr.Wrap(errors.New("payer signature is invalid"))
+		}
+	}
 
 	//
 	//
@@ -83,6 +95,14 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 	txctx.Receiver = txctx.BlockContext.AcctHandler.FindOrNewAccount(toAddr, txctx.Exec)
 	if txctx.Receiver == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
+	}
+	if payerAddr != nil {
+		txctx.Payer = txctx.BlockContext.AcctHandler.FindAccount(payerAddr, txctx.Exec)
+		if txctx.Payer == nil {
+			return nil, xerrors.ErrNotFoundAccount.Wrapf("payer address: %v", payerAddr)
+		}
+	} else {
+		txctx.Payer = txctx.Sender
 	}
 
 	return txctx, nil

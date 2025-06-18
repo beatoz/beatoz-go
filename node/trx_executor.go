@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
@@ -42,10 +43,20 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	tx := ctx.Tx
 
 	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
-	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
-	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
-		return xerr
+	if bytes.Compare(ctx.Sender.Address, ctx.Payer.Address) != 0 {
+		if xerr := ctx.Payer.CheckBalance(feeAmt); xerr != nil {
+			return xerr
+		}
+		if xerr := ctx.Sender.CheckBalance(tx.Amount); xerr != nil {
+			return xerr
+		}
+	} else {
+		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+		if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
+			return xerr
+		}
 	}
+
 	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
 		return xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
@@ -156,7 +167,7 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 	// processing fee = gas * gasPrice
 	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
-	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
+	if xerr := ctx.Payer.SubBalance(fee); xerr != nil {
 		return xerr
 	}
 
@@ -167,7 +178,11 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
 		return xerr
 	}
-
+	if bytes.Compare(ctx.Sender.Address, ctx.Payer.Address) != 0 {
+		if xerr := ctx.AcctHandler.SetAccount(ctx.Payer, ctx.Exec); xerr != nil {
+			return xerr
+		}
+	}
 	// set used gas
 	ctx.GasUsed = ctx.Tx.Gas
 	return nil

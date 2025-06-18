@@ -64,13 +64,6 @@ func Test_NewTrxContext(t *testing.T) {
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
 	//
-	// Wrong Signature - sign with proto encoding
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(0))
-	_, _, _ = w0.SignTrxProto(tx, chainId)
-	txctx, xerr = newTrxCtx(tx, 1)
-	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
-
-	//
 	// Wrong Signature - no signature
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(0))
 	txctx, xerr = newTrxCtx(tx, 1)

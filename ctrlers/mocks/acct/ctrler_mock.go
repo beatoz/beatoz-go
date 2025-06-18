@@ -37,6 +37,10 @@ func (mock *AcctHandlerMock) RandWallet() *web3.Wallet {
 	return mock.wallets[idx]
 }
 
+func (mock *AcctHandlerMock) AddWallet(w *web3.Wallet) {
+	mock.wallets = append(mock.wallets, w)
+}
+
 func (mock *AcctHandlerMock) GetWallet(idx int) *web3.Wallet {
 	if idx >= len(mock.wallets) {
 		return nil
@@ -69,6 +73,7 @@ func (mock *AcctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *ct
 		return acct
 	}
 
+	// no wallet, only account
 	acct := ctrlertypes.NewAccount(addr)
 	mock.accounts = append(mock.accounts, acct)
 	return acct
