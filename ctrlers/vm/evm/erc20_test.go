@@ -273,9 +273,7 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 			_addr, err := types.HexToAddress(string(evt.Attributes[0].Value))
 			require.NoError(t, err)
 
-			// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
-			// Calculate an expected address with `fromAcct.Nonce-1`.
-			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce-1))
+			addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce))
 			require.EqualValues(t, addr0[:], _addr)
 			require.EqualValues(t, addr0[:], txctx.RetData)
 

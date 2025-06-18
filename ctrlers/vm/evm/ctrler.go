@@ -193,7 +193,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
 		ctx.Tx.Gas,
-		ctx.GovHandler.GasPrice(),
+		ctx.Tx.GasPrice,
 		ctx.Tx.Amount,
 		inputData,
 		ctx.Exec,

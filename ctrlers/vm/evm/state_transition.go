@@ -8,7 +8,6 @@ import (
 	"fmt"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcore "github.com/ethereum/go-ethereum/core"
-	ethcoretypes "github.com/ethereum/go-ethereum/core/types"
 	ethvm "github.com/ethereum/go-ethereum/core/vm"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	ethparams "github.com/ethereum/go-ethereum/params"
@@ -38,7 +37,7 @@ The state transitioning model does all the necessary work to work out a valid ne
 */
 type VMStateTransition struct {
 	gp         *ethcore.GasPool
-	msg        VMMessage
+	msg        ethcore.Message
 	gas        uint64
 	gasPrice   *big.Int
 	gasFeeCap  *big.Int
@@ -50,28 +49,8 @@ type VMStateTransition struct {
 	evm        *ethvm.EVM
 }
 
-// VMMessage represents a message sent to a contract.
-type VMMessage interface {
-	From() ethcommon.Address
-	To() *ethcommon.Address
-
-	GasPrice() *big.Int
-	GasFeeCap() *big.Int
-	GasTipCap() *big.Int
-	Gas() uint64
-	Value() *big.Int
-
-	Nonce() uint64
-	IsFake() bool
-	Data() []byte
-	AccessList() ethcoretypes.AccessList
-
-	// added for txfee sponsor
-	Sponsor() *ethcommon.Address
-}
-
 // NewStateTransition initialises and returns a new state transition object.
-func NewVMStateTransition(evm *ethvm.EVM, msg VMMessage, gp *ethcore.GasPool) *VMStateTransition {
+func NewVMStateTransition(evm *ethvm.EVM, msg ethcore.Message, gp *ethcore.GasPool) *VMStateTransition {
 	return &VMStateTransition{
 		gp:        gp,
 		evm:       evm,
@@ -111,7 +90,10 @@ func (st *VMStateTransition) buyGas() error {
 	st.gas += st.msg.Gas()
 
 	st.initialGas = st.msg.Gas()
-	st.state.SubBalance(st.msg.From(), mgval)
+
+	// DO NOT change the sender's balance for the tx fee at this point.
+	// This should be handled in postRunTrx in node/trx_executor.go.
+	//st.state.SubBalance(st.msg.From(), mgval)
 	return nil
 }
 
@@ -279,9 +261,12 @@ func (st *VMStateTransition) refundGas(refundQuotient uint64) {
 	}
 	st.gas += refund
 
-	// Return ETH for remaining gas, exchanged at the original rate.
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
-	st.state.AddBalance(st.msg.From(), remaining)
+	// DO NOT change the sender's balance for the tx fee at this point.
+	// This should be handled in postRunTrx in node/trx_executor.go.
+	//
+	//// Return ETH for remaining gas, exchanged at the original rate.
+	//remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
+	//st.state.AddBalance(st.msg.From(), remaining)
 
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.
