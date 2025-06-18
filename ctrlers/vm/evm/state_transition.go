@@ -7,7 +7,6 @@ package evm
 import (
 	"fmt"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	ethmath "github.com/ethereum/go-ethereum/common/math"
 	ethcore "github.com/ethereum/go-ethereum/core"
 	ethcoretypes "github.com/ethereum/go-ethereum/core/types"
 	ethvm "github.com/ethereum/go-ethereum/core/vm"
@@ -246,20 +245,24 @@ func (st *VMStateTransition) TransitionDb() (*ethcore.ExecutionResult, error) {
 		st.refundGas(ethparams.RefundQuotientEIP3529)
 	}
 
-	effectiveTip := st.gasPrice
-	if rules.IsLondon {
-		effectiveTip = ethmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
-	}
-
-	if st.evm.Config.NoBaseFee && st.gasFeeCap.Sign() == 0 && st.gasTipCap.Sign() == 0 {
-		// Skip fee payment when NoBaseFee is set and the fee fields
-		// are 0. This avoids a negative effectiveTip being applied to
-		// the coinbase when simulating calls.
-	} else {
-		fee := new(big.Int).SetUint64(st.gasUsed())
-		fee.Mul(fee, effectiveTip)
-		st.state.AddBalance(st.evm.Context.Coinbase, fee)
-	}
+	//
+	// DO NOT reward tx fee to `st.evm.Context.Coinbase` at this point.
+	// This should be handled in AcctCtrler.EndBlock.
+	//
+	//effectiveTip := st.gasPrice
+	//if rules.IsLondon {
+	//	effectiveTip = ethmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
+	//}
+	//
+	//if st.evm.Config.NoBaseFee && st.gasFeeCap.Sign() == 0 && st.gasTipCap.Sign() == 0 {
+	//	// Skip fee payment when NoBaseFee is set and the fee fields
+	//	// are 0. This avoids a negative effectiveTip being applied to
+	//	// the coinbase when simulating calls.
+	//} else {
+	//	fee := new(big.Int).SetUint64(st.gasUsed())
+	//	fee.Mul(fee, effectiveTip)
+	//	st.state.AddBalance(st.evm.Context.Coinbase, fee)
+	//}
 
 	return &ethcore.ExecutionResult{
 		UsedGas:    st.gasUsed(),
