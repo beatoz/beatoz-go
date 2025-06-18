@@ -28,13 +28,14 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
 			}
 
-			// apply to SupplyHandler.lastTotalSupply.
-			if xerr := bctx.SupplyHandler.Burn(bctx, types.PowerToAmount(slashed)); xerr != nil {
+			// do permanent lock
+			deadAmt := types.PowerToAmount(slashed)
+			if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
 				return nil, xerr
 			}
 
 			evts = append(evts, abcitypes.Event{
-				Type: "stake.slashing",
+				Type: "vpower.slashing",
 				Attributes: []abcitypes.EventAttribute{
 					{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
 					{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
