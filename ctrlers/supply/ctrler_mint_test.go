@@ -20,7 +20,6 @@ func Test_Mint(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	initSupply := btztypes.PowerToAmount(350_000_000)
-	adjustedHeight := int64(1)
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
 
@@ -52,7 +51,7 @@ func Test_Mint(t *testing.T) {
 		//wa = wa.Truncate(precision)
 
 		sd := Sd(
-			heightYears(currHeight-adjustedHeight, govMock.AssumedBlockInterval()),
+			heightYears(currHeight, govMock.AssumedBlockInterval()),
 			totalSupply, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
 		expectedChange := uint256.MustFromBig(sd.BigInt())
 		expectedTotalSupply := new(uint256.Int).Add(totalSupply, expectedChange)
@@ -453,136 +452,6 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 	}
 }
 
-//func Test_Annual_Supply_Sd2(t *testing.T) {
-//	initSupply := uint256.MustFromDecimal("350000000000000000000000000")
-//	totalSupply := initSupply.Clone()
-//	adjustedSupply := initSupply.Clone()
-//	adjustedHeight := int64(1)
-//
-//	powChunks := []*vpower.PowerChunkProto{
-//		{Height: 1, Power: 21_000_000},
-//	}
-//
-//	govMock.GetValues().InflationWeightPermil = 2999
-//	fmt.Println("tau", govMock.BondingBlocksWeightPermil())
-//	fmt.Println("lamda", govMock.InflationWeightPermil())
-//	fmt.Println("inflation.cycle", govMock.InflationCycleBlocks())
-//
-//	burned := false
-//	preSupply := totalSupply.Clone()
-//	currHeight := types.DaySeconds
-//	for {
-//		//burning
-//		if currHeight == types.YearSeconds*14 {
-//			// burn x %
-//			remainRate := decimal.NewFromFloat(0.8)
-//			remainSupply := uint256.MustFromBig(decimal.NewFromBigInt(totalSupply.ToBig(), 0).Mul(remainRate).BigInt())
-//			adjustedHeight = currHeight
-//			adjustedSupply = remainSupply.Clone()
-//
-//			preSupply = totalSupply.Clone()
-//			totalSupply = remainSupply.Clone()
-//			burned = true
-//
-//			//fmt.Printf("year: %2d, height: %10v(%v), adjustedSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
-//			//	currHeight/types.YearSeconds, currHeight, adjustedHeight,
-//			//	btztypes.FormattedString(adjustedSupply),
-//			//	btztypes.FormattedString(totalSupply),
-//			//	"0", "0", "0",
-//			//	btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
-//		}
-//		////bonding / unbonding
-//		//if rand.Intn(7) == 0 {
-//		//	add := (rand.Intn(7) == 0)
-//		//	if add {
-//		//		pow := rand.Int63n(1_000_000) + 4_000
-//		//		powChunks = append(powChunks,
-//		//			&vpower.PowerChunkProto{
-//		//				Power:  pow,
-//		//				Height: currHeight,
-//		//			})
-//		//		//fmt.Printf("\tAdd voting power - height: %d, power: %d \n", h, pow)
-//		//	} else {
-//		//		rdx := rand.Intn(len(powChunks))
-//		//		pc := powChunks[rdx]
-//		//		pow := rand.Int63n(pc.Power) + 1
-//		//		pc.Power -= pow
-//		//		if pc.Power == 0 {
-//		//			powChunks = append(powChunks[:rdx], powChunks[rdx+1:]...)
-//		//		}
-//		//		//fmt.Printf("\tSub voting power - height: %d, power: %d, change: %d\n", pc.Height, pc.Power, pow)
-//		//	}
-//		//}
-//
-//		if currHeight%govMock.InflationCycleBlocks() != 0 {
-//			currHeight += types.DaySeconds
-//			continue
-//		}
-//
-//		// Mint...
-//
-//		preSupply = totalSupply.Clone()
-//
-//		vw := vpower.FxNumWeightOfPowerChunks(
-//			powChunks, currHeight,
-//			govMock.RipeningBlocks(),
-//			govMock.BondingBlocksWeightPermil(),
-//			totalSupply)
-//
-//		scaledH := heightYears(currHeight-adjustedHeight, govMock.AssumedBlockInterval())
-//
-//		decSd := Sd2(
-//			scaledH,
-//			adjustedSupply,
-//			govMock.MaxTotalSupply(),
-//			govMock.InflationCycleBlocks(),
-//			govMock.AssumedBlockInterval(),
-//			govMock.InflationWeightPermil(),
-//			vw).Floor()
-//
-//		mintSupply := uint256.MustFromBig(decSd.BigInt())
-//		_ = totalSupply.Add(totalSupply, mintSupply)
-//
-//		if !burned {
-//			//require.True(t, totalSupply.Gt(preSupply),
-//			//	fmt.Sprintf("height %d: %v >= %v, w=%v, scaledH:%v, adjust=%v, minted=%v",
-//			//		h, preSupply, totalSupply, vw, scaledH, adjustedSupply, btztypes.FormattedString(mintSupply)))
-//			if totalSupply.Lt(preSupply) {
-//				t.Logf("totalSupply is dereased!!!! - height %d: %v >= %v, w=%v, scaledH:%v, exp:%v, minted=%v",
-//					currHeight,
-//					btztypes.FormattedString(preSupply),
-//					btztypes.FormattedString(totalSupply),
-//					vw, scaledH, vw.Mul(scaledH),
-//					btztypes.FormattedString(mintSupply))
-//			}
-//			burned = false
-//		}
-//
-//		{
-//			// log annual total supply
-//			currHeightYear := currHeight / types.YearSeconds
-//			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) / types.YearSeconds
-//			m, _ := btztypes.FromGransRem(totalSupply)
-//			if currHeightYear != nextHeightYear || m >= 693_000_000 {
-//
-//				fmt.Printf("year: %2d, height: %10v(%v), adjustedSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
-//					currHeightYear, currHeight, adjustedHeight,
-//					btztypes.FormattedString(adjustedSupply),
-//					btztypes.FormattedString(totalSupply),
-//					vw.StringN(7), scaledH.StringN(7), vw.Mul(scaledH).StringN(7),
-//					btztypes.FormattedString(mintSupply))
-//
-//				if m >= 693_000_000 { // 99% of 700_000_000 (max)
-//					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", btztypes.FormattedString(totalSupply), currHeightYear, currHeight)
-//					break
-//				}
-//			}
-//		}
-//
-//		currHeight += types.DaySeconds
-//	}
-//}
-
 func Benchmark_AdjustHeight(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
@@ -615,4 +484,30 @@ func absDiff64(x, y int64) int64 {
 		return x - y
 	}
 	return y - x
+}
+
+// return_height = {(si * YearSeconds) / (vpAmt * blockIntv)} * {ln((smax - preSi)/(smax-si)) / ln(1+lambda)}
+func adjustHeight(si, preSi, smax *uint256.Int, vp int64, lambda, blockIntv int32) int64 {
+	dLambdaAddOne := decimal.New(int64(lambda), -3)
+	dLambdaAddOne = dLambdaAddOne.Add(decimal.NewFromInt(1))
+	dsi := decimal.NewFromBigInt(si.ToBig(), 0)
+	d0 := decimal.NewFromInt(types.YearSeconds).Mul(dsi)
+	d0 = d0.Div(decimal.New(vp, 18).Mul(decimal.NewFromInt(int64(blockIntv))))
+
+	var err error
+	dlastSi := decimal.NewFromBigInt(preSi.ToBig(), 0)
+	dlog := decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dlastSi)
+	dlog = dlog.Div(decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dsi))
+	dlog, err = dlog.Ln(int32(decimal.DivisionPrecision))
+	if err != nil {
+		panic(err)
+	}
+	dLambdaAddOne, err = dLambdaAddOne.Ln(int32(decimal.DivisionPrecision))
+	if err != nil {
+		panic(err)
+	}
+	dlog = dlog.Div(dLambdaAddOne)
+
+	h := d0.Mul(dlog)
+	return h.IntPart()
 }
