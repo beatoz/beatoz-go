@@ -80,7 +80,6 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 
 		bctx := req.bctx
 		lastTotalSupply := req.lastTotalSupply
-		lastAdjustedHeight := req.lastAdjustedHeight
 
 		// 1. compute voting power weight
 		retWeight, xerr := bctx.VPowerHandler.ComputeWeight(
@@ -102,7 +101,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		waVals := retWeight.ValWeight() //.Truncate(precision)
 
 		addedSupply := Sd(
-			heightYears(bctx.Height()-lastAdjustedHeight, bctx.GovHandler.AssumedBlockInterval()),
+			heightYears(bctx.Height(), bctx.GovHandler.AssumedBlockInterval()),
 			lastTotalSupply,
 			bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(),
 			waAll,
@@ -185,9 +184,8 @@ func Sd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, w
 }
 
 func decimalSd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
-
-	_lambda := decimal.New(int64(lambda), -3)
-	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
+	decLambdaAddOne := decimal.New(int64(lambda), -3)
+	decLambdaAddOne = decLambdaAddOne.Add(decimal.New(1, 0))
 	decScaledH, _ := scaledHeight.ToDecimal()
 	decWa, _ := wa.ToDecimal()
 	decExp := decWa.Mul(decScaledH)
@@ -195,38 +193,4 @@ func decimalSd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda i
 	part1 := decimal.NewFromInt(1).Sub(decLambdaAddOne.Pow(decExp.Neg()))
 	part0 := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, lastSupply).ToBig(), 0)
 	return part0.Mul(part1)
-}
-
-// DEPRECATED
-// Si returns the total supply amount determined by the issuance formula of block 'height'.
-func Si(scaledHeight fxnum.FxNum, adjustSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
-	return decimalSi(scaledHeight, adjustSupply, smax, lambda, wa)
-}
-
-// DEPRECATED
-func decimalSi(scaledHeight fxnum.FxNum, adjustSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
-	_lambda := decimal.New(int64(lambda), -3)
-	decLambdaAddOne := _lambda.Add(decimal.New(1, 0))
-	decScaledH, _ := scaledHeight.ToDecimal()
-	decWa, _ := wa.ToDecimal()
-	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustSupply).ToBig(), 0)
-
-	decWHid := decWa.Mul(decScaledH)
-	decDenom := decLambdaAddOne.Pow(decWHid)
-	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
-	return decSmax.Sub(decNumer.Div(decDenom))
-}
-
-// DEPRECATED
-func fxnumSi(scaledHeight fxnum.FxNum, adjustSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
-	_lambda := fxnum.Permil(int(lambda))
-	fxLambdaAddOne := _lambda.Add(fxnum.ONE)
-
-	fxWHid := wa.Mul(scaledHeight)
-	fxDenom := fxLambdaAddOne.Pow(fxWHid)
-
-	decDenom, _ := fxDenom.ToDecimal()
-	decNumer := decimal.NewFromBigInt(new(uint256.Int).Sub(smax, adjustSupply).ToBig(), 0)
-	decSmax := decimal.NewFromBigInt(smax.ToBig(), 0)
-	return decSmax.Sub(decNumer.Div(decDenom))
 }

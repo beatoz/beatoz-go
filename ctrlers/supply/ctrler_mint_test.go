@@ -20,7 +20,6 @@ func Test_Mint(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
 	initSupply := btztypes.PowerToAmount(350_000_000)
-	adjustedHeight := int64(1)
 	ctrler, xerr := initLedger(initSupply)
 	require.NoError(t, xerr)
 
@@ -52,7 +51,7 @@ func Test_Mint(t *testing.T) {
 		//wa = wa.Truncate(precision)
 
 		sd := Sd(
-			heightYears(currHeight-adjustedHeight, govMock.AssumedBlockInterval()),
+			heightYears(currHeight, govMock.AssumedBlockInterval()),
 			totalSupply, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
 		expectedChange := uint256.MustFromBig(sd.BigInt())
 		expectedTotalSupply := new(uint256.Int).Add(totalSupply, expectedChange)
@@ -215,20 +214,20 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 	currHeight := types.DaySeconds
 	for {
 		//burning
-		if currHeight == types.YearSeconds*14 {
+		if currHeight == types.YearSeconds*35 {
 			// burn x %
 			preSupply = totalSupply.Clone()
 			remainRate := decimal.NewFromFloat(0.8)
 			totalSupply = uint256.MustFromBig(decimal.NewFromBigInt(totalSupply.ToBig(), 0).Mul(remainRate).BigInt())
-			adjustedHeight = currHeight
+			//adjustedHeight = currHeight
 			burned = true
 
-			fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
-				currHeight/types.YearSeconds, currHeight,
-				btztypes.FormattedString(preSupply),
-				btztypes.FormattedString(totalSupply),
-				"0", "0", "0",
-				btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
+			//fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
+			//	currHeight/types.YearSeconds, currHeight,
+			//	btztypes.FormattedString(preSupply),
+			//	btztypes.FormattedString(totalSupply),
+			//	"0", "0", "0",
+			//	btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
 
 		}
 		// bonding/unbonding
@@ -299,17 +298,15 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 			// log annual total supply
 			currHeightYear := currHeight / types.YearSeconds
 			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) / types.YearSeconds
-			m, _ := btztypes.FromGransRem(totalSupply)
-			if currHeightYear != nextHeightYear || m >= 693_000_000 {
+			if currHeightYear != nextHeightYear || currHeightYear >= 100 {
 
-				fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
-					currHeightYear, currHeight,
+				fmt.Printf("year: %2d, height: %10v(%v), preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
+					currHeightYear, currHeight, adjustedHeight,
 					btztypes.FormattedString(preSupply),
 					btztypes.FormattedString(totalSupply),
 					vw.StringN(7), scaledH.StringN(7), vw.Mul(scaledH).StringN(7),
 					btztypes.FormattedString(mintSupply))
-				if m >= 693_000_000 { // 99% of 700_000_000 (max)
-					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", btztypes.FormattedString(totalSupply), currHeightYear, currHeight)
+				if currHeightYear >= 100 {
 					break
 				}
 			}
@@ -338,23 +335,34 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 	currHeight := types.DaySeconds
 	for {
 		//burning
-		if currHeight == types.YearSeconds*14 {
+		if currHeight == types.YearSeconds*35 {
 			// burn x %
 			remainRate := decimal.NewFromFloat(0.8)
 			remainSupply := uint256.MustFromBig(decimal.NewFromBigInt(totalSupply.ToBig(), 0).Mul(remainRate).BigInt())
-			diff := new(uint256.Int).Sub(totalSupply, remainSupply)
-			adjustedHeight = adjustHeight(remainSupply, new(uint256.Int).Sub(preSupply, diff), govMock.MaxTotalSupply(), powChunks[0].Power)
+			//preLastSupply := uint256.MustFromBig(decimal.NewFromBigInt(preSupply.ToBig(), 0).Mul(remainRate).BigInt())
+
+			//estimatedHeight := adjustHeight(
+			//	remainSupply,
+			//	preLastSupply,
+			//	govMock.MaxTotalSupply(),
+			//	powChunks[0].Power,
+			//	govMock.InflationWeightPermil(),
+			//	govMock.AssumedBlockInterval(),
+			//)
+			estimatedHeight := decimal.NewFromInt(currHeight).Mul(remainRate).IntPart()
+			adjustedHeight = currHeight - estimatedHeight
+			//fmt.Println("currHeight", currHeight, "estimatedHeight", estimatedHeight, "adjustedHeight", adjustedHeight)
 
 			preSupply = totalSupply.Clone()
 			totalSupply = remainSupply.Clone()
 			burned = true
 
-			fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
-				currHeight/types.YearSeconds, currHeight,
-				btztypes.FormattedString(preSupply),
-				btztypes.FormattedString(totalSupply),
-				"0", "0", "0",
-				btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
+			//fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, burned: -%s\n",
+			//	currHeight/types.YearSeconds, currHeight,
+			//	btztypes.FormattedString(preSupply),
+			//	btztypes.FormattedString(totalSupply),
+			//	"0", "0", "0",
+			//	btztypes.FormattedString(new(uint256.Int).Sub(preSupply, totalSupply)))
 		}
 		// bonding/unbonding
 		//if rand.Intn(7) == 0 {
@@ -425,18 +433,16 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 			// log annual total supply
 			currHeightYear := currHeight / types.YearSeconds
 			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) / types.YearSeconds
-			m, _ := btztypes.FromGransRem(totalSupply)
-			if currHeightYear != nextHeightYear || m >= 693_000_000 {
+			if currHeightYear != nextHeightYear || currHeightYear >= 100 {
 
-				fmt.Printf("year: %2d, height: %10v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
-					currHeightYear, currHeight,
+				fmt.Printf("year: %2d, height: %10v/%v, preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
+					currHeightYear, currHeight, adjustedHeight,
 					btztypes.FormattedString(preSupply),
 					btztypes.FormattedString(totalSupply),
 					vw.StringN(7), scaledH.StringN(7), vw.Mul(scaledH).StringN(7),
 					btztypes.FormattedString(mintSupply))
 
-				if m >= 693_000_000 { // 99% of 700_000_000 (max)
-					fmt.Printf("totalSupply(%s) is reached max supply in %d years (height: %v)\n", btztypes.FormattedString(totalSupply), currHeightYear, currHeight)
+				if currHeightYear >= 100 {
 					break
 				}
 			}
@@ -456,33 +462,8 @@ func Benchmark_AdjustHeight(b *testing.B) {
 		vp := bytes.RandInt64N(btztypes.FromGrans(lastSi))
 		b.StartTimer()
 
-		_ = adjustHeight(si, lastSi, smax, vp)
+		_ = adjustHeight(si, lastSi, smax, vp, govMock.InflationWeightPermil(), govMock.AssumedBlockInterval())
 	}
-}
-
-func adjustHeight(si, lastSi, smax *uint256.Int, vp int64) int64 {
-	dLambdaAddOne := decimal.New(int64(govMock.InflationWeightPermil()), -3)
-	dLambdaAddOne = dLambdaAddOne.Add(decimal.NewFromInt(1))
-	dsi := decimal.NewFromBigInt(si.ToBig(), 0)
-	d0 := decimal.NewFromInt(types.YearSeconds).Mul(dsi)
-	d0 = d0.Div(decimal.New(vp, 18).Mul(decimal.NewFromInt(int64(govMock.AssumedBlockInterval()))))
-
-	var err error
-	dlastSi := decimal.NewFromBigInt(lastSi.ToBig(), 0)
-	dlog := decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dlastSi)
-	dlog = dlog.Div(decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dsi))
-	dlog, err = dlog.Ln(int32(decimal.DivisionPrecision))
-	if err != nil {
-		panic(err)
-	}
-	dLambdaAddOne, err = dLambdaAddOne.Ln(int32(decimal.DivisionPrecision))
-	if err != nil {
-		panic(err)
-	}
-	dlog = dlog.Div(dLambdaAddOne)
-
-	h := d0.Mul(dlog)
-	return h.IntPart()
 }
 
 func absDiff(x, y *uint256.Int) *uint256.Int {
@@ -503,4 +484,30 @@ func absDiff64(x, y int64) int64 {
 		return x - y
 	}
 	return y - x
+}
+
+// return_height = {(si * YearSeconds) / (vpAmt * blockIntv)} * {ln((smax - preSi)/(smax-si)) / ln(1+lambda)}
+func adjustHeight(si, preSi, smax *uint256.Int, vp int64, lambda, blockIntv int32) int64 {
+	dLambdaAddOne := decimal.New(int64(lambda), -3)
+	dLambdaAddOne = dLambdaAddOne.Add(decimal.NewFromInt(1))
+	dsi := decimal.NewFromBigInt(si.ToBig(), 0)
+	d0 := decimal.NewFromInt(types.YearSeconds).Mul(dsi)
+	d0 = d0.Div(decimal.New(vp, 18).Mul(decimal.NewFromInt(int64(blockIntv))))
+
+	var err error
+	dlastSi := decimal.NewFromBigInt(preSi.ToBig(), 0)
+	dlog := decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dlastSi)
+	dlog = dlog.Div(decimal.NewFromBigInt(smax.ToBig(), 0).Sub(dsi))
+	dlog, err = dlog.Ln(int32(decimal.DivisionPrecision))
+	if err != nil {
+		panic(err)
+	}
+	dLambdaAddOne, err = dLambdaAddOne.Ln(int32(decimal.DivisionPrecision))
+	if err != nil {
+		panic(err)
+	}
+	dlog = dlog.Div(dLambdaAddOne)
+
+	h := d0.Mul(dlog)
+	return h.IntPart()
 }
