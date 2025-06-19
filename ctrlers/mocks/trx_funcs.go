@@ -13,14 +13,23 @@ func MakeTrxCtxWithTrx(
 	a ctrlertypes.IAccountHandler,
 	e ctrlertypes.IEVMHandler,
 	s ctrlertypes.ISupplyHandler,
-	v ctrlertypes.IVPowerHandler) (*ctrlertypes.TrxContext, xerrors.XError) {
+	v ctrlertypes.IVPowerHandler,
+) (*ctrlertypes.TrxContext, xerrors.XError) {
+	bctx := ctrlertypes.TempBlockContext(chainId, height, btm, g, a, e, s, v)
+	return MakeTrxCtxWithTrxBctx(tx, bctx, exec)
+}
+
+func MakeTrxCtxWithTrxBctx(
+	tx *ctrlertypes.Trx,
+	bctx *ctrlertypes.BlockContext,
+	exec bool,
+) (*ctrlertypes.TrxContext, xerrors.XError) {
 	txbz, xerr := tx.Encode()
 	if xerr != nil {
 		return nil, xerr
 	}
-	return MakeTrxCtxWithBz(txbz, chainId, height, btm, exec, g, a, e, s, v)
+	return ctrlertypes.NewTrxContext(txbz, bctx, exec)
 }
-
 func MakeTrxCtxWithBz(
 	txbz []byte,
 	chainId string, height int64, btm time.Time, exec bool,
@@ -28,12 +37,16 @@ func MakeTrxCtxWithBz(
 	a ctrlertypes.IAccountHandler,
 	e ctrlertypes.IEVMHandler,
 	s ctrlertypes.ISupplyHandler,
-	v ctrlertypes.IVPowerHandler) (*ctrlertypes.TrxContext, xerrors.XError) {
+	v ctrlertypes.IVPowerHandler,
+) (*ctrlertypes.TrxContext, xerrors.XError) {
 	bctx := ctrlertypes.TempBlockContext(chainId, height, btm, g, a, e, s, v)
-	txctx, xerr := ctrlertypes.NewTrxContext(txbz, bctx, exec)
-	if xerr != nil {
-		return nil, xerr
-	}
+	return MakeTrxCtxWithBzBctx(txbz, bctx, exec)
+}
 
-	return txctx, nil
+func MakeTrxCtxWithBzBctx(
+	txbz []byte,
+	bctx *ctrlertypes.BlockContext,
+	exec bool,
+) (*ctrlertypes.TrxContext, xerrors.XError) {
+	return ctrlertypes.NewTrxContext(txbz, bctx, exec)
 }

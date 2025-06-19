@@ -69,7 +69,7 @@ func Test_BlockGasLimit(t *testing.T) {
 	//lower := blockGasLimit / 100
 
 	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmtypes.Header{Height: 1}},
+		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId, Height: 1}},
 		govMock,
 		acctMock,
 		nil, nil, nil)
@@ -83,10 +83,10 @@ func Test_BlockGasLimit(t *testing.T) {
 		_, _, xerr := w0.SignTrxRLP(tx, chainId)
 		require.NoError(t, xerr)
 
-		txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
 		require.NoError(t, xerr)
 
-		require.NoError(t, runTrx(txctx, bctx))
+		require.NoError(t, runTrx(txctx))
 		require.Equal(t, rnGas, txctx.GasUsed)
 
 		blockGasUsed += rnGas
@@ -108,7 +108,7 @@ func Test_BlockGasLimit(t *testing.T) {
 	lower := blockGasLimit / 100
 
 	bctx = ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmtypes.Header{Height: 1}},
+		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId, Height: 1}},
 		govMock,
 		acctMock,
 		nil, nil, nil)
@@ -125,10 +125,10 @@ func Test_BlockGasLimit(t *testing.T) {
 		_, _, xerr := w0.SignTrxRLP(tx, chainId)
 		require.NoError(t, xerr)
 
-		txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
 		require.NoError(t, xerr)
 
-		require.NoError(t, runTrx(txctx, bctx))
+		require.NoError(t, runTrx(txctx))
 		require.Equal(t, rnGas, txctx.GasUsed)
 
 		blockGasUsed += rnGas
@@ -171,7 +171,7 @@ func Test_Payer(t *testing.T) {
 	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	require.NoError(t, xerr)
 	require.NoError(t, validateTrx(txctx))
-	require.NoError(t, runTrx(txctx, nil))
+	require.NoError(t, runTrx(txctx))
 
 	actualPayer := acctMock.FindAccount(payer.Address(), true)
 	require.Equal(t, expectedPayerBalance.Dec(), actualPayer.GetBalance().Dec())
@@ -194,7 +194,7 @@ func Test_Payer(t *testing.T) {
 	require.NoError(t, xerr)
 	require.EqualValues(t, txctx.Sender.Address, txctx.Payer.Address)
 	require.NoError(t, validateTrx(txctx))
-	require.NoError(t, runTrx(txctx, nil))
+	require.NoError(t, runTrx(txctx))
 
 	actualSender = acctMock.FindAccount(sender.Address(), true)
 	require.Equal(t, expectedSenderBalance.Dec(), actualSender.GetBalance().Dec())

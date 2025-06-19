@@ -21,12 +21,12 @@ func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 	}
 }
 
-func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors.XError {
+func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	xerr := validateTrx(ctx)
 	if xerr != nil {
 		return xerr
 	}
-	xerr = runTrx(ctx, bctx)
+	xerr = runTrx(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -99,19 +99,20 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func runTrx(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors.XError {
+func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	var xerr xerrors.XError
 
 	// consuming gas
-	if bctx != nil {
-		if xerr = bctx.UseBlockGas(ctx.Tx.Gas); xerr != nil {
-			return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)", bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), ctx.Tx.Gas)
-		}
+	if xerr = ctx.BlockContext.UseBlockGas(ctx.Tx.Gas); xerr != nil {
+		return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)",
+			ctx.BlockContext.GetBlockGasLimit(),
+			ctx.BlockContext.GetBlockGasUsed(), ctx.Tx.Gas,
+		)
 	}
 
 	defer func() {
-		if xerr != nil && bctx != nil && !ctx.IsHandledByEVM() {
-			bctx.RefundBlockGas(ctx.Tx.Gas)
+		if xerr != nil {
+			ctx.BlockContext.RefundBlockGas(ctx.Tx.Gas)
 		}
 	}()
 
