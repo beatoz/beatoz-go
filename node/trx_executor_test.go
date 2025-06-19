@@ -143,20 +143,59 @@ func Test_BlockGasLimit(t *testing.T) {
 }
 
 func Test_Payer(t *testing.T) {
-	sender := acctMock.RandWallet() //
-	payer := web3.NewWallet(nil)
-	fmt.Println("payer address", payer.Address(), "balance", payer.GetBalance().Dec())
-	acctMock.AddWallet(payer) // payer has no balance
+	sender := acctMock.RandWallet()
+	amt := uint256.NewInt(rand.Uint64N(sender.GetBalance().Uint64()/2) + 10)
+	fmt.Println("sender", sender.Address(), "balance", sender.GetBalance(), "transfer", amt, "fee", govMock.MinTrxFee())
 
 	//
-	//
-	tx := web3.NewTrxTransfer(sender.Address(), types.RandAddress(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(balance))
+	// Insufficient fund
+	payer := web3.NewWallet(nil)
+	acctMock.AddWallet(payer) // payer has no balance
+	tx := web3.NewTrxTransfer(sender.Address(), types.RandAddress(), 0, govMock.MinTrxGas(), govMock.GasPrice(), amt)
 	_, _, err := sender.SignTrxRLP(tx, chainId)
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, chainId)
 	require.NoError(t, err)
-
 	txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	require.NoError(t, xerr)
-	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInsufficientFund.Error())
+	require.ErrorContains(t, validateTrx(txctx), xerrors.ErrInsufficientFund.Error())
+
+	//
+	// Sufficient fund
+	_ = payer.GetAccount().AddBalance(uint256.NewInt(balance))
+	expectedPayerBalance := payer.GetBalance().Clone()
+	_ = expectedPayerBalance.Sub(expectedPayerBalance, govMock.MinTrxFee())
+	expectedSenderBalance := sender.GetBalance().Clone()
+	_ = expectedSenderBalance.Sub(expectedSenderBalance, amt)
+
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	require.NoError(t, xerr)
+	require.NoError(t, validateTrx(txctx))
+	require.NoError(t, runTrx(txctx, nil))
+
+	actualPayer := acctMock.FindAccount(payer.Address(), true)
+	require.Equal(t, expectedPayerBalance.Dec(), actualPayer.GetBalance().Dec())
+	actualSender := acctMock.FindAccount(sender.Address(), true)
+	require.Equal(t, expectedSenderBalance.Dec(), actualSender.GetBalance().Dec())
+
+	//
+	// No Payer: sender should pay tx fee
+	amt = uint256.NewInt(rand.Uint64N(sender.GetBalance().Uint64()/2) + 10)
+	fmt.Println("sender", sender.Address(), "balance", sender.GetBalance(), "transfer", amt, "fee", govMock.MinTrxFee())
+
+	expectedSenderBalance = sender.GetBalance().Clone()
+	_ = expectedSenderBalance.Sub(expectedSenderBalance, amt)
+	_ = expectedSenderBalance.Sub(expectedSenderBalance, govMock.MinTrxFee()) // pay tx fee
+
+	tx = web3.NewTrxTransfer(sender.Address(), types.RandAddress(), 1, govMock.MinTrxGas(), govMock.GasPrice(), amt)
+	_, _, err = sender.SignTrxRLP(tx, chainId)
+	require.NoError(t, err)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	require.NoError(t, xerr)
+	require.EqualValues(t, txctx.Sender.Address, txctx.Payer.Address)
+	require.NoError(t, validateTrx(txctx))
+	require.NoError(t, runTrx(txctx, nil))
+
+	actualSender = acctMock.FindAccount(sender.Address(), true)
+	require.Equal(t, expectedSenderBalance.Dec(), actualSender.GetBalance().Dec())
 }

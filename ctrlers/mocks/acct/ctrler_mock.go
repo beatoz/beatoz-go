@@ -159,13 +159,12 @@ func (mock *AcctHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
 }
 
 func (mock *AcctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	_ = ctx.Sender.AddBalance(ctx.Tx.Amount)
-	_ = ctx.Receiver.SubBalance(ctx.Tx.Amount)
+	_ = ctx.Sender.SubBalance(ctx.Tx.Amount)
+	_ = ctx.Receiver.AddBalance(ctx.Tx.Amount)
 	return nil
 }
 
