@@ -92,7 +92,7 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
 	gp := new(core.GasPool).AddGas(blockContext.GasLimit)
-	result, err := core.ApplyMessage(vmevm, vmmsg, gp)
+	result, err := NewVMStateTransition(vmevm, vmmsg, gp).TransitionDb()
 	if err != nil {
 		return nil, xerrors.From(err)
 	}

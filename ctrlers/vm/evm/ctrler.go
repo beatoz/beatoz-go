@@ -193,7 +193,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		ctx.Tx.To,
 		ctx.Tx.Nonce,
 		ctx.Tx.Gas,
-		ctx.GovHandler.GasPrice(),
+		ctx.Tx.GasPrice,
 		ctx.Tx.Amount,
 		inputData,
 		ctx.Exec,
@@ -282,7 +282,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas int64, gasPri
 	txContext := ethcore.NewEVMTxContext(vmmsg)
 	ctrler.vmevm.Reset(txContext, ctrler.stateDBWrapper)
 
-	result, err := ethcore.ApplyMessage(ctrler.vmevm, vmmsg, ctrler.blockGasPool)
+	result, err := NewVMStateTransition(ctrler.vmevm, vmmsg, ctrler.blockGasPool).TransitionDb()
 	if err != nil {
 		return nil, xerrors.From(err)
 	}

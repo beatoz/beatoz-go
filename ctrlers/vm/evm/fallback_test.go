@@ -75,9 +75,7 @@ func Test_Fallback(t *testing.T) {
 	// `txctx.RetData` has the address of contract.
 	contAddr := txctx.RetData
 
-	// Because `ExcuteTrx` has increased `fromAcct.Nonce`,
-	// Calculate an expected address with `fromAcct.Nonce-1`.
-	addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce-1))
+	addr0 := ethcrypto.CreateAddress(fromAcct.Address.Array20(), uint64(fromAcct.Nonce))
 	require.Equal(t, addr0[:], contAddr)
 
 	// EndBlock and Commit
@@ -97,6 +95,7 @@ func Test_Fallback(t *testing.T) {
 
 	originBalance0 := fromAcct.Balance.Clone()
 	originBalance1 := contAcct.Balance.Clone()
+	originNonce := fromAcct.GetNonce()
 
 	//fmt.Println("sender", originBalance0.Dec(), "address", originBalance1.Dec())
 
@@ -118,14 +117,18 @@ func Test_Fallback(t *testing.T) {
 	_, _, xerr = fallbackEVM.Commit()
 	require.NoError(t, xerr)
 
-	gasAmt := types.GasToFee(txctx.GasUsed, govMock.GasPrice())
-
-	expectedBalance0 := new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToGrans(100))
+	// EVMCtrler doesn't handle the gas anymore
+	//gasAmt := types.GasToFee(txctx.GasUsed, govMock.GasPrice())
+	expectedBalance0 := new(uint256.Int).Sub(originBalance0, types.ToGrans(100)) //new(uint256.Int).Sub(new(uint256.Int).Sub(originBalance0, gasAmt), types.ToGrans(100))
 	expectedBalance1 := new(uint256.Int).Add(originBalance1, types.ToGrans(100))
 
+	// EVMCtrler doesn't handle the nonce anymore
+	expectedNonce := originNonce // + 1
+
 	//fmt.Println("sender", expectedBalance0.Dec(), "contract", expectedBalance1.Dec(), "gas", gasAmt.Dec())
-	require.Equal(t, expectedBalance0.Dec(), fromAcct.Balance.Dec())
-	require.Equal(t, expectedBalance1.Dec(), contAcct.Balance.Dec())
+	require.Equal(t, expectedNonce, fromAcct.GetNonce(), "from's nonce wrong")
+	require.Equal(t, expectedBalance0.Dec(), fromAcct.Balance.Dec(), "from's balanace wrong")
+	require.Equal(t, expectedBalance1.Dec(), contAcct.Balance.Dec(), "to's balance wrong")
 
 	found := false
 	for _, attr := range txctx.Events[0].Attributes {

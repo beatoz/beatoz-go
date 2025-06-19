@@ -245,7 +245,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			}
 		}
 
-		xerr = ctrler.txExecutor.ExecuteSync(txctx, nil)
+		xerr = ctrler.txExecutor.ExecuteSync(txctx)
 		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("CheckTx", "error", xerr)
@@ -440,7 +440,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 	}
 	ctrler.currBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
 
-	xerr = ctrler.txExecutor.ExecuteSync(txctx, ctrler.currBlockCtx)
+	xerr = ctrler.txExecutor.ExecuteSync(txctx)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("deliverTxSync", "error", xerr)
@@ -531,7 +531,7 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 
 // asyncExecTrxContext is called in parallel tx processing
 func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abcitypes.ResponseDeliverTx {
-	xerr := ctrler.txExecutor.ExecuteSync(txctx, ctrler.currBlockCtx)
+	xerr := ctrler.txExecutor.ExecuteSync(txctx)
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("asyncExecTrxContext", "error", xerr)

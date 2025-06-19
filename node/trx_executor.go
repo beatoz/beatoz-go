@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
@@ -20,12 +21,12 @@ func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 	}
 }
 
-func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors.XError {
+func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	xerr := validateTrx(ctx)
 	if xerr != nil {
 		return xerr
 	}
-	xerr = runTrx(ctx, bctx)
+	xerr = runTrx(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -42,10 +43,20 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	tx := ctx.Tx
 
 	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
-	needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
-	if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
-		return xerr
+	if bytes.Compare(ctx.Sender.Address, ctx.Payer.Address) != 0 {
+		if xerr := ctx.Payer.CheckBalance(feeAmt); xerr != nil {
+			return xerr
+		}
+		if xerr := ctx.Sender.CheckBalance(tx.Amount); xerr != nil {
+			return xerr
+		}
+	} else {
+		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+		if xerr := ctx.Sender.CheckBalance(needAmt); xerr != nil {
+			return xerr
+		}
 	}
+
 	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
 		return xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
@@ -88,20 +99,20 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	return nil
 }
 
-func runTrx(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors.XError {
+func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	var xerr xerrors.XError
 
 	// consuming gas
-	// Note that the gas for txs executed by `EVMCtrler` is handled directly by `EVMCtrler`.
-	if bctx != nil && !ctx.IsHandledByEVM() {
-		if xerr = bctx.UseBlockGas(ctx.Tx.Gas); xerr != nil {
-			return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)", bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), ctx.Tx.Gas)
-		}
+	if xerr = ctx.BlockContext.UseBlockGas(ctx.Tx.Gas); xerr != nil {
+		return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)",
+			ctx.BlockContext.GetBlockGasLimit(),
+			ctx.BlockContext.GetBlockGasUsed(), ctx.Tx.Gas,
+		)
 	}
 
 	defer func() {
-		if xerr != nil && bctx != nil && !ctx.IsHandledByEVM() {
-			bctx.RefundBlockGas(ctx.Tx.Gas)
+		if xerr != nil {
+			ctx.BlockContext.RefundBlockGas(ctx.Tx.Gas)
 		}
 	}()
 
@@ -142,19 +153,22 @@ func runTrx(ctx *ctrlertypes.TrxContext, bctx *ctrlertypes.BlockContext) xerrors
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT ||
-		(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
-		// 1. If the tx type is `TRX_CONTRACT`,
-		//    the gas & nonce have already been processed in `EVMCtrler`.
-		// 2. If the tx is `TRX_TRANSFER` type and the receiver is a contract,
-		//    it is executed by `EVMCtrler` to process the fallback feature.
-		//    In this case too, tha gas & nonce have already been also processed in `EVMCtrler`.
-		return nil
-	}
+	//
+	// EVMCtrler doesn't handle the gas and nonce anymore.
+	//
+	//if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT ||
+	//	(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
+	//	// 1. If the tx type is `TRX_CONTRACT`,
+	//	//    the gas & nonce have already been processed in `EVMCtrler`.
+	//	// 2. If the tx is `TRX_TRANSFER` type and the receiver is a contract,
+	//	//    it is executed by `EVMCtrler` to process the fallback feature.
+	//	//    In this case too, tha gas & nonce have already been also processed in `EVMCtrler`.
+	//	return nil
+	//}
 
 	// processing fee = gas * gasPrice
 	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
-	if xerr := ctx.Sender.SubBalance(fee); xerr != nil {
+	if xerr := ctx.Payer.SubBalance(fee); xerr != nil {
 		return xerr
 	}
 
@@ -165,7 +179,11 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
 		return xerr
 	}
-
+	if bytes.Compare(ctx.Sender.Address, ctx.Payer.Address) != 0 {
+		if xerr := ctx.AcctHandler.SetAccount(ctx.Payer, ctx.Exec); xerr != nil {
+			return xerr
+		}
+	}
 	// set used gas
 	ctx.GasUsed = ctx.Tx.Gas
 	return nil

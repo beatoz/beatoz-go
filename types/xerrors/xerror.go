@@ -169,6 +169,11 @@ func (xerr *xerror) Wrap(err error) XError {
 			// So the value of `xerr.cause` is set to the new error `err`
 			// and the existing value disappears.
 			// errors.Wrap ???
+			return &xerror{
+				code:  xerr.code,
+				msg:   xerr.msg,
+				cause: errors.Join(xerr.cause, err),
+			}
 		}
 	}
 	return &xerror{

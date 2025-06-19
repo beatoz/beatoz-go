@@ -70,15 +70,13 @@ func (s *StateDBWrapper) Finish() {
 
 	for _, addr := range sortedKeys {
 		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
-		nonce := s.StateDB.GetNonce(addr)
 
 		acct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
 		acct.SetBalance(amt)
-		acct.SetNonce(int64(nonce))
 
 		_ = s.acctHandler.SetAccount(acct, s.exec)
 
-		s.logger.Debug("Finish", "address", acct.Address, "nonce", acct.Nonce, "balance", acct.Balance.Dec())
+		s.logger.Debug("Finish", "address", acct.Address, "balance", acct.Balance.Dec())
 	}
 
 	// issue #68

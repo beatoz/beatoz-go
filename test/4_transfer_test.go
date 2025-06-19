@@ -46,6 +46,55 @@ func TestTransfer_GasUsed(t *testing.T) {
 
 }
 
+func TestTransfer_GasPayer(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	sender := randCommonWallet()
+	payer := randCommonWallet()
+	require.NotEqual(t, sender.Address(), payer.Address())
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.NoError(t, payer.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, payer.SyncAccount(bzweb3))
+
+	oriBalance := sender.GetBalance().Clone()
+	oriPayerBalance := payer.GetBalance().Clone()
+
+	raddr := types.RandAddress()
+	trAmt := uint256.MustFromDecimal("1000")
+
+	tx := web3.NewTrxTransfer(
+		sender.Address(),
+		raddr,
+		sender.GetNonce(),
+		defGas, defGasPrice,
+		trAmt,
+	)
+	_, _, err := sender.SignTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+
+	ret, err := bzweb3.SendTransactionSync(tx)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+
+	txRet, xerr := waitTrxResult(ret.Hash, 30, bzweb3)
+	require.NoError(t, xerr)
+	require.Equal(t, defGas, txRet.TrxObj.Gas)
+
+	fee := types.GasToFee(txRet.TrxObj.Gas, defGasPrice)
+
+	expectedPayerBalance := new(uint256.Int).Sub(oriPayerBalance, fee)
+	require.NoError(t, payer.SyncAccount(bzweb3))
+	require.Equal(t, expectedPayerBalance.Dec(), payer.GetBalance().Dec())
+
+	expectedBalance := new(uint256.Int).Sub(oriBalance, trAmt)
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.Equal(t, expectedBalance.Dec(), sender.GetBalance().Dec())
+
+}
+
 func TestTransferCommit_Bulk(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
 
