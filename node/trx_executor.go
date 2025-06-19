@@ -102,19 +102,22 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	var xerr xerrors.XError
 
-	// consuming gas
-	if xerr = ctx.BlockContext.UseBlockGas(ctx.Tx.Gas); xerr != nil {
-		return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)",
-			ctx.BlockContext.GetBlockGasLimit(),
-			ctx.BlockContext.GetBlockGasUsed(), ctx.Tx.Gas,
-		)
-	}
-
-	defer func() {
-		if xerr != nil {
-			ctx.BlockContext.RefundBlockGas(ctx.Tx.Gas)
+	// In case of EVM Tx, the EVMCtrler directly handles the block gas pool.
+	if !ctx.IsHandledByEVM() {
+		// consuming gas in gas pool
+		if xerr = ctx.BlockContext.UseBlockGas(ctx.Tx.Gas); xerr != nil {
+			return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)",
+				ctx.BlockContext.GetBlockGasLimit(),
+				ctx.BlockContext.GetBlockGasUsed(), ctx.Tx.Gas,
+			)
 		}
-	}()
+
+		defer func() {
+			if xerr != nil {
+				ctx.BlockContext.RefundBlockGas(ctx.Tx.Gas)
+			}
+		}()
+	}
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
