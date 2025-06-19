@@ -65,6 +65,11 @@ func TestERC20_Fallback(t *testing.T) {
 	testFallback(t)
 }
 
+func TestERC20_Payer(t *testing.T) {
+	testPayer_Deploy(t, "./abi_fallback_contract.json", nil)
+	testPayer_Receive(t)
+}
+
 func testDeployWithNilAddress(t *testing.T, abiFile string, args []interface{}) {
 	bzweb3 := randBeatozWeb3()
 
@@ -406,6 +411,180 @@ func testReceive(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, expectedSenderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, expectedContractBalance.Dec(), contAcct.GetBalance().Dec())
+
+	found := false
+	for _, evt := range ret.DeliverTx.Events {
+		if evt.Type != "evm" {
+			continue
+		}
+		for _, attr := range evt.Attributes {
+			//fmt.Println(attr.String())
+			if string(attr.Key) == "data" {
+				val, err := hex.DecodeString(string(attr.Value))
+				require.NoError(t, err)
+				found = strings.HasPrefix(string(val[64:]), "receive")
+				break
+			}
+		}
+	}
+
+	require.True(t, found)
+
+}
+func testPayer_Deploy(t *testing.T, abiFile string, args []interface{}) {
+	bzweb3 := randBeatozWeb3()
+
+	sender := randCommonWallet()
+	payer := randCommonWallet()
+	require.NotEqual(t, sender.Address(), payer.Address())
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.NoError(t, payer.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, payer.SyncAccount(bzweb3))
+
+	originSenderBalance := sender.GetBalance().Clone()
+	originPayerBalance := payer.GetBalance().Clone()
+
+	contract, err := vm.NewEVMContract(abiFile)
+	require.NoError(t, err)
+
+	to := types.ZeroAddress()
+	data, err := contract.Pack("", args...)
+	require.NoError(t, err)
+	data = append(contract.GetBytecode(), data...)
+
+	tx := web3.NewTrxContract(
+		sender.Address(),
+		to,
+		sender.GetNonce(),
+		contractGas, defGasPrice,
+		uint256.NewInt(0),
+		data,
+	)
+	_, _, err = sender.SignTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+
+	ret, err := bzweb3.SendTransactionCommit(tx)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.Equal(t, 20, len(ret.DeliverTx.Data)) // contract address
+	contract.SetAddress(ret.DeliverTx.Data)
+
+	//fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
+	contAcct, err := bzweb3.QueryAccount(contract.GetAddress())
+	require.NoError(t, err)
+	require.Equal(t, []byte(ret.Hash), contAcct.Code)
+
+	//txRet, err := waitTrxResult(ret.Hash, 30, bzweb3)
+	//require.NoError(t, err, err)
+	//require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
+
+	addr0 := ethcrypto.CreateAddress(sender.Address().Array20(), uint64(sender.GetNonce()))
+	require.EqualValues(t, addr0[:], ret.DeliverTx.Data)
+	require.EqualValues(t, addr0[:], contract.GetAddress())
+	for _, evt := range ret.DeliverTx.Events {
+		if evt.Type == "evm" {
+			require.GreaterOrEqual(t, len(evt.Attributes), 1)
+			require.Equal(t, "contractAddress", string(evt.Attributes[0].Key), string(evt.Attributes[0].Key))
+			require.Equal(t, 40, len(evt.Attributes[0].Value), string(evt.Attributes[0].Value))
+			_addr, err := types.HexToAddress(string(evt.Attributes[0].Value))
+			require.NoError(t, err)
+			require.EqualValues(t, addr0[:], _addr)
+		}
+	}
+	evmContract = contract
+
+	// check balance - changed by gas
+	gasAmt := new(uint256.Int).Mul(uint256.NewInt(uint64(ret.DeliverTx.GasUsed)), defGasPrice)
+
+	//fmt.Println("--- before ----")
+	//fmt.Println("sender", sender.Address(), "balance", sender.GetBalance())
+	//fmt.Println("payer", payer.Address(), "balance", payer.GetBalance())
+	//fmt.Println("contAcct", contAcct.Address, "balance", contAcct.GetBalance())
+
+	expectedSenderBalance := originSenderBalance
+	expectedPayerBalance := new(uint256.Int).Sub(originPayerBalance, gasAmt)
+
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.NoError(t, payer.SyncAccount(bzweb3))
+
+	//fmt.Println("--- after ----")
+	//fmt.Println("sender", sender.Address(), "balance", sender.GetBalance())
+	//fmt.Println("payer", payer.Address(), "balance", payer.GetBalance())
+	//fmt.Println("contAcct", contAcct.Address, "balance", contAcct.GetBalance())
+
+	require.Equal(t, expectedSenderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, expectedPayerBalance.Dec(), payer.GetBalance().Dec())
+}
+
+func testPayer_Receive(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	sender := randCommonWallet()
+	payer := randCommonWallet()
+	require.NotEqual(t, sender.Address(), payer.Address())
+	require.NoError(t, sender.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.NoError(t, payer.Unlock(defaultRpcNode.Pass), string(defaultRpcNode.Pass))
+	require.NoError(t, payer.SyncAccount(bzweb3))
+
+	contAcct, err := bzweb3.QueryAccount(evmContract.GetAddress())
+	require.NoError(t, err)
+	require.Equal(t, "0", contAcct.Balance.Dec())
+
+	originSenderBalance := sender.GetBalance().Clone()
+	originPayerBalance := payer.GetBalance().Clone()
+	originContractBalance := contAcct.GetBalance().Clone()
+
+	//
+	// Transfer
+	//
+	randAmt := bytes.RandU256IntN(sender.GetBalance())
+	_ = randAmt.Sub(randAmt, baseFee)
+
+	tx := web3.NewTrxTransfer(
+		sender.Address(),
+		evmContract.GetAddress(),
+		sender.GetNonce(),
+		bigGas, defGasPrice,
+		randAmt,
+	)
+	_, _, err = sender.SignTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())
+	require.NoError(t, err)
+
+	ret, err := bzweb3.SendTransactionCommit(tx)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+
+	//fmt.Println("--- before ----")
+	//fmt.Println("sender", sender.Address(), "balance", sender.GetBalance())
+	//fmt.Println("payer", payer.Address(), "balance", payer.GetBalance())
+	//fmt.Println("contAcct", contAcct.Address, "balance", contAcct.GetBalance())
+
+	gasAmt := new(uint256.Int).Mul(uint256.NewInt(uint64(ret.DeliverTx.GasUsed)), defGasPrice)
+	expectedSenderBalance := new(uint256.Int).Sub(originSenderBalance, randAmt)
+	expectedPayerBalance := new(uint256.Int).Sub(originPayerBalance, gasAmt)
+	expectedContractBalance := new(uint256.Int).Add(originContractBalance, randAmt)
+
+	require.NoError(t, sender.SyncAccount(bzweb3))
+	require.NoError(t, payer.SyncAccount(bzweb3))
+	contAcct, err = bzweb3.QueryAccount(evmContract.GetAddress())
+	require.NoError(t, err)
+
+	//fmt.Println("--- after ----")
+	//fmt.Println("sender", sender.Address(), "balance", sender.GetBalance())
+	//fmt.Println("payer", payer.Address(), "balance", payer.GetBalance())
+	//fmt.Println("contAcct", contAcct.Address, "balance", contAcct.GetBalance())
+
+	require.Equal(t, expectedSenderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, expectedPayerBalance.Dec(), payer.GetBalance().Dec())
 	require.Equal(t, expectedContractBalance.Dec(), contAcct.GetBalance().Dec())
 
 	found := false
