@@ -35,7 +35,7 @@ const (
 	EVENT_ATTR_AMOUNT   = "amount"
 )
 
-type trxRPL struct {
+type trxRLP struct {
 	Version  uint64
 	Time     uint64
 	Nonce    uint64
@@ -48,8 +48,8 @@ type trxRPL struct {
 	Payload  bytes.HexBytes
 	Sig      bytes.HexBytes
 
-	Payer    types.Address
-	PayerSig bytes.HexBytes
+	Payer    types.Address  `rlp:"-"`
+	PayerSig bytes.HexBytes `rlp:"-"`
 }
 
 type ITrxPayload interface {
@@ -147,7 +147,7 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 		payload = _tmp
 	}
 
-	tmpTx := &trxRPL{
+	tmpTx := &trxRLP{
 		Version:  uint64(tx.Version),
 		Time:     uint64(tx.Time),
 		Nonce:    uint64(tx.Nonce),
@@ -166,7 +166,7 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 }
 
 func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
-	rtx := &trxRPL{}
+	rtx := &trxRLP{}
 	err := s.Decode(rtx)
 	if err != nil {
 		return err
