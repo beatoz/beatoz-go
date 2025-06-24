@@ -141,7 +141,7 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	}
 
 	if uint64(ctx.Tx.Gas) < gas {
-		return xerrors.ErrInvalidGas
+		return xerrors.ErrInvalidGas.Wrapf("invalid gas: %v, needed: %v", ctx.Tx.Gas, gas)
 	}
 
 	if ctx.Exec == false {

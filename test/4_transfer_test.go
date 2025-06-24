@@ -21,6 +21,55 @@ import (
 	"time"
 )
 
+func TestTransfer_NonceSequence(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	w := randCommonWallet()
+	require.NoError(t, w.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, w.SyncAccount(bzweb3))
+
+	// event subscriber
+	subWg := &sync.WaitGroup{}
+	sub, err := web3.NewSubscriber(defaultRpcNode.WSEnd)
+	defer func() {
+		sub.Stop()
+	}()
+	require.NoError(t, err)
+	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", w.Address())
+	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
+
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		require.NoError(t, err)
+
+		eventDataTx := event.Data.(tmtypes.EventDataTx)
+		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code, eventDataTx.TxResult.Result.Log)
+
+		//txHash := event.Events["tx.hash"][0]
+		//fmt.Println("event - txhash:", txHash)
+
+		subWg.Done()
+	})
+
+	for i := 0; i < 3000; i++ {
+		subWg.Add(1)
+
+		ret, err := w.TransferSync(types.RandAddress(), defGas, defGasPrice, uint256.NewInt(1), bzweb3)
+		if err != nil && strings.Contains(err.Error(), "mempool is full") {
+			subWg.Done()
+			fmt.Println("error", err)
+			time.Sleep(time.Millisecond * 3000)
+
+			continue
+		}
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
+		w.AddNonce()
+		//fmt.Println("transfer - txhash:", ret.Hash)
+	}
+	subWg.Wait()
+}
+
 func TestTransfer_GasUsed(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
 

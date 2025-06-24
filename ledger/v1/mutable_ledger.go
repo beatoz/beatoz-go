@@ -164,7 +164,7 @@ func (ledger *MutableLedger) set(key LedgerKey, item ILedgerItem) xerrors.XError
 		return xerrors.From(err)
 	}
 
-	ledger.logger.Debug("set item to tree", "key", key, "oldVal", oldVal, "newVal", newVal)
+	//ledger.logger.Debug("set item to tree", "key", key, "oldVal", oldVal, "newVal", newVal)
 
 	if bytes.Compare(oldVal, newVal) != 0 {
 		// if `oldVal` is `nil`, it means that the item is created, and it should be removed in reverting.

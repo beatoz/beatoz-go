@@ -18,10 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"io/ioutil"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var (
@@ -47,6 +49,11 @@ func TestERC20_EstimateGas(t *testing.T) {
 func TestERC20_NonceDup(t *testing.T) {
 	testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
 	testNonceDup(t)
+}
+
+func TestERC20_NonceSeq(t *testing.T) {
+	testDeploy(t, "./abi_erc20.json", []interface{}{"BeatozToken", "BZT"})
+	testNonceSeq(t)
 }
 
 func TestERC20_Payable(t *testing.T) {
@@ -231,6 +238,56 @@ func testNonceDup(t *testing.T) {
 	retTx, err = evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, nonce, estimatedGas /*contractGas*/, defGasPrice, uint256.NewInt(0), bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.Code, retTx.Log)
+}
+
+func testNonceSeq(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+
+	require.NoError(t, creator.Unlock(defaultRpcNode.Pass))
+	require.NoError(t, creator.SyncAccount(bzweb3))
+
+	// event subscriber
+	subWg := &sync.WaitGroup{}
+	sub, err := web3.NewSubscriber(defaultRpcNode.WSEnd)
+	defer func() {
+		sub.Stop()
+	}()
+	require.NoError(t, err)
+	query := fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", creator.Address())
+	err = sub.Start(query, func(sub *web3.Subscriber, result []byte) {
+
+		event := &coretypes.ResultEvent{}
+		err := tmjson.Unmarshal(result, event)
+		require.NoError(t, err)
+
+		eventDataTx := event.Data.(tmtypes.EventDataTx)
+		require.Equal(t, xerrors.ErrCodeSuccess, eventDataTx.TxResult.Result.Code, eventDataTx.TxResult.Result.Log)
+
+		//txHash := event.Events["tx.hash"][0]
+		//fmt.Println("event - txhash:", txHash)
+
+		subWg.Done()
+	})
+
+	for i := 0; i < 100; i++ {
+		subWg.Add(1)
+
+		retTx, err := evmContract.ExecSync("transfer", []interface{}{types.RandAddress().Array20(), uint256.NewInt(1).ToBig()}, creator, creator.GetNonce(), 300_000, defGasPrice, uint256.NewInt(0), bzweb3)
+
+		if err != nil && strings.Contains(err.Error(), "mempool is full") {
+			subWg.Done()
+			fmt.Println("error", err)
+			time.Sleep(time.Millisecond * 3000)
+
+			continue
+		}
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, retTx.Code, retTx.Log)
+		creator.AddNonce()
+		//fmt.Println("transfer - txhash:", retTx.Hash)
+	}
+	subWg.Wait()
+
 }
 
 func testPayable(t *testing.T) {
