@@ -169,8 +169,12 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	//	return nil
 	//}
 
+	// In case of EVM Tx, ctx.GasUsed has been already computed in EVMCtrler.
+	if !ctx.IsHandledByEVM() {
+		ctx.GasUsed = ctx.Tx.Gas
+	}
 	// processing fee = gas * gasPrice
-	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
+	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.GasUsed)))
 	if xerr := ctx.Payer.SubBalance(fee); xerr != nil {
 		return xerr
 	}
@@ -188,6 +192,5 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		}
 	}
 	// set used gas
-	ctx.GasUsed = ctx.Tx.Gas
 	return nil
 }
