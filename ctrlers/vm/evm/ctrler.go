@@ -120,7 +120,10 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 }
 
 func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Receiver.Code == nil {
+	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
+		// In case of a fallback transaction,
+		// the tx type is TRX_TRANSFER (not TRX_CONTRACT)
+		// and the `to`(receiver) address should point to a contract.
 		return xerrors.ErrInvalidAccountType
 	}
 
