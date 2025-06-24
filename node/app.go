@@ -142,9 +142,15 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 					Time:   tmtime.Canonical(time.Now()),
 				},
 			},
-			nil, nil, nil, nil, nil)
+			ctrler.govCtrler, ctrler.acctCtrler, ctrler.vmCtrler, ctrler.supplyCtrler, ctrler.vpowCtrler,
+		)
 		ctrler.lastBlockCtx.SetAppHash(appHash)
 	} else {
+		ctrler.lastBlockCtx.GovHandler = ctrler.govCtrler
+		ctrler.lastBlockCtx.AcctHandler = ctrler.acctCtrler
+		ctrler.lastBlockCtx.EVMHandler = ctrler.vmCtrler
+		ctrler.lastBlockCtx.SupplyHandler = ctrler.supplyCtrler
+		ctrler.lastBlockCtx.VPowerHandler = ctrler.vpowCtrler
 		lastHeight = ctrler.lastBlockCtx.Height()
 		appHash = ctrler.lastBlockCtx.AppHash()
 	}
@@ -348,7 +354,6 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// todo: Consider using block gas limit of lastBlockCtx
 	blockGasLimit := ctrlertypes.AdjustBlockGasLimit(
 		ctrler.lastBlockCtx.GetBlockGasLimit(),
 		ctrler.lastBlockCtx.GetBlockGasUsed(),
