@@ -120,8 +120,8 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 }
 
 func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
-		return xerrors.ErrUnknownTrxType
+	if ctx.Receiver.Code == nil {
+		return xerrors.ErrInvalidAccountType
 	}
 
 	inputData := []byte(nil)
