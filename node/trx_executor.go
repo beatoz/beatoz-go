@@ -156,19 +156,6 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	//
-	// EVMCtrler doesn't handle the gas and nonce anymore.
-	//
-	//if ctx.Tx.GetType() == ctrlertypes.TRX_CONTRACT ||
-	//	(ctx.Tx.GetType() == ctrlertypes.TRX_TRANSFER && ctx.Receiver.Code != nil) {
-	//	// 1. If the tx type is `TRX_CONTRACT`,
-	//	//    the gas & nonce have already been processed in `EVMCtrler`.
-	//	// 2. If the tx is `TRX_TRANSFER` type and the receiver is a contract,
-	//	//    it is executed by `EVMCtrler` to process the fallback feature.
-	//	//    In this case too, tha gas & nonce have already been also processed in `EVMCtrler`.
-	//	return nil
-	//}
-
 	// In case of EVM Tx, ctx.GasUsed has been already computed in EVMCtrler.
 	if !ctx.IsHandledByEVM() {
 		ctx.GasUsed = ctx.Tx.Gas
