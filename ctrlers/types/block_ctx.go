@@ -24,13 +24,9 @@ type BlockContext struct {
 	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
-	GovHandler  IGovHandler
-	AcctHandler IAccountHandler
-	EVMHandler  IEVMHandler
-
-	// DEPRECATED
-	//StakeHandler  IStakeHandler
-
+	GovHandler    IGovHandler
+	AcctHandler   IAccountHandler
+	EVMHandler    IEVMHandler
 	SupplyHandler ISupplyHandler
 	VPowerHandler IVPowerHandler
 
@@ -51,17 +47,16 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 	}
 
 	ret := &BlockContext{
-		blockInfo:   bi,
-		feeSum:      uint256.NewInt(0),
-		txsCnt:      0,
-		evmTxsCnt:   0,
-		appHash:     nil,
-		GovHandler:  g,
-		AcctHandler: a,
-		EVMHandler:  e,
-		//StakeHandler:  s,
+		blockInfo:     bi,
+		feeSum:        uint256.NewInt(0),
+		txsCnt:        0,
+		evmTxsCnt:     0,
+		appHash:       nil,
+		GovHandler:    g,
+		AcctHandler:   a,
+		EVMHandler:    e,
 		SupplyHandler: su,
-		VPowerHandler: vp, // todo: perfectly implement temp code
+		VPowerHandler: vp,
 		ValUpdates:    nil,
 	}
 	if g != nil {

@@ -155,14 +155,9 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// and in the 'CheckTx' phase it is minimally executed.
 
 		// update balance
-		feeAmt := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.GasUsed)))
-		needAmt := new(uint256.Int).Add(feeAmt, ctx.Tx.Amount)
-		if xerr := ctx.Sender.SubBalance(needAmt); xerr != nil {
+		if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr
 		}
-
-		// update nonce
-		ctx.Sender.AddNonce()
 
 		// update account ledger
 		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
