@@ -77,17 +77,21 @@ func Test_BlockGasLimit(t *testing.T) {
 	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
 
+	nonce := int64(0)
 	for {
 		rnGas := rand.Int64N(100_000) + govMock.MinTrxGas()
-		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, rnGas, govMock.GasPrice(), uint256.NewInt(1))
+		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), nonce, rnGas, govMock.GasPrice(), uint256.NewInt(1))
 		_, _, xerr := w0.SignTrxRLP(tx, chainId)
 		require.NoError(t, xerr)
 
 		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
 		require.NoError(t, xerr)
 
+		require.NoError(t, validateTrx(txctx))
 		require.NoError(t, runTrx(txctx))
 		require.Equal(t, rnGas, txctx.GasUsed)
+
+		nonce++
 
 		blockGasUsed += rnGas
 
@@ -121,15 +125,18 @@ func Test_BlockGasLimit(t *testing.T) {
 		if blockGasUsed+rnGas >= lower {
 			break
 		}
-		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, rnGas, govMock.GasPrice(), uint256.NewInt(1))
+		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), nonce, rnGas, govMock.GasPrice(), uint256.NewInt(1))
 		_, _, xerr := w0.SignTrxRLP(tx, chainId)
 		require.NoError(t, xerr)
 
 		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
 		require.NoError(t, xerr)
 
+		require.NoError(t, validateTrx(txctx))
 		require.NoError(t, runTrx(txctx))
 		require.Equal(t, rnGas, txctx.GasUsed)
+
+		nonce++
 
 		blockGasUsed += rnGas
 

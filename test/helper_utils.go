@@ -98,13 +98,19 @@ func prepareTest(_peers []*PeerMock) {
 
 	for _, peer := range _peers {
 		w := peer.PrivValWallet()
-		ret, _ := sender.TransferCommit(w.Address(), defGas, defGasPrice, btztypes.ToGrans(10_000_000), bzweb3)
-		if ret.CheckTx.Code != xerrors.ErrCodeSuccess {
-			panic(ret.CheckTx.Code)
+		//ret, _ := sender.TransferCommit(w.Address(), defGas, defGasPrice, btztypes.ToGrans(10_000_000), bzweb3)
+		//if ret.CheckTx.Code != xerrors.ErrCodeSuccess {
+		//	panic(ret.CheckTx.Code)
+		//}
+		//if ret.DeliverTx.Code != xerrors.ErrCodeSuccess {
+		//	panic(ret.DeliverTx.Code)
+		//}
+
+		ret, _ := sender.TransferSync(w.Address(), defGas, defGasPrice, btztypes.ToGrans(10_000_000), bzweb3)
+		if ret.Code != xerrors.ErrCodeSuccess {
+			panic(ret.Code)
 		}
-		if ret.DeliverTx.Code != xerrors.ErrCodeSuccess {
-			panic(ret.DeliverTx.Code)
-		}
+
 		sender.AddNonce()
 	}
 

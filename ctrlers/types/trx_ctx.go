@@ -86,16 +86,19 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 	if txctx.Sender == nil {
 		return nil, xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From)
 	}
-	// RG-91:  Also find the account object with the destination address 0x0.
-	toAddr := tx.To
+
+	// RG-91: Find the account object with the destination address 0x0.
+	toAddr := txctx.Tx.To
 	if toAddr == nil {
 		// `toAddr` may be `nil` when the tx type is `TRX_CONTRACT`.
 		toAddr = types.ZeroAddress()
 	}
+
 	txctx.Receiver = txctx.BlockContext.AcctHandler.FindOrNewAccount(toAddr, txctx.Exec)
 	if txctx.Receiver == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", tx.To)
+		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", toAddr)
 	}
+
 	if payerAddr != nil {
 		txctx.Payer = txctx.BlockContext.AcctHandler.FindAccount(payerAddr, txctx.Exec)
 		if txctx.Payer == nil {

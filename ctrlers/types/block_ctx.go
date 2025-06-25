@@ -21,7 +21,6 @@ type BlockContext struct {
 	blockGasPool   *ethcore.GasPool
 	feeSum         *uint256.Int
 	txsCnt         int
-	evmTxsCnt      int
 	appHash        bytes.HexBytes
 
 	GovHandler    IGovHandler
@@ -50,7 +49,6 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 		blockInfo:     bi,
 		feeSum:        uint256.NewInt(0),
 		txsCnt:        0,
-		evmTxsCnt:     0,
 		appHash:       nil,
 		GovHandler:    g,
 		AcctHandler:   a,
@@ -192,21 +190,11 @@ func (bctx *BlockContext) TxsCnt() int {
 	return bctx.txsCnt
 }
 
-func (bctx *BlockContext) EVMTxsCnt() int {
-	bctx.mtx.RLock()
-	defer bctx.mtx.RUnlock()
-
-	return bctx.evmTxsCnt
-}
-
-func (bctx *BlockContext) AddTxsCnt(d int, isEVMTx bool) {
+func (bctx *BlockContext) AddTxsCnt(d int) {
 	bctx.mtx.Lock()
 	defer bctx.mtx.Unlock()
 
 	bctx.txsCnt += d
-	if isEVMTx {
-		bctx.evmTxsCnt += d
-	}
 }
 
 func (bctx *BlockContext) GetValUpdates() abcitypes.ValidatorUpdates {
@@ -309,7 +297,6 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 		BlockGasUsed   int64                       `json:"blockGasUsed"`
 		FeeSum         *uint256.Int                `json:"feeSum"`
 		TxsCnt         int                         `json:"txsCnt"`
-		EVMTxsCnt      int                         `json:"evmTxsCnt"`
 		AppHash        []byte                      `json:"appHash"`
 	}{
 		BlockInfo:      bctx.blockInfo,
@@ -318,7 +305,6 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 		BlockGasUsed:   bctx.GetBlockGasUsed(),
 		FeeSum:         bctx.feeSum,
 		TxsCnt:         bctx.txsCnt,
-		EVMTxsCnt:      bctx.evmTxsCnt,
 		AppHash:        bctx.appHash,
 	}
 
@@ -336,7 +322,6 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 		BlockGasUsed   int64                       `json:"blockGasUsed"`
 		FeeSum         *uint256.Int                `json:"feeSum"`
 		TxsCnt         int                         `json:"txsCnt"`
-		EVMTxsCnt      int                         `json:"evmTxsCnt"`
 		AppHash        []byte                      `json:"appHash"`
 	}{}
 
@@ -349,7 +334,6 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(bctx.blockGasLimit - _bctx.BlockGasUsed))
 	bctx.feeSum = _bctx.FeeSum
 	bctx.txsCnt = _bctx.TxsCnt
-	bctx.evmTxsCnt = _bctx.EVMTxsCnt
 	bctx.appHash = _bctx.AppHash
 	return nil
 }

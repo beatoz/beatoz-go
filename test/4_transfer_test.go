@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-func TestTransfer_NonceSequence(t *testing.T) {
+func TestTransfer_WrongAppHash(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
 
 	w := randCommonWallet()
@@ -169,8 +169,6 @@ func TestTransferCommit_Bulk(t *testing.T) {
 	}
 	require.Greater(t, senderCnt, 0)
 
-	//// 최대 100 개 까지 계정 생성하여 리시버로 사용.
-	//// 100 개 이상이면 이미 있는 계정 사용.
 	for i := len(allAcctObjs); i < 100; i++ {
 		newAcctTestObj := newAcctObj(web3.NewWallet(defaultRpcNode.Pass))
 		require.NoError(t, saveWallet(newAcctTestObj.w))

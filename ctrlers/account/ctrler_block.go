@@ -52,6 +52,9 @@ func (ctrler *AcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
+	clear(ctrler.newbiesCheck)
+	clear(ctrler.newbiesDeliver)
+
 	h, v, xerr := ctrler.acctState.Commit()
 	return h, v, xerr
 }
