@@ -1,10 +1,11 @@
 package test
 
 import (
+	"encoding/hex"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
-	"github.com/tendermint/tendermint/libs/bytes"
 	"sync"
 )
 
@@ -35,6 +36,22 @@ func newAcctObj(w *web3.Wallet) *acctObj {
 		expectedBalance: w.GetBalance(),
 		expectedNonce:   w.GetNonce(),
 	}
+}
+
+func (obj *acctObj) GetTxHashes() []bytes.HexBytes {
+	obj.mtx.RLock()
+	defer obj.mtx.RUnlock()
+
+	var ret []bytes.HexBytes
+	for k, _ := range obj.txHashes {
+		hash, err := hex.DecodeString(k)
+		if err != nil {
+			panic(err)
+		}
+		ret = append(ret, hash)
+	}
+	return ret
+
 }
 
 func (obj *acctObj) addTxHashOfAddr(txhash bytes.HexBytes, addr types.Address) {
@@ -83,21 +100,4 @@ func (obj *acctObj) addExpectedNonce() {
 	defer obj.mtx.Unlock()
 
 	obj.expectedNonce++
-}
-
-var senderAcctObjs = make(map[string]*acctObj)
-var gmtx = &sync.Mutex{}
-
-func addSenderAcctHelper(k string, v *acctObj) {
-	gmtx.Lock()
-	defer gmtx.Unlock()
-
-	senderAcctObjs[k] = v
-}
-
-func clearSenderAcctHelper() {
-	gmtx.Lock()
-	defer gmtx.Unlock()
-
-	senderAcctObjs = make(map[string]*acctObj)
 }

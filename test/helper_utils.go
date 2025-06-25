@@ -96,23 +96,30 @@ func prepareTest(_peers []*PeerMock) {
 	_ = sender.Unlock(peers[0].Pass)
 	_ = sender.SyncAccount(bzweb3)
 
-	for _, peer := range _peers {
-		w := peer.PrivValWallet()
-		//ret, _ := sender.TransferCommit(w.Address(), defGas, defGasPrice, btztypes.ToGrans(10_000_000), bzweb3)
-		//if ret.CheckTx.Code != xerrors.ErrCodeSuccess {
-		//	panic(ret.CheckTx.Code)
-		//}
-		//if ret.DeliverTx.Code != xerrors.ErrCodeSuccess {
-		//	panic(ret.DeliverTx.Code)
-		//}
+	subWg := &sync.WaitGroup{}
+	sub, _ := btzweb3.NewSubscriber(randPeer().WSEnd)
+	defer func() {
+		sub.Stop()
+	}()
+	err = sub.Start(
+		fmt.Sprintf("tm.event='Tx' AND tx.sender='%v'", sender.Address()),
+		func(sub *btzweb3.Subscriber, result []byte) {
+			subWg.Done()
+		},
+	)
 
+	for _, peer := range _peers {
+		subWg.Add(1)
+
+		w := peer.PrivValWallet()
 		ret, _ := sender.TransferSync(w.Address(), defGas, defGasPrice, btztypes.ToGrans(10_000_000), bzweb3)
 		if ret.Code != xerrors.ErrCodeSuccess {
 			panic(ret.Code)
 		}
-
 		sender.AddNonce()
 	}
+
+	subWg.Wait()
 
 	W0 = wallets[0]
 	W1 = wallets[1]
@@ -225,6 +232,8 @@ func waitEvent(query string, cb func(*coretypes.ResultEvent, error) bool) (*sync
 
 	return &subWg, nil
 }
+
+var gmtx = &sync.Mutex{}
 
 func addValidatorWallet(w *btzweb3.Wallet) {
 	gmtx.Lock()

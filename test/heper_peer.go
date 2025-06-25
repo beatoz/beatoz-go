@@ -118,6 +118,7 @@ func (peer *PeerMock) Start() error {
 	peer.Config.RPC.MaxSubscriptionClients = 501
 	peer.Config.RPC.MaxSubscriptionsPerClient = 100
 	peer.Config.RPC.SubscriptionBufferSize = 10000
+	//peer.Config.Mempool.Version = "v1"
 
 	peer.nd, err = node.NewBeatozNode(peer.Config, peer.Pass, logger)
 	if err != nil {
@@ -173,10 +174,10 @@ func runPeers(n int) {
 	for i := 0; i < n; i++ {
 		ll := "*:error"
 
-		if i == 0 {
+		if i == 1 {
 			//// change log level only on the first peer.
 			//ll = "beatoz:debug,*:error"
-			////ll = "*:info"
+			//ll = "*:info"
 		}
 		_peer := NewPeerMock("beatoz_test_chain", i, 46656+i, 36657+i, ll)
 		if err := _peer.Init(1); err != nil { // with only one validator
