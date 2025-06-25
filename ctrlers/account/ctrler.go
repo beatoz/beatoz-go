@@ -16,6 +16,9 @@ import (
 type AcctCtrler struct {
 	acctState v1.IStateLedger
 
+	newbiesCheck   map[btztypes.AcctKey]*btztypes.Account
+	newbiesDeliver map[btztypes.AcctKey]*btztypes.Account
+
 	logger tmlog.Logger
 	mtx    sync.RWMutex
 }
@@ -27,8 +30,10 @@ func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error)
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
-			acctState: _state,
-			logger:    lg,
+			acctState:      _state,
+			newbiesCheck:   make(map[btztypes.AcctKey]*btztypes.Account),
+			newbiesDeliver: make(map[btztypes.AcctKey]*btztypes.Account),
+			logger:         lg,
 		}, nil
 	}
 }
@@ -112,14 +117,23 @@ func (ctrler *AcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btzty
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// `AcctCtrler` MUST be locked until new account is set to acctState (issue #32)
+	// `AcctCtrler` MUST be locked until a new account has been created (issue #32)
 
 	if acct := ctrler.findAccount(addr, exec); acct != nil {
 		return acct
 	}
 
+	newbies := ctrler.newbiesCheck
+	if exec {
+		newbies = ctrler.newbiesDeliver
+	}
+	acctKey := btztypes.ToAcctKey(addr)
+	if acct, ok := newbies[acctKey]; ok {
+		return acct
+	}
+
 	newAcct := btztypes.NewAccountWithName(addr, "")
-	_ = ctrler.setAccount(newAcct, exec)
+	newbies[acctKey] = newAcct
 	return newAcct
 }
 
@@ -316,6 +330,7 @@ var _ btztypes.IAccountHandler = (*AcctCtrler)(nil)
 
 type SimuAcctCtrler struct {
 	simuLedger v1.IImitable
+	newbies    map[btztypes.AcctKey]*btztypes.Account
 	logger     tmlog.Logger
 	mtx        sync.RWMutex
 }
@@ -331,11 +346,13 @@ func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool)
 	if acct := memCtrler.findAccount(addr); acct != nil {
 		return acct
 	}
+	acctKey := btztypes.ToAcctKey(addr)
+	if acct, ok := memCtrler.newbies[acctKey]; ok {
+		return acct
+	}
 
 	newAcct := btztypes.NewAccountWithName(addr, "")
-	if newAcct != nil {
-		_ = memCtrler.SetAccount(newAcct, exec)
-	}
+	memCtrler.newbies[acctKey] = newAcct
 	return newAcct
 }
 
@@ -402,8 +419,8 @@ func (memCtrler *SimuAcctCtrler) EndBlock(context *btztypes.BlockContext) ([]abc
 }
 
 func (memCtrler *SimuAcctCtrler) Commit() ([]byte, int64, xerrors.XError) {
-	//TODO implement me
-	panic("implement me")
+	memCtrler.newbies = make(map[btztypes.AcctKey]*btztypes.Account)
+	return nil, 0, nil
 }
 
 var _ btztypes.IAccountHandler = (*SimuAcctCtrler)(nil)

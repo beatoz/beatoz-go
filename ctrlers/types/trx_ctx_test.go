@@ -85,6 +85,7 @@ func Test_NewTrxContext(t *testing.T) {
 
 	//
 	// To nil address (not contract transaction)
+	// todo: move this case to trx_test.go
 	tx = web3.NewTrxTransfer(w0.Address(), nil, 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, chainId)
 	txctx, xerr = newTrxCtx(tx, 1)
@@ -100,7 +101,8 @@ func Test_NewTrxContext(t *testing.T) {
 	require.Equal(t, txctx.Sender.Address, w0.Address())
 	require.NotNil(t, txctx.Receiver)
 	require.Equal(t, txctx.Receiver.Address, types.ZeroAddress())
-
+	require.NotNil(t, txctx.Payer)
+	require.Equal(t, txctx.Payer.Address, w0.Address())
 	//
 	// To Zero Address
 	tx = web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
@@ -111,6 +113,8 @@ func Test_NewTrxContext(t *testing.T) {
 	require.Equal(t, txctx.Sender.Address, w0.Address())
 	require.NotNil(t, txctx.Receiver)
 	require.Equal(t, txctx.Receiver.Address, types.ZeroAddress())
+	require.NotNil(t, txctx.Payer)
+	require.Equal(t, txctx.Payer.Address, w0.Address())
 
 	//
 	// Success

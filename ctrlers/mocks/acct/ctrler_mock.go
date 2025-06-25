@@ -41,6 +41,10 @@ func (mock *AcctHandlerMock) AddWallet(w *web3.Wallet) {
 	mock.wallets = append(mock.wallets, w)
 }
 
+func (mock *AcctHandlerMock) AddAccount(acct *ctrlertypes.Account) {
+	mock.accounts = append(mock.accounts, acct)
+}
+
 func (mock *AcctHandlerMock) GetWallet(idx int) *web3.Wallet {
 	if idx >= len(mock.wallets) {
 		return nil

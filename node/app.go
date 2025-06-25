@@ -443,7 +443,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 
 	}
-	ctrler.currBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
+	ctrler.currBlockCtx.AddTxsCnt(1)
 
 	xerr = ctrler.txExecutor.ExecuteSync(txctx)
 	if xerr != nil {
@@ -525,7 +525,7 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 				}
 			}
 
-			ctrler.currBlockCtx.AddTxsCnt(1, txctx.IsHandledByEVM())
+			ctrler.currBlockCtx.AddTxsCnt(1)
 			return txctx, nil
 		},
 	)

@@ -64,7 +64,6 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-
 	//
 	// tx validation
 	if xerr := commonValidation(ctx); xerr != nil {
