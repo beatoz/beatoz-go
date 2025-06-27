@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
+var hex40Reg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
 func parseHeight(heightPtr *int64) int64 {
 	if heightPtr == nil {
@@ -23,4 +23,8 @@ func parsePath(ctx *tmrpctypes.Context) string {
 		return strings.TrimSuffix(strings.TrimPrefix(ctx.HTTPReq.URL.Path, "/"), "/")
 	}
 	return ""
+}
+
+func hexToUpper(s string) string {
+	return hex40Reg.ReplaceAllStringFunc(s, strings.ToUpper)
 }

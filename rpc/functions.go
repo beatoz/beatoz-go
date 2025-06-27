@@ -7,7 +7,6 @@ import (
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	tmrpccoretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
-	"strings"
 )
 
 func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
@@ -141,11 +140,11 @@ func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSub
 	// make hex string like address or hash be uppercase
 	//  address's size is 20bytes(40characters)
 	//  hash's size is 32bytes(64characters)
-	return tmrpccore.Subscribe(ctx, hexReg.ReplaceAllStringFunc(query, strings.ToUpper))
+	return tmrpccore.Subscribe(ctx, hexToUpper(query))
 }
 
 func Unsubscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultUnsubscribe, error) {
-	return tmrpccore.Unsubscribe(ctx, hexReg.ReplaceAllStringFunc(query, strings.ToUpper))
+	return tmrpccore.Unsubscribe(ctx, hexToUpper(query))
 }
 
 func TxSearch(
@@ -155,7 +154,7 @@ func TxSearch(
 	pagePtr, perPagePtr *int,
 	orderBy string,
 ) (*tmrpccoretypes.ResultTxSearch, error) {
-	return tmrpccore.TxSearch(ctx, hexReg.ReplaceAllStringFunc(query, strings.ToUpper), prove, pagePtr, perPagePtr, orderBy)
+	return tmrpccore.TxSearch(ctx, hexToUpper(query), prove, pagePtr, perPagePtr, orderBy)
 }
 
 func Validators(ctx *tmrpctypes.Context, heightPtr *int64, pagePtr, perPagePtr *int) (*tmrpccoretypes.ResultValidators, error) {
