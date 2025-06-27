@@ -51,42 +51,16 @@ ifeq ($(HOSTOS), windows)
 	OUTPUT=$(BUILDDIR)/beatoz.exe
 endif
 
-#BUILD_YN="N"
-## if there is no `beatoz` binary.
-#ifeq ($(wildcard $(OUTPUT)),)
-#	BUILD_YN="Y"
-#$(info [info] not found $(OUTPUT))
-#else
-#	# if source files are updated.
-#	status=$(shell git status -s | grep ".go")
-#	ifneq ($(status), )
-#		BUILD_YN="Y"
-#$(info [info] modified files: $(status))
-#	else
-#		# if commit hashes are different
-#		ver_commit=$(word 2, $(subst -, ,$(subst @, ,$(shell $(OUTPUT) version))))
-#		ifneq ($(ver_commit),$(GITCOMMIT))
-#			BUILD_YN="Y"
-#$(info [info] commit hash is different: $(GITCOMMIT) <> $(ver_commit))
-#		endif
-#	endif
-#endif
-
 .PHONY: all pbm $(TARGETOS) deploy
 
 all: pbm $(TARGETOS)
 
 $(TARGETOS):
-#ifeq ($(BUILD_YN),"Y")
-#	@echo "[$(@)] Build beatoz($(GITCOMMIT)) for $(@) on $(UNAME_S)-$(UNAME_M)"
 ifeq ($(HOSTOS),windows)
 	@set GOOS=$@& set GOARCH=$(HOSTARCH)& go build -o $(OUTPUT) $(BUILD_FLAGS)  ./cmd/
 else
 	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(OUTPUT) $(BUILD_FLAGS) ./cmd/
 endif
-#else
-#	@echo "[$(@)] The last version ($(shell $(OUTPUT) version)) has already been built."
-#endif
 	@echo "[$(@)] BEATOZ Version $(shell $(OUTPUT) version) has been compiled."
 pbm:
 	@echo "[$(@)] Compile protocol messages"
