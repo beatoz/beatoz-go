@@ -13,16 +13,27 @@ import (
 
 var hexReg = regexp.MustCompile(`(?i)[a-f0-9]{40,}`)
 
-func takeHeight(ctx *tmrpctypes.Context, heightPtr *int64) int64 {
+func parseHeight(heightPtr *int64) int64 {
 	if heightPtr == nil {
 		return 0
 	}
 	return *heightPtr
 }
 
+func parsePath(ctx *tmrpctypes.Context) string {
+	if ctx.JSONReq != nil {
+		return ctx.JSONReq.Method
+	}
+	if ctx.HTTPReq != nil {
+		return strings.TrimSuffix(strings.TrimPrefix(ctx.HTTPReq.URL.Path, "/"), "/")
+	}
+	return ""
+}
+
 func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "account", tmbytes.HexBytes(addr), height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -30,8 +41,9 @@ func QueryAccount(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int6
 }
 
 func QueryDelegatee(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "delegatee", tmbytes.HexBytes(addr), height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -39,8 +51,9 @@ func QueryDelegatee(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *in
 }
 
 func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes", tmbytes.HexBytes(addr), height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -48,8 +61,9 @@ func QueryStakes(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64
 }
 
 func QueryStakes1(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes/total_power", nil, height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -57,8 +71,9 @@ func QueryStakes1(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, erro
 }
 
 func QueryStakes2(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "stakes/voting_power", nil, height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -66,8 +81,9 @@ func QueryStakes2(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, erro
 }
 
 func QueryReward(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "reward", tmbytes.HexBytes(addr), height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, tmbytes.HexBytes(addr), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -75,8 +91,9 @@ func QueryReward(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64
 }
 
 func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "proposal", tmbytes.HexBytes(txhash), height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, tmbytes.HexBytes(txhash), height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -84,8 +101,9 @@ func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *i
 }
 
 func QueryGovParams(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "gov_params", nil, height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -104,8 +122,9 @@ func QueryVM(
 	copy(params[len(addr):], to)
 	copy(params[len(addr)+len(to):], data)
 
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "vm_call", params, height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, params, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
@@ -124,8 +143,9 @@ func QueryEstimateGas(
 	copy(params[len(addr):], to)
 	copy(params[len(addr)+len(to):], data)
 
-	height := takeHeight(ctx, heightPtr)
-	if resp, err := tmrpccore.ABCIQuery(ctx, "vm_estimate_gas", params, height, false); err != nil {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, params, height, false); err != nil {
 		return nil, err
 	} else {
 		return &QueryResult{resp.Response}, nil
