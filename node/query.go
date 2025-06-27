@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/binary"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -15,14 +16,20 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 	}
 
 	response := abcitypes.ResponseQuery{
-		Code:   abcitypes.CodeTypeOK,
-		Key:    req.Data,
+		Code: abcitypes.CodeTypeOK,
+		// Key:    req.Data, // req.Data maybe too long in case of vm_call or vm_estimate_gas.
 		Height: req.Height,
 	}
 
 	var xerr xerrors.XError
 
 	switch req.Path {
+	case "chain_id":
+		response.Value = []byte(ctrler.rootConfig.ChainID)
+	case "block_height":
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(ctrler.lastBlockCtx.Height()))
+		response.Value = val
 	case "account":
 		response.Value, xerr = ctrler.acctCtrler.Query(req)
 		if xerr == nil {
