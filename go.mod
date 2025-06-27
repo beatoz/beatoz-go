@@ -25,6 +25,8 @@ require (
 	google.golang.org/protobuf v1.35.2
 )
 
+replace github.com/tendermint/tendermint v0.34.24 => github.com/beatoz/tendermint-ethaddr v0.34.24-0.20250627100917-18235d9553f1
+
 require (
 	cosmossdk.io/core v0.12.1-0.20240725072823-6a2d039e1212 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
