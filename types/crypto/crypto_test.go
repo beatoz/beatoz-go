@@ -8,7 +8,7 @@ import (
 
 var (
 	prvKeyHex       = "83b8749ffd3b90bb26bdfa430f8df21d881df9962eb96b4ee68b3f60c57c5ccb"
-	expectedBTCAddr = "7612536BD0991DB67E60DA9ECA1E3E276889B8DC"
+	expectedETHAddr = "44087362E1D64596743A3D4AC3CFE874544CA7FA"
 )
 
 func TestPub2Addr(t *testing.T) {
@@ -16,7 +16,7 @@ func TestPub2Addr(t *testing.T) {
 	require.NoError(t, err)
 
 	addr := Pub2Addr(&prvKey.PublicKey)
-	require.Equal(t, expectedBTCAddr, addr.String())
+	require.Equal(t, expectedETHAddr, addr.String())
 }
 
 func BenchmarkPub2Addr(b *testing.B) {
@@ -42,7 +42,7 @@ func TestSig2Addr(t *testing.T) {
 
 	addr, _, err := Sig2Addr(randBytes, sig)
 	require.NoError(t, err)
-	require.Equal(t, expectedBTCAddr, addr.String())
+	require.Equal(t, expectedETHAddr, addr.String())
 }
 
 func BenchmarkSig2Addr(b *testing.B) {
