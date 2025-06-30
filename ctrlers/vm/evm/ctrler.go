@@ -120,10 +120,10 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 }
 
 func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
-		// In case of a fallback transaction,
-		// the tx type is TRX_TRANSFER (not TRX_CONTRACT)
-		// and the `to`(receiver) address should point to a contract.
+	// deploy tx	: address == zero, code == nil
+	// normal tx	: address != zero, code != nil
+	// fallback tx	: address != zero, code != nil
+	if !bytes.Equal(ctx.Receiver.Address, types.ZeroAddress()) && ctx.Receiver.Code == nil {
 		return xerrors.ErrInvalidAccountType
 	}
 
@@ -131,6 +131,10 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	payload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract)
 	if ok {
 		inputData = payload.Data
+	}
+
+	if bytes.Equal(ctx.Receiver.Address, types.ZeroAddress()) && len(inputData) == 0 {
+		return xerrors.ErrInvalidTrxPayloadParams
 	}
 
 	// Check intrinsic gas if everything is correct
@@ -167,9 +171,6 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 			return xerr
 		}
 		return nil
-	}
-	if ctx.Tx.GetType() != ctrlertypes.TRX_CONTRACT && ctx.Receiver.Code == nil {
-		return xerrors.ErrUnknownTrxType
 	}
 
 	ctrler.mtx.Lock()
