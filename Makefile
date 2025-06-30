@@ -61,7 +61,7 @@ ifeq ($(HOSTOS),windows)
 else
 	@GOOS=$@ GOARCH=$(HOSTARCH) go build -o $(OUTPUT) $(BUILD_FLAGS) ./cmd/
 endif
-	@echo "[$(@)] BEATOZ Version $(shell $(OUTPUT) version) has been compiled."
+	@echo "[$(@)] BEATOZ Version `$(OUTPUT) version` has been compiled."
 pbm:
 	@echo "[$(@)] Compile protocol messages"
 	@protoc --go_out=$(LOCAL_GOPATH)/src -I./protos/ account.proto
