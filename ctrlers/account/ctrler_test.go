@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	account2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -13,6 +14,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -164,4 +166,47 @@ func TestAcctCtrler_Commit(t *testing.T) {
 		}
 		preVer = v
 	}
+}
+
+func Test_Issue32(t *testing.T) {
+	config := cfg.DefaultConfig()
+	config.DBPath = filepath.Join(os.TempDir(), "test-concurrnent-findornewaccount")
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+	ctrler, err := NewAcctCtrler(config, tmlog.NewNopLogger())
+	require.NoError(t, err)
+
+	chStart := make(chan interface{})
+	var accts []*account2.Account
+	wg := sync.WaitGroup{}
+	randAddr := types.RandAddress()
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func() {
+			<-chStart
+			defer func() {
+				require.Nil(t, recover())
+			}()
+			acct := ctrler.FindOrNewAccount(randAddr, true)
+			accts = append(accts, acct)
+			wg.Done()
+		}()
+	}
+	close(chStart)
+	wg.Wait()
+
+	for i, acct := range accts {
+		if i == 0 {
+			continue
+		}
+		require.True(t, accts[i-1] == acct,
+			fmt.Sprintf("not same pointer accts[%d](%p) != accts[%d](%p)", i-1, accts[i-1], i, acct), // compare pointer
+		)
+		if i == len(accts)-1 {
+			require.True(t, accts[0] == acct,
+				fmt.Sprintf("not same pointer accts[%d](%p) != accts[%d](%p)", 0, accts[0], i, acct), // compare pointer
+			)
+		}
+	}
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
 }

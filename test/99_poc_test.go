@@ -150,6 +150,7 @@ func TestPoC1(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.CheckTx.Code, commitRet.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, commitRet.DeliverTx.Code, commitRet.DeliverTx.Log)
 	fmt.Println("TestPoC1", "deploy contract - gas used", commitRet.DeliverTx.GasUsed, "wanted", commitRet.DeliverTx.GasWanted)
+	fmt.Println("TestPoC1", "deploy contract - fee used", types.GasToFee(commitRet.DeliverTx.GasUsed, defGasPrice))
 
 	//submitTrx(wallet, trxObj)
 	//fmt.Printf("%s\n", submitTrx(wallet, trxObj))
@@ -369,6 +370,10 @@ func TestPoc3(t *testing.T) {
 }
 
 func TestPoC4(t *testing.T) {
+	// the contract tx to EOA (not contract address) is rejected.
+	// so, the following test is not available.
+	return
+
 	bzweb3 := beatozweb3.NewBeatozWeb3(beatozweb3.NewHttpProvider(defaultRpcNode.RPCURL))
 
 	walletMain := randCommonWallet() // don't use randWallet(). if the validator wallet is selected, balance check is fail.

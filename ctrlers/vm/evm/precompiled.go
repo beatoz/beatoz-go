@@ -3,17 +3,16 @@ package evm
 import (
 	beatoz_crypto "github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"math/big"
 )
 
 func init() {
-	vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
-	vm.PrecompiledContractsByzantium[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
-	vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
-	vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
+	//vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
+	//vm.PrecompiledContractsByzantium[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
+	//vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
+	//vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
 }
 
 // ECRECOVER implemented as a native contract.

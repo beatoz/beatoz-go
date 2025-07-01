@@ -74,6 +74,50 @@ func init() {
 		//	fmt.Printf("%x: %s\n", evt.ID, evt.Sig)
 		//}
 	}
+}
+
+func Test_ValidateTrx(t *testing.T) {
+	os.RemoveAll(dbPath)
+	ctrler := NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
+
+	// deploy tx	: address == zero, code == nil
+	// normal tx	: address != zero, code != nil
+	// fallback tx	: address != zero, code != nil
+
+	bctx := &ctrlertypes.BlockContext{}
+	fromAcct := ctrlertypes.NewAccount(types.RandAddress())
+
+	txctx := &ctrlertypes.TrxContext{
+		BlockContext: bctx,
+		Tx: web3.NewTrxContract(types.ZeroAddress(), types.ZeroAddress(),
+			1, 300000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(32)),
+		Sender: fromAcct,
+	}
+
+	// contract tx: toAcct.Code == nil
+	txctx.Receiver = ctrlertypes.NewAccount(types.RandAddress())
+	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrInvalidAccountType.Error())
+
+	// contract tx: toAcct.Code != nil
+	txctx.Receiver = ctrlertypes.NewAccount(types.RandAddress())
+	txctx.Receiver.Code = []byte("not nil")
+	require.NoError(t, ctrler.ValidateTrx(txctx))
+
+	// contract tx: toAcct.Code != nil, input == nil or 0 len
+	txctx.Receiver = ctrlertypes.NewAccount(types.RandAddress())
+	txctx.Receiver.Code = []byte("not nil")
+	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 0)
+	require.NoError(t, ctrler.ValidateTrx(txctx))
+
+	// deploy tx: input == nil or 0 len
+	txctx.Receiver = ctrlertypes.NewAccount(types.ZeroAddress())
+	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 0)
+	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrInvalidTrxPayloadParams.Error())
+
+	// deploy tx: input == nil or 0 len
+	txctx.Receiver = ctrlertypes.NewAccount(types.ZeroAddress())
+	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 1)
+	require.NoError(t, ctrler.ValidateTrx(txctx))
 
 }
 

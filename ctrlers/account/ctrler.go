@@ -319,6 +319,7 @@ func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandl
 
 	return &SimuAcctCtrler{
 		simuLedger: memLedger,
+		newbies:    make(map[btztypes.AcctKey]*btztypes.Account),
 		logger:     ctrler.logger.With("module", "SimuAcctCtrler"),
 	}, nil
 }

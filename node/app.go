@@ -274,7 +274,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 		// validate amount and nonce of sender, which may have been changed.
 		tx := &ctrlertypes.Trx{}
 		if xerr := tx.Decode(req.Tx); xerr != nil {
-			xerr := xerrors.ErrCheckTx.Wrap(xerr)
+			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
 				Code: xerr.Code(),
@@ -306,7 +306,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 		// check nonce
 		if xerr := sender.CheckNonce(tx.Nonce); xerr != nil {
-			xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
+			xerr = xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
 				Code: xerr.Code(),
