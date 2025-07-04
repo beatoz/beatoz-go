@@ -264,10 +264,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 		return abcitypes.ResponseCheckTx{
 			Code:      abcitypes.CodeTypeOK,
+			GasWanted: txctx.Tx.Gas,
+			GasUsed:   txctx.GasUsed,
 			Log:       "",
 			Data:      txctx.RetData,
-			GasWanted: int64(txctx.Tx.Gas),
-			GasUsed:   int64(txctx.GasUsed),
 		}
 	case abcitypes.CheckTxType_Recheck:
 		// do Tx validation minimally
@@ -552,10 +552,12 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 		})
 
 		return &abcitypes.ResponseDeliverTx{
-			Code:   xerr.Code(),
-			Log:    xerr.Error(),
-			Data:   txctx.RetData, // in case of evm, there may be return data when tx is failed.
-			Events: txctx.Events,
+			Code:      xerr.Code(),
+			Log:       xerr.Error(),
+			GasWanted: txctx.Tx.Gas,
+			GasUsed:   txctx.GasUsed,
+			Data:      txctx.RetData, // in case of evm, there may be return data when tx is failed.
+			Events:    txctx.Events,
 		}
 	} else {
 
@@ -576,8 +578,8 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 
 		return &abcitypes.ResponseDeliverTx{
 			Code:      abcitypes.CodeTypeOK,
-			GasWanted: int64(txctx.Tx.Gas),
-			GasUsed:   int64(txctx.GasUsed),
+			GasWanted: txctx.Tx.Gas,
+			GasUsed:   txctx.GasUsed,
 			Data:      txctx.RetData,
 			Events:    txctx.Events,
 		}
