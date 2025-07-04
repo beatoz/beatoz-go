@@ -53,9 +53,9 @@ func NewGovParams(interval int) *GovParams {
 			ValidatorRewardRate:       30,                                                             // 30%
 			TxFeeRewardRate:           90,                                                             // 90%
 			SlashRate:                 50,                                                             // 50%
-			XGasPrice:                 uint256.NewInt(250_000_000_000).Bytes(),                        // 250e9 = 250 Ggrans
-			MinTrxGas:                 4_000,                                                          // 4e3 * 25e10 = 1e15 = 0.001 BTOZ
-			MaxTrxGas:                 30_000_000,
+			XGasPrice:                 uint256.NewInt(33_000_000_000).Bytes(),                         // 33e9 = 33 Ggrans
+			MinTrxGas:                 4_000,                                                          // 4e3 * 33e9 = 132e12 = 0.000132 BTOZ
+			MaxTrxGas:                 50_000_000,
 			MaxBlockGas:               50_000_000,
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
 			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
