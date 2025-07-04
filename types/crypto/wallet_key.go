@@ -109,10 +109,7 @@ func NewWalletKeyWith(keyBytes, pass []byte) *WalletKey {
 	}
 	_pubKey = tmsecp256k1.PrivKey(keyBytes).PubKey().Bytes()
 
-	_addr, err := PubBytes2Addr(_pubKey)
-	if err != nil {
-		panic(err)
-	}
+	_addr := PubKeyBytes2Addr(_pubKey)
 
 	return &WalletKey{
 		Version:          1,

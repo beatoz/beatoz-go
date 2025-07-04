@@ -46,23 +46,19 @@ func VerifySig(pubkey, msg, sig []byte) bool {
 	return ethcrypto.VerifySignature(pubkey, hmsg, sig)
 }
 
-func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
-	pubKeyBytes := CompressPubkey(pub)
-	ret, _ := PubBytes2Addr(pubKeyBytes)
-	return ret
+func Sig2Addr(msg, sig []byte) (types.Address, abytes.HexBytes, xerrors.XError) {
+	hmsg := DefaultHash(msg)
+	pubKey, err := ethcrypto.SigToPub(hmsg, sig)
+	if err != nil {
+		return nil, nil, xerrors.From(err)
+	}
+
+	return Pub2Addr(pubKey), CompressPubkey(pubKey), nil
 }
 
-// pubBytes is 33 bytes compressed format
-func PubBytes2Addr(pubBytes abytes.HexBytes) (types.Address, xerrors.XError) {
-	// ethereum style
-	//pub, err := ethcrypto.DecompressPubkey(pubBytes)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//a := ethcrypto.PubkeyToAddress(*pub)
-	//return a[:], nil
-
-	return abytes.HexBytes(tmsecp256k1.PubKey(pubBytes).Address()), nil
+func Pub2Addr(pub *ecdsa.PublicKey) types.Address {
+	pubKeyBytes := CompressPubkey(pub)
+	return PubKeyBytes2Addr(pubKeyBytes)
 }
 
 func PubKeyBytes2Addr(pubBytes abytes.HexBytes) types.Address {
@@ -79,16 +75,6 @@ func DecompressPubkey(bz []byte) (*ecdsa.PublicKey, xerrors.XError) {
 	} else {
 		return pubKey, nil
 	}
-}
-
-func Sig2Addr(msg, sig []byte) (types.Address, abytes.HexBytes, xerrors.XError) {
-	hmsg := DefaultHash(msg)
-	pubKey, err := ethcrypto.SigToPub(hmsg, sig)
-	if err != nil {
-		return nil, nil, xerrors.From(err)
-	}
-
-	return Pub2Addr(pubKey), CompressPubkey(pubKey), nil
 }
 
 func DefaultHash(datas ...[]byte) []byte {
