@@ -5,6 +5,7 @@ import (
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -15,9 +16,15 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		req.Height = ctrler.lastBlockCtx.Height()
 	}
 
+	// req.Data maybe too long in case of vm_call or vm_estimate_gas.
+	key := req.Data
+	if len(key) > 32 {
+		key = crypto.DefaultHash(req.Data)
+	}
+
 	response := abcitypes.ResponseQuery{
-		Code: abcitypes.CodeTypeOK,
-		// Key:    req.Data, // req.Data maybe too long in case of vm_call or vm_estimate_gas.
+		Code:   abcitypes.CodeTypeOK,
+		Key:    key,
 		Height: req.Height,
 	}
 

@@ -81,7 +81,12 @@ func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *i
 
 func QueryGovParams(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
 	height := parseHeight(heightPtr)
+	// one of rule and gov_params
+	// rule is deprecated
 	path := parsePath(ctx)
+	if path == "rule" {
+		path = "gov_params"
+	}
 	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, height, false); err != nil {
 		return nil, err
 	} else {
