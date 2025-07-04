@@ -6,11 +6,13 @@ import (
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	ethcoretypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"math/big"
 	"time"
 )
 
@@ -64,7 +66,6 @@ func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xe
 
 	return state.GetCode(addr.Array20()), nil
 }
-
 func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 
 	// Get the stateDB at block<height> and the `stateDBWrapper` that has account ledger(acctCtrler)
@@ -85,8 +86,18 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := evmMessage(sender, toAddr, 0, 3000000, uint256.NewInt(0), uint256.NewInt(0), data, true)
-	blockContext := evmBlockContext(sender, height, blockTime, 3000000)
+	vmmsg := callMsg{
+		ethereum.CallMsg{
+			From:     sender,
+			To:       toAddr,
+			Data:     data,
+			Gas:      50000000,
+			GasPrice: new(big.Int), GasFeeCap: new(big.Int), GasTipCap: new(big.Int),
+			Value: new(big.Int),
+		},
+	}
+
+	blockContext := evmBlockContext(sender, height, blockTime, 50000000)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
@@ -107,3 +118,19 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 
 	return result, nil
 }
+
+type callMsg struct {
+	ethereum.CallMsg
+}
+
+func (m callMsg) From() common.Address                { return m.CallMsg.From }
+func (m callMsg) Nonce() uint64                       { return 0 }
+func (m callMsg) IsFake() bool                        { return true }
+func (m callMsg) To() *common.Address                 { return m.CallMsg.To }
+func (m callMsg) GasPrice() *big.Int                  { return m.CallMsg.GasPrice }
+func (m callMsg) GasFeeCap() *big.Int                 { return m.CallMsg.GasFeeCap }
+func (m callMsg) GasTipCap() *big.Int                 { return m.CallMsg.GasTipCap }
+func (m callMsg) Gas() uint64                         { return m.CallMsg.Gas }
+func (m callMsg) Value() *big.Int                     { return m.CallMsg.Value }
+func (m callMsg) Data() []byte                        { return m.CallMsg.Data }
+func (m callMsg) AccessList() ethcoretypes.AccessList { return m.CallMsg.AccessList }

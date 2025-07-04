@@ -27,9 +27,11 @@ if echo "$COMMITS" | grep -q 'BREAKING CHANGE\|!:'; then
   MAJOR=$((MAJOR + 1))
   MINOR=0
   PATCH=0
-elif echo "$COMMITS" | grep -q '^feat'; then
+elif echo "$COMMITS" | grep -q '^feat:'; then
   MINOR=$((MINOR + 1))
   PATCH=0
+elif echo "$COMMITS" | grep -q '^feat\('; then
+  PATCH=$((PATCH + 1))
 elif echo "$COMMITS" | grep -q '^fix'; then
   PATCH=$((PATCH + 1))
 else

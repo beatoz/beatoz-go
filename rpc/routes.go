@@ -22,4 +22,6 @@ func AddRoutes() {
 	tmrpccore.Routes["validators"] = tmrpccore_server.NewRPCFunc(Validators, "height,page,per_page")
 	tmrpccore.Routes["vm_call"] = tmrpccore_server.NewRPCFunc(QueryVM, "addr,to,height,data")
 	tmrpccore.Routes["vm_estimate_gas"] = tmrpccore_server.NewRPCFunc(QueryEstimateGas, "addr,to,height,data")
+
+	AddEthRoutes()
 }
