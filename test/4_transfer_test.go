@@ -293,12 +293,12 @@ func TestTransfer_BulkSync(t *testing.T) {
 					sumRetTxs += sender.retTxsCnt
 					txHashes = append(txHashes, sender.GetTxHashes()...)
 				}
-				fmt.Println("monitor: num_txs", len(txHashes), "sent", sumSentTxs, "event", sumRetTxs)
+				fmt.Println("monitoring: num_txs", len(txHashes), "sent", sumSentTxs, "event", sumRetTxs)
 
 				for _, hash := range txHashes {
 					resp, err := bzweb3.QueryTransaction(hash)
 					if err != nil {
-						fmt.Println("query tx error", "txhash", hash, "error", err)
+						//fmt.Println("query tx error", "txhash", hash, "error", err)
 						continue
 					}
 					require.Equal(t, xerrors.ErrCodeSuccess, resp.TxResult.Code)
@@ -318,7 +318,7 @@ func TestTransfer_BulkSync(t *testing.T) {
 		sumRetTxs += sender.retTxsCnt
 		txHashes = append(txHashes, sender.GetTxHashes()...)
 	}
-	fmt.Println("monitor: num_txs", len(txHashes), "sent", sumSentTxs, "event", sumRetTxs)
+	fmt.Println("TestTransfer_BulkSync - monitored: num_txs", len(txHashes), "sent", sumSentTxs, "event", sumRetTxs)
 
 	fmt.Printf("TestTransfer_BulkSync - Check %v accounts...\n", len(allAcctObjs))
 
