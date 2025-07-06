@@ -12,6 +12,7 @@ import (
 	ethcoretypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"math"
 	"math/big"
 	"time"
 )
@@ -97,7 +98,7 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		},
 	}
 
-	blockContext := evmBlockContext(sender, height, blockTime, 50000000)
+	blockContext := evmBlockContext(sender, height, blockTime, math.MaxInt64)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
