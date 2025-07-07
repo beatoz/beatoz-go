@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/cmd/version"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs"
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"os"
 	"path/filepath"
@@ -77,13 +79,6 @@ func AddInitFlags(cmd *cobra.Command) {
 			"It is not based on actual block production timing.\n"+
 			"Instead, it is used as a constant reference to estimate time from the number of blocks produced.")
 	cmd.Flags().Int64Var(
-		&initParams.InflationCycleBlocks,
-		"inflation_cycle_blocks",
-		initParams.InflationCycleBlocks,
-		"the number of blocks required to trigger a new inflation event.\n"+
-			"This determines the frequency of inflation based on block count, not real time.",
-	)
-	cmd.Flags().Int64Var(
 		&initParams.MaxTotalSupply,
 		"max_total_supply",
 		initParams.MaxTotalSupply,
@@ -132,7 +127,11 @@ func initFiles(cmd *cobra.Command, args []string) error {
 	return InitFilesWith(rootConfig, initParams)
 }
 
-func InitFilesWith(config *cfg.Config, params *InitParams) error {
+func InitFilesWith(
+	config *cfg.Config,
+	params *InitParams,
+	callbacks ...func(*tmtypes.GenesisDoc),
+) error {
 	if err := params.Validate(); err != nil {
 		return err
 	}
@@ -206,6 +205,19 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 				return err
 			}
 		} else { // anything (e.g. loclanet)
+			//
+			// Initialize consensus parameters
+			consensusParams := &tmproto.ConsensusParams{
+				Block:    tmtypes.DefaultBlockParams(),
+				Evidence: tmtypes.DefaultEvidenceParams(),
+				Validator: tmproto.ValidatorParams{
+					PubKeyTypes: []string{tmtypes.ABCIPubKeyTypeSecp256k1},
+				},
+				Version: tmproto.VersionParams{
+					AppVersion: version.Major(),
+				},
+			}
+			consensusParams.Block.MaxGas = params.BlockGasLimit
 
 			defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
 			if err = tmos.EnsureDir(defaultWalkeyDirPath, acrypto.DefaultWalletKeyDirPerm); err != nil {
@@ -256,21 +268,35 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 			logger.Debug("GenesisAssetHolder", "holders count", len(holders))
 
 			//
-			// Create Governance Parameters at genesis
+			// Create Governance Parameters
 			blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
 			if err != nil {
 				return err
 			}
 			govParams := types.NewGovParams(int(blockInterval.Seconds()))
-			govParams.GetValues().InflationCycleBlocks = params.InflationCycleBlocks
 			govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
 
-			genDoc, err = genesis.NewGenesisDoc(params.ChainID, valset, holders, govParams)
+			appState := &genesis.GenesisAppState{
+				AssetHolders: holders,
+				GovParams:    govParams,
+			}
+
+			//
+			// Create genesis
+			genDoc, err = genesis.NewGenesisDoc(
+				params.ChainID,
+				consensusParams,
+				valset,
+				appState,
+			)
 			if err != nil {
 				return err
 			}
-			genDoc.ConsensusParams.Block.MaxGas = params.BlockGasLimit
 		}
+		for _, cb := range callbacks {
+			cb(genDoc)
+		}
+
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err
 		}
@@ -288,7 +314,6 @@ type InitParams struct {
 	HolderSecret         []byte
 	BlockGasLimit        int64
 	AssumedBlockInterval string
-	InflationCycleBlocks int64
 	MaxTotalSupply       int64
 	InitTotalSupply      int64
 	InitVotingPower      int64
@@ -296,12 +321,11 @@ type InitParams struct {
 
 func DefaultInitParams() *InitParams {
 	return &InitParams{
-		ChainID:              "mainnet",
+		ChainID:              "localnet",
 		ValCnt:               1,
 		HolderCnt:            10,
 		BlockGasLimit:        int64(36_000_000),
-		AssumedBlockInterval: "7s",
-		InflationCycleBlocks: int64(86_400),
+		AssumedBlockInterval: "10s",
 		MaxTotalSupply:       int64(700_000_000),
 		InitTotalSupply:      int64(350_000_000),
 		InitVotingPower:      int64(35_000_000),

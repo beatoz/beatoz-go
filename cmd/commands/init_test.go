@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
@@ -41,7 +40,6 @@ func Test_InitialAmounts(t *testing.T) {
 			HolderSecret:         bytes.RandBytes(12),
 			BlockGasLimit:        rand.Int63n(36_000_000),
 			AssumedBlockInterval: fmt.Sprintf("%ds", rand.Int31n(3600)+1),
-			InflationCycleBlocks: rand.Int63n(types.WeekSeconds*8) + 1,
 			MaxTotalSupply:       rand.Int63n(1000) + 100,
 			InitTotalSupply:      rand.Int63n(1000) + 100,
 			InitVotingPower:      rand.Int63n(1000) + 100,
@@ -101,7 +99,6 @@ func Test_InitialAmounts(t *testing.T) {
 		bintv, err := time.ParseDuration(params.AssumedBlockInterval)
 		require.NoError(t, err)
 		require.Equal(t, int32(bintv.Seconds()), govParams.AssumedBlockInterval(), params.AssumedBlockInterval)
-		require.Equal(t, params.InflationCycleBlocks, govParams.InflationCycleBlocks())
 		require.Equal(t, types2.ToGrans(params.MaxTotalSupply).Dec(), govParams.MaxTotalSupply().Dec())
 
 		require.NoError(t, os.RemoveAll(config.RootDir))

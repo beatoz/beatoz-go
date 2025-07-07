@@ -119,13 +119,14 @@ func TestAcctCtrler_Commit(t *testing.T) {
 
 	require.NoError(t, initialize())
 	for i := 0; i < 100; i++ {
-		// simulation 의 경우 각 노드(acctCtrler) 이 서로 다른 값을 가져도 상관 없다.
+		// In case of simulation, each node can have different values.
+		// Each node can execute different txs in simulation mode(e.g. CheckTx or Query)
 		require.NoError(t, simuRand(100))
 
+		// In simulation mode, there is no committed values and no hash changes.
 		h, v, e := commit()
 		require.NoError(t, e)
 
-		// simulation 의 경우 commit 되는 것이 없으므로 hash 변경도 없다.
 		if preHash != nil {
 			require.Equal(t, preHash, h)
 		}
@@ -142,7 +143,8 @@ func TestAcctCtrler_Commit(t *testing.T) {
 		require.NoError(t, execRand(100))
 
 		_, _, e := commit()
-		// execution 이 random 으로 실행 (execRand) 되면(각 노드(acctCtrler) 이 서로 다른 살행을 하면) 에러 발생.
+
+		// It should occur the error that each node executes different txs in execution mode.
 		require.Error(t, e)
 	}
 
@@ -176,20 +178,17 @@ func Test_Issue32(t *testing.T) {
 	require.NoError(t, err)
 
 	chStart := make(chan interface{})
-	var accts []*account2.Account
+	targetAddr := types.RandAddress()
+	accts := make([]*account2.Account, 10000)
 	wg := sync.WaitGroup{}
-	randAddr := types.RandAddress()
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		wg.Add(1)
-		go func() {
+		go func(idx int) {
 			<-chStart
-			defer func() {
-				require.Nil(t, recover())
-			}()
-			acct := ctrler.FindOrNewAccount(randAddr, true)
-			accts = append(accts, acct)
+			acct := ctrler.FindOrNewAccount(targetAddr, true)
+			accts[idx] = acct
 			wg.Done()
-		}()
+		}(i)
 	}
 	close(chStart)
 	wg.Wait()

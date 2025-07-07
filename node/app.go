@@ -183,16 +183,16 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 
 	appState, initTotalSupply, xerr := checkRequestInitChain(req)
 	if xerr != nil {
-		ctrler.logger.Error("BeatozApp", "error", xerr)
+		ctrler.logger.Error("wrong request", "error", xerr)
 		panic(xerr)
 	}
 
 	if xerr := ctrler.govCtrler.InitLedger(appState); xerr != nil {
-		ctrler.logger.Error("BeatozApp", "error", xerr)
+		ctrler.logger.Error("fail to initialize governance controller", "error", xerr)
 		panic(xerr)
 	}
 	if xerr := ctrler.acctCtrler.InitLedger(appState); xerr != nil {
-		ctrler.logger.Error("BeatozApp", "error", xerr)
+		ctrler.logger.Error("fail to initialize account controller", "error", xerr)
 		panic(xerr)
 	}
 
@@ -217,7 +217,7 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.lastBlockCtx.SetAppHash(appHash)
 	ctrler.rootConfig.ChainID = req.GetChainId()
 
-	ctrler.logger.Info("chain initialization",
+	ctrler.logger.Info("InitChain",
 		"chainID", ctrler.lastBlockCtx.ChainID(),
 		"height", ctrler.lastBlockCtx.Height(),
 		"appHash", ctrler.lastBlockCtx.AppHash(),
@@ -354,12 +354,6 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	blockGasLimit := ctrlertypes.AdjustBlockGasLimit(
-		ctrler.lastBlockCtx.GetBlockGasLimit(),
-		ctrler.lastBlockCtx.GetBlockGasUsed(),
-		ctrler.govCtrler.MaxTrxGas(), // it means minimum block gas limit
-		ctrler.govCtrler.MaxBlockGas(),
-	)
 	ctrler.currBlockCtx = ctrlertypes.NewBlockContext(
 		req,
 		ctrler.govCtrler,
@@ -369,7 +363,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 		ctrler.vpowCtrler,
 	)
 	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
-	ctrler.currBlockCtx.SetBlockGasLimit(blockGasLimit)
+	ctrler.currBlockCtx.SetBlockGasLimit(ctrler.lastBlockCtx.GetBlockGasLimit())
 
 	var beginBlockEvents []abcitypes.Event
 
@@ -681,8 +675,8 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	newBlockGasLimit := ctrlertypes.AdjustBlockGasLimit(
 		ctrler.currBlockCtx.GetBlockGasLimit(),
 		ctrler.currBlockCtx.GetBlockGasUsed(),
-		ctrler.govCtrler.MaxTrxGas(), // minimum block gas limit
-		ctrler.govCtrler.MaxBlockGas(),
+		ctrler.govCtrler.MinBlockGasLimit(), // minimum block gas limit
+		ctrler.govCtrler.MaxBlockGasLimit(),
 	)
 
 	var consensusParams *abcitypes.ConsensusParams
@@ -694,8 +688,6 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 			},
 		}
 
-		//upperThreshold := ctrler.currBlockCtx.GetBlockGasLimit() - (ctrler.currBlockCtx.GetBlockGasLimit() / 10) // 90%
-		//lowerThreshold := ctrler.currBlockCtx.GetBlockGasLimit() / 100                                           // 1%
 		ctrler.logger.Info("Update block gas limit",
 			"height", req.Height,
 			"used", ctrler.currBlockCtx.GetBlockGasUsed(),

@@ -53,8 +53,6 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 	// validation gas.
 	if tx.Gas < txctx.BlockContext.GovHandler.MinTrxGas() {
 		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too small gas (min: %v)", txctx.GovHandler.MinTrxGas())
-	} else if tx.Gas > txctx.BlockContext.GovHandler.MaxTrxGas() {
-		return nil, xerrors.ErrInvalidGas.Wrapf("the tx has too much gas (max: %d)", txctx.GovHandler.MaxTrxGas())
 	}
 
 	if tx.GasPrice.Cmp(txctx.BlockContext.GovHandler.GasPrice()) != 0 {
