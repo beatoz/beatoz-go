@@ -104,7 +104,7 @@ func Test_BlockGasLimit(t *testing.T) {
 	}
 
 	expected := blockGasLimit + blockGasLimit/10 // increasing by 10%
-	adjusted := ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.MaxBlockGas())
+	adjusted := ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.MaxBlockGasLimit())
 	require.Equal(t, expected, adjusted)
 
 	blockGasLimit = adjusted
@@ -145,7 +145,7 @@ func Test_BlockGasLimit(t *testing.T) {
 	}
 
 	expected = blockGasLimit - blockGasLimit/100 // increasing by 10%
-	adjusted = ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.MaxBlockGas())
+	adjusted = ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.MaxBlockGasLimit())
 	require.Equal(t, expected, adjusted)
 }
 

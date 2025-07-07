@@ -58,7 +58,7 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 		ValUpdates:    nil,
 	}
 	if g != nil {
-		ret.setBlockGasLimit(g.MaxBlockGas())
+		ret.setBlockGasLimit(g.MaxBlockGasLimit())
 	}
 	return ret
 }
@@ -339,20 +339,19 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 }
 
 func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max int64) int64 {
-	if preBlockGasUsed == 0 {
-		return preBlockGasLimit
-	}
-
 	blockGasLimit := preBlockGasLimit
-	upperThreshold := blockGasLimit - (blockGasLimit / 10) // 90%
-	lowerThreshold := blockGasLimit / 100                  // 1%
-	if preBlockGasUsed > upperThreshold {
-		// increase gas limit
-		blockGasLimit = blockGasLimit + (blockGasLimit / 10) // increase 10%
 
-	} else if preBlockGasUsed < lowerThreshold {
-		// decrease gas limit
-		blockGasLimit = blockGasLimit - (blockGasLimit / 100) // decrease 1%
+	if preBlockGasUsed > 0 {
+		upperThreshold := blockGasLimit - (blockGasLimit / 10) // 90%
+		lowerThreshold := blockGasLimit / 100                  // 1%
+		if preBlockGasUsed > upperThreshold {
+			// increase gas limit
+			blockGasLimit = blockGasLimit + (blockGasLimit / 10) // increase 10%
+
+		} else if preBlockGasUsed < lowerThreshold {
+			// decrease gas limit
+			blockGasLimit = blockGasLimit - (blockGasLimit / 100) // decrease 1%
+		}
 	}
 
 	if blockGasLimit > max {
