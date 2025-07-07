@@ -178,20 +178,17 @@ func Test_Issue32(t *testing.T) {
 	require.NoError(t, err)
 
 	chStart := make(chan interface{})
-	var accts []*account2.Account
+	targetAddr := types.RandAddress()
+	accts := make([]*account2.Account, 10000)
 	wg := sync.WaitGroup{}
-	randAddr := types.RandAddress()
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		wg.Add(1)
-		go func() {
+		go func(idx int) {
 			<-chStart
-			defer func() {
-				require.Nil(t, recover())
-			}()
-			acct := ctrler.FindOrNewAccount(randAddr, true)
-			accts = append(accts, acct)
+			acct := ctrler.FindOrNewAccount(targetAddr, true)
+			accts[idx] = acct
 			wg.Done()
-		}()
+		}(i)
 	}
 	close(chStart)
 	wg.Wait()

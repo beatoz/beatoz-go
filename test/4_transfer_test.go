@@ -301,7 +301,7 @@ func TestTransfer_BulkSync(t *testing.T) {
 						//fmt.Println("query tx error", "txhash", hash, "error", err)
 						continue
 					}
-					require.Equal(t, xerrors.ErrCodeSuccess, resp.TxResult.Code)
+					require.Equal(t, xerrors.ErrCodeSuccess, resp.TxResult.Code, resp.TxResult.Log)
 				}
 			}
 		}

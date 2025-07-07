@@ -127,7 +127,11 @@ func initFiles(cmd *cobra.Command, args []string) error {
 	return InitFilesWith(rootConfig, initParams)
 }
 
-func InitFilesWith(config *cfg.Config, params *InitParams) error {
+func InitFilesWith(
+	config *cfg.Config,
+	params *InitParams,
+	callbacks ...func(*tmtypes.GenesisDoc),
+) error {
 	if err := params.Validate(); err != nil {
 		return err
 	}
@@ -201,6 +205,19 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 				return err
 			}
 		} else { // anything (e.g. loclanet)
+			//
+			// Initialize consensus parameters
+			consensusParams := &tmproto.ConsensusParams{
+				Block:    tmtypes.DefaultBlockParams(),
+				Evidence: tmtypes.DefaultEvidenceParams(),
+				Validator: tmproto.ValidatorParams{
+					PubKeyTypes: []string{tmtypes.ABCIPubKeyTypeSecp256k1},
+				},
+				Version: tmproto.VersionParams{
+					AppVersion: version.Major(),
+				},
+			}
+			consensusParams.Block.MaxGas = params.BlockGasLimit
 
 			defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
 			if err = tmos.EnsureDir(defaultWalkeyDirPath, acrypto.DefaultWalletKeyDirPerm); err != nil {
@@ -251,7 +268,7 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 			logger.Debug("GenesisAssetHolder", "holders count", len(holders))
 
 			//
-			// Create Governance Parameters at genesis
+			// Create Governance Parameters
 			blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
 			if err != nil {
 				return err
@@ -259,30 +276,27 @@ func InitFilesWith(config *cfg.Config, params *InitParams) error {
 			govParams := types.NewGovParams(int(blockInterval.Seconds()))
 			govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
 
-			consensusParams := &tmproto.ConsensusParams{
-				Block:    tmtypes.DefaultBlockParams(),
-				Evidence: tmtypes.DefaultEvidenceParams(),
-				Validator: tmproto.ValidatorParams{
-					PubKeyTypes: []string{tmtypes.ABCIPubKeyTypeSecp256k1},
-				},
-				Version: tmproto.VersionParams{
-					AppVersion: version.Major(),
-				},
+			appState := &genesis.GenesisAppState{
+				AssetHolders: holders,
+				GovParams:    govParams,
 			}
-			consensusParams.Block.MaxGas = params.BlockGasLimit
+
+			//
+			// Create genesis
 			genDoc, err = genesis.NewGenesisDoc(
 				params.ChainID,
 				consensusParams,
 				valset,
-				&genesis.GenesisAppState{
-					AssetHolders: holders,
-					GovParams:    govParams,
-				},
+				appState,
 			)
 			if err != nil {
 				return err
 			}
 		}
+		for _, cb := range callbacks {
+			cb(genDoc)
+		}
+
 		if err := genDoc.SaveAs(genFile); err != nil {
 			return err
 		}

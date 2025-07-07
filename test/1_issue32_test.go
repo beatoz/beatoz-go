@@ -48,7 +48,7 @@ func TestIssue32(t *testing.T) {
 		//toAddr := event.Events["tx.receiver"][0]
 		//fmt.Println("event", "from", fromAddr, "to", toAddr, "height", eventData.Height, "txhash", txHash, "code", eventData.TxResult.Result.Code)
 
-		require.Equal(t, xerrors.ErrCodeSuccess, eventData.TxResult.Result.Code)
+		require.Equal(t, xerrors.ErrCodeSuccess, eventData.TxResult.Result.Code, eventData.TxResult.Result.Log)
 
 		wg.Done()
 	})

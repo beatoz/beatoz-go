@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/beatoz/beatoz-go/cmd/commands"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/node"
 	beatozweb3 "github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/containerd/continuity/fs"
@@ -13,6 +15,7 @@ import (
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmnode "github.com/tendermint/tendermint/node"
+	"github.com/tendermint/tendermint/types"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -102,8 +105,12 @@ func (peer *PeerMock) Init(valCnt int) error {
 	initParams.InitTotalSupply = int64(100_000_000*500 + 1_000_000*valCnt)
 	initParams.MaxTotalSupply = int64(100_000_000*500 + 1_000_000*valCnt*2)
 	initParams.AssumedBlockInterval = "1s"
-	initParams.InflationCycleBlocks = 10
-	return commands.InitFilesWith(peer.Config, initParams)
+	return commands.InitFilesWith(peer.Config, initParams, func(genDoc *types.GenesisDoc) {
+		appState := &genesis.GenesisAppState{}
+		_ = jsonx.Unmarshal(genDoc.AppState, appState)
+		appState.GovParams.GetValues().InflationCycleBlocks = 10
+		genDoc.AppState, _ = jsonx.Marshal(appState)
+	})
 }
 
 func (peer *PeerMock) Start() error {
