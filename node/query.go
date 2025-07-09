@@ -63,7 +63,7 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 				return ctrler.govCtrler.MinValidatorPower()
 			},
 		)
-	case "reward":
+	case "reward", "total_supply":
 		response.Value, xerr = ctrler.supplyCtrler.Query(req)
 	case "proposal", "gov_params":
 		response.Value, xerr = ctrler.govCtrler.Query(req)

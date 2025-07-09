@@ -69,6 +69,16 @@ func QueryReward(ctx *tmrpctypes.Context, addr abytes.HexBytes, heightPtr *int64
 	}
 }
 
+func QueryTotalSupply(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
 	height := parseHeight(heightPtr)
 	path := parsePath(ctx)
