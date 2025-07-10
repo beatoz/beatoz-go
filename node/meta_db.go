@@ -19,7 +19,7 @@ type MetaDB struct {
 	db tmdb.DB
 
 	txn        uint64
-	txFeeTotal *uint256.Int
+	totalTxFee *uint256.Int
 
 	mtx sync.RWMutex
 }
@@ -44,7 +44,7 @@ func OpenMetaDB(name, dir string) (*MetaDB, error) {
 	return &MetaDB{
 		db:         db,
 		txn:        txn,
-		txFeeTotal: txFeeTotal,
+		totalTxFee: txFeeTotal,
 	}, nil
 }
 
@@ -102,21 +102,21 @@ func (stdb *MetaDB) PutTxn(n uint64) error {
 	return nil
 }
 
-func (stdb *MetaDB) TxFeeTotal() *uint256.Int {
+func (stdb *MetaDB) TotalTxFee() *uint256.Int {
 	stdb.mtx.RLock()
 	defer stdb.mtx.RUnlock()
 
-	return stdb.txFeeTotal.Clone()
+	return stdb.totalTxFee.Clone()
 }
 
-func (stdb *MetaDB) PutTxFeeTotal(f *uint256.Int) error {
+func (stdb *MetaDB) PutTotalTxFee(f *uint256.Int) error {
 	stdb.mtx.Lock()
 	defer stdb.mtx.Unlock()
 
 	if err := stdb.put(keyTxFee, f.Bytes()); err != nil {
 		return err
 	}
-	stdb.txFeeTotal = f.Clone()
+	stdb.totalTxFee = f.Clone()
 	return nil
 }
 

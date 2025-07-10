@@ -748,8 +748,8 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 			_ = ctrler.metaDB.PutTxn(txn)
 		}
 		if ctrler.lastBlockCtx.SumFee().Sign() > 0 {
-			feeTotal := new(uint256.Int).Add(ctrler.metaDB.TxFeeTotal(), ctrler.lastBlockCtx.SumFee())
-			_ = ctrler.metaDB.PutTxFeeTotal(feeTotal)
+			feeTotal := new(uint256.Int).Add(ctrler.metaDB.TotalTxFee(), ctrler.lastBlockCtx.SumFee())
+			_ = ctrler.metaDB.PutTotalTxFee(feeTotal)
 		}
 	}
 
