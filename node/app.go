@@ -733,22 +733,25 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := hasher.Sum(nil)
 
-	if ctrler.rootConfig.RPC.ListenAddress != "" {
-		_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
-		txn := ctrler.metaDB.Txn() + uint64(ctrler.currBlockCtx.TxsCnt())
-		_ = ctrler.metaDB.PutTxn(txn)
-		feeTotal := new(uint256.Int).Add(ctrler.metaDB.TxFeeTotal(), ctrler.currBlockCtx.SumFee())
-		_ = ctrler.metaDB.PutTxFeeTotal(feeTotal)
-	}
-
 	ctrler.currBlockCtx.SetAppHash(appHash)
 	ctrler.logger.Debug("Finish BeatozApp Commit",
 		"height", ver0,
 		"txs", ctrler.currBlockCtx.TxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash())
-
+	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
+
+	if ctrler.rootConfig.RPC.ListenAddress != "" {
+		if ctrler.lastBlockCtx.TxsCnt() > 0 {
+			txn := ctrler.metaDB.Txn() + uint64(ctrler.lastBlockCtx.TxsCnt())
+			_ = ctrler.metaDB.PutTxn(txn)
+		}
+		if ctrler.lastBlockCtx.SumFee().Sign() > 0 {
+			feeTotal := new(uint256.Int).Add(ctrler.metaDB.TxFeeTotal(), ctrler.lastBlockCtx.SumFee())
+			_ = ctrler.metaDB.PutTxFeeTotal(feeTotal)
+		}
+	}
 
 	return abcitypes.ResponseCommit{
 		Data: appHash[:],

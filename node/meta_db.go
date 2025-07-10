@@ -32,12 +32,12 @@ func OpenMetaDB(name, dir string) (*MetaDB, error) {
 	}
 
 	txn := uint64(0)
-	if v, err := db.Get([]byte(keyTxn)); err != nil {
+	if v, err := db.Get([]byte(keyTxn)); v != nil && err == nil {
 		txn = binary.BigEndian.Uint64(v)
 	}
 
 	txFeeTotal := uint256.NewInt(0)
-	if v, err := db.Get([]byte(keyTxFee)); err != nil {
+	if v, err := db.Get([]byte(keyTxFee)); v != nil && err == nil {
 		_ = txFeeTotal.SetBytes(v)
 	}
 
@@ -113,7 +113,11 @@ func (stdb *MetaDB) PutTxFeeTotal(f *uint256.Int) error {
 	stdb.mtx.Lock()
 	defer stdb.mtx.Unlock()
 
-	return stdb.put(keyTxFee, f.Bytes())
+	if err := stdb.put(keyTxFee, f.Bytes()); err != nil {
+		return err
+	}
+	stdb.txFeeTotal = f.Clone()
+	return nil
 }
 
 func (stdb *MetaDB) get(k string) []byte {

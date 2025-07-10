@@ -24,6 +24,7 @@ func AddRoutes() {
 	tmrpccore.Routes["vm_call"] = tmrpccore_server.NewRPCFunc(QueryVM, "addr,to,height,data")
 	tmrpccore.Routes["vm_estimate_gas"] = tmrpccore_server.NewRPCFunc(QueryEstimateGas, "addr,to,height,data")
 	tmrpccore.Routes["txn"] = tmrpccore_server.NewRPCFunc(QueryTxn, "")
+	tmrpccore.Routes["tx_fee_total"] = tmrpccore_server.NewRPCFunc(QueryTxFeeTotal, "")
 
 	AddEthRoutes()
 }

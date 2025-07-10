@@ -73,6 +73,9 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 	case "txn":
 		txn := ctrler.metaDB.Txn()
 		response.Value, xerr = []byte(fmt.Sprintf("\"%d\"", txn)), nil
+	case "tx_fee_total":
+		feeTotal := ctrler.metaDB.TxFeeTotal()
+		response.Value, xerr = []byte(fmt.Sprintf("\"%d\"", feeTotal)), nil
 	default:
 		response.Value, xerr = nil, xerrors.ErrInvalidQueryPath
 	}
