@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/binary"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	tmdb "github.com/tendermint/tm-db"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 const (
 	keyBlockContext = "bc"
+	keyTxn          = "xn"
 )
 
 type MetaDB struct {
@@ -56,6 +58,20 @@ func (stdb *MetaDB) PutLastBlockContext(ctx *BlockContext) error {
 		return err
 	}
 	return stdb.put(keyBlockContext, bz)
+}
+
+func (stdb *MetaDB) Txn() uint64 {
+	bz := stdb.get(keyTxn)
+	if bz == nil {
+		return 0
+	}
+	return binary.BigEndian.Uint64(bz)
+}
+
+func (stdb *MetaDB) PutTxn(n uint64) error {
+	bz := make([]byte, 8)
+	binary.BigEndian.PutUint64(bz, uint64(n))
+	return stdb.put(keyTxn, bz)
 }
 
 func (stdb *MetaDB) putCache(k string, v []byte) {

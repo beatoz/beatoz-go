@@ -146,6 +146,15 @@ func QueryEstimateGas(
 	}
 }
 
+func QueryTxn(ctx *tmrpctypes.Context) (*QueryResult, error) {
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, 0, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func Subscribe(ctx *tmrpctypes.Context, query string) (*tmrpccoretypes.ResultSubscribe, error) {
 	// return error when the event subscription request is received over http session.
 	// related to: #103

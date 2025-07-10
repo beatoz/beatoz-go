@@ -2,6 +2,7 @@ package node
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -69,6 +70,9 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		response.Value, xerr = ctrler.govCtrler.Query(req)
 	case "vm_call", "vm_estimate_gas":
 		response.Value, xerr = ctrler.vmCtrler.Query(req)
+	case "txn":
+		txn := ctrler.metaDB.Txn()
+		response.Value, xerr = []byte(fmt.Sprintf("\"%d\"", txn)), nil
 	default:
 		response.Value, xerr = nil, xerrors.ErrInvalidQueryPath
 	}

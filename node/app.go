@@ -740,6 +740,8 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 		"appHash", ctrler.currBlockCtx.AppHash())
 
 	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
+	txn := ctrler.metaDB.Txn() + uint64(ctrler.currBlockCtx.TxsCnt())
+	_ = ctrler.metaDB.PutTxn(txn)
 
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
