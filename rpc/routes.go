@@ -12,6 +12,7 @@ func AddRoutes() {
 	tmrpccore.Routes["stakes/total_power"] = tmrpccore_server.NewRPCFunc(QueryStakes1, "height")
 	tmrpccore.Routes["stakes/voting_power"] = tmrpccore_server.NewRPCFunc(QueryStakes2, "height")
 	tmrpccore.Routes["reward"] = tmrpccore_server.NewRPCFunc(QueryReward, "addr,height")
+	tmrpccore.Routes["total_supply"] = tmrpccore_server.NewRPCFunc(QueryTotalSupply, "height")
 	tmrpccore.Routes["proposals"] = tmrpccore_server.NewRPCFunc(QueryProposal, "txhash,height")
 	tmrpccore.Routes["proposal"] = tmrpccore_server.NewRPCFunc(QueryProposal, "txhash,height")
 	tmrpccore.Routes["rule"] = tmrpccore_server.NewRPCFunc(QueryGovParams, "height")
@@ -22,6 +23,8 @@ func AddRoutes() {
 	tmrpccore.Routes["validators"] = tmrpccore_server.NewRPCFunc(Validators, "height,page,per_page")
 	tmrpccore.Routes["vm_call"] = tmrpccore_server.NewRPCFunc(QueryVM, "addr,to,height,data")
 	tmrpccore.Routes["vm_estimate_gas"] = tmrpccore_server.NewRPCFunc(QueryEstimateGas, "addr,to,height,data")
+	tmrpccore.Routes["txn"] = tmrpccore_server.NewRPCFunc(QueryTxn, "")
+	tmrpccore.Routes["tx_fee_total"] = tmrpccore_server.NewRPCFunc(QueryTxFeeTotal, "")
 
 	AddEthRoutes()
 }
