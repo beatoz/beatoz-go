@@ -37,7 +37,7 @@ type BeatozApp struct {
 	lastBlockCtx *ctrlertypes.BlockContext
 	currBlockCtx *ctrlertypes.BlockContext
 
-	metaDB       *ctrlertypes.MetaDB
+	metaDB       *MetaDB
 	acctCtrler   *account.AcctCtrler
 	govCtrler    *gov.GovCtrler
 	vpowCtrler   *vpower.VPowerCtrler
@@ -54,7 +54,7 @@ type BeatozApp struct {
 }
 
 func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
-	metaDB, err := ctrlertypes.OpenMetaDB("beatoz_app", config.DBDir())
+	metaDB, err := OpenMetaDB("beatoz_app", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
@@ -335,8 +335,8 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 		}
 		return abcitypes.ResponseCheckTx{
 			Code:      abcitypes.CodeTypeOK,
-			GasWanted: int64(tx.Gas),
-			GasUsed:   int64(tx.Gas),
+			GasWanted: tx.Gas,
+			GasUsed:   tx.Gas,
 		}
 	}
 	return abcitypes.ResponseCheckTx{Code: abcitypes.CodeTypeOK}
@@ -733,15 +733,19 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	appHash := hasher.Sum(nil)
 
+	if ctrler.rootConfig.RPC.ListenAddress != "" {
+		_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
+		txn := ctrler.metaDB.Txn() + uint64(ctrler.currBlockCtx.TxsCnt())
+		_ = ctrler.metaDB.PutTxn(txn)
+		feeTotal := new(uint256.Int).Add(ctrler.metaDB.TxFeeTotal(), ctrler.currBlockCtx.SumFee())
+		_ = ctrler.metaDB.PutTxFeeTotal(feeTotal)
+	}
+
 	ctrler.currBlockCtx.SetAppHash(appHash)
 	ctrler.logger.Debug("Finish BeatozApp Commit",
 		"height", ver0,
 		"txs", ctrler.currBlockCtx.TxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash())
-
-	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
-	txn := ctrler.metaDB.Txn() + uint64(ctrler.currBlockCtx.TxsCnt())
-	_ = ctrler.metaDB.PutTxn(txn)
 
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
