@@ -256,9 +256,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("CheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
-				Data: txctx.RetData, // in case of evm, there may be return data when tx is failed.
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				Data:      txctx.RetData, // in case of evm, there may be return data when tx is failed.
+				GasWanted: txctx.Tx.Gas,
 			}
 		}
 
@@ -287,8 +288,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr := xerrors.ErrCheckTx.Wrap(xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From))
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 
@@ -299,8 +301,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 
@@ -309,8 +312,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 
@@ -319,8 +323,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 		sender.AddNonce()
@@ -329,8 +334,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 		return abcitypes.ResponseCheckTx{
