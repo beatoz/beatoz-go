@@ -74,11 +74,21 @@ func (s *StateDBWrapper) Finish() {
 
 		acct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
 		acct.SetBalance(amt)
-		if codeSize > 0 && acct.Code == nil {
-			codeHash := s.StateDB.GetCodeHash(addr)
-			acct.SetCode(codeHash[:])
+		if codeSize > 0 {
+			if acct.Code == nil {
+				codeHash := s.StateDB.GetCodeHash(addr)
+				acct.SetCode(codeHash[:])
+			}
+			//
+			// If the contract has created another contract,
+			// the caller contract(`to` address in tx)'s nonce has been increased by EVM.
+			// So, in case of the contract, the updated nonce should be applied to the account ledger.
+			// Beatoz state machine does not handle the contract's nonce but only sender's nonce.
+			acct.SetNonce(int64(s.StateDB.GetNonce(addr)))
 		}
 		_ = s.acctHandler.SetAccount(acct, s.exec)
+
+		//s.logger.Debug("Finish", "addr", addr, "beatozAcct.nonde", acct.GetNonce(), "stateDB.nonde", s.StateDB.GetNonce(addr), "codeSize", codeSize)
 	}
 
 	// issue #68
