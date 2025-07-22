@@ -70,13 +70,15 @@ func (s *StateDBWrapper) Finish() {
 
 	for _, addr := range sortedKeys {
 		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
+		codeSize := s.StateDB.GetCodeSize(addr)
 
 		acct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
 		acct.SetBalance(amt)
-
+		if codeSize > 0 && acct.Code == nil {
+			codeHash := s.StateDB.GetCodeHash(addr)
+			acct.SetCode(codeHash[:])
+		}
 		_ = s.acctHandler.SetAccount(acct, s.exec)
-
-		s.logger.Debug("Finish", "address", acct.Address, "balance", acct.Balance.Dec())
 	}
 
 	// issue #68

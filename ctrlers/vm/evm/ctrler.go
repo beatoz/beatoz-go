@@ -234,13 +234,6 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		createdAddr := ethcrypto.CreateAddress(ctx.Tx.From.Array20(), uint64(ctx.Tx.Nonce))
 		ctrler.logger.Debug("Create contract", "address", createdAddr)
 
-		// Account.Code 에 현재 Tx(Contract 생성) 의 Hash 를 기록.
-		contAcct := ctx.AcctHandler.FindAccount(createdAddr[:], ctx.Exec)
-		contAcct.SetCode(ctx.TxHash)
-		if xerr := ctx.AcctHandler.SetAccount(contAcct, ctx.Exec); xerr != nil {
-			return xerr
-		}
-
 		// When creating a contract,
 		// the original evm returns deployed code (via evmResult.ReturnData),
 		// and `ctx.RetData` currently points to it.
