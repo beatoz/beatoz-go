@@ -12,6 +12,9 @@ func parseHeight(heightPtr *int64) int64 {
 	if heightPtr == nil {
 		return 0
 	}
+	if *heightPtr < 0 {
+		return 0
+	}
 	return *heightPtr
 }
 

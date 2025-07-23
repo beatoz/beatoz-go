@@ -79,6 +79,15 @@ func QueryTotalSupply(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, 
 	}
 }
 
+func QueryTotalTxFee(ctx *tmrpctypes.Context) (*QueryResult, error) {
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, 0, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func QueryProposal(ctx *tmrpctypes.Context, txhash abytes.HexBytes, heightPtr *int64) (*QueryResult, error) {
 	height := parseHeight(heightPtr)
 	path := parsePath(ctx)
@@ -147,15 +156,6 @@ func QueryEstimateGas(
 }
 
 func QueryTxn(ctx *tmrpctypes.Context) (*QueryResult, error) {
-	path := parsePath(ctx)
-	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, 0, false); err != nil {
-		return nil, err
-	} else {
-		return &QueryResult{resp.Response}, nil
-	}
-}
-
-func QueryTxFeeTotal(ctx *tmrpctypes.Context) (*QueryResult, error) {
 	path := parsePath(ctx)
 	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, 0, false); err != nil {
 		return nil, err

@@ -48,6 +48,15 @@ func Test_Fallback(t *testing.T) {
 	// deploy
 	// make transaction
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
+
+	// note: `acctHandler.walletsArr[0]` (the deployer account) has already created a contract with nonce 0 (contract#1).
+	// Since nonce updates are out of this test's scope, the deployer account's nonce remains 0.
+	// If the deployer account tries to create a new contract, the resulting address will be the same as that of contract#1.
+	// However, contract#1 already exists in `acctHandler` with nonce 1,
+	// so `ErrContractAddressCollision` will occur.
+	// To avoid this error scenario, we manually increment the deployer account's nonce
+	fromAcct.AddNonce()
+
 	toAcct := ctrlertypes.NewAccount(types.ZeroAddress())
 
 	// BeginBlock

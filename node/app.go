@@ -256,9 +256,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("CheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
-				Data: txctx.RetData, // in case of evm, there may be return data when tx is failed.
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				Data:      txctx.RetData, // in case of evm, there may be return data when tx is failed.
+				GasWanted: txctx.Tx.Gas,
 			}
 		}
 
@@ -287,8 +288,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr := xerrors.ErrCheckTx.Wrap(xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From))
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 
@@ -299,8 +301,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 
@@ -309,8 +312,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 
@@ -319,8 +323,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 		sender.AddNonce()
@@ -329,8 +334,9 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
 			ctrler.logger.Error("ReCheckTx", "error", xerr)
 			return abcitypes.ResponseCheckTx{
-				Code: xerr.Code(),
-				Log:  xerr.Error(),
+				Code:      xerr.Code(),
+				Log:       xerr.Error(),
+				GasWanted: tx.Gas,
 			}
 		}
 		return abcitypes.ResponseCheckTx{
@@ -581,7 +587,7 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 }
 
 func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	ctrler.logger.Debug("Begin BeatozApp::EndBlock",
+	ctrler.logger.Debug("BeatozApp::EndBlock",
 		"height", req.Height)
 
 	ctrler.mtx.Lock()
@@ -695,6 +701,7 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 			"ratio(%)", ctrler.currBlockCtx.GetBlockGasUsed()*100/ctrler.currBlockCtx.GetBlockGasLimit(),
 			"new", newBlockGasLimit)
 	}
+
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates:      ctrler.currBlockCtx.ValUpdates,
 		ConsensusParamUpdates: consensusParams,
@@ -706,7 +713,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("Try BeatozApp Commit", "height", ctrler.currBlockCtx.Height())
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.Height())
 
 	ver0 := int64(0)
 	hasher := crypto.DefaultHasher()
@@ -734,7 +741,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	appHash := hasher.Sum(nil)
 
 	ctrler.currBlockCtx.SetAppHash(appHash)
-	ctrler.logger.Debug("Finish BeatozApp Commit",
+	ctrler.logger.Debug("Finish BeatozApp::Commit",
 		"height", ver0,
 		"txs", ctrler.currBlockCtx.TxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash())
@@ -748,8 +755,8 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 			_ = ctrler.metaDB.PutTxn(txn)
 		}
 		if ctrler.lastBlockCtx.SumFee().Sign() > 0 {
-			feeTotal := new(uint256.Int).Add(ctrler.metaDB.TxFeeTotal(), ctrler.lastBlockCtx.SumFee())
-			_ = ctrler.metaDB.PutTxFeeTotal(feeTotal)
+			feeTotal := new(uint256.Int).Add(ctrler.metaDB.TotalTxFee(), ctrler.lastBlockCtx.SumFee())
+			_ = ctrler.metaDB.PutTotalTxFee(feeTotal)
 		}
 	}
 

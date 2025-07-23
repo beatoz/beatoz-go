@@ -73,6 +73,7 @@ func (ledger *MemLedger) findRawBytes(key LedgerKey) ([]byte, xerrors.XError) {
 	}
 
 	if bz == nil {
+		ledger.logger.Debug("MemLedger.immuTree.Get returns nil", "key", key)
 		return nil, xerrors.ErrNotFoundResult
 	}
 	return bz, nil
@@ -107,7 +108,7 @@ func (ledger *MemLedger) Iterate(cb FuncIterate) xerrors.XError {
 
 		return nil
 	}
-
+	ledger.logger.Debug("MemLedger.immuTree in Iterate is nil")
 	return xerrors.ErrNotFoundResult
 }
 
@@ -116,6 +117,7 @@ func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb FuncIterate) xer
 	defer ledger.mtx.RUnlock()
 
 	if ledger.immuTree == nil {
+		ledger.logger.Debug("MemLedger.immuTree is nil in Seek", "prefix", prefix, "ascending", ascending)
 		return xerrors.ErrNotFoundResult
 	}
 

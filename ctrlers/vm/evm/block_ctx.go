@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/holiman/uint256"
+	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	"math/big"
 )
 
@@ -15,7 +16,15 @@ var (
 )
 
 func GetHash(h uint64) common.Hash {
-	return common.Hash{}
+	var blockHash common.Hash
+
+	height := int64(h)
+	retBlock, err := tmrpccore.Block(nil, &height)
+	if err != nil {
+		return blockHash // zero hash
+	}
+	blockHash.SetBytes(retBlock.BlockID.Hash)
+	return blockHash
 }
 
 func evmBlockContext(coinbase common.Address, bn int64, tm int64, gasLimit int64) vm.BlockContext {

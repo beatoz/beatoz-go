@@ -114,13 +114,16 @@ func (peer *PeerMock) Init(valCnt int) error {
 }
 
 func (peer *PeerMock) Start() error {
-	logger := tmlog.NewNopLogger()
+	var err error
 
-	logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-	if peer.Config.LogFormat == "json" {
-		logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
+	logger := tmlog.NewNopLogger()
+	if peer.Config.LogLevel != "" {
+		logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
+		if peer.Config.LogFormat == "json" {
+			logger = tmlog.NewTMJSONLogger(tmlog.NewSyncWriter(os.Stdout))
+		}
+		logger, _ = tmflags.ParseLogLevel(peer.Config.LogLevel, logger, tmcfg.DefaultLogLevel)
 	}
-	logger, err := tmflags.ParseLogLevel(peer.Config.LogLevel, logger, tmcfg.DefaultLogLevel)
 
 	peer.Config.RPC.MaxSubscriptionClients = 501
 	peer.Config.RPC.MaxSubscriptionsPerClient = 100
@@ -179,12 +182,12 @@ func randBeatozWeb3() *beatozweb3.BeatozWeb3 {
 
 func runPeers(n int) {
 	for i := 0; i < n; i++ {
-		ll := "*:error"
+		ll := "" //"*:error"
 
 		if i == 1 {
-			//// change log level only on the first peer.
-			//ll = "beatoz:debug,*:error"
-			//ll = "*:info"
+			// change log level only on the first peer.
+			//ll = "beatoz:debug,beatoz_VPowerCtrler:debug,*:error"
+			ll = "*:error"
 		}
 		_peer := NewPeerMock("beatoz_test_chain", i, 46656+i, 36657+i, ll)
 		if err := _peer.Init(1); err != nil { // with only one validator

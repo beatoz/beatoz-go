@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/beatoz/beatoz-go/libs/jsonx"
 	rtypes0 "github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -158,14 +159,15 @@ func TestMinDelegatorPower(t *testing.T) {
 func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	bzweb3 := randBeatozWeb3()
 
-	govParams, err := bzweb3.GetGovParams()
+	govParams, err := bzweb3.QueryGovParams()
 	require.NoError(t, err)
 
 	valWal := peers[0].PrivValWallet()
 	valStakes, err := bzweb3.QueryDelegatee(valWal.Address())
 	require.NoError(t, err)
 
-	fmt.Println(valStakes)
+	json, _ := jsonx.MarshalIndent(valStakes, "", "  ")
+	fmt.Println(string(json))
 
 	delegator := randCommonWallet()
 	require.NoError(t, delegator.Unlock(defaultRpcNode.Pass))
@@ -176,6 +178,11 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	maxAllowedPower := valStakes.SelfPower * int64(100) / int64(govParams.MinSelfPowerRate())
 	maxAllowedPower = maxAllowedPower - valStakes.TotalPower
 	maxAllowedAmt := rtypes0.PowerToAmount(maxAllowedPower)
+
+	fmt.Println("MinSelfPowerRate", govParams.MinSelfPowerRate())
+	fmt.Println("maxAllowedPower", maxAllowedPower)
+	fmt.Println("maxAllowedPower", maxAllowedPower)
+	fmt.Println("maxAllowedAmt", maxAllowedAmt.Dec())
 
 	// at now, peers[0] has maximum power.
 	ret, err := delegator.StakingSync(valWal.Address(), defGas, defGasPrice, maxAllowedAmt, bzweb3)
