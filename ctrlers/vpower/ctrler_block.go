@@ -5,6 +5,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/crypto/encoding"
 	"strconv"
 )
 
@@ -66,11 +67,15 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				ctrler.logger.Info("Validator stop",
 					"address", types.Address(vote.Validator.Address),
 					"power", vote.Validator.Power,
-					"missed_blocks", missedCnt)
+					"missed_blocks", missedCnt, "allowedDownCnt", allowedDownCnt)
 
 				refundHeight := bctx.Height() + bctx.GovHandler.LazyUnbondingBlocks()
 
 				dgtee, xerr := ctrler.readDelegatee(vote.Validator.Address, true)
+				if xerr != nil && xerr.Contains(xerrors.ErrNotFoundResult) {
+					ctrler.logger.Debug("Validator is not found (maybe already removed)", "address", types.Address(vote.Validator.Address))
+					continue
+				}
 				if xerr != nil {
 					return nil, xerr
 				}
@@ -104,7 +109,6 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 		totalPower += v.SumPower
 	}
 	ctrler.vpowLimiter.Reset(totalPower, bctx.GovHandler.MaxUpdatablePowerRate())
-
 	return evts, nil
 }
 
@@ -140,6 +144,16 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	bctx.SetValUpdates(newValUps)
 	ctrler.lastValidators = newValidators
 
+	if len(newValUps) > 0 {
+		for _, val := range newValUps {
+			if puk, err := encoding.PubKeyFromProto(val.PubKey); err == nil {
+				ctrler.logger.Debug("Validator is updated", "address", puk.Address(), "power", val.Power)
+			}
+		}
+		for _, val := range newValidators {
+			ctrler.logger.Debug("Selected validators", "address", val.Address(), "power", val.SumPower)
+		}
+	}
 	return nil, nil
 }
 
