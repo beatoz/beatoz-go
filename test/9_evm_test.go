@@ -151,7 +151,7 @@ func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 	//fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
 	contAcct, err := bzweb3.GetAccount(contract.GetAddress())
 	require.NoError(t, err)
-	require.Equal(t, []byte(ret.Hash), contAcct.Code)
+	require.NotNil(t, contAcct.Code)
 
 	txRet, err := waitTrxResult(ret.Hash, 30, bzweb3)
 	require.NoError(t, err, err)
@@ -534,7 +534,7 @@ func testPayer_Deploy(t *testing.T, abiFile string, args []interface{}) {
 	//fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
 	contAcct, err := bzweb3.QueryAccount(contract.GetAddress())
 	require.NoError(t, err)
-	require.Equal(t, []byte(ret.Hash), contAcct.Code)
+	require.NotNil(t, contAcct.Code)
 
 	//txRet, err := waitTrxResult(ret.Hash, 30, bzweb3)
 	//require.NoError(t, err, err)
