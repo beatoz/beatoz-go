@@ -587,7 +587,7 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 }
 
 func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	ctrler.logger.Debug("Begin BeatozApp::EndBlock",
+	ctrler.logger.Debug("BeatozApp::EndBlock",
 		"height", req.Height)
 
 	ctrler.mtx.Lock()
@@ -701,6 +701,7 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 			"ratio(%)", ctrler.currBlockCtx.GetBlockGasUsed()*100/ctrler.currBlockCtx.GetBlockGasLimit(),
 			"new", newBlockGasLimit)
 	}
+
 	return abcitypes.ResponseEndBlock{
 		ValidatorUpdates:      ctrler.currBlockCtx.ValUpdates,
 		ConsensusParamUpdates: consensusParams,
@@ -712,7 +713,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("Try BeatozApp Commit", "height", ctrler.currBlockCtx.Height())
+	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.Height())
 
 	ver0 := int64(0)
 	hasher := crypto.DefaultHasher()
@@ -740,7 +741,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	appHash := hasher.Sum(nil)
 
 	ctrler.currBlockCtx.SetAppHash(appHash)
-	ctrler.logger.Debug("Finish BeatozApp Commit",
+	ctrler.logger.Debug("Finish BeatozApp::Commit",
 		"height", ver0,
 		"txs", ctrler.currBlockCtx.TxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash())

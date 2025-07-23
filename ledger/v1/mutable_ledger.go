@@ -2,6 +2,7 @@ package v1
 
 import (
 	"bytes"
+	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	dbm "github.com/cosmos/iavl/db"
@@ -67,6 +68,7 @@ func (ledger *MutableLedger) get(key LedgerKey) (ILedgerItem, xerrors.XError) {
 	if bz, err := ledger.tree.Get(key); err != nil {
 		return nil, xerrors.From(err)
 	} else if bz == nil {
+		ledger.logger.Debug("MutableLedger.tree.Get returns nil", "key", bytes2.HexBytes(key))
 		return nil, xerrors.ErrNotFoundResult
 	} else {
 		item := ledger.newItemFor(key)
