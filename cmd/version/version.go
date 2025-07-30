@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	FMT_VERSTR      = "v%v.%v.%v-%x@%s"
+	FMT_VERSTR      = "v%v.%v.%v-%07x@%s"
 	MASK_MAJOR_VER  = uint64(0xFF00000000000000)
 	MASK_MINOR_VER  = uint64(0x00FF000000000000)
 	MASK_PATCH_VER  = uint64(0x0000FFFF00000000)
