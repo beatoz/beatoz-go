@@ -38,7 +38,6 @@ func fxnumScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripening
 			w_riging := _tau.Mul(fxnum.FromInt(dur)).Div(_ripeningCycle).Add(_keppa).Mul(fxnum.FromInt(pc.Power))
 			_risingPower = _risingPower.Add(w_riging)
 		}
-		//fmt.Println("fxnumScaledPowerChunks", "power", pc.Power, "height", pc.Height, "dur", dur)
 	}
 
 	return _risingPower.Add(fxnum.FromInt(maturedPower))

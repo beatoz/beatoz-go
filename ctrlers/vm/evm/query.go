@@ -27,11 +27,6 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 		height = ctrler.lastBlockHeight
 	}
 
-	//_, err := tmrpccore.Block(nil, &height)
-	//if err != nil {
-	//	return nil, xerrors.From(err)
-	//}
-
 	execRet, xerr := ctrler.callVM(from, to, data, height, time.Now().Unix())
 	if xerr != nil {
 		return nil, xerr

@@ -36,7 +36,6 @@ func decimalScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 			decW = decW.Add(_keppa).Mul(decimal.NewFromInt(pc.Power))
 			risingPower = risingPower.Add(decW) // risingPower += decW
 		}
-		//fmt.Println("decimalScaledPowerChunks", "power", pc.Power, "height", pc.Height, "dur", dur)
 	}
 
 	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))

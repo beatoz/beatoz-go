@@ -58,7 +58,7 @@ func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to type
 func (s *StateDBWrapper) Finish() {
 	// NOTE: Keep the order of addresses.
 	// The acctHandler.SetAccount updates the ledger of account controller.
-	// And the updates must be run in the same key(`common.Address`) order.
+	// And the updates must be run in the same order of keys(`common.Address`) in all peers.
 	var sortedKeys []common.Address
 	for k, _ := range s.accessedObjAddrs {
 		sortedKeys = append(sortedKeys, k)
@@ -81,7 +81,7 @@ func (s *StateDBWrapper) Finish() {
 			}
 			//
 			// If the contract has created another contract,
-			// the caller contract(`to` address in tx)'s nonce has been increased by EVM.
+			// the contract(`to` address in the origin tx)'s nonce has been increased by EVM.
 			// So, in case of the contract, the updated nonce should be applied to the account ledger.
 			// Beatoz state machine does not handle the contract's nonce but only sender's nonce.
 			acct.SetNonce(int64(s.StateDB.GetNonce(addr)))

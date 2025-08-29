@@ -73,20 +73,6 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 
 	var weightInfo *fxnumWeight
 
-	//{
-	//	weightInfo = NewWeight()
-	//	start := time.Now()
-	//	for _, addr := range benefAddrs {
-	//		benefPowChunks := mapBenefPowChunks[addr.String()]
-	//		benefW := fxnumWeightOfPowerChunks(
-	//			benefPowChunks.pcs,
-	//			height, ripeningBlocks, tau, baseSupply)
-	//		weightInfo.Add(addr, benefW, benefPowChunks.signW, benefPowChunks.val)
-	//	}
-	//	since := time.Since(start)
-	//	fmt.Println("time1", since)
-	//}
-
 	{
 		weightInfo = NewWeight()
 

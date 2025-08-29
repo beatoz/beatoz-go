@@ -1,14 +1,15 @@
 package proposal
 
 import (
+	"sort"
+	"sync"
+
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"google.golang.org/protobuf/proto"
-	"sort"
-	"sync"
 )
 
 type GovProposal struct {
@@ -134,7 +135,7 @@ func (prop *GovProposal) doVote(voter *VoterProto, choice int32) {
 	if choice >= 0 {
 		opt := prop.v.Options[choice]
 		if opt == nil {
-			return //xerrors.NewOrdinary("not found option")
+			return
 		}
 
 		opt.DoVote(voter.Power)

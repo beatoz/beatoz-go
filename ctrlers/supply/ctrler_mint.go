@@ -2,6 +2,7 @@ package supply
 
 import (
 	"fmt"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/fxnum"
 	btztypes "github.com/beatoz/beatoz-go/types"
@@ -97,8 +98,8 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		}
 
 		valRate := decimal.NewFromInt(int64(bctx.GovHandler.ValidatorRewardRate())).Div(decimal.NewFromInt(100))
-		waAll := retWeight.SumWeight()  //.Truncate(precision) // is too expensive
-		waVals := retWeight.ValWeight() //.Truncate(precision)
+		waAll := retWeight.SumWeight()
+		waVals := retWeight.ValWeight()
 
 		addedSupply := Sd(
 			heightYears(bctx.Height(), bctx.GovHandler.AssumedBlockInterval()),
@@ -128,7 +129,6 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 			remainder := decimal.Zero
 
 			for i, benef := range beneficiaries {
-				//.Truncate(precision) // Truncate is too expensive.
 				decWi, _ := benef.Weight().ToDecimal()
 
 				// for all delegators

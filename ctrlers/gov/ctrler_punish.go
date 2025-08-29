@@ -15,17 +15,6 @@ func (ctrler *GovCtrler) doSlash(targetAddr types.Address) (int64, xerrors.XErro
 	defer func() {
 		for _, prop := range updatedProp {
 			_ = ctrler.govState.Set(v1.LedgerKeyProposal(prop.Header().TxHash), prop, true)
-			//fmt.Println("punishment", "txhash", prop.TxHash, "total.power", prop.TotalVotingPower, "majore.power", prop.MajorityPower)
-			//for _, voter := range prop.Voters {
-			//	fmt.Println("voter", voter.Addr, "power", voter.Power)
-			//}
-
-			//d, _ := ctrler.govState.Get(v1.LedgerKeyProposal(prop.TxHash), true)
-			//prop2, _ := d.(*proposal.GovProposal)
-			//fmt.Println("read", "txhash", prop2.TxHash, "total.power", prop2.TotalVotingPower, "majore.power", prop2.MajorityPower)
-			//for _, voter := range prop2.Voters {
-			//fmt.Println("read voter", voter.Addr, "power", voter.Power)
-			//}
 		}
 	}()
 

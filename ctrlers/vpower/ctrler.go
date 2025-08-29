@@ -4,6 +4,10 @@ import (
 	bytes2 "bytes"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
+	"sync"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
@@ -13,9 +17,6 @@ import (
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math"
-	"strconv"
-	"sync"
 )
 
 type VPowerCtrler struct {
@@ -241,10 +242,6 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		pc := vpow.findPowerChunk(txhash)
 		if pc == nil {
-			//fmt.Printf("-------------------------------f:%x, t:%x, h:%x\n", vpow.From, vpow.to, txhash)
-			//for i, _pc := range vpow.PowerChunks {
-			//	fmt.Printf("-------------------------------[%d] %x\n", i, _pc.TxHash)
-			//}
 			return xerrors.ErrNotFoundStake
 		}
 

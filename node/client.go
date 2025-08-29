@@ -127,20 +127,6 @@ func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverT
 	return nil
 }
 
-/*
-Original DeliverTxAsync
-func (client *beatozLocalClient) DeliverTxAsync(params abcitypes.RequestDeliverTx) *abcicli.ReqRes {
-	client.mtx.Lock()
-	defer client.mtx.Unlock()
-
-	res := client.Application.DeliverTx(params)
-	return client.callback(
-		abcitypes.ToRequestDeliverTx(params),
-		abcitypes.ToResponseDeliverTx(res),
-	)
-}
-*/
-
 func (client *beatozLocalClient) CheckTxAsync(req abcitypes.RequestCheckTx) *abcicli.ReqRes {
 	client.mtx.Lock()
 	defer client.mtx.Unlock()
