@@ -38,8 +38,8 @@ func decimalScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 		}
 	}
 
-	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
-	return decWightedPower
+	decWeightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+	return decWeightedPower
 }
 
 func decimalScaledPowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
@@ -174,10 +174,10 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, baseSupply *uint
 		}
 	}
 
-	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+	decWeightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
 	decBaseSupply := decimal.NewFromBigInt(baseSupply.ToBig(), -1*int32(types.DECIMAL))
 
-	q, _ := decWightedPower.QuoRem(decBaseSupply, getDivisionPrecision())
+	q, _ := decWeightedPower.QuoRem(decBaseSupply, getDivisionPrecision())
 	return q
 }
 
