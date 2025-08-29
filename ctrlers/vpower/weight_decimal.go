@@ -89,7 +89,7 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, baseSupply decimal
 }
 
 func oldWi(pow, vdur, ripeningCycle int64, tau int32, baseSupply decimal.Decimal) decimal.Decimal {
-	if vdur == 0 {
+	if vdur <= 0 {
 		return decimal.Zero
 	}
 
@@ -110,7 +110,7 @@ func oldWi(pow, vdur, ripeningCycle int64, tau int32, baseSupply decimal.Decimal
 // Wi calculates the voting power weight `W_i` of a validator and delegator like the below.
 // `W_i = (tau * min(StakeDurationInSecond/RipeningCycle, 1) + keppa) * Stake_i / S_i`
 func Wi(pow, vdur, ripeningCycle int64, tau int32, baseSupply decimal.Decimal) decimal.Decimal {
-	if vdur == 0 {
+	if vdur <= 0 {
 		return decimal.Zero
 	}
 
