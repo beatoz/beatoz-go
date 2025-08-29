@@ -24,7 +24,7 @@ func (ctrler *GovCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 		}
 
 		txhash := req.Data
-		if txhash == nil || len(txhash) == 0 {
+		if len(txhash) == 0 {
 			var readProposals []*_response
 			if xerr := atledger.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
 				prop, _ := item.(*proposal.GovProposal)
