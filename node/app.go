@@ -2,6 +2,10 @@ package node
 
 import (
 	"fmt"
+	"strconv"
+	"sync"
+	"time"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/cmd/version"
 	"github.com/beatoz/beatoz-go/ctrlers/account"
@@ -24,9 +28,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
-	"strconv"
-	"sync"
-	"time"
 )
 
 var _ abcitypes.Application = (*BeatozApp)(nil)
@@ -111,6 +112,12 @@ func (ctrler *BeatozApp) Stop() error {
 		return err
 	}
 	if err := ctrler.govCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.vpowCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.supplyCtrler.Close(); err != nil {
 		return err
 	}
 	if err := ctrler.vmCtrler.Close(); err != nil {
