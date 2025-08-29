@@ -2,6 +2,7 @@ package vpower
 
 import (
 	"encoding/binary"
+
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
@@ -115,7 +116,6 @@ func (ctrler *VPowerCtrler) freezePowerChunk(from types.Address, pc *PowerChunkP
 		return xerr
 	}
 	if item == nil {
-		// xerr is xerrors.ErrNotFoundResult
 		item = newFrozenVPower(0)
 	}
 
@@ -134,7 +134,6 @@ func (ctrler *VPowerCtrler) freezePowerChunkList(from types.Address, pcs []*Powe
 		return xerr
 	}
 	if item == nil {
-		// xerr is xerrors.ErrNotFoundResult
 		item = newFrozenVPower(0)
 	}
 	frozen, _ := item.(*FrozenVPower)

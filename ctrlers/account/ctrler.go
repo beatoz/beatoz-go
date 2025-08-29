@@ -1,6 +1,8 @@
 package account
 
 import (
+	"sync"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
@@ -10,7 +12,6 @@ import (
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"sync"
 )
 
 type AcctCtrler struct {
@@ -146,7 +147,6 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *btztypes.A
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *btztypes.Account {
 	if acct, xerr := ctrler.acctState.Get(v1.LedgerKeyAccount(addr), exec); xerr != nil {
-		//ctrler.logger.Debug("AcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
 		return acct.(*btztypes.Account)
@@ -366,7 +366,6 @@ func (memCtrler *SimuAcctCtrler) FindAccount(addr types.Address, exec bool) *btz
 
 func (memCtrler *SimuAcctCtrler) findAccount(addr types.Address) *btztypes.Account {
 	if acct, xerr := memCtrler.simuLedger.Get(v1.LedgerKeyAccount(addr)); xerr != nil {
-		//memCtrler.logger.Debug("SimuAcctCtrler - not found account", "address", addr, "error", xerr)
 		return nil
 	} else {
 		return acct.(*btztypes.Account)

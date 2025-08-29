@@ -2,6 +2,8 @@ package vpower
 
 import (
 	"fmt"
+	"sort"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs"
@@ -10,7 +12,6 @@ import (
 	btztypes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"sort"
 )
 
 func (ctrler *VPowerCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
@@ -37,8 +38,7 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 		To          types.Address     `json:"to"`
 		TxHash      btztypes.HexBytes `json:"txhash"`
 		StartHeight int64             `json:"startHeight,string"`
-		//RefundHeight int64           `json:"refundHeight,string"`
-		Power int64 `json:"power,string"`
+		Power       int64             `json:"power,string"`
 	}
 	var ret []*respStake
 
@@ -77,8 +77,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 		To          types.Address     `json:"to"`
 		TxHash      btztypes.HexBytes `json:"txhash"`
 		StartHeight int64             `json:"startHeight,string"`
-		//RefundHeight int64           `json:"refundHeight,string"`
-		Power int64 `json:"power,string"`
+		Power       int64             `json:"power,string"`
 	}
 
 	type respDelegatee struct {

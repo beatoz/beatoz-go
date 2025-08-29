@@ -118,7 +118,7 @@ STOP:
 	for {
 		select {
 		case param := <-chReqParams:
-			_txctx, _resp := param.onPrepare(param.req, param.idx) //.paramapp.(*BeatozApp).asyncPrepareTrxContext(param.req, param.idx)
+			_txctx, _resp := param.onPrepare(param.req, param.idx)
 			param.onCompleted(&resultValue{param.idx, param.req, _resp, _txctx})
 		case <-done:
 			break STOP

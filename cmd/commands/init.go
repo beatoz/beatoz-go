@@ -2,6 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/cmd/version"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
@@ -14,10 +19,6 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 var (
@@ -156,7 +157,6 @@ func InitFilesWith(
 			pv = acrypto.LoadSFilePV(_keyFilePath, _keyStateFilePath, params.ValSecret)
 			logger.Info("Found private validator", "keyFile", _keyFilePath,
 				"stateFile", _keyStateFilePath)
-			//pv.SaveWith(secret) // encrypt with new driven key.
 		} else {
 			pv = acrypto.GenSFilePV(_keyFilePath, _keyStateFilePath)
 			pv.SaveWith(params.ValSecret)

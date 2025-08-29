@@ -3,14 +3,15 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
+	"sort"
+	"sync"
+
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"google.golang.org/protobuf/proto"
-	"sort"
-	"sync"
 )
 
 const (
@@ -192,13 +193,6 @@ func (acct *Account) GetCode() []byte {
 func (acct *Account) Type() int16 {
 	return types.ACCT_COMMON_TYPE
 }
-
-//func (acct *Account) Key() v1.LedgerKey {
-//	acct.mtx.RLock()
-//	acct.mtx.RUnlock()
-//
-//	return acct.Address
-//}
 
 func (acct *Account) Encode() ([]byte, xerrors.XError) {
 	if bz, err := proto.Marshal(&AcctProto{
