@@ -117,7 +117,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 	dgtors := make([]types.Address, len(dgtee.Delegators))
 	var stakes []*respStake
 	for i, _addr := range dgtee.Delegators {
-		dgtors[i] = addr
+		dgtors[i] = _addr
 
 		item, xerr = atledger.Get(v1.LedgerKeyVPower(_addr, dgtee.addr))
 		if xerr != nil {
