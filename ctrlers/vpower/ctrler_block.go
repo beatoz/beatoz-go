@@ -110,6 +110,9 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 }
 
 func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	// Reset vpowLimiter
 	ctrler.vpowLimiter.Reset(ctrler.sumPowerOfValidators(), bctx.GovHandler.MaxUpdatablePowerRate())
 

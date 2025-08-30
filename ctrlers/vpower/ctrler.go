@@ -375,6 +375,17 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 	return nil
 }
 
+func (ctrler *VPowerCtrler) CopyLastValidators() []*Delegatee {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	ret := make([]*Delegatee, len(ctrler.lastValidators))
+	for i, v := range ctrler.lastValidators {
+		ret[i] = v.Clone()
+	}
+	return ret
+}
+
 func (ctrler *VPowerCtrler) Validators() ([]*abcitypes.Validator, int64) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()

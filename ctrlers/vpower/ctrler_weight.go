@@ -29,7 +29,8 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 		return nil, xerr
 	}
 
-	for _, val := range ctrler.lastValidators {
+	lastValidators := ctrler.CopyLastValidators()
+	for _, val := range lastValidators {
 
 		// NOTE: Consider caching the missed block count.
 		item, xerr := ledger.Get(v1.LedgerKeyMissedBlockCount(val.addr))
