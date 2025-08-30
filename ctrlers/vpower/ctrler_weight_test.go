@@ -2,12 +2,15 @@ package vpower
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/ctrlers/mocks"
-	"github.com/beatoz/beatoz-go/libs/fxnum"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"os"
 	"testing"
+
+	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
+	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
@@ -100,4 +103,100 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 	}
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+// Test_VPowerCtrler_ComputeWeight_ValidatorMark is designed to test the following scenario.
+// When a single account was both a validator and a delegator,
+// ComputeWeight had a bug where it merged the two power records into a single beneficiary when calculating weight.
+// As a result, the weight as a validator and the weight as a delegator were not distinguished,
+// and only one of the reward ratios was applied.
+// This has been fixed so that the two roles are handled separately:
+//
+//	one can receive rewards as a validator, and the other can receive rewards as a delegator.
+func Test_VPowerCtrler_ComputeWeight_ValidatorMark(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	ctrler, lastValUps0, valWallets0, xerr := initLedger(config)
+	require.NoError(t, xerr)
+	require.Equal(t, len(lastValUps0), len(valWallets0))
+
+	_, h, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+
+	//printValidators(ctrler.lastValidators)
+
+	from := ctrler.lastValidators[0].addr
+	toVal := ctrler.lastValidators[1]
+
+	vpow := NewVPower(from, toVal.addr)
+	xerr = ctrler.bondPowerChunk(toVal, vpow, 1234, h+1, bytes.ZeroBytes(32), true)
+	require.NoError(t, xerr)
+
+	//fmt.Printf("Delegate: from(%v), to(%v)\n", from, toVal.addr)
+
+	for i := 0; i < 100; i++ {
+		_, h, xerr = ctrler.Commit()
+		require.NoError(t, xerr)
+	}
+
+	//printValidators(ctrler.lastValidators)
+
+	weightComputed, xerr := ctrler.ComputeWeight(
+		h+1,
+		govMock.InflationCycleBlocks(),
+		govMock.RipeningBlocks(),
+		govMock.BondingBlocksWeightPermil(),
+		totalSupply)
+	require.NoError(t, xerr)
+
+	// lastValidators(21) + delegator(1)
+	require.Equal(t, len(ctrler.lastValidators)+1, len(weightComputed.Beneficiaries()))
+
+	chkV, chkD := false, false
+	for _, b := range weightComputed.Beneficiaries() {
+		if bytes.Equal(b.Address(), from) {
+			// The `from` account should exist as a validator and a delegator.
+			if b.IsValidator() {
+				chkV = true
+			} else {
+				chkD = true
+			}
+		} else {
+			require.True(t, b.IsValidator())
+		}
+	}
+	require.True(t, chkV)
+	require.True(t, chkD)
+
+	//printWeightResult(weightComputed)
+}
+
+func printValidators(vals []*Delegatee) {
+	fmt.Println("--- validators ---")
+	for i, v := range vals {
+		fmt.Printf("Validator[%d]: 0x%v, sum.power: %v, self.power: %v\n", i, v.addr, v.SumPower, v.SelfPower)
+		for j, d := range v.Delegators {
+			ch := "D"
+			if bytes.Equal(d, v.addr) {
+				ch = "V"
+			}
+			fmt.Printf("  %v[%d]: 0x%x\n", ch, j, d)
+		}
+	}
+}
+
+func printWeightResult(weightRet types.IWeightResult) {
+	fmt.Println("--- weight result ---")
+	fmt.Printf("sum.weight: %v, val.weight: %v\n", weightRet.SumWeight(), weightRet.ValWeight())
+	sumWeight := fxnum.ZERO
+	benefs := weightRet.Beneficiaries()
+	for i, b := range benefs {
+		sumWeight = sumWeight.Add(b.Weight())
+		ch := "D"
+		if b.IsValidator() {
+			ch = "V"
+		}
+		fmt.Printf("  %s[%02d]: 0x%v, w: %v, signingRate: %v\n", ch, i, b.Address(), b.Weight(), b.SignRate())
+	}
+	fmt.Println("sumWeight", sumWeight)
 }
