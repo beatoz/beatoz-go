@@ -1,12 +1,13 @@
 package vpower
 
 import (
+	"strconv"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/encoding"
-	"strconv"
 )
 
 func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -104,15 +105,14 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	}
 
 	// Reset vpowLimiter
-	totalPower := int64(0)
-	for _, v := range ctrler.lastValidators {
-		totalPower += v.SumPower
-	}
-	ctrler.vpowLimiter.Reset(totalPower, bctx.GovHandler.MaxUpdatablePowerRate())
+	ctrler.vpowLimiter.Reset(ctrler.sumPowerOfValidators(), bctx.GovHandler.MaxUpdatablePowerRate())
 	return evts, nil
 }
 
 func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	// Reset vpowLimiter
+	ctrler.vpowLimiter.Reset(ctrler.sumPowerOfValidators(), bctx.GovHandler.MaxUpdatablePowerRate())
+
 	if xerr := ctrler.unfreezePowerChunk(bctx); xerr != nil {
 		return nil, xerr
 	}

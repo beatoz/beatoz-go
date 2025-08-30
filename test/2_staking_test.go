@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/beatoz/beatoz-go/libs/jsonx"
+	"strings"
+	"testing"
+
 	rtypes0 "github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 func TestQueryValidators(t *testing.T) {
@@ -166,8 +166,8 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	valStakes, err := bzweb3.QueryDelegatee(valWal.Address())
 	require.NoError(t, err)
 
-	json, _ := jsonx.MarshalIndent(valStakes, "", "  ")
-	fmt.Println(string(json))
+	//json, _ := jsonx.MarshalIndent(valStakes, "", "  ")
+	//fmt.Println(string(json))
 
 	delegator := randCommonWallet()
 	require.NoError(t, delegator.Unlock(defaultRpcNode.Pass))
@@ -179,24 +179,52 @@ func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {
 	maxAllowedPower = maxAllowedPower - valStakes.TotalPower
 	maxAllowedAmt := rtypes0.PowerToAmount(maxAllowedPower)
 
+	fmt.Println("TotalPower", valStakes.TotalPower)
 	fmt.Println("MinSelfPowerRate", govParams.MinSelfPowerRate())
 	fmt.Println("maxAllowedPower", maxAllowedPower)
 	fmt.Println("maxAllowedPower", maxAllowedPower)
 	fmt.Println("maxAllowedAmt", maxAllowedAmt.Dec())
 
-	// at now, peers[0] has maximum power.
-	ret, err := delegator.StakingSync(valWal.Address(), defGas, defGasPrice, maxAllowedAmt, bzweb3)
+	// expected error triggered by govParams.MaxUpdatablePowerRate()
+	ret, err := delegator.StakingCommit(valWal.Address(), defGas, defGasPrice, maxAllowedAmt, bzweb3)
 	require.NoError(t, err)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-
-	delegator.AddNonce()
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.True(t, strings.Contains(ret.CheckTx.Log, "allowedRate"), ret.CheckTx.Log)
 
 	//
-	// not allowed delegating, because peers[0] is already delegated by maximum power.
-	ret, err = delegator.StakingSync(valWal.Address(), defGas, defGasPrice, rtypes0.ToGrans(4000), bzweb3)
+	// Delegate in parts to avoid the error triggered by govParams.MaxUpdatablePowerRate().
+	n, remain := int64(0), int64(0)
+	updatablePow := (valStakes.TotalPower * int64(govParams.MaxUpdatablePowerRate()) / int64(100)) - 1
+	for {
+		remain = maxAllowedPower % updatablePow
+		if remain >= govParams.MinDelegatorPower() {
+			// to avoid the error triggered by govParams.MinDelegatorPower().
+			n = maxAllowedPower / updatablePow
+			break
+		}
+		updatablePow -= 1
+	}
+
+	for i := 0; i < int(n); i++ {
+		ret, err = delegator.StakingCommit(valWal.Address(), defGas, defGasPrice, rtypes0.PowerToAmount(updatablePow), bzweb3)
+		require.NoError(t, err)
+		require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+		require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+		delegator.AddNonce()
+	}
+	// process for remain
+	ret, err = delegator.StakingCommit(valWal.Address(), defGas, defGasPrice, rtypes0.PowerToAmount(remain), bzweb3)
 	require.NoError(t, err)
-	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-	require.True(t, strings.Contains(ret.Log, "not enough self power"), ret.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	delegator.AddNonce()
+
+	// At now, the peers[0] has maximum power delegating from others.
+	// Any more delegation should not be allowed, because the peers[0] is already delegated by maximum power.
+	ret, err = delegator.StakingCommit(valWal.Address(), defGas, defGasPrice, rtypes0.ToGrans(4000), bzweb3)
+	require.NoError(t, err)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
+	require.True(t, strings.Contains(ret.CheckTx.Log, "not enough self power"), ret.CheckTx.Log)
 
 }
 
