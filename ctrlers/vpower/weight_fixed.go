@@ -6,7 +6,7 @@ import (
 	"github.com/robaho/fixed"
 )
 
-// fixedWeightOfPowerChunks calculates the voting power weight not applied.
+// fixedWeightOfPowerChunks calculates the voting power weight.
 // `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / baseSupply`
 func fixedWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, baseSupply *uint256.Int) fixed.Fixed {
 	totalPower, _ := types.AmountToPower(baseSupply)

@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// decimalWeightOfPowerChunks calculates the voting power weight not applied.
+// decimalWeightOfPowerChunks calculates the voting power weight.
 // `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / baseSupply`
 func decimalWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, baseSupply *uint256.Int) decimal.Decimal {
 	decBaseSupply := decimal.NewFromBigInt(baseSupply.ToBig(), -1*int32(types.DECIMAL))
