@@ -170,7 +170,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			// check minDelegatorPower
 			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", txPower, minDelegatorPower)
+				return xerrors.ErrInvalidTrx.Wrapf("invalid delegation: must be >= %v power", minDelegatorPower)
 			}
 
 			// it's delegating. check minSelfStakeRatio
