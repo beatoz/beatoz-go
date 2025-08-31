@@ -50,10 +50,11 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 
 		mapBenefPowChunks := make(map[string]*benefPowChunksW)
 		for _, from := range val.Delegators {
-			vpow, xerr := ctrler.readVPower(from, val.addr, true)
+			item, xerr = ledger.Get(v1.LedgerKeyVPower(from, val.addr))
 			if xerr != nil {
 				return nil, xerr
 			}
+			vpow, _ := item.(*VPower)
 
 			_mapKey := bytes.HexBytes(from).String()
 			b, ok := mapBenefPowChunks[_mapKey]

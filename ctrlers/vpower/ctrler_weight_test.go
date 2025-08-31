@@ -34,25 +34,25 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 			Height: 1,
 		})
 	}
-	for h := int64(2); h <= govMock.RipeningBlocks()*2; h += govMock.InflationCycleBlocks() {
-		for i := mocks.CurrBlockCtx().Height(); i < h; i++ {
+	for h := mocks.CurrBlockHeight(); h <= govMock.RipeningBlocks()*2; h += govMock.InflationCycleBlocks() {
+		for i := mocks.CurrBlockHeight(); i < h; i++ {
 			require.NoError(t, mocks.DoCommit(ctrler))
 		}
 
 		// processing random staking(delegating) txs
 		cnt := rand.Intn(100)
 		if cnt > 0 {
-			froms, tos, powers, txhashes := testRandDelegate(t, cnt, ctrler, valWallets0, h)
+			froms, tos, powers, txhashes := testRandDelegate(t, cnt, ctrler, valWallets0, mocks.CurrBlockHeight())
 			require.Equal(t, len(froms), len(tos), "len(froms)", len(froms), "len(tos)", len(tos))
 			require.Equal(t, len(froms), len(powers), "len(froms)", len(froms), "len(powers)", len(powers))
 			require.Equal(t, len(froms), len(txhashes), "len(froms)", len(froms), "len(txhashes)", len(txhashes))
 			for i, pow := range powers {
 				powChunks0 = append(powChunks0, &PowerChunkProto{
 					Power:  pow,
-					Height: h,
+					Height: mocks.CurrBlockHeight(),
 					TxHash: txhashes[i],
 				})
-				//fmt.Println("new tx", bytes.HexBytes(txhashes[i]))
+				//fmt.Println("new tx", "from", froms[i].Address(), "to", tos[i].Address(), "txhash", bytes.HexBytes(txhashes[i]))
 			}
 			//fromWals0 = append(fromWals0, froms...)
 			//toWals0 = append(toWals0, tos...)
@@ -62,13 +62,13 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 
 		// compute weight
 		// fxnumWeightOfPowerChunks
-		w_waex64pc := fxnumWeightOfPowerChunks(powChunks0, h, govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
+		w_waex64pc := fxnumWeightOfPowerChunks(powChunks0, mocks.CurrBlockHeight(), govMock.RipeningBlocks(), govMock.BondingBlocksWeightPermil(), totalSupply)
 		//fmt.Println("--- decimalWeightOfPowerChunks return", w_waex64pc)
 		w_waex64pc = w_waex64pc.Truncate(fxnum.GetWantPrecision())
 
 		// ComputeWeight
 		weightComputed, xerr := ctrler.ComputeWeight(
-			h,
+			mocks.CurrBlockHeight(),
 			govMock.InflationCycleBlocks(),
 			govMock.RipeningBlocks(),
 			govMock.BondingBlocksWeightPermil(),
@@ -94,12 +94,12 @@ func Test_VPowerCtrler_ComputeWeight(t *testing.T) {
 		}
 		sumIndW = sumIndW.Truncate(fxnum.GetWantPrecision())
 
-		require.True(t, w_waex64pc.LessThanOrEqual(fxnum.ONE), "fxnumWeightOfPowerChunks", w_waex64pc, "height", h)
-		require.True(t, w_computed.LessThanOrEqual(fxnum.ONE), "ComputeWeight", w_computed, "height", h)
+		require.True(t, w_waex64pc.LessThanOrEqual(fxnum.ONE), "fxnumWeightOfPowerChunks", w_waex64pc, "height", mocks.CurrBlockHeight())
+		require.True(t, w_computed.LessThanOrEqual(fxnum.ONE), "ComputeWeight", w_computed, "height", mocks.CurrBlockHeight())
 		require.Equal(t, w_computed.String(), sumIndW.String())
-		require.Equal(t, w_waex64pc.String(), w_computed.String(), fmt.Sprintf("fxnumWeightOfPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, h))
+		require.Equal(t, w_waex64pc.String(), w_computed.String(), fmt.Sprintf("fxnumWeightOfPowerChunks:%v, ComputeWeight:%v, height:%v", w_waex64pc, w_computed, mocks.CurrBlockHeight()))
 
-		//fmt.Printf("Block[%v] the %v delegate txs are executed and the weight is %v <> %v\n", h, cnt, w_waex64pc, w_computed)
+		//fmt.Printf("Block[%v] the %v delegate txs are executed and the weight is %v <> %v\n", mocks.CurrBlockHeight(), cnt, w_waex64pc, w_computed)
 	}
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
