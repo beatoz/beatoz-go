@@ -153,7 +153,7 @@ func TestMinDelegatorPower(t *testing.T) {
 	ret, err := delegator.StakingSync(valWal.Address(), defGas, defGasPrice, powAmt, bzweb3)
 	require.NoError(t, err)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.Code, ret.Log)
-	require.True(t, strings.Contains(ret.Log, "too small stake to become delegator"), ret.Log)
+	require.True(t, strings.Contains(ret.Log, "invalid delegation: must be >="), ret.Log)
 }
 
 func TestDelegating_OverMinSelfStakeRatio(t *testing.T) {

@@ -28,23 +28,23 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
-			}
+			} else {
+				// do permanent lock
+				deadAmt := types.PowerToAmount(slashed)
+				if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
+					return nil, xerr
+				}
 
-			// do permanent lock
-			deadAmt := types.PowerToAmount(slashed)
-			if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
-				return nil, xerr
+				evts = append(evts, abcitypes.Event{
+					Type: "vpower.slashing",
+					Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
+						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
+						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
+						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
+					},
+				})
 			}
-
-			evts = append(evts, abcitypes.Event{
-				Type: "vpower.slashing",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
-					{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
-					{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
-					{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
-				},
-			})
 		}
 	}
 
