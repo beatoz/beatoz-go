@@ -1,12 +1,13 @@
 package vpower
 
 import (
+	"strconv"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/encoding"
-	"strconv"
 )
 
 func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -27,23 +28,23 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
-			}
+			} else {
+				// do permanent lock
+				deadAmt := types.PowerToAmount(slashed)
+				if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
+					return nil, xerr
+				}
 
-			// do permanent lock
-			deadAmt := types.PowerToAmount(slashed)
-			if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
-				return nil, xerr
+				evts = append(evts, abcitypes.Event{
+					Type: "vpower.slashing",
+					Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
+						{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
+						{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
+						{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
+					},
+				})
 			}
-
-			evts = append(evts, abcitypes.Event{
-				Type: "vpower.slashing",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte("byzantine"), Value: []byte(types.Address(evi.Validator.Address).String()), Index: true},
-					{Key: []byte("type"), Value: []byte(abcitypes.EvidenceType_name[int32(evi.Type)]), Index: false},
-					{Key: []byte("height"), Value: []byte(strconv.FormatInt(evi.Height, 10)), Index: false},
-					{Key: []byte("slashed"), Value: []byte(strconv.FormatInt(slashed, 10)), Index: false},
-				},
-			})
 		}
 	}
 
@@ -104,15 +105,17 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	}
 
 	// Reset vpowLimiter
-	totalPower := int64(0)
-	for _, v := range ctrler.lastValidators {
-		totalPower += v.SumPower
-	}
-	ctrler.vpowLimiter.Reset(totalPower, bctx.GovHandler.MaxUpdatablePowerRate())
+	ctrler.vpowLimiter.Reset(ctrler.sumPowerOfValidators(), bctx.GovHandler.MaxUpdatablePowerRate())
 	return evts, nil
 }
 
 func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	// Reset vpowLimiter
+	ctrler.vpowLimiter.Reset(ctrler.sumPowerOfValidators(), bctx.GovHandler.MaxUpdatablePowerRate())
+
 	if xerr := ctrler.unfreezePowerChunk(bctx); xerr != nil {
 		return nil, xerr
 	}

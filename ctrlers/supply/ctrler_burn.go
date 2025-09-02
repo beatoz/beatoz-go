@@ -14,6 +14,9 @@ func (ctrler *SupplyCtrler) Burn(bctx *ctrlertypes.BlockContext, amt *uint256.In
 }
 
 func (ctrler *SupplyCtrler) burn(height int64, amt *uint256.Int) xerrors.XError {
+	if amt.Cmp(ctrler.lastTotalSupply.GetTotalSupply()) >= 0 {
+		return xerrors.ErrInvalidAmount
+	}
 	ctrler.lastTotalSupply.AdjustSub(height, amt)
 	return nil
 }

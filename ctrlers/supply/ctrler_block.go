@@ -1,11 +1,12 @@
 package supply
 
 import (
+	"time"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"time"
 )
 
 func (ctrler *SupplyCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -33,9 +34,9 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 		start := time.Now()
 		// In ctrler.waitMint, ctrler.lastTotalSupply is changed.
 		resp, xerr := ctrler.waitMint(bctx)
-		since := time.Since(start)
+		delay := time.Since(start)
 
-		ctrler.logger.Debug("wait to process mint and reward", "delay", since)
+		ctrler.logger.Debug("wait to process mint and reward", "delay", delay)
 		if xerr != nil {
 			ctrler.logger.Error("waitMint returns", "error", xerr.Error())
 			return nil, xerr

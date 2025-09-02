@@ -2,6 +2,10 @@ package node
 
 import (
 	"fmt"
+	"strconv"
+	"sync"
+	"time"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/cmd/version"
 	"github.com/beatoz/beatoz-go/ctrlers/account"
@@ -12,7 +16,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
-	types2 "github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -24,9 +28,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	tmver "github.com/tendermint/tendermint/version"
-	"strconv"
-	"sync"
-	"time"
 )
 
 var _ abcitypes.Application = (*BeatozApp)(nil)
@@ -111,6 +112,12 @@ func (ctrler *BeatozApp) Stop() error {
 		return err
 	}
 	if err := ctrler.govCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.vpowCtrler.Close(); err != nil {
+		return err
+	}
+	if err := ctrler.supplyCtrler.Close(); err != nil {
 		return err
 	}
 	if err := ctrler.vmCtrler.Close(); err != nil {
@@ -294,53 +301,88 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			}
 		}
 
-		// check balance
-		feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
-		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
-		if xerr := sender.CheckBalance(needAmt); xerr != nil {
-			xerr = xerrors.ErrCheckTx.Wrap(xerr)
-			ctrler.logger.Error("ReCheckTx", "error", xerr)
-			return abcitypes.ResponseCheckTx{
-				Code:      xerr.Code(),
-				Log:       xerr.Error(),
-				GasWanted: tx.Gas,
+		var payer *ctrlertypes.Account
+		if tx.Payer != nil {
+			payer = ctrler.acctCtrler.FindAccount(tx.Payer, false)
+			if payer == nil {
+				xerr := xerrors.ErrCheckTx.Wrap(xerrors.ErrNotFoundAccount.Wrapf("payer address: %v", tx.Payer))
+				ctrler.logger.Error("ReCheckTx", "error", xerr)
+				return abcitypes.ResponseCheckTx{
+					Code:      xerr.Code(),
+					Log:       xerr.Error(),
+					GasWanted: tx.Gas,
+				}
 			}
 		}
 
-		// check nonce
-		if xerr := sender.CheckNonce(tx.Nonce); xerr != nil {
-			xerr = xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
-			ctrler.logger.Error("ReCheckTx", "error", xerr)
-			return abcitypes.ResponseCheckTx{
-				Code:      xerr.Code(),
-				Log:       xerr.Error(),
-				GasWanted: tx.Gas,
+		var xerr xerrors.XError
+		for {
+			//
+			// simple tx validation
+			// check balance
+			feeAmt := types.GasToFee(tx.Gas, tx.GasPrice)
+			if payer == nil {
+				needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+				if xerr = sender.CheckBalance(needAmt); xerr != nil {
+					break
+				}
+			} else {
+				if xerr = sender.CheckBalance(tx.Amount); xerr != nil {
+					break
+				}
+				if xerr = payer.CheckBalance(feeAmt); xerr != nil {
+					break
+				}
 			}
+
+			// check nonce
+			if xerr = sender.CheckNonce(tx.Nonce); xerr != nil {
+				xerr = xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", sender.GetNonce(), tx.Nonce, sender.Address, tmtypes.Tx(req.Tx).Hash()))
+				break
+			}
+
+			//
+			// simple tx execution
+			// update account
+
+			sender.AddNonce()
+
+			if payer == nil {
+				needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+				if xerr = sender.SubBalance(needAmt); xerr != nil {
+					break
+				}
+				if xerr = ctrler.acctCtrler.SetAccount(sender, false); xerr != nil {
+					break
+				}
+			} else {
+				if xerr = sender.SubBalance(tx.Amount); xerr != nil {
+					break
+				}
+				if xerr = payer.SubBalance(feeAmt); xerr != nil {
+					break
+				}
+				if xerr = ctrler.acctCtrler.SetAccount(sender, false); xerr != nil {
+					break
+				}
+				if xerr = ctrler.acctCtrler.SetAccount(payer, false); xerr != nil {
+					break
+				}
+			}
+			break
 		}
 
-		// update sender account
-		if xerr := sender.SubBalance(feeAmt); xerr != nil {
+		errCode := abcitypes.CodeTypeOK
+		errLog := ""
+		if xerr != nil {
 			xerr = xerrors.ErrCheckTx.Wrap(xerr)
-			ctrler.logger.Error("ReCheckTx", "error", xerr)
-			return abcitypes.ResponseCheckTx{
-				Code:      xerr.Code(),
-				Log:       xerr.Error(),
-				GasWanted: tx.Gas,
-			}
+			errCode = xerr.Code()
+			errLog = xerr.Error()
 		}
-		sender.AddNonce()
 
-		if xerr := ctrler.acctCtrler.SetAccount(sender, false); xerr != nil {
-			xerr = xerrors.ErrCheckTx.Wrap(xerr)
-			ctrler.logger.Error("ReCheckTx", "error", xerr)
-			return abcitypes.ResponseCheckTx{
-				Code:      xerr.Code(),
-				Log:       xerr.Error(),
-				GasWanted: tx.Gas,
-			}
-		}
 		return abcitypes.ResponseCheckTx{
-			Code:      abcitypes.CodeTypeOK,
+			Code:      errCode,
+			Log:       errLog,
 			GasWanted: tx.Gas,
 			GasUsed:   tx.Gas,
 		}
@@ -468,7 +510,7 @@ func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(types2.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -561,7 +603,7 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 		}
 	} else {
 
-		ctrler.currBlockCtx.AddFee(types2.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+		ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 		// add event
 		txctx.Events = append(txctx.Events, abcitypes.Event{
@@ -772,7 +814,7 @@ func checkRequestInitChain(req abcitypes.RequestInitChain) (*genesis.GenesisAppS
 	for _, val := range req.Validators {
 		genVotinPower += val.Power
 	}
-	genVotingPowerAmt := types2.PowerToAmount(genVotinPower)
+	genVotingPowerAmt := types.PowerToAmount(genVotinPower)
 
 	genAppState := &genesis.GenesisAppState{}
 	if err := jsonx.Unmarshal(req.AppStateBytes, genAppState); err != nil {

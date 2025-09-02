@@ -4,6 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
+	"math/rand"
+	"os"
+	"sort"
+	"testing"
+	"time"
+
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -20,12 +27,6 @@ import (
 	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/log"
-	"math"
-	"math/rand"
-	"os"
-	"sort"
-	"testing"
-	"time"
 )
 
 func Test_InitLedger(t *testing.T) {
@@ -327,11 +328,7 @@ func Test_Unbonding(t *testing.T) {
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
 
 	// -----------------------------------------------------------------------------------------------------------------
-	//
-	_, lastTotalPower := ctrler.Validators()
-	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatablePowerRate())
 
-	//
 	// unbonding
 	// 1. wrong from
 	txctx1, xerr := doUndelegate(ctrler, acctMock.RandWallet(), valWal.Address(), lastHeight+1, txhash0)
@@ -415,9 +412,6 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
 
-	_, lastTotalPower := ctrler.Validators()
-	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatablePowerRate())
-
 	onceWals := removeDupWallets(vals)
 	for i, valWal := range onceWals {
 		if i == len(onceWals)-1 {
@@ -468,9 +462,6 @@ func Test_Freezing(t *testing.T) {
 	_, lastHeight, xerr := ctrler.Commit()
 	require.NoError(t, xerr)
 	height := lastHeight + 1
-
-	_, lastTotalPower := ctrler.Validators()
-	ctrler.vpowLimiter.Reset(lastTotalPower, govMock.MaxUpdatablePowerRate())
 
 	froms, vals, powers, txhashes := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
 
@@ -747,7 +738,6 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 }
 
 func initLedger(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {
-
 	ctrler, xerr := NewVPowerCtrler(cfg, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -778,6 +768,15 @@ func initLedger(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpda
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
+
+	// Use Reset(..., 100) to mock vpowLimiter (no-op).
+	// This prevents vpowLimiter from interfering with these test cases.
+	// Note: the purpose here is not to test `VPowerLimiter`;
+	// The tests for `VPowerLimiter` are done by `Test_limiter` in `limiter_test.go` and
+	// `TestDelegating_OverMinSelfStakeRatio` in `test/2_staking_test.go`
+	_, totalPower := ctrler.Validators()
+	ctrler.vpowLimiter.Reset(totalPower, 100)
+
 	return ctrler, vals, valWallets, nil
 }
 

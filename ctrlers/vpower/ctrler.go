@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"sync"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
@@ -171,7 +170,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			// check minDelegatorPower
 			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {
-				return xerrors.ErrInvalidTrx.Wrapf("too small stake to become delegator: %v < %v", txPower, minDelegatorPower)
+				return xerrors.ErrInvalidTrx.Wrapf("invalid delegation: must be >= %v power", minDelegatorPower)
 			}
 
 			// it's delegating. check minSelfStakeRatio
@@ -194,20 +193,8 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by txPower
-		if rate, xerr := ctrler.vpowLimiter.ChangeRate(txPower, ADD_POWER); xerr != nil {
+		if xerr := ctrler.vpowLimiter.CheckLimit(txPower, ADD_POWER); xerr != nil {
 			return xerr
-		} else if rate > ctrler.vpowLimiter.allowRate {
-			ctx.Events = append(ctx.Events, abcitypes.Event{
-				Type: "vpower.warning",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte("total"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.lastTotalPower, 10)), Index: false},
-					{Key: []byte("adding"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.addingPower, 10)), Index: false},
-					{Key: []byte("subing"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.subingPower, 10)), Index: false},
-					{Key: []byte("totaling"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.estimatedTotalPower, 10)), Index: false},
-					{Key: []byte("rate"), Value: []byte(strconv.FormatInt(int64(rate), 10)), Index: false},
-					{Key: []byte("allowed"), Value: []byte(strconv.FormatInt(int64(ctrler.vpowLimiter.allowRate), 10)), Index: false},
-				},
-			})
 		}
 
 		// set the result of ValidateTrx
@@ -247,20 +234,8 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by vpow.SumPower
-		if rate, xerr := ctrler.vpowLimiter.ChangeRate(vpow.SumPower, SUB_POWER); xerr != nil {
+		if xerr := ctrler.vpowLimiter.CheckLimit(vpow.SumPower, SUB_POWER); xerr != nil {
 			return xerr
-		} else if rate > ctrler.vpowLimiter.allowRate {
-			ctx.Events = append(ctx.Events, abcitypes.Event{
-				Type: "vpower.warning",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte("total"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.lastTotalPower, 10)), Index: false},
-					{Key: []byte("adding"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.addingPower, 10)), Index: false},
-					{Key: []byte("subing"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.subingPower, 10)), Index: false},
-					{Key: []byte("totaling"), Value: []byte(strconv.FormatInt(ctrler.vpowLimiter.estimatedTotalPower, 10)), Index: false},
-					{Key: []byte("rate"), Value: []byte(strconv.FormatInt(int64(rate), 10)), Index: false},
-					{Key: []byte("allowed"), Value: []byte(strconv.FormatInt(int64(ctrler.vpowLimiter.allowRate), 10)), Index: false},
-				},
-			})
 		}
 
 		// set the result of ValidateTrx
@@ -400,6 +375,17 @@ func (ctrler *VPowerCtrler) Close() xerrors.XError {
 	return nil
 }
 
+func (ctrler *VPowerCtrler) CopyLastValidators() []*Delegatee {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	ret := make([]*Delegatee, len(ctrler.lastValidators))
+	for i, v := range ctrler.lastValidators {
+		ret[i] = v.Clone()
+	}
+	return ret
+}
+
 func (ctrler *VPowerCtrler) Validators() ([]*abcitypes.Validator, int64) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
@@ -427,6 +413,21 @@ func (ctrler *VPowerCtrler) IsValidator(addr types.Address) bool {
 		}
 	}
 	return false
+}
+
+func (ctrler *VPowerCtrler) SumPowerOfValidators() int64 {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.sumPowerOfValidators()
+}
+
+func (ctrler *VPowerCtrler) sumPowerOfValidators() int64 {
+	totalPower := int64(0)
+	for _, v := range ctrler.lastValidators {
+		totalPower += v.SumPower
+	}
+	return totalPower
 }
 
 func (ctrler *VPowerCtrler) SumPowerOf(addr types.Address) int64 {

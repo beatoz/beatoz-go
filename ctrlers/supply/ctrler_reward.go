@@ -13,7 +13,8 @@ import (
 // this is called from waitMint that is called from EndBlock.
 func (ctrler *SupplyCtrler) distReward(rewards []*mintedReward, height int64, poolAddr btztypes.Address) xerrors.XError {
 	if poolAddr != nil && !bytes.Equal(poolAddr, btztypes.ZeroAddress()) {
-		return ctrler.distRewqrdToPool()
+		ctrler.logger.Info("reward pool is not supported yet.")
+		return ctrler.distRewardToState(rewards, height)
 	} else {
 		return ctrler.distRewardToState(rewards, height)
 	}
@@ -39,7 +40,7 @@ func (ctrler *SupplyCtrler) distRewardToState(rewards []*mintedReward, height in
 	return nil
 }
 
-func (ctrler *SupplyCtrler) distRewqrdToPool() xerrors.XError {
+func (ctrler *SupplyCtrler) distRewardToPool() xerrors.XError {
 	panic("not supported yet")
 }
 

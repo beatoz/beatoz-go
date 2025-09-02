@@ -52,24 +52,26 @@ func (limiter *VPowerLimiter) CheckLimit(power int64, op OP_POWER) xerrors.XErro
 }
 
 // checkTotalPower returns error when the newly added power is greater than the new total power.
-// After any changes—whether some amount is added or removed—the new total should be seen as: newly added amount + remaining(previously existing) amount.
+// After any changes (whether some amount is added or removed) the new total should be seen as: newly added amount + remaining(previously existing) amount.
 // To ensure stability, the existing amount must still represent at least 'X%' of the total after the change.
 // Therefore, the newly added amount is only allowed if it stays within '(100 - X)%' of the new total.
 func (limiter *VPowerLimiter) checkTotalPower(diff int64, op OP_POWER) xerrors.XError {
 	var rate int32
+	var changes int64
+	var newtotal int64
 	if op == ADD_POWER {
-		rate = changeRate(limiter.addingPower+diff, limiter.estimatedTotalPower+diff)
+		changes, newtotal = limiter.addingPower+diff, limiter.estimatedTotalPower+diff
 	} else if limiter.estimatedTotalPower >= diff {
-		//
-		rate = changeRate(limiter.addingPower, limiter.estimatedTotalPower-diff)
+		changes, newtotal = limiter.addingPower, limiter.estimatedTotalPower-diff
 	} else {
 		return xerrors.ErrOverFlow.Wrapf("estimatedTotalPower(%v) > subtractedPower(%v)", limiter.estimatedTotalPower, diff)
 	}
 
+	rate = changeRate(changes, newtotal)
 	if rate >= limiter.allowRate {
 		return xerrors.ErrUpdatableStakeRatio.Wrapf(
-			"combinedAddingPower(%v) / estimatedTotalPower(%v) > allowedRate(%v%%)",
-			limiter.addingPower+diff, limiter.estimatedTotalPower+diff, limiter.allowRate)
+			"combinedAddingPower(%v) / estimatedTotalPower(%v) = rate(%v%%) >= allowedRate(%v%%)",
+			changes, newtotal, rate, limiter.allowRate)
 	}
 	return nil
 }

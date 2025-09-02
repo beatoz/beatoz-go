@@ -2,7 +2,9 @@ package node
 
 import (
 	"fmt"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -160,7 +162,7 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		ctx.GasUsed = ctx.Tx.Gas
 	}
 	// processing fee = gas * gasPrice
-	fee := new(uint256.Int).Mul(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.GasUsed)))
+	fee := types.GasToFee(ctx.GasUsed, ctx.Tx.GasPrice)
 	if xerr := ctx.Payer.SubBalance(fee); xerr != nil {
 		return xerr
 	}

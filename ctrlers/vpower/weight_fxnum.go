@@ -10,7 +10,7 @@ func FxNumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 	return fxnumWeightOfPowerChunks(powerChunks, currHeight, ripeningCycle, tau, baseSupply)
 }
 
-// fxnumWeightOfPowerChunks calculates the voting power weight not applied.
+// fxnumWeightOfPowerChunks calculates the voting power weight.
 // `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / totalSupply`
 func fxnumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, baseSupply *uint256.Int) fxnum.FxNum {
 	basePower, _ := types.AmountToPower(baseSupply)
@@ -20,6 +20,8 @@ func fxnumWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 	return fxScaledPower.Div(fxBasePower)
 }
 
+// fxnumWeightOfPowerChunks calculates the voting power weight not applied to the total supply.
+// `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power}`
 func fxnumScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32) fxnum.FxNum {
 	_tau := fxnum.Permil(int(tau))
 	_keppa := fxnum.ONE.Sub(_tau)
@@ -35,8 +37,8 @@ func fxnumScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripening
 			maturedPower += pc.Power
 		} else if dur >= 1 {
 			//  (((tau * dur) / ripeningCycle) + keppa) * power_i
-			w_riging := _tau.Mul(fxnum.FromInt(dur)).Div(_ripeningCycle).Add(_keppa).Mul(fxnum.FromInt(pc.Power))
-			_risingPower = _risingPower.Add(w_riging)
+			w_rising := _tau.Mul(fxnum.FromInt(dur)).Div(_ripeningCycle).Add(_keppa).Mul(fxnum.FromInt(pc.Power))
+			_risingPower = _risingPower.Add(w_rising)
 		}
 	}
 

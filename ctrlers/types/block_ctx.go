@@ -2,6 +2,9 @@ package types
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -10,8 +13,6 @@ import (
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
-	"sync"
-	"time"
 )
 
 type BlockContext struct {
@@ -78,7 +79,7 @@ func TempBlockContext(chainId string, height int64, btime time.Time, g IGovHandl
 }
 
 func ExpectNextBlockContext(last *BlockContext, blockIntval time.Duration) *BlockContext {
-	tm := last.BlockInfo().Header.Time.Add(blockIntval * time.Second)
+	tm := last.BlockInfo().Header.Time.Add(blockIntval)
 	next := NewBlockContext(
 		abcitypes.RequestBeginBlock{
 			Header: tmprototypes.Header{

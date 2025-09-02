@@ -2,10 +2,11 @@ package mocks
 
 import (
 	"fmt"
+	"time"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	types2 "github.com/tendermint/tendermint/proto/tendermint/types"
-	"time"
 )
 
 var lastBlockCtx *ctrlertypes.BlockContext

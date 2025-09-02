@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// decimalWeightOfPowerChunks calculates the voting power weight not applied.
+// decimalWeightOfPowerChunks calculates the voting power weight.
 // `result = (tau * min({bonding_duration}/ripeningCycle, 1) + keppa) * {sum_of_voting_power} / baseSupply`
 func decimalWeightOfPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeningCycle int64, tau int32, baseSupply *uint256.Int) decimal.Decimal {
 	decBaseSupply := decimal.NewFromBigInt(baseSupply.ToBig(), -1*int32(types.DECIMAL))
@@ -38,8 +38,8 @@ func decimalScaledPowerChunks(powerChunks []*PowerChunkProto, currHeight, ripeni
 		}
 	}
 
-	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
-	return decWightedPower
+	decWeightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+	return decWeightedPower
 }
 
 func decimalScaledPowerChunk(pc *PowerChunkProto, currHeight, ripeningCycle int64, tau int32) decimal.Decimal {
@@ -89,7 +89,7 @@ func Wa(pows, vpdurs []int64, ripeningCycle int64, tau int32, baseSupply decimal
 }
 
 func oldWi(pow, vdur, ripeningCycle int64, tau int32, baseSupply decimal.Decimal) decimal.Decimal {
-	if vdur == 0 {
+	if vdur <= 0 {
 		return decimal.Zero
 	}
 
@@ -110,7 +110,7 @@ func oldWi(pow, vdur, ripeningCycle int64, tau int32, baseSupply decimal.Decimal
 // Wi calculates the voting power weight `W_i` of a validator and delegator like the below.
 // `W_i = (tau * min(StakeDurationInSecond/RipeningCycle, 1) + keppa) * Stake_i / S_i`
 func Wi(pow, vdur, ripeningCycle int64, tau int32, baseSupply decimal.Decimal) decimal.Decimal {
-	if vdur == 0 {
+	if vdur <= 0 {
 		return decimal.Zero
 	}
 
@@ -174,10 +174,10 @@ func WaEx64(pows, durs []int64, ripeningCycle int64, tau int32, baseSupply *uint
 		}
 	}
 
-	decWightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
+	decWeightedPower := risingPower.Add(decimal.NewFromInt(_maturedPower))
 	decBaseSupply := decimal.NewFromBigInt(baseSupply.ToBig(), -1*int32(types.DECIMAL))
 
-	q, _ := decWightedPower.QuoRem(decBaseSupply, getDivisionPrecision())
+	q, _ := decWeightedPower.QuoRem(decBaseSupply, getDivisionPrecision())
 	return q
 }
 
