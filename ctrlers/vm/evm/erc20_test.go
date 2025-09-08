@@ -4,6 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -20,12 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"io/ioutil"
-	"math/big"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 var (
@@ -140,7 +141,7 @@ func Test_Deploy(t *testing.T) {
 	fmt.Println("TestDeploy", "used gas", txctx.GasUsed)
 	fmt.Println("TestDeploy", "Commit block", height)
 
-	bzCode, xerr := erc20EVM.QueryCode(erc20ContAddr, height)
+	bzCode, xerr := erc20EVM.GetCode(erc20ContAddr, height)
 	require.NoError(t, xerr)
 	require.Equal(t, []byte(erc20BuildInfo.DeployedBytecode), []byte(bzCode))
 

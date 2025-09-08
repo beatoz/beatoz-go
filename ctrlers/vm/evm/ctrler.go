@@ -3,6 +3,11 @@ package evm
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
+	"sync"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -19,10 +24,6 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmdb "github.com/tendermint/tm-db"
-	"math/big"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 var (
@@ -407,8 +408,8 @@ func (ctrler *EVMCtrler) Close() xerrors.XError {
 
 // MemStateAt returns the ledger of EVM and AcctCtrler with the state values at the `height`.
 // THIS LEDGER MUST BE NOT COMMITED.
-// MemStateAt is called from `QueryCode` and `callVM`.
-// When it is called from `QueryCode`, this ledger is only read (not updated).
+// MemStateAt is called from `GetCode` and `callVM`.
+// When it is called from `GetCode`, this ledger is only read (not updated).
 // In this case, the ledger can be immutable.
 // When it is called from `callVM`, this ledger may be updated.
 // In this case, the ledger should not be immutable.
