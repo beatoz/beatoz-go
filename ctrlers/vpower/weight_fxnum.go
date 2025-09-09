@@ -1,5 +1,10 @@
 package vpower
 
+//
+// The `libs/fxnum` package is a wrapper around `robaho/fixed` and `shopspring/decimal`.
+// When built with the '-tags decimal' build tag, it uses `shopspring/decimal`; otherwise (by default), it uses `robaho/fixed`.
+//
+
 import (
 	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/beatoz/beatoz-go/types"
