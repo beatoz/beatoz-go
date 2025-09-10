@@ -176,7 +176,13 @@ func scaledHeight(height, base int64) fxnum.FxNum {
 }
 
 func heightYears(height int64, intval int32) fxnum.FxNum {
-	return scaledHeight(height*int64(intval), ctrlertypes.YearSeconds)
+	// Previously returned block height scaled to years
+	// using block interval since genesis.
+	//  `return scaledHeight(height*int64(intval), ctrlertypes.YearSeconds)`
+	// However, annual reward variance became too large.
+	// Although functional, such variance may harm validator stability.
+	// Now always returns a fixed value instead.
+	return fxnum.FromInt(1)
 }
 
 // Sd calculates the additional issuance amount based on the current supply and the inflation rate.
