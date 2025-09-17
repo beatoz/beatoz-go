@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -16,11 +22,6 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	"io/ioutil"
-	"os"
-	"strings"
-	"testing"
-	"time"
 )
 
 var (
@@ -41,8 +42,8 @@ func init() {
 }
 
 func Test_Fallback(t *testing.T) {
-	os.RemoveAll(dbPath)
-	fallbackEVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
+	os.RemoveAll(btzCfg.DBDir())
+	fallbackEVM = NewEVMCtrler(btzCfg, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
 
 	//
 	// deploy

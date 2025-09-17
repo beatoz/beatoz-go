@@ -2,6 +2,10 @@ package evm
 
 import (
 	"fmt"
+	"math"
+	"math/big"
+	"time"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -12,9 +16,6 @@ import (
 	ethcoretypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"math"
-	"math/big"
-	"time"
 )
 
 func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.Option) ([]byte, xerrors.XError) {
@@ -54,7 +55,7 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 	return retbz, nil
 }
 
-func (ctrler *EVMCtrler) QueryCode(addr types.Address, height int64) ([]byte, xerrors.XError) {
+func (ctrler *EVMCtrler) GetCode(addr types.Address, height int64) ([]byte, xerrors.XError) {
 	state, xerr := ctrler.MemStateAt(height)
 	if xerr != nil {
 		return nil, xerr

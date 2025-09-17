@@ -3,6 +3,7 @@ package node
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	rtypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -40,17 +41,35 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		response.Value = val
 	case "account":
 		response.Value, xerr = ctrler.acctCtrler.Query(req)
-		if xerr == nil {
-			_acct := &struct {
-				Address rtypes.Address `json:"address"`
-				Name    string         `json:"name,omitempty"`
-				Nonce   uint64         `json:"nonce,string"`
-				Balance string         `json:"balance"`
-				Code    bytes.HexBytes `json:"code,omitempty"`
-				DocURL  string         `json:"docURL,omitempty"`
-			}{}
-			if err := jsonx.Unmarshal(response.Value, &_acct); err != nil {
+		if xerr != nil {
+			break
+		}
+
+		_acct := &struct {
+			Address rtypes.Address `json:"address"`
+			Name    string         `json:"name,omitempty"`
+			Nonce   uint64         `json:"nonce,string"`
+			Balance string         `json:"balance"`
+			Code    bytes.HexBytes `json:"code,omitempty"`
+			DocURL  string         `json:"docURL,omitempty"`
+		}{}
+
+		if err := jsonx.Unmarshal(response.Value, _acct); err != nil {
+			xerr = xerrors.ErrQuery.Wrap(err)
+			break
+		}
+		if _acct.Code != nil {
+			// _acct.Code is the hash value of contract deployed code.
+			// replace it with real code.
+			if _acct.Code, xerr = ctrler.vmCtrler.GetCode(_acct.Address, req.Height); xerr != nil {
+				xerr = xerrors.ErrQuery.Wrap(xerr)
+				break
+			}
+			if val, err := jsonx.Marshal(_acct); err != nil {
 				xerr = xerrors.ErrQuery.Wrap(err)
+				break
+			} else {
+				response.Value = val
 			}
 		}
 
