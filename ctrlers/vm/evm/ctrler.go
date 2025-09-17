@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -27,9 +28,15 @@ import (
 )
 
 var (
-	lastBlockHeightKey                = []byte("lbh")
-	BEATOZTestnetEVMCtrlerChainConfig = &params.ChainConfig{big.NewInt(220818), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil}
-	BEATOZMainnetEVMCtrlerChainConfig = &params.ChainConfig{big.NewInt(220819), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil}
+	lastBlockHeightKey           = []byte("lbh")
+	BEATOZ_EVMCtrlerChainConfigs = []*params.ChainConfig{
+		// mainnet
+		{big.NewInt(12495059 /*0xBEA8D3*/), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil},
+		// testnet
+		{big.NewInt(13543635 /*0xCEA8D3*/), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil},
+		// devnet
+		{big.NewInt(14592211 /*0xDEA8D3*/), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil},
+	}
 )
 
 func blockKey(h int64) []byte {
@@ -52,8 +59,31 @@ type EVMCtrler struct {
 	mtx    sync.RWMutex
 }
 
-func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) *EVMCtrler {
-	metadb, err := tmdb.NewDB("heightRootHash", "goleveldb", path)
+func strip0x(s string) string {
+	if len(s) > 2 && s[:2] == "0x" {
+		return s[2:]
+	}
+	return s
+}
+func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) *EVMCtrler {
+	var evmConfig *params.ChainConfig
+	chainId, ret := new(big.Int).SetString(strip0x(config.ChainID), 16)
+	if ret {
+		for _, evmCfg := range BEATOZ_EVMCtrlerChainConfigs {
+			if chainId.Cmp(evmCfg.ChainID) == 0 {
+				evmConfig = evmCfg
+				break
+			}
+		}
+	} else {
+		evmConfig = BEATOZ_EVMCtrlerChainConfigs[2] // force devnet
+	}
+
+	if evmConfig == nil {
+		panic(fmt.Sprintf("not found chain id: %v", config.ChainID))
+	}
+
+	metadb, err := tmdb.NewDB("heightRootHash", "goleveldb", config.DBDir())
 	if err != nil {
 		panic(err)
 	}
@@ -75,15 +105,17 @@ func NewEVMCtrler(path string, acctHandler ctrlertypes.IAccountHandler, logger t
 		panic(err)
 	}
 
-	db, err := rawdb.NewLevelDBDatabase(path, 128, 128, "", false)
+	db, err := rawdb.NewLevelDBDatabase(config.DBDir(), 128, 128, "", false)
 	if err != nil {
 		panic(err)
 	}
 
 	lg := logger.With("module", "beatoz_EVMCtrler")
 
+	lg.Info("EVMCtrler", "chainId", "0x"+evmConfig.ChainID.Text(16))
+
 	return &EVMCtrler{
-		ethChainConfig:  BEATOZMainnetEVMCtrlerChainConfig,
+		ethChainConfig:  evmConfig,
 		ethDB:           db,
 		metadb:          metadb,
 		acctHandler:     acctHandler,

@@ -7,10 +7,10 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -32,7 +32,7 @@ import (
 var (
 	govMock     = govmock.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	acctHandler acctHandlerMock
-	dbPath      = filepath.Join(os.TempDir(), "beatoz-evm-test")
+	btzCfg      *cfg.Config
 )
 
 var (
@@ -49,6 +49,11 @@ type TruffleBuild struct {
 }
 
 func init() {
+	btzCfg = cfg.DefaultConfig()
+	btzCfg.ChainID = "0xDEA8D3"
+	btzCfg.RootDir = os.TempDir()
+	btzCfg.DBPath = "evm-test-db"
+
 	// initialize acctHandler
 	acctHandler.origin = true
 	acctHandler.walletsMap = make(map[string]*web3.Wallet)
@@ -78,8 +83,9 @@ func init() {
 }
 
 func Test_ValidateTrx(t *testing.T) {
-	os.RemoveAll(dbPath)
-	ctrler := NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
+	os.RemoveAll(btzCfg.DBDir())
+
+	ctrler := NewEVMCtrler(btzCfg, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
 
 	// deploy tx	: address == zero, code == nil
 	// normal tx	: address != zero, code != nil
@@ -123,8 +129,8 @@ func Test_ValidateTrx(t *testing.T) {
 }
 
 func Test_Deploy(t *testing.T) {
-	os.RemoveAll(dbPath)
-	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
+	os.RemoveAll(btzCfg.DBDir())
+	erc20EVM = NewEVMCtrler(btzCfg, &acctHandler, tmlog.NewNopLogger() /*tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))*/)
 
 	deployInput, err := abiERC20Contract.Pack("", "TokenOnBeatoz", "TOR")
 	require.NoError(t, err)
@@ -208,7 +214,7 @@ func Test_Transfer(t *testing.T) {
 	xerr = erc20EVM.Close()
 	require.NoError(t, xerr)
 
-	erc20EVM = NewEVMCtrler(dbPath, &acctHandler, tmlog.NewNopLogger())
+	erc20EVM = NewEVMCtrler(btzCfg, &acctHandler, tmlog.NewNopLogger())
 	state, xerr = erc20EVM.MemStateAt(erc20EVM.lastBlockHeight)
 	require.NoError(t, xerr)
 

@@ -80,7 +80,7 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 		panic(err)
 	}
 
-	vmCtrler := evm.NewEVMCtrler(config.DBDir(), acctCtrler, logger)
+	vmCtrler := evm.NewEVMCtrler(config, acctCtrler, logger)
 
 	txExecutor := NewTrxExecutor(logger)
 
