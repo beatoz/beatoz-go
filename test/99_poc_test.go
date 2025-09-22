@@ -5,6 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"math/big"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
+
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -17,13 +25,6 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	"io/ioutil"
-	"log"
-	"math/big"
-	"net/http"
-	"sync"
-	"testing"
-	"time"
 )
 
 func requestHttp(url string) []byte {
@@ -86,14 +87,14 @@ func getAccountData(address types.Address) AccountData {
 
 func submitTrx(wallet *web3.Wallet, trx *types2.Trx) []byte {
 	wallet.Unlock([]byte("1234"))
-	wallet.SignTrxRLP(trx, defaultRpcNode.ChainID)
+	wallet.SignTrxRLP(trx, defaultRpcNode.Config.ChainID)
 	encode, _ := trx.Encode()
 	return requestHttp(defaultRpcNode.RPCURL + "/broadcast_tx_commit?tx=0x" + hex.EncodeToString(encode))
 }
 
 func submitTrxAsync(wallet *web3.Wallet, trx *types2.Trx) []byte {
 	wallet.Unlock([]byte("1234"))
-	wallet.SignTrxRLP(trx, defaultRpcNode.ChainID)
+	wallet.SignTrxRLP(trx, defaultRpcNode.Config.ChainID)
 	encode, _ := trx.Encode()
 	return requestHttp(defaultRpcNode.RPCURL + "/broadcast_tx_async?tx=0x" + hex.EncodeToString(encode))
 }

@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 )
@@ -63,4 +64,59 @@ func GasToFee(gas int64, price *uint256.Int) *uint256.Int {
 func FeeToGas(fee, price *uint256.Int) int64 {
 	gas := new(uint256.Int).Div(fee, price)
 	return int64(gas.Uint64())
+}
+
+var (
+	digitTab [256]byte
+	hexTab   [256]byte
+)
+
+func init() {
+	// 0-9
+	for c := byte('0'); c <= '9'; c++ {
+		digitTab[c] = 1
+		hexTab[c] = 1
+	}
+	// a-f, A-F
+	for c := byte('a'); c <= 'f'; c++ {
+		hexTab[c] = 1
+	}
+	for c := byte('A'); c <= 'F'; c++ {
+		hexTab[c] = 1
+	}
+}
+
+// IsHexByteString returns true if the string is a hexadecimal string (satisfying the conditions above)
+// and its length is even (i.e., represents bytes).
+func IsHexByteString(s string, allowPrefix bool) bool {
+	if allowPrefix && len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
+		s = s[2:]
+	}
+	// check even length
+	if (len(s) & 1) != 0 {
+		return false
+	}
+	if len(s) == 0 { // empty is not allowed
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if hexTab[s[i]] == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// IsNumericString returns true if s contains only digits [0-9].
+// An empty string returns false.
+func IsNumericString(s string) bool {
+	if len(s) == 0 { // empty is not allowed
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if digitTab[s[i]] == 0 {
+			return false
+		}
+	}
+	return true
 }

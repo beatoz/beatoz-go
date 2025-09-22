@@ -321,7 +321,7 @@ type InitParams struct {
 
 func DefaultInitParams() *InitParams {
 	return &InitParams{
-		ChainID:              "localnet",
+		ChainID:              "0x0001",
 		ValCnt:               1,
 		HolderCnt:            10,
 		BlockGasLimit:        int64(36_000_000),
@@ -333,6 +333,11 @@ func DefaultInitParams() *InitParams {
 }
 
 func (params *InitParams) Validate() error {
+	if !btztypes.IsHexByteString(params.ChainID, true) &&
+		!btztypes.IsNumericString(params.ChainID) {
+		return fmt.Errorf("invalid chain_id: %s", params.ChainID)
+	}
+
 	if params.InitTotalSupply > params.MaxTotalSupply {
 		return fmt.Errorf("init_total_supply (%d) cannot exceed max_total_supply (%d)", params.InitTotalSupply, params.MaxTotalSupply)
 	}

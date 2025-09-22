@@ -3,6 +3,12 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/node"
@@ -11,11 +17,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/log"
 	tmp2p "github.com/tendermint/tendermint/p2p"
-	"io"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
 )
 
 var (

@@ -2,14 +2,15 @@ package test
 
 import (
 	"fmt"
-	cfg "github.com/beatoz/beatoz-go/cmd/config"
-	tmcfg "github.com/tendermint/tendermint/config"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
+	tmcfg "github.com/tendermint/tendermint/config"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 func TestMain(m *testing.M) {
@@ -55,6 +56,7 @@ func test_on_external_node(m *testing.M) {
 	//// node to be executed externally
 
 	config := cfg.DefaultConfig()
+	config.ChainID = "0x01020304"
 	config.LogLevel = ""
 	root, _ := filepath.Abs("../.tmp/test-localnet0")
 	config.SetRoot(root) //config.SetRoot("/Users/kysee/beatoz_localnet_0")
@@ -64,11 +66,10 @@ func test_on_external_node(m *testing.M) {
 	}
 
 	peer := &PeerMock{
-		ChainID: "test-localnet0",
-		Config:  config,
-		RPCURL:  "http://localhost:26657",
-		WSEnd:   "ws://localhost:26657/websocket",
-		Pass:    []byte("1111"),
+		Config: config,
+		RPCURL: "http://localhost:26657",
+		WSEnd:  "ws://localhost:26657/websocket",
+		Pass:   []byte("1111"),
 	}
 	peers = append(peers, peer)
 	defaultRpcNode = peer

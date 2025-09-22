@@ -2,6 +2,12 @@ package commands
 
 import (
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
@@ -11,12 +17,42 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 )
+
+func Test_ChainId(t *testing.T) {
+	cases := []struct {
+		chainId string
+		isErr   bool
+	}{
+		{"localnet0", false},
+		{"", false},
+		{"0xZZZZ", false},
+		{"0x123", false},
+		{"0x0123", true},
+		{"123", true},
+	}
+	params := &InitParams{
+		ValCnt:               1,
+		ValSecret:            bytes.RandBytes(12),
+		HolderCnt:            1,
+		HolderSecret:         bytes.RandBytes(12),
+		BlockGasLimit:        rand.Int63n(36_000_000),
+		AssumedBlockInterval: "1s",
+		MaxTotalSupply:       1000,
+		InitTotalSupply:      1000,
+		InitVotingPower:      1000,
+	}
+
+	for _, c := range cases {
+		params.ChainID = c.chainId
+		err := params.Validate()
+		if c.isErr {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+		}
+	}
+}
 
 func Test_InitialAmounts(t *testing.T) {
 
@@ -33,7 +69,7 @@ func Test_InitialAmounts(t *testing.T) {
 
 		// gloval variables
 		params := &InitParams{
-			ChainID:              "init-test-chain-id",
+			ChainID:              "0x01",
 			ValCnt:               rand.Intn(100) + 1,
 			ValSecret:            bytes.RandBytes(12),
 			HolderCnt:            rand.Intn(100) + 1,
