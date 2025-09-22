@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -88,10 +89,13 @@ func init() {
 
 // IsHexByteString returns true if the string is a hexadecimal string (satisfying the conditions above)
 // and its length is even (i.e., represents bytes).
-func IsHexByteString(s string, allowPrefix bool) bool {
-	if allowPrefix && len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
-		s = s[2:]
+func IsHexByteString(s string) bool {
+	if len(s) < 2 || !strings.HasPrefix(s, "0x") {
+		return false
 	}
+
+	s = s[2:]
+
 	// check even length
 	if (len(s) & 1) != 0 {
 		return false

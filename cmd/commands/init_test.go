@@ -24,12 +24,14 @@ func Test_ChainId(t *testing.T) {
 		chainId string
 		isErr   bool
 	}{
-		{"localnet0", false},
 		{"", false},
-		{"0xZZZZ", false},
+		{"localnet0", false},
+		{"12aa", false},
+		{"0X12aa", false},
+		{"0x123Z", false},
 		{"0x123", false},
 		{"0x0123", true},
-		{"123", true},
+		{"1234", true},
 	}
 	params := &InitParams{
 		ValCnt:               1,
@@ -47,9 +49,9 @@ func Test_ChainId(t *testing.T) {
 		params.ChainID = c.chainId
 		err := params.Validate()
 		if c.isErr {
-			require.NoError(t, err)
+			require.NoError(t, err, "chainId", params.ChainID)
 		} else {
-			require.Error(t, err)
+			require.Error(t, err, "chainId", params.ChainID)
 		}
 	}
 }

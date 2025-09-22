@@ -333,7 +333,7 @@ func DefaultInitParams() *InitParams {
 }
 
 func (params *InitParams) Validate() error {
-	if !btztypes.IsHexByteString(params.ChainID, true) &&
+	if !btztypes.IsHexByteString(params.ChainID) &&
 		!btztypes.IsNumericString(params.ChainID) {
 		return fmt.Errorf("invalid chain_id: %s", params.ChainID)
 	}

@@ -59,20 +59,13 @@ type EVMCtrler struct {
 	mtx    sync.RWMutex
 }
 
-func strip0x(s string) string {
-	if len(s) > 2 && s[:2] == "0x" {
-		return s[2:]
-	}
-	return s
-}
-
 func chainIdFrom(chainIdStr string) (*big.Int, error) {
-	if strings.HasPrefix(chainIdStr, "0x") {
-		chainId, ret := new(big.Int).SetString(strip0x(chainIdStr), 16)
+	if types.IsHexByteString(chainIdStr) {
+		chainId, ret := new(big.Int).SetString(chainIdStr[2:], 16)
 		if ret {
 			return chainId, nil
 		}
-	} else {
+	} else if types.IsNumericString(chainIdStr) {
 		chainId, ret := new(big.Int).SetString(chainIdStr, 10)
 		if ret {
 			return chainId, nil
