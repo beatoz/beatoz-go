@@ -187,6 +187,7 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	if req.GetChainId() == "" {
 		panic("there is no chain_id")
 	}
+	ctrler.rootConfig.ChainID = req.GetChainId()
 
 	appState, initTotalSupply, xerr := checkRequestInitChain(req)
 	if xerr != nil {
@@ -212,6 +213,11 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(xerr)
 	}
 
+	if xerr := ctrler.vmCtrler.InitLedger(req.ChainId); xerr != nil {
+		ctrler.logger.Error("fail to initialize vm controller", "error", xerr)
+		panic(xerr)
+	}
+
 	appHash, err := appState.Hash()
 	if err != nil {
 		panic(err)
@@ -222,7 +228,6 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
 	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
 	ctrler.lastBlockCtx.SetAppHash(appHash)
-	ctrler.rootConfig.ChainID = req.GetChainId()
 
 	ctrler.logger.Info("InitChain",
 		"chainID", ctrler.lastBlockCtx.ChainID(),

@@ -66,19 +66,19 @@ func strip0x(s string) string {
 	return s
 }
 
-func chainIdFrom(chainIdStr string) *big.Int {
+func chainIdFrom(chainIdStr string) (*big.Int, error) {
 	if strings.HasPrefix(chainIdStr, "0x") {
 		chainId, ret := new(big.Int).SetString(strip0x(chainIdStr), 16)
 		if ret {
-			return chainId
+			return chainId, nil
 		}
 	} else {
 		chainId, ret := new(big.Int).SetString(chainIdStr, 10)
 		if ret {
-			return chainId
+			return chainId, nil
 		}
 	}
-	panic(fmt.Errorf("invalid chain id: %v", chainIdStr))
+	return nil, fmt.Errorf("invalid chain id: %v", chainIdStr)
 }
 
 func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) *EVMCtrler {
@@ -111,14 +111,8 @@ func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, l
 
 	lg := logger.With("module", "beatoz_EVMCtrler")
 
-	chainId := chainIdFrom(config.ChainID)
-	evmChainConfig := defaultEVMChainConfig
-	evmChainConfig.ChainID = chainId
-
-	lg.Info("EVMCtrler", "chainId", chainId)
-
 	return &EVMCtrler{
-		ethChainConfig:  evmChainConfig,
+		ethChainConfig:  defaultEVMChainConfig,
 		ethDB:           db,
 		metadb:          metadb,
 		acctHandler:     acctHandler,
@@ -129,7 +123,16 @@ func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, l
 }
 
 func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
-	// Handle `lastRoot` at here
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	chainId, err := chainIdFrom(req.(string))
+	if err != nil {
+		return xerrors.From(err)
+	}
+	ctrler.ethChainConfig.ChainID = chainId
+	ctrler.logger.Info("InitLedger", "chainId", chainId)
+
 	return nil
 }
 
