@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -196,103 +197,100 @@ func InitFilesWith(
 	} else {
 		var err error
 		var genDoc *tmtypes.GenesisDoc
-		if params.ChainID == "mainnet" {
-			if genDoc, err = genesis.MainnetGenesisDoc(params.ChainID); err != nil {
-				return err
-			}
-		} else if params.ChainID == "testnet" {
-			if genDoc, err = genesis.TestnetGenesisDoc(params.ChainID); err != nil {
-				return err
-			}
-		} else { // anything (e.g. loclanet)
-			//
-			// Initialize consensus parameters
-			consensusParams := &tmproto.ConsensusParams{
-				Block:    tmtypes.DefaultBlockParams(),
-				Evidence: tmtypes.DefaultEvidenceParams(),
-				Validator: tmproto.ValidatorParams{
-					PubKeyTypes: []string{tmtypes.ABCIPubKeyTypeSecp256k1},
-				},
-				Version: tmproto.VersionParams{
-					AppVersion: version.Major(),
-				},
-			}
-			consensusParams.Block.MaxGas = params.BlockGasLimit
 
-			defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
-			if err = tmos.EnsureDir(defaultWalkeyDirPath, acrypto.DefaultWalletKeyDirPerm); err != nil {
-				return err
-			}
-			//
-			// Initialize validators at genesis
-			pow := params.InitVotingPower / int64(len(pvs))
-			rpow := params.InitVotingPower % int64(len(pvs))
-			var valset []tmtypes.GenesisValidator
-			for i, pv := range pvs {
-				if i == len(pvs)-1 {
-					pow += rpow
-				}
-				pubKey, err := pv.GetPubKey()
-				if err != nil {
-					return fmt.Errorf("can't get pubkey: %w", err)
-				}
-				valset = append(valset, tmtypes.GenesisValidator{
-					Address: pubKey.Address(),
-					PubKey:  pubKey,
-					Power:   pow,
-				})
-				logger.Info("GenesisValidator", "address", pubKey.Address(), "power", pow)
-			}
+		//
+		// Initialize consensus parameters
+		consensusParams := &tmproto.ConsensusParams{
+			Block:    tmtypes.DefaultBlockParams(),
+			Evidence: tmtypes.DefaultEvidenceParams(),
+			Validator: tmproto.ValidatorParams{
+				PubKeyTypes: []string{tmtypes.ABCIPubKeyTypeSecp256k1},
+			},
+			Version: tmproto.VersionParams{
+				AppVersion: version.Major(),
+			},
+		}
+		consensusParams.Block.MaxGas = params.BlockGasLimit
 
-			//
-			// Initialize asset holders at genesis
-			walkeys, err := acrypto.CreateWalletKeyFiles(params.HolderSecret, params.HolderCnt, defaultWalkeyDirPath)
+		defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
+		if err = tmos.EnsureDir(defaultWalkeyDirPath, acrypto.DefaultWalletKeyDirPerm); err != nil {
+			return err
+		}
+		//
+		// Initialize validators at genesis
+		pow := params.InitVotingPower / int64(len(pvs))
+		rpow := params.InitVotingPower % int64(len(pvs))
+		var valset []tmtypes.GenesisValidator
+		for i, pv := range pvs {
+			if i == len(pvs)-1 {
+				pow += rpow
+			}
+			pubKey, err := pv.GetPubKey()
 			if err != nil {
-				return err
+				return fmt.Errorf("can't get pubkey: %w", err)
 			}
-			logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
+			valset = append(valset, tmtypes.GenesisValidator{
+				Address: pubKey.Address(),
+				PubKey:  pubKey,
+				Power:   pow,
+			})
+			logger.Info("GenesisValidator", "address", pubKey.Address(), "power", pow)
+		}
 
-			realInitSupply := params.InitTotalSupply - params.InitVotingPower
-			amt := realInitSupply / int64(len(walkeys))
-			ramt := realInitSupply % int64(len(walkeys))
-			holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
-			for i, wk := range walkeys {
-				if i == len(walkeys)-1 {
-					amt += ramt
-				}
-				holders[i] = &genesis.GenesisAssetHolder{
-					Address: wk.Address,
-					Balance: btztypes.ToGrans(amt), // amt * 10^18
-				}
+		//
+		// Initialize asset holders at genesis
+		walkeys, err := acrypto.CreateWalletKeyFiles(params.HolderSecret, params.HolderCnt, defaultWalkeyDirPath)
+		if err != nil {
+			return err
+		}
+		logger.Info("Generated initial holder's wallet key files", "path", defaultWalkeyDirPath)
+
+		realInitSupply := params.InitTotalSupply - params.InitVotingPower
+		amt := realInitSupply / int64(len(walkeys))
+		ramt := realInitSupply % int64(len(walkeys))
+		holders := make([]*genesis.GenesisAssetHolder, len(walkeys))
+		for i, wk := range walkeys {
+			if i == len(walkeys)-1 {
+				amt += ramt
 			}
-			logger.Debug("GenesisAssetHolder", "holders count", len(holders))
-
-			//
-			// Create Governance Parameters
-			blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
-			if err != nil {
-				return err
-			}
-			govParams := types.NewGovParams(int(blockInterval.Seconds()))
-			govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
-
-			appState := &genesis.GenesisAppState{
-				AssetHolders: holders,
-				GovParams:    govParams,
-			}
-
-			//
-			// Create genesis
-			genDoc, err = genesis.NewGenesisDoc(
-				params.ChainID,
-				consensusParams,
-				valset,
-				appState,
-			)
-			if err != nil {
-				return err
+			holders[i] = &genesis.GenesisAssetHolder{
+				Address: wk.Address,
+				Balance: btztypes.ToGrans(amt), // amt * 10^18
 			}
 		}
+		logger.Debug("GenesisAssetHolder", "holders count", len(holders))
+
+		//
+		// Create Governance Parameters
+		blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
+		if err != nil {
+			return err
+		}
+		govParams := types.NewGovParams(int(blockInterval.Seconds()))
+		govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
+
+		appState := &genesis.GenesisAppState{
+			AssetHolders: holders,
+			GovParams:    govParams,
+		}
+
+		//
+		// Create genesis
+
+		bigChainId, err := btztypes.ChainIdFrom(params.ChainID)
+		if err != nil {
+			return err
+		}
+		genDoc, err = genesis.NewGenesisDoc(
+			"0x"+hex.EncodeToString(bigChainId.Bytes()), // write chainId as hex string
+			consensusParams,
+			valset,
+			appState,
+		)
+		if err != nil {
+			return err
+		}
+
 		for _, cb := range callbacks {
 			cb(genDoc)
 		}

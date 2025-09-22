@@ -59,21 +59,6 @@ type EVMCtrler struct {
 	mtx    sync.RWMutex
 }
 
-func chainIdFrom(chainIdStr string) (*big.Int, error) {
-	if types.IsHexByteString(chainIdStr) {
-		chainId, ret := new(big.Int).SetString(chainIdStr[2:], 16)
-		if ret {
-			return chainId, nil
-		}
-	} else if types.IsNumericString(chainIdStr) {
-		chainId, ret := new(big.Int).SetString(chainIdStr, 10)
-		if ret {
-			return chainId, nil
-		}
-	}
-	return nil, fmt.Errorf("invalid chain id: %v", chainIdStr)
-}
-
 func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) *EVMCtrler {
 	metadb, err := tmdb.NewDB("heightRootHash", "goleveldb", config.DBDir())
 	if err != nil {
@@ -119,7 +104,7 @@ func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	chainId, err := chainIdFrom(req.(string))
+	chainId, err := types.ChainIdFrom(req.(string))
 	if err != nil {
 		return xerrors.From(err)
 	}
