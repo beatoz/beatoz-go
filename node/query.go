@@ -34,7 +34,7 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 
 	switch req.Path {
 	case "chain_id":
-		response.Value = []byte(ctrler.rootConfig.ChainID)
+		response.Value = ctrler.rootConfig.ChainId().Bytes()
 	case "block_height":
 		val := make([]byte, 8)
 		binary.BigEndian.PutUint64(val, uint64(ctrler.lastBlockCtx.Height()))

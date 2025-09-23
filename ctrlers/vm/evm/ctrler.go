@@ -89,6 +89,7 @@ func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, l
 
 	lg := logger.With("module", "beatoz_EVMCtrler")
 
+	defaultEVMChainConfig.ChainID = config.ChainId()
 	return &EVMCtrler{
 		ethChainConfig:  defaultEVMChainConfig,
 		ethDB:           db,
@@ -104,12 +105,7 @@ func (ctrler *EVMCtrler) InitLedger(req interface{}) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	chainId, err := types.ChainIdFrom(req.(string))
-	if err != nil {
-		return xerrors.From(err)
-	}
-	ctrler.ethChainConfig.ChainID = chainId
-	ctrler.logger.Info("InitLedger", "chainId", chainId)
+	ctrler.logger.Info("InitLedger", "chainId", ctrler.ethChainConfig.ChainID)
 
 	return nil
 }

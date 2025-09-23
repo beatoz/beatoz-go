@@ -44,7 +44,10 @@ func AddInitFlags(cmd *cobra.Command) {
 		&initParams.ChainID,
 		"chain_id",
 		initParams.ChainID, // default name
-		"the id of chain to generate (e.g. mainnet, testnet, devnet and others)")
+		"the id of chain to generate.\n"+
+			"mainnet = 12495059(0xBEA8D3)\n"+
+			"testnet = 13543635(0xCEA8D3)\n"+
+			"devnet  = 14592211(0xDEA8D3) and others")
 	cmd.Flags().IntVar(
 		&initParams.HolderCnt,
 		"holders",
