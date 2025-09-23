@@ -3,6 +3,9 @@ package types
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"reflect"
+	"sync"
+
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -10,8 +13,6 @@ import (
 	"github.com/holiman/uint256"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
-	"reflect"
-	"sync"
 )
 
 type GovParams struct {
@@ -42,7 +43,7 @@ func NewGovParams(interval int) *GovParams {
 			MaxIndividualPowerRate:    33,                                // 33%
 			MinBondingBlocks:          2 * WeekSeconds / int64(interval), // 2 weeks blocks
 			MinSignedBlocks:           500,
-			LazyUnbondingBlocks:       2 * WeekSeconds / int64(interval),                              // 2 weeks blocks
+			LazyUnbondingBlocks:       30 * DaySeconds / int64(interval),                              // 2 weeks blocks
 			XMaxTotalSupply:           uint256.MustFromDecimal("700000000000000000000000000").Bytes(), // 700,000,000 BEATOZ
 			InflationWeightPermil:     3,                                                              // 0.003
 			InflationCycleBlocks:      WeekSeconds / int64(interval),                                  // 1 weeks blocks

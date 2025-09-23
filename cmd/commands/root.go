@@ -2,9 +2,10 @@ package commands
 
 import (
 	"fmt"
-	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"os"
 	"strings"
+
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	rootConfig = cfg.DefaultConfig()
+	rootConfig = cfg.DefaultConfig("0")
 	logger     = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
 )
 
@@ -41,7 +42,7 @@ func ParseConfig() (*cfg.Config, error) {
 	if err := conf.ValidateBasic(); err != nil {
 		return nil, fmt.Errorf("error in rootConfig file: %v", err)
 	}
-	return &cfg.Config{conf, ""}, nil
+	return cfg.DefaultConfigWith(conf, "0"), nil
 }
 
 // RootCmd is the root command for Tendermint core.

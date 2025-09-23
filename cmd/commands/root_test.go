@@ -2,12 +2,13 @@ package commands
 
 import (
 	"fmt"
-	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

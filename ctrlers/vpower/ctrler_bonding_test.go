@@ -791,11 +791,11 @@ func makeBondingTrxCtx(fromAcct *web3.Wallet, to types.Address, power int64, hei
 		govMock.MinTrxGas(), govMock.GasPrice(),
 		types.PowerToAmount(power),
 	)
-	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainID); err != nil {
+	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainIdHex()); err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	txCtx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainID, height, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	txCtx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainIdHex(), height, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -813,11 +813,11 @@ func makeUnbondingTrxCtx(fromAcct *web3.Wallet, to types.Address, height int64, 
 		govMock.MinTrxGas(), govMock.GasPrice(),
 		txhash,
 	)
-	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainID); err != nil {
+	if _, _, err := fromAcct.SignTrxRLP(tx, config.ChainIdHex()); err != nil {
 		return nil, xerrors.From(err)
 	}
 
-	txCtx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainID, height, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	txCtx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainIdHex(), height, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	if xerr != nil {
 		return nil, xerr
 	}

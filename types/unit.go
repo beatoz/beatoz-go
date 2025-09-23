@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 )

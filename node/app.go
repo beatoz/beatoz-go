@@ -145,8 +145,9 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
-					Height: lastHeight,
-					Time:   tmtime.Canonical(time.Now()),
+					ChainID: ctrler.rootConfig.ChainIdHex(),
+					Height:  lastHeight,
+					Time:    tmtime.Canonical(time.Now()),
 				},
 			},
 			ctrler.govCtrler, ctrler.acctCtrler, ctrler.vmCtrler, ctrler.supplyCtrler, ctrler.vpowCtrler,
@@ -163,7 +164,15 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	}
 
 	// get chain_id
-	ctrler.rootConfig.ChainID = ctrler.lastBlockCtx.ChainID()
+	if ctrler.lastBlockCtx.ChainID() != "" {
+		chainId, err := types.ChainIdFrom(ctrler.lastBlockCtx.ChainID())
+		if err != nil {
+			panic(err)
+		}
+		if chainId.Cmp(ctrler.rootConfig.ChainId()) != 0 {
+			panic(fmt.Errorf("chain_id is not same: genesis(%v), actual(%v)", ctrler.rootConfig.ChainId(), chainId))
+		}
+	}
 
 	ctrler.logger.Info("last block information",
 		"chainID", ctrler.lastBlockCtx.ChainID(),
@@ -183,11 +192,6 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 
 // InitChain is called only when the ResponseInfo::LastBlockHeight which is returned in Info() is 0.
 func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	// set and put chain_id
-	if req.GetChainId() == "" {
-		panic("there is no chain_id")
-	}
-
 	appState, initTotalSupply, xerr := checkRequestInitChain(req)
 	if xerr != nil {
 		ctrler.logger.Error("wrong request", "error", xerr)
@@ -212,6 +216,11 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		panic(xerr)
 	}
 
+	if xerr := ctrler.vmCtrler.InitLedger(req.ChainId); xerr != nil {
+		ctrler.logger.Error("fail to initialize vm controller", "error", xerr)
+		panic(xerr)
+	}
+
 	appHash, err := appState.Hash()
 	if err != nil {
 		panic(err)
@@ -222,7 +231,6 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
 	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
 	ctrler.lastBlockCtx.SetAppHash(appHash)
-	ctrler.rootConfig.ChainID = req.GetChainId()
 
 	ctrler.logger.Info("InitChain",
 		"chainID", ctrler.lastBlockCtx.ChainID(),

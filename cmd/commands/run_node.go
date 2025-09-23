@@ -3,6 +3,12 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/node"
@@ -11,11 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/log"
 	tmp2p "github.com/tendermint/tendermint/p2p"
-	"io"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
+	"github.com/tendermint/tendermint/types"
 )
 
 var (
@@ -118,6 +120,18 @@ func NewRunNodeCmd(nodeProvider node.Provider) *cobra.Command {
 			if err := checkGenesisHash(rootConfig); err != nil {
 				return err
 			}
+
+			// get chainId from genesis file
+			data, err := os.ReadFile(rootConfig.GenesisFile())
+			if err != nil {
+				return fmt.Errorf("can't open genesis file: %w", err)
+			}
+			genDoc, err := types.GenesisDocFromJSON(data)
+			if err != nil {
+				return fmt.Errorf("can't parse genesis file: %w", err)
+			}
+			rootConfig.SetChainId(genDoc.ChainID)
+			logger.Info("BEATOZ Blockchain", "ChainId", rootConfig.ChainId())
 
 			var s []byte
 			if privValSecretFeederAddr != "" {

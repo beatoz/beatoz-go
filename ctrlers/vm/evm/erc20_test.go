@@ -50,7 +50,7 @@ type TruffleBuild struct {
 
 func init() {
 	btzCfg = cfg.DefaultConfig()
-	btzCfg.ChainID = "0xDEA8D3"
+	btzCfg.SetChainId("0xDEA8D3")
 	btzCfg.RootDir = os.TempDir()
 	btzCfg.DBPath = "evm-test-db"
 

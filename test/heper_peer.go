@@ -3,6 +3,11 @@ package test
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/beatoz/beatoz-go/cmd/commands"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/genesis"
@@ -16,10 +21,6 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmnode "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/types"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 var (
@@ -28,7 +29,6 @@ var (
 
 type PeerMock struct {
 	PeerIdx int
-	ChainID string
 	Config  *cfg.Config
 	nd      *tmnode.Node
 	RPCURL  string
@@ -37,13 +37,13 @@ type PeerMock struct {
 	Pass []byte
 }
 
-func NewPeerMock(chain string, id int, p2pPort, rpcPort int, logLevel string) *PeerMock {
-	config := cfg.DefaultConfig()
+func NewPeerMock(id int, p2pPort, rpcPort int, logLevel string) *PeerMock {
+	config := cfg.DefaultConfig("1212")
 	config.LogLevel = logLevel
 	config.P2P.AllowDuplicateIP = true
 	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
 	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
-	config.Config.Moniker = fmt.Sprintf("peer-%v@%v", id, chain)
+	config.Config.Moniker = fmt.Sprintf("peer-%v@%v", id, config.ChainId())
 	config.SetRoot(filepath.Join(os.TempDir(), fmt.Sprintf("beatoz_test_%v", id)))
 	_ = os.RemoveAll(config.RootDir) // reset root directory
 	tmcfg.EnsureRoot(config.RootDir)
@@ -54,7 +54,6 @@ func NewPeerMock(chain string, id int, p2pPort, rpcPort int, logLevel string) *P
 
 	return &PeerMock{
 		PeerIdx: id,
-		ChainID: chain,
 		Config:  config,
 		RPCURL:  fmt.Sprintf("http://localhost:%d", rpcPort),
 		WSEnd:   fmt.Sprintf("ws://localhost:%d/websocket", rpcPort),
@@ -96,7 +95,7 @@ func (peer *PeerMock) SetPass(pass []byte) {
 
 func (peer *PeerMock) Init(valCnt int) error {
 	initParams := commands.DefaultInitParams()
-	initParams.ChainID = peer.ChainID
+	initParams.ChainID = peer.Config.ChainIdHex()
 	initParams.ValCnt = valCnt
 	initParams.ValSecret = peer.Pass
 	initParams.HolderCnt = 500
@@ -189,7 +188,7 @@ func runPeers(n int) {
 			//ll = "beatoz:debug,beatoz_VPowerCtrler:debug,*:error"
 			ll = "*:error"
 		}
-		_peer := NewPeerMock("beatoz_test_chain", i, 46656+i, 36657+i, ll)
+		_peer := NewPeerMock(i, 46656+i, 36657+i, ll)
 		if err := _peer.Init(1); err != nil { // with only one validator
 			panic(err)
 		}

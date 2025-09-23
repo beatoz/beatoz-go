@@ -1,6 +1,10 @@
 package supply
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
 	btzcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	acctmock "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
@@ -11,9 +15,6 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 var (
@@ -24,7 +25,7 @@ var (
 
 func init() {
 	rootDir := filepath.Join(os.TempDir(), "supply-test")
-	config = btzcfg.DefaultConfig()
+	config = btzcfg.DefaultConfig("1234")
 	config.SetRoot(rootDir)
 
 	govMock = govmock.NewGovHandlerMock(types.NewGovParams(1))
@@ -46,7 +47,7 @@ func Test_InitLedger(t *testing.T) {
 	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetHeight())
 	require.Equal(t, int64(1), ctrler.lastTotalSupply.GetAdjustHeight())
 
-	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, nil, nil, nil, nil)
+	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), 1, govMock, nil, nil, nil, nil)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 	require.NoError(t, ctrler.Close())
