@@ -55,8 +55,7 @@ func test_on_internal_node(m *testing.M) {
 func test_on_external_node(m *testing.M) {
 	//// node to be executed externally
 
-	config := cfg.DefaultConfig()
-	config.ChainID = "0x01020304"
+	config := cfg.DefaultConfig("0x01020304")
 	config.LogLevel = ""
 	root, _ := filepath.Abs("../.tmp/test-localnet0")
 	config.SetRoot(root) //config.SetRoot("/Users/kysee/beatoz_localnet_0")

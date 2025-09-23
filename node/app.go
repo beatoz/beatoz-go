@@ -145,7 +145,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
-					ChainID: ctrler.rootConfig.ChainId().String(),
+					ChainID: ctrler.rootConfig.ChainIdHex(),
 					Height:  lastHeight,
 					Time:    tmtime.Canonical(time.Now()),
 				},

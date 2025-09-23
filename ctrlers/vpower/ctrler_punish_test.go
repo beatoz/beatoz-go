@@ -1,14 +1,15 @@
 package vpower
 
 import (
+	"math/rand"
+	"os"
+	"testing"
+
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"math/rand"
-	"os"
-	"testing"
 )
 
 func Test_Slash_Byzantine(t *testing.T) {
@@ -94,7 +95,7 @@ func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
+	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
 	require.NoError(t, mocks.DoBeginBlock(ctrler))
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
@@ -205,7 +206,7 @@ func Test_Punish_MissingBlock(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
+	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
 	require.NoError(t, mocks.DoAllProcess(ctrler))
 
 	targetValWal := valWallets0[rand.Intn(len(valWallets0))]

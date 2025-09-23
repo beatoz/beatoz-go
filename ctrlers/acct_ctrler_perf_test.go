@@ -1,6 +1,14 @@
 package ctrlers
 
 import (
+	"math/rand"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/account"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
@@ -10,13 +18,6 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sync"
-	"testing"
-	"time"
 )
 
 var (
@@ -31,7 +32,7 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 	bcfg := config.DefaultConfig()
 	bcfg.SetRoot(root)
 	bcfg.DBPath = base
-	bcfg.ChainID = "test_chain_id"
+	bcfg.SetChainId("1234")
 
 	_ctrler, xerr := account.NewAcctCtrler(bcfg, tmlog.NewNopLogger())
 	if xerr != nil {
@@ -49,7 +50,7 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 
 		// randomly create transfer transactions
 		tx := web3.NewTrxTransfer(w.Address(), types2.RandAddress(), w.GetNonce(), govHandler.MinTrxGas(), govHandler.GasPrice(), uint256.NewInt(rand.Uint64()))
-		if bz, _, err := w.SignTrxRLP(tx, bcfg.ChainID); err != nil {
+		if bz, _, err := w.SignTrxRLP(tx, bcfg.ChainIdHex()); err != nil {
 			panic(err)
 		} else if tx.Sig = bz; tx.Sig == nil {
 			panic("not reachable")
@@ -79,7 +80,7 @@ func Benchmark_AcctCtrler_ASync_ByChannel(b *testing.B) {
 		chIn := make(chan int, mempoolSize/runtime.NumCPU()+1)
 		chIns = append(chIns, chIn)
 		go makeTrxCtxRoutineEx(chIn, txs,
-			bcfg.ChainID,
+			bcfg.ChainIdHex(),
 			govHandler,
 			acctCtrler,
 			func(_txctx *types.TrxContext) xerrors.XError {
@@ -139,7 +140,7 @@ func Benchmark_AcctCtrler_ASync(b *testing.B) {
 				defer wg.Done()
 
 				txbz := txs[rand.Intn(len(txs))]
-				txctx := _makeTrxCtx(txbz, bcfg.ChainID, govHandler, acctCtrler)
+				txctx := _makeTrxCtx(txbz, bcfg.ChainIdHex(), govHandler, acctCtrler)
 
 				mtx.Lock()
 				txctxs = append(txctxs, txctx)
@@ -170,7 +171,7 @@ func Benchmark_AcctCtrler_Sync(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < mempoolSize; j++ {
-			bctx := types.TempBlockContext(bcfg.ChainID, rand.Int63(), time.Now(), govHandler, acctCtrler, nil, nil, nil)
+			bctx := types.TempBlockContext(bcfg.ChainIdHex(), rand.Int63(), time.Now(), govHandler, acctCtrler, nil, nil, nil)
 			txbz := txs[rand.Intn(len(txs))]
 			txctx, xerr := types.NewTrxContext(txbz,
 				bctx, // issue #39: set block time expected to be executed.

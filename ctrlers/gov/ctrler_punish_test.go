@@ -2,6 +2,11 @@ package gov
 
 import (
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
@@ -13,10 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 func Test_Punish_By_BlockProcess(t *testing.T) {
@@ -24,7 +25,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	rootPath := filepath.Join(os.TempDir(), "gov-punish-test")
 	localCfg := cfg.DefaultConfig()
 	localCfg.SetRoot(rootPath)
-	localCfg.ChainID = "gov-punish-test-chain"
+	localCfg.SetChainId("1234")
 
 	require.NoError(t, os.RemoveAll(rootPath))
 
@@ -32,8 +33,8 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	require.NoError(t, xerr)
 	localGovCtrler.GovParams = *(types.DefaultGovParams())
 
-	bctx := mocks.InitBlockCtxWith(localCfg.ChainID, 1, localGovCtrler, acctMock, nil, nil, vpowMock)
-	bctx.SetChainID(localCfg.ChainID)
+	bctx := mocks.InitBlockCtxWith(localCfg.ChainIdHex(), 1, localGovCtrler, acctMock, nil, nil, vpowMock)
+	bctx.SetChainID(localCfg.ChainIdHex())
 
 	voterAddr := vpowMock.PickAddress(vpowMock.ValCnt - 1)
 	expectedvoterPower := vpowMock.TotalPowerOf(voterAddr)
@@ -43,12 +44,12 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	require.NoError(t, err)
 	tx := web3.NewTrxProposal(
 		voterAddr, btztypes.ZeroAddress(), 1, defMinGas, defGasPrice,
-		localCfg.ChainID,
+		localCfg.ChainIdHex(),
 		10,
 		localGovCtrler.MinVotingPeriodBlocks(),
 		10+localGovCtrler.MinVotingPeriodBlocks()+localGovCtrler.LazyApplyingBlocks(),
 		proposal.PROPOSAL_GOVPARAMS, bzOpt) // it will be used to test wrong start height
-	_ = signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), localCfg.ChainID)
+	_ = signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), localCfg.ChainIdHex())
 	txbz, xerr := tx.Encode()
 	require.NoError(t, xerr)
 	txctx, xerr := types.NewTrxContext(txbz, bctx, true)

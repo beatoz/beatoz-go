@@ -37,13 +37,13 @@ type PeerMock struct {
 	Pass []byte
 }
 
-func NewPeerMock(chainId string, id int, p2pPort, rpcPort int, logLevel string) *PeerMock {
-	config := cfg.DefaultConfig()
+func NewPeerMock(id int, p2pPort, rpcPort int, logLevel string) *PeerMock {
+	config := cfg.DefaultConfig("1212")
 	config.LogLevel = logLevel
 	config.P2P.AllowDuplicateIP = true
 	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
 	config.RPC.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", rpcPort)
-	config.Config.Moniker = fmt.Sprintf("peer-%v@%v", id, chainId)
+	config.Config.Moniker = fmt.Sprintf("peer-%v@%v", id, config.ChainId())
 	config.SetRoot(filepath.Join(os.TempDir(), fmt.Sprintf("beatoz_test_%v", id)))
 	_ = os.RemoveAll(config.RootDir) // reset root directory
 	tmcfg.EnsureRoot(config.RootDir)
@@ -51,7 +51,6 @@ func NewPeerMock(chainId string, id int, p2pPort, rpcPort int, logLevel string) 
 	if err := config.ValidateBasic(); err != nil {
 		panic(fmt.Errorf("error in rootConfig file: %v", err))
 	}
-	config.ChainID = chainId
 
 	return &PeerMock{
 		PeerIdx: id,
@@ -96,7 +95,7 @@ func (peer *PeerMock) SetPass(pass []byte) {
 
 func (peer *PeerMock) Init(valCnt int) error {
 	initParams := commands.DefaultInitParams()
-	initParams.ChainID = peer.Config.ChainID
+	initParams.ChainID = peer.Config.ChainIdHex()
 	initParams.ValCnt = valCnt
 	initParams.ValSecret = peer.Pass
 	initParams.HolderCnt = 500
@@ -189,7 +188,7 @@ func runPeers(n int) {
 			//ll = "beatoz:debug,beatoz_VPowerCtrler:debug,*:error"
 			ll = "*:error"
 		}
-		_peer := NewPeerMock(fmt.Sprintf("0x%04x", i+1), i, 46656+i, 36657+i, ll)
+		_peer := NewPeerMock(i, 46656+i, 36657+i, ll)
 		if err := _peer.Init(1); err != nil { // with only one validator
 			panic(err)
 		}

@@ -1,6 +1,11 @@
 package node
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
@@ -13,10 +18,6 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	tmsync "github.com/tendermint/tendermint/libs/sync"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 func Test_InitChain(t *testing.T) {
@@ -75,7 +76,7 @@ func Benchmark_TxLifeCycle(b *testing.B) {
 	jz, err := jsonx.Marshal(appState)
 	require.NoError(b, err)
 
-	btxcfg := config.DefaultConfig()
+	btxcfg := config.DefaultConfig("1234")
 	btxcfg.SetRoot(filepath.Join(b.TempDir(), "bench-beatoz-app"))
 	btzApp := NewBeatozApp(btxcfg, log.NewNopLogger())
 	btzClient := NewBeatozLocalClient(&tmsync.Mutex{}, btzApp)
@@ -104,13 +105,13 @@ func Benchmark_TxLifeCycle(b *testing.B) {
 	}()
 
 	_ = btzApp.BeginBlock(abcitypes.RequestBeginBlock{
-		Header: tmproto.Header{Height: 1, ChainID: btxcfg.ChainID},
+		Header: tmproto.Header{Height: 1, ChainID: btxcfg.ChainIdHex()},
 	})
 	_ = btzApp.EndBlock(abcitypes.RequestEndBlock{Height: 1})
 	_ = btzApp.Commit()
 
 	_ = btzApp.BeginBlock(abcitypes.RequestBeginBlock{
-		Header: tmproto.Header{Height: 2, ChainID: btxcfg.ChainID},
+		Header: tmproto.Header{Height: 2, ChainID: btxcfg.ChainIdHex()},
 	})
 
 	b.ResetTimer()
@@ -124,7 +125,7 @@ func Benchmark_TxLifeCycle(b *testing.B) {
 		from.AddNonce()
 		to := types2.RandAddress()
 		tx := web3.NewTrxTransfer(from.Address(), to, nonce, btzApp.govCtrler.MinTrxGas(), btzApp.govCtrler.GasPrice(), uint256.NewInt(1))
-		_, _, err := from.SignTrxRLP(tx, btxcfg.ChainID)
+		_, _, err := from.SignTrxRLP(tx, btxcfg.ChainIdHex())
 		require.NoError(b, err)
 		bztx, err := tx.Encode()
 		require.NoError(b, err)

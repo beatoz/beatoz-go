@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"math/big"
 
 	"github.com/beatoz/beatoz-go/types"
@@ -58,4 +59,8 @@ func (c *Config) ChainId() *big.Int {
 // ChainID is override BaseConfig.ChainID() of tendermint
 func (c *Config) ChainID() *big.Int {
 	return c.chainId
+}
+
+func (c *Config) ChainIdHex() string {
+	return "0x" + hex.EncodeToString(c.chainId.Bytes())
 }

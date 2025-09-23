@@ -1,6 +1,11 @@
 package vpower
 
 import (
+	"os"
+	"path/filepath"
+	"sort"
+	"testing"
+
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
@@ -14,10 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/rand"
-	"os"
-	"path/filepath"
-	"sort"
-	"testing"
 )
 
 var (
@@ -50,7 +51,7 @@ func Test_NewValidatorSet(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
 
-	_ = mocks.InitBlockCtxWith(config.ChainID, 1, govMock, acctMock, nil, nil, ctrler)
+	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), 1, govMock, acctMock, nil, nil, ctrler)
 
 	var expectedValUps []types.ValidatorUpdate
 
