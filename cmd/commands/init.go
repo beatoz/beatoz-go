@@ -280,7 +280,7 @@ func InitFilesWith(
 		//
 		// Create genesis
 
-		bigChainId, err := btztypes.ChainIdFrom(params.ChainID)
+		bigChainId, err := btztypes.ChainIdInt(params.ChainID)
 		if err != nil {
 			return err
 		}

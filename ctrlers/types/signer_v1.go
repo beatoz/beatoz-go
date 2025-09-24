@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -16,12 +15,8 @@ type SignerV1 struct {
 	chainId *big.Int
 }
 
-func NewSignerV1(chainId string) *SignerV1 {
-	_chainId, err := types.ChainIdFrom(chainId)
-	if err != nil {
-		panic(err)
-	}
-	return &SignerV1{chainId: _chainId}
+func NewSignerV1(chainId *big.Int) *SignerV1 {
+	return &SignerV1{chainId: chainId}
 }
 
 func (s *SignerV1) SignSender(tx *Trx, prvBytes bytes.HexBytes) (bytes.HexBytes, error) {

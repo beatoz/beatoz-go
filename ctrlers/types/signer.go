@@ -16,39 +16,49 @@ type ISigner interface {
 	VerifyPayer(*Trx) (bytes.HexBytes, bytes.HexBytes, xerrors.XError)
 }
 
-func init() {
+var signerV0 *SignerV0
+var signerV1 *SignerV1
 
+func InitSigner(chainId string) {
+	signerV0 = NewSignerV0(chainId)
+
+	_chainId, err := types.ChainIdInt(chainId)
+	if err != nil {
+		panic(err)
+	}
+	signerV1 = NewSignerV1(_chainId)
+}
+
+func getSigner(chainId string, v byte) (ISigner, xerrors.XError) {
+	switch v {
+	case 0, 1:
+		// In signerV0, the type of chainId is string. If chainId is a hex string,
+		// case-sensitivity issues may occur. Therefore, it is safer to enforce using
+		// the chainId recorded in the current block.
+		// The signing side will use the chainId from genesis, which is the same
+		// as the chainId in the block.
+		signerV0.chainId = chainId
+		return signerV0, nil
+	case 27, 28:
+		return signerV1, nil
+	default:
+		return nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("invalid v value - %v", v))
+	}
 }
 
 func VerifyTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
-	var signer ISigner
-
-	v := tx.Sig[64]
-	switch v {
-	case 0, 1:
-		signer = NewSignerV0(chainId)
-	case 27, 28:
-		signer = NewSignerV1(chainId)
-	default:
-		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("invalid v value - %v", v))
+	signer, xerr := getSigner(chainId, tx.Sig[64])
+	if xerr != nil {
+		return nil, nil, xerr
 	}
-
 	return signer.VerifySender(tx)
 }
 
 func VerifyPayerTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
-	var signer ISigner
-
-	v := tx.PayerSig[64]
-	switch v {
-	case 0, 1:
-		signer = NewSignerV0(chainId)
-	case 27, 28:
-		signer = NewSignerV1(chainId)
-	default:
-		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("invalid v value - %v", v))
+	signer, xerr := getSigner(chainId, tx.PayerSig[64])
+	if xerr != nil {
+		return nil, nil, xerr
 	}
-
 	return signer.VerifyPayer(tx)
 }
 

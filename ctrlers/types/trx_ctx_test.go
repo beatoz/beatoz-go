@@ -1,6 +1,9 @@
 package types_test
 
 import (
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -10,12 +13,10 @@ import (
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 var (
-	chainId  = "test_trx_ctx_chain"
+	chainId  = "0x1234"
 	govMock  = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	acctMock = acct.NewAcctHandlerMock(1000)
 )

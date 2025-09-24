@@ -165,7 +165,8 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 
 	// get chain_id
 	if ctrler.lastBlockCtx.ChainID() != "" {
-		chainId, err := types.ChainIdFrom(ctrler.lastBlockCtx.ChainID())
+		// it's not first time to run
+		chainId, err := types.ChainIdInt(ctrler.lastBlockCtx.ChainID())
 		if err != nil {
 			panic(err)
 		}
@@ -173,6 +174,9 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 			panic(fmt.Errorf("chain_id is not same: genesis(%v), actual(%v)", ctrler.rootConfig.ChainId(), chainId))
 		}
 	}
+
+	// create signers
+	ctrlertypes.InitSigner(ctrler.rootConfig.ChainIdHex())
 
 	ctrler.logger.Info("last block information",
 		"chainID", ctrler.lastBlockCtx.ChainID(),

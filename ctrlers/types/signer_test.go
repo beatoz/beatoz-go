@@ -15,13 +15,16 @@ import (
 	ctrtypes "github.com/beatoz/beatoz-go/ctrlers/types"
 )
 
+func init() {
+	ctrtypes.InitSigner(chainId)
+}
+
 func TestSignerV0_Recover(t *testing.T) {
 	senderWal := web3.NewWallet([]byte("1"))
 	require.NoError(t, senderWal.Unlock([]byte("1")))
 	payerWal := web3.NewWallet([]byte("1"))
 	require.NoError(t, payerWal.Unlock([]byte("1")))
 
-	chainId := "0xabcd"
 	tx := &ctrtypes.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
@@ -84,7 +87,6 @@ func TestSignerV1_Recover(t *testing.T) {
 	payerWal := web3.ImportKey(payerPrvBz, []byte("1"))
 	require.NoError(t, payerWal.Unlock([]byte("1")))
 
-	chainId := "0xabcd"
 	tx := &ctrtypes.Trx{
 		Version:  1,
 		Time:     time.Now().UnixNano(),
@@ -99,10 +101,12 @@ func TestSignerV1_Recover(t *testing.T) {
 	}
 
 	//
-	signer := ctrtypes.NewSignerV1(chainId)
+	chainIdInt, err := types.ChainIdInt(chainId)
+	require.NoError(t, err)
+	signer := ctrtypes.NewSignerV1(chainIdInt)
 
 	// for Sender
-	_, err := signer.SignSender(tx, senderPrvBz)
+	_, err = signer.SignSender(tx, senderPrvBz)
 	require.NoError(t, err)
 
 	addr, pubBytes1, err := signer.VerifySender(tx)
