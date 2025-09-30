@@ -1,15 +1,16 @@
 package gov
 
 import (
+	"time"
+
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"time"
 )
 
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 
-	txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, "", height, time.Now(), exec, govCtrler, acctMock, nil, nil, vpowMock)
+	txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, govTestChainId, height, time.Now(), exec, govCtrler, acctMock, nil, nil, vpowMock)
 	if xerr != nil {
 		panic(xerr)
 	}

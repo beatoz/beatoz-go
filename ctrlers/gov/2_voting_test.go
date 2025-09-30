@@ -1,6 +1,8 @@
 package gov
 
 import (
+	"testing"
+
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
@@ -10,7 +12,6 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (
@@ -28,7 +29,7 @@ func init() {
 	txProposal := web3.NewTrxProposal(
 		vpowMock.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(txProposal, vpowMock.PickAddress(1), "")
+	_ = signTrx(txProposal, vpowMock.PickAddress(1), govTestChainId)
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -40,24 +41,24 @@ func init() {
 	// no error
 	tx0 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx0, vpowMock.PickAddress(0), "")
+	_ = signTrx(tx0, vpowMock.PickAddress(0), govTestChainId)
 	// no right
 	tx1 := web3.NewTrxVoting(vpowMock.PickAddress(vpowMock.ValCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt), "")
+	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt), govTestChainId)
 
 	// invalid payload params : wrong choice
 	tx2 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 1)
-	_ = signTrx(tx2, vpowMock.PickAddress(0), "")
+	_ = signTrx(tx2, vpowMock.PickAddress(0), govTestChainId)
 	// invalid payload params : wrong choice
 	tx3 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, -1)
-	_ = signTrx(tx3, vpowMock.PickAddress(0), "")
+	_ = signTrx(tx3, vpowMock.PickAddress(0), govTestChainId)
 	// not found result
 	tx4 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		bytes.RandBytes(32), 0)
-	_ = signTrx(tx4, vpowMock.PickAddress(0), "")
+	_ = signTrx(tx4, vpowMock.PickAddress(0), govTestChainId)
 
 	// test cases #1
 	voteTestCases1 = []*Case{
@@ -81,7 +82,7 @@ func init() {
 		//}
 		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
 			trxCtxProposal.TxHash, choice)
-		_ = signTrx(tx, addr, "")
+		_ = signTrx(tx, addr, govTestChainId)
 		txs = append(txs, tx)
 	}
 

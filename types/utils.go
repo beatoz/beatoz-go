@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -64,7 +65,7 @@ func IsNumericString(s string) bool {
 	return true
 }
 
-func ChainIdFrom(chainIdStr string) (*big.Int, error) {
+func ChainIdInt(chainIdStr string) (*big.Int, error) {
 	if IsHexByteString(chainIdStr) {
 		chainId, ret := new(big.Int).SetString(chainIdStr[2:], 16)
 		if ret {
@@ -77,4 +78,8 @@ func ChainIdFrom(chainIdStr string) (*big.Int, error) {
 		}
 	}
 	return nil, fmt.Errorf("invalid chain id: %v", chainIdStr)
+}
+
+func ChainIdHex(chainId *big.Int) string {
+	return "0x" + hex.EncodeToString(chainId.Bytes())
 }

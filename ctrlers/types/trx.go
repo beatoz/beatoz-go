@@ -1,16 +1,15 @@
 package types
 
 import (
-	"fmt"
+	"io"
+	"time"
+
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	"google.golang.org/protobuf/proto"
-	"io"
-	"time"
 )
 
 const (
@@ -48,8 +47,8 @@ type trxRLP struct {
 	Payload  bytes.HexBytes
 	Sig      bytes.HexBytes
 
-	Payer    types.Address  `rlp:"-"`
-	PayerSig bytes.HexBytes `rlp:"-"`
+	//Payer    types.Address  `rlp:"-"`
+	//PayerSig bytes.HexBytes `rlp:"-"`
 }
 
 type ITrxPayload interface {
@@ -159,8 +158,8 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 		Type:     uint64(tx.Type),
 		Payload:  payload,
 		Sig:      tx.Sig,
-		Payer:    tx.Payer,
-		PayerSig: tx.PayerSig,
+		//Payer:    tx.Payer,
+		//PayerSig: tx.PayerSig,
 	}
 	return rlp.Encode(w, tmpTx)
 }
@@ -182,8 +181,8 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 	tx.GasPrice = new(uint256.Int).SetBytes(rtx.GasPrice)
 	tx.Type = int32(rtx.Type)
 	tx.Sig = rtx.Sig
-	tx.Payer = rtx.Payer
-	tx.PayerSig = rtx.PayerSig
+	//tx.Payer = rtx.Payer
+	//tx.PayerSig = rtx.PayerSig
 
 	var payload ITrxPayload
 	if rtx.Payload != nil && len(rtx.Payload) > 0 {
@@ -390,69 +389,4 @@ func TrxTypeString(t int32) string {
 	default:
 		return "unknown"
 	}
-}
-
-func VerifyTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
-	preimg, xerr := GetPreimageSenderTrxRLP(tx, chainId)
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	fromAddr, pubKey, xerr := crypto.Sig2Addr(preimg, tx.Sig)
-	if xerr != nil {
-		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(xerr)
-	}
-	if bytes.Compare(fromAddr, tx.From) != 0 {
-		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong address(or sig) - expected: %v, actual: %v", tx.From, fromAddr))
-	}
-	return fromAddr, pubKey, nil
-}
-
-func GetPreimageSenderTrxRLP(tx *Trx, chainId string) ([]byte, xerrors.XError) {
-	sig, payer, payerSig := tx.Sig, tx.Payer, tx.PayerSig
-	tx.Sig, tx.Payer, tx.PayerSig = nil, nil, nil
-	defer func() {
-		tx.Sig = sig
-		tx.Payer = payer
-		tx.PayerSig = payerSig
-	}()
-
-	bz, err := rlp.EncodeToBytes(tx)
-	if err != nil {
-		return nil, xerrors.From(err)
-	}
-	prefix := fmt.Sprintf("\x19BEATOZ(%s) Signed Message:\n%d", chainId, len(bz))
-	return append([]byte(prefix), bz...), nil
-}
-
-func VerifyPayerTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
-	preimg, xerr := GetPreimagePayerTrxRLP(tx, chainId)
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	payerAddr, pubKey, xerr := crypto.Sig2Addr(preimg, tx.PayerSig)
-	if xerr != nil {
-		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(xerr)
-	}
-	if bytes.Compare(payerAddr, tx.Payer) != 0 {
-		return nil, nil, xerrors.ErrInvalidTrxSig.Wrap(fmt.Errorf("wrong payer(or sig) - expected: %v, actual: %v", tx.Payer, payerAddr))
-	}
-	return payerAddr, pubKey, nil
-}
-
-func GetPreimagePayerTrxRLP(tx *Trx, chainId string) ([]byte, xerrors.XError) {
-	payer, sig := tx.Payer, tx.PayerSig
-	tx.Payer, tx.PayerSig = nil, nil
-	defer func() {
-		tx.Payer = payer
-		tx.PayerSig = sig
-	}()
-
-	bz, err := rlp.EncodeToBytes(tx)
-	if err != nil {
-		return nil, xerrors.From(err)
-	}
-	prefix := fmt.Sprintf("\x19BEATOZ(%s) Signed Message:\n%d", chainId, len(bz))
-	return append([]byte(prefix), bz...), nil
 }

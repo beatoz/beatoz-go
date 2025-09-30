@@ -25,7 +25,7 @@ func init() {
 	newTrx := web3.NewTrxProposal(
 		vpowMock.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test improving governance parameters proposal", 15, 259200, 518400+15, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(newTrx, vpowMock.PickAddress(1), "")
+	_ = signTrx(newTrx, vpowMock.PickAddress(1), govTestChainId)
 	newTrxContext = makeTrxCtx(newTrx, 1, true)
 	if xerr := runTrx(newTrxContext); xerr != nil {
 		panic(xerr)
@@ -40,7 +40,7 @@ func init() {
 		choice := int32(0)
 		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
 			newTrxContext.TxHash, choice)
-		_ = signTrx(tx, addr, "")
+		_ = signTrx(tx, addr, govTestChainId)
 		txs = append(txs, tx)
 	}
 
