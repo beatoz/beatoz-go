@@ -2,23 +2,21 @@ package rpc
 
 import (
 	"encoding/binary"
+	"math/big"
+	"regexp"
+	"strconv"
+
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
-	"regexp"
-	"strconv"
 )
 
 func EthChainId(ctx *tmrpctypes.Context) (string, error) {
-	//if resp, err := tmrpccore.ABCIQuery(ctx, "chain_id", nil, 0, false); err != nil {
-	//	return "", err
-	//} else {
-	//	return "0x" + hex.EncodeToString(resp.Response.Value), nil
-	//}
-
-	// todo: Implement chain id as number type
-	// This chain ID encodes a modulo-based mapping onto 'beatoz'.
-	return "0xbed83", nil
+	if resp, err := tmrpccore.ABCIQuery(ctx, "chain_id", nil, 0, false); err != nil {
+		return "", err
+	} else {
+		return "0x" + new(big.Int).SetBytes(resp.Response.Value).Text(16), nil
+	}
 }
 
 func EthGetBlockNumber(ctx *tmrpctypes.Context) (string, error) {
