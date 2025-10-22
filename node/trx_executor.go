@@ -24,15 +24,14 @@ func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 }
 
 func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	xerr := validateTrx(ctx)
+	var xerr xerrors.XError
+
+	xerr = validateTrx(ctx)
 	if xerr != nil {
 		return xerr
 	}
-	xerr = runTrx(ctx)
-	if xerr != nil {
-		return xerr
-	}
-	return nil
+
+	return runTrx(ctx)
 }
 
 func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -43,6 +42,16 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	// (after the account balance and nonce have been updated by the previous tx execution.)
 	//
 	tx := ctx.Tx
+
+	remainedBlockGas := ctx.BlockContext.GetBlockGasRemained()
+	if remainedBlockGas <= 0 || remainedBlockGas < tx.Gas {
+		return xerrors.ErrInvalidGas.Wrapf("blockGasLimit(%v), used(%v), remained(%v), txGasWanted(%v)",
+			ctx.BlockContext.GetBlockGasLimit(),
+			ctx.BlockContext.GetBlockGasUsed(),
+			remainedBlockGas,
+			ctx.Tx.Gas,
+		)
+	}
 
 	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
 	if bytes.Compare(ctx.Sender.Address, ctx.Payer.Address) != 0 {
@@ -62,6 +71,7 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if xerr := ctx.Sender.CheckNonce(tx.Nonce); xerr != nil {
 		return xerr.Wrap(fmt.Errorf("ledger: %v, tx:%v, address: %v, txhash: %X", ctx.Sender.GetNonce(), tx.Nonce, ctx.Sender.Address, ctx.TxHash))
 	}
+
 	return nil
 }
 
@@ -102,23 +112,16 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	var xerr xerrors.XError
-
-	// In case of EVM Tx, the EVMCtrler directly handles the block gas pool.
-	if !ctx.IsHandledByEVM() {
-		// consuming gas in gas pool
-		if xerr = ctx.BlockContext.UseBlockGas(ctx.Tx.Gas); xerr != nil {
-			return xerr.Wrapf("blockGasLimit(%v), blockGasUsed(%v), txGasWanted(%v)",
-				ctx.BlockContext.GetBlockGasLimit(),
-				ctx.BlockContext.GetBlockGasUsed(), ctx.Tx.Gas,
-			)
-		}
-
-		defer func() {
+	defer func() {
+		if ctx.Exec || xerr == nil {
+			_xerr0 := postRunTrx(ctx)
 			if xerr != nil {
-				ctx.BlockContext.RefundBlockGas(ctx.Tx.Gas)
+				xerr = xerr.Wrap(_xerr0)
+			} else {
+				xerr = _xerr0
 			}
-		}()
-	}
+		}
+	}()
 
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
@@ -149,17 +152,15 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		return xerrors.ErrUnknownTrxType
 	}
 
-	if xerr = postRunTrx(ctx); xerr != nil {
-		return xerr
-	}
-
 	return nil
 }
 
 func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	// In case of EVM Tx, ctx.GasUsed has been already computed in EVMCtrler.
+	// In case of EVM Tx, ctx.GasUsed has been already computed by EVMCtrler.
+	// In case of EVM Tx, the block gas pool has been already handled by EVMCtrler.
 	if !ctx.IsHandledByEVM() {
 		ctx.GasUsed = ctx.Tx.Gas
+		_ = ctx.BlockContext.UseBlockGas(ctx.Tx.Gas)
 	}
 	// processing fee = gas * gasPrice
 	fee := types.GasToFee(ctx.GasUsed, ctx.Tx.GasPrice)
@@ -179,6 +180,5 @@ func postRunTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			return xerr
 		}
 	}
-	// set used gas
 	return nil
 }

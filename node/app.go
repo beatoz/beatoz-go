@@ -284,10 +284,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 		return abcitypes.ResponseCheckTx{
 			Code:      abcitypes.CodeTypeOK,
-			GasWanted: txctx.Tx.Gas,
-			GasUsed:   txctx.GasUsed,
 			Log:       "",
 			Data:      txctx.RetData,
+			GasWanted: txctx.Tx.Gas,
+			GasUsed:   txctx.GasUsed,
 		}
 	case abcitypes.CheckTxType_Recheck:
 		// do Tx validation minimally
@@ -465,94 +465,6 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	return abcitypes.ResponseBeginBlock{
 		Events: beginBlockEvents,
 	}
-}
-
-// DEPRECATED
-func (ctrler *BeatozApp) deliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-
-	txctx, xerr := ctrlertypes.NewTrxContext(req.Tx,
-		ctrler.currBlockCtx,
-		true)
-	if xerr != nil {
-		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		ctrler.logger.Error("deliverTxSync", "error", xerr)
-
-		var events []abcitypes.Event
-		if txctx != nil && txctx.Tx != nil {
-			// add event
-			events = append(events, abcitypes.Event{
-				Type: "tx",
-				Attributes: []abcitypes.EventAttribute{
-					{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-					{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
-				},
-			})
-		}
-
-		return abcitypes.ResponseDeliverTx{
-			Code:   xerr.Code(),
-			Log:    xerr.Error(),
-			Events: events,
-		}
-
-	}
-	ctrler.currBlockCtx.AddTxsCnt(1)
-
-	xerr = ctrler.txExecutor.ExecuteSync(txctx)
-	if xerr != nil {
-		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
-		ctrler.logger.Error("deliverTxSync", "error", xerr)
-
-		// add event
-		txctx.Events = append(txctx.Events, abcitypes.Event{
-			Type: "tx",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
-			},
-		})
-
-		return abcitypes.ResponseDeliverTx{
-			Code:   xerr.Code(),
-			Log:    xerr.Error(),
-			Data:   txctx.RetData, // in case of evm, there may be return data when tx is failed.
-			Events: txctx.Events,
-		}
-	} else {
-
-		ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
-
-		// add event
-		txctx.Events = append(txctx.Events, abcitypes.Event{
-			Type: "tx",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte("0"), Index: false},
-			},
-		})
-
-		return abcitypes.ResponseDeliverTx{
-			Code:      abcitypes.CodeTypeOK,
-			GasWanted: txctx.Tx.Gas,
-			GasUsed:   txctx.GasUsed,
-			Data:      txctx.RetData,
-			Events:    txctx.Events,
-		}
-	}
-}
-
-// DEPRECATED
-func (ctrler *BeatozApp) DeliverTxSync(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	ctrler.mtx.Lock()
-	defer ctrler.mtx.Unlock()
-
-	return ctrler.deliverTxSync(req)
 }
 
 func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {

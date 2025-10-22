@@ -5,6 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -19,11 +25,6 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"io/ioutil"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 var (
@@ -209,6 +210,9 @@ func testEstimateGas(t *testing.T) {
 	//require.Equal(t, int64(0), retTx.CheckTx.GasUsed)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)
 	require.Equal(t, int64(0), retTx.DeliverTx.GasUsed)
+
+	// Although the previous tx is failed, the nonce was increased.
+	require.NoError(t, creator.SyncBalance(bzweb3))
 
 	// success
 	retTx, err = evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), estimatedGas, defGasPrice, uint256.NewInt(0), bzweb3)
