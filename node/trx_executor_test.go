@@ -85,7 +85,7 @@ func Test_commonValidation(t *testing.T) {
 	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInsufficientFund.Error())
 }
 
-func Test_Gas_FailTx(t *testing.T) {
+func Test_Gas_FailedTx(t *testing.T) {
 	w0 := acctMock.RandWallet() //web3.NewWallet(nil)
 	w1 := web3.NewWallet(nil)
 
@@ -161,6 +161,10 @@ func Test_Gas_FailTx(t *testing.T) {
 	require.Equal(t, usedGas0+gas, bctx.GetBlockGasUsed())
 	fee = types.GasToFee(txctx.GasUsed, txctx.Tx.GasPrice)
 	require.Equal(t, new(uint256.Int).Sub(balance0, new(uint256.Int).Add(fee, amt)).Dec(), w0.GetBalance().Dec())
+}
+
+func Test_Gas_FailedTx_EVM(t *testing.T) {
+
 }
 
 func Test_AdjustBlockGasLimit(t *testing.T) {

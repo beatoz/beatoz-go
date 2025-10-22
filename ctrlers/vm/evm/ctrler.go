@@ -31,11 +31,34 @@ var (
 	lastBlockHeightKey = []byte("lbh")
 
 	// ChainID values
-	// mainnet = 12495059 /*0xBEA8D3*/
-	// testnet = 13543635 /*0xCEA8D3*/
-	// devnet  = 14592211 /*0xDEA8D3*/
+	// devnet0  = 12496257 /*0xBEAD81*/
+	// testnet0 = 12496258 /*0xBEAD82*/
+	// mainnet  = 12496259 /*0xBEAD83*/
 	defaultEVMChainConfig = &params.ChainConfig{
-		big.NewInt(0), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(params.EthashConfig), nil,
+		big.NewInt(0),
+		big.NewInt(0),
+		nil,
+		false,
+		big.NewInt(0),
+		common.Hash{},
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+		new(params.EthashConfig),
+		nil,
 	}
 )
 
@@ -158,11 +181,10 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	}
 
 	if uint64(ctx.Tx.Gas) < gas {
-		return xerrors.ErrInvalidGas.Wrapf("invalid gas: %v, needed: %v", ctx.Tx.Gas, gas)
+		return xerrors.ErrInvalidGas.Wrapf("invalid gas: expected(%v+) got(%v)", gas, ctx.Tx.Gas)
 	}
 
 	if ctx.Exec == false {
-		// `GasUsed` will be used to simulate in `ExecuteTrx`.
 		ctx.GasUsed = int64(gas)
 	}
 
@@ -216,10 +238,14 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		return xerr
 	}
 
+	// Although the tx is failed, the gas should be still used.
+	// Gas pool is already decreased by buyGas and refundGas in EVM
+	ctx.GasUsed = int64(evmResult.UsedGas)
+	ctx.RetData = evmResult.ReturnData
+
 	if evmResult.Failed() {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		ctrler.stateDBWrapper.Finish()
-		ctx.RetData = evmResult.ReturnData
 		return xerrors.From(evmResult.Err)
 	}
 
@@ -232,11 +258,6 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	} else {
 		ctrler.lastRootHash = ctrler.stateDBWrapper.IntermediateRoot(ctrler.ethChainConfig.IsEIP158(blockNumber)).Bytes()
 	}
-
-	// Gas is already applied to accounts and gas pool by buyGas and refundGas in EVM
-	// the `EVM` handles nonce, amount and gas.
-	ctx.GasUsed = int64(evmResult.UsedGas)
-	ctx.RetData = evmResult.ReturnData
 
 	//
 	// Add events from evm logs.
