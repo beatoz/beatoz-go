@@ -340,7 +340,10 @@ func TestPoc3(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, resp2.CheckTx.Code, resp2.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeDeliverTx, resp2.DeliverTx.Code)
-	nonce--
+
+	// If the tx is failed in CheckTx, the nonce is not increased.
+	// But if the tx is failed in DeliverTx, the nonce is increased.
+	//nonce--
 
 	contAcct = getAccountData(contractAddr)
 	require.Equal(t, _amt.Dec(), contAcct.Balance)
@@ -360,6 +363,8 @@ func TestPoc3(t *testing.T) {
 	resp2 = &coretypes.ResultBroadcastTxCommit{}
 	err = jsonx.Unmarshal(resp.Result, resp2)
 	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, resp2.CheckTx.Code, resp2.CheckTx.Log)
+	require.Equal(t, xerrors.ErrCodeSuccess, resp2.DeliverTx.Code, resp2.DeliverTx.Log)
 
 	contAcct = getAccountData(contractAddr)
 	fmt.Println("contract balance", contAcct.Balance)
@@ -371,10 +376,6 @@ func TestPoc3(t *testing.T) {
 }
 
 func TestPoC4(t *testing.T) {
-	// the contract tx to EOA (not contract address) is rejected.
-	// so, the following test is not available.
-	return
-
 	bzweb3 := beatozweb3.NewBeatozWeb3(beatozweb3.NewHttpProvider(defaultRpcNode.RPCURL))
 
 	walletMain := randCommonWallet() // don't use randWallet(). if the validator wallet is selected, balance check is fail.
@@ -429,7 +430,8 @@ func TestPoC4(t *testing.T) {
 	// set accessedObjAddrs - walletMain
 	bytedata, _ := hex.DecodeString("1234")
 	trx1 := web3.NewTrxContract(walletB.Address(), walletMain.Address(), walletB.GetNonce(), bigGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
-	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
+	// trx1 should be rejected
+	//_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	// transfer all money to walletMoneCopy with NewTrxTransfer
 	// now, beatoz state is changed but evm state is not changed
@@ -441,7 +443,8 @@ func TestPoC4(t *testing.T) {
 	// use evm stated(accessedObjAddrs[walletMain] is true)
 	// overwrite walletMain's state(balance)
 	trx3 := web3.NewTrxContract(walletA.Address(), walletMain.Address(), walletA.GetNonce(), bigGas, defGasPrice, uint256.MustFromDecimal("1"), bytedata)
-	_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
+	// trx3 should be rejected
+	//_ = expectedMainBalance.Add(expectedMainBalance, uint256.MustFromDecimal("1"))
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -452,13 +455,14 @@ func TestPoC4(t *testing.T) {
 		require.NoError(t, err)
 		//submitTrxAsync(walletB, trx1)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 60, bzweb3)
-		require.NoError(t, err)
-		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+		retTx, err := waitTrxResult(retAsync.Hash, 5, bzweb3)
+		require.Error(t, err)
+		//require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code)
+		require.Nil(t, retTx)
 
 		wg.Done()
 
-		fmt.Println("tx0", retTx.Hash, "height", retTx.Height)
+		fmt.Println("tx0: error")
 	}()
 	wg.Add(1)
 	go func() {
@@ -467,7 +471,7 @@ func TestPoC4(t *testing.T) {
 		require.NoError(t, err)
 		//submitTrxAsync(walletMain, trx2)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 60, bzweb3)
+		retTx, err := waitTrxResult(retAsync.Hash, 5, bzweb3)
 		require.NoError(t, err)
 		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
 
@@ -483,12 +487,13 @@ func TestPoC4(t *testing.T) {
 		require.NoError(t, err)
 		//submitTrxAsync(walletA, trx3)
 
-		retTx, err := waitTrxResult(retAsync.Hash, 60, bzweb3)
-		require.NoError(t, err)
-		require.Equal(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code, retTx.TxResult.Log)
+		retTx, err := waitTrxResult(retAsync.Hash, 5, bzweb3)
+		require.Error(t, err)
+		//require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.TxResult.Code)
+		require.Nil(t, retTx)
 
 		wg.Done()
-		fmt.Println("tx2", retTx.Hash, "height", retTx.Height)
+		fmt.Println("tx2: error")
 	}()
 
 	wg.Wait()

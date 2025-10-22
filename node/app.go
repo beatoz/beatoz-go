@@ -284,10 +284,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 		return abcitypes.ResponseCheckTx{
 			Code:      abcitypes.CodeTypeOK,
-			GasWanted: txctx.Tx.Gas,
-			GasUsed:   txctx.GasUsed,
 			Log:       "",
 			Data:      txctx.RetData,
+			GasWanted: txctx.Tx.Gas,
+			GasUsed:   txctx.GasUsed,
 		}
 	case abcitypes.CheckTxType_Recheck:
 		// do Tx validation minimally

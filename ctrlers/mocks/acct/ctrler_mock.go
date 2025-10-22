@@ -167,8 +167,12 @@ func (mock *AcctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XE
 }
 
 func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	_ = ctx.Sender.SubBalance(ctx.Tx.Amount)
-	_ = ctx.Receiver.AddBalance(ctx.Tx.Amount)
+	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
+		return xerr
+	}
+	if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+		return xerr
+	}
 	return nil
 }
 
