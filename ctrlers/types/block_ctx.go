@@ -282,6 +282,12 @@ func (bctx *BlockContext) RefundBlockGas(gas int64) {
 	//
 }
 
+func (bctx *BlockContext) GetBlockGasRemained() int64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+	return int64(bctx.blockGasPool.Gas())
+}
+
 func (bctx *BlockContext) GetBlockGasPool() *ethcore.GasPool {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
