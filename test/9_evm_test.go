@@ -204,15 +204,11 @@ func testEstimateGas(t *testing.T) {
 	fmt.Println("estimatedGas", estimatedGas, "wrongGas", wrongGas)
 	retTx, err := evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), wrongGas, defGasPrice, uint256.NewInt(0), bzweb3)
 	require.NoError(t, err)
-	// In CheckTx, the evm tx is not fully executed,
-	// So, the error, out of gas, doesn't occur.
-	//require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.CheckTx.Code, retTx.CheckTx.Log)
-	//require.Equal(t, int64(0), retTx.CheckTx.GasUsed)
 	require.NotEqual(t, xerrors.ErrCodeSuccess, retTx.DeliverTx.Code, retTx.DeliverTx.Log)
-	require.Equal(t, int64(0), retTx.DeliverTx.GasUsed)
-
+	// Although the tx is failed, the gas should be used.
+	require.NotEqual(t, int64(0), retTx.DeliverTx.GasUsed, "gasUsed", retTx.DeliverTx.GasUsed)
 	// Although the previous tx is failed, the nonce was increased.
-	require.NoError(t, creator.SyncBalance(bzweb3))
+	require.NoError(t, creator.SyncAccount(bzweb3))
 
 	// success
 	retTx, err = evmContract.ExecCommit("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, creator.GetNonce(), estimatedGas, defGasPrice, uint256.NewInt(0), bzweb3)
@@ -237,7 +233,7 @@ func testNonceDup(t *testing.T) {
 	require.Equal(t, xerrors.ErrCodeSuccess, retTx.Code, retTx.Log)
 
 	// Expected error for same nonce
-	// The txs that are handled by `EVMCtrler`, the nonce validation has been not performed in `CheckTx` phase.
+	// In case of the txs handled by `EVMCtrler`, the nonce validation has not been performed in `CheckTx` phase.
 	// After that bug is fixed, the error should be occurred.
 	retTx, err = evmContract.ExecSync("transfer", []interface{}{rAddr.Array20(), uint256.NewInt(100).ToBig()}, creator, nonce, estimatedGas /*contractGas*/, defGasPrice, uint256.NewInt(0), bzweb3)
 	require.NoError(t, err)
