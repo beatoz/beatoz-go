@@ -3,10 +3,11 @@ package libs
 import (
 	"bytes"
 	"fmt"
-	rbytes "github.com/beatoz/beatoz-go/types/bytes"
-	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"os/signal"
+
+	rbytes "github.com/beatoz/beatoz-go/types/bytes"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func ClearCredential(c []byte) {
@@ -14,6 +15,11 @@ func ClearCredential(c []byte) {
 }
 
 func ReadCredential(prompt string) []byte {
+	// check environment variable
+	if envPassword := os.Getenv("BEATOZ_WALKEY_SECRET"); envPassword != "" {
+		return []byte(envPassword)
+	}
+
 	var ret []byte
 	if terminal.IsTerminal(int(os.Stdin.Fd())) {
 		ret = readFromTERM(prompt, int(os.Stdin.Fd()))

@@ -51,7 +51,7 @@ ifeq ($(HOSTOS), windows)
 	OUTPUT=$(BUILDDIR)/beatoz.exe
 endif
 
-.PHONY: all pbm $(TARGETOS) deploy
+.PHONY: all pbm $(TARGETOS) docker-build
 
 all: pbm $(TARGETOS)
 
@@ -88,3 +88,17 @@ check:
 	@echo "HOSTOS: $(HOSTOS)"
 	@echo "HOSTARCH: $(HOSTARCH)"
 	@echo "MAKECMDGOALS $(MAKECMDGOALS)"
+
+docker-build:
+	@echo "[docker-build] Building Docker image with version $(VERTAG)-$(GITCOMMIT)"
+	@docker build --progress=plain \
+		--build-arg VERSION=$(VERTAG) \
+		--build-arg GITCOMMIT=$(GITCOMMIT) \
+		-t beatoz-re:latest \
+		-t beatoz-re:$(VERTAG) \
+		-t beatoz-re:$(VERTAG)-$(GITCOMMIT) \
+		.
+	@echo "[docker-build] Docker images created:"
+	@echo "  - beatoz-re:latest"
+	@echo "  - beatoz-re:$(VERTAG)"
+	@echo "  - beatoz-re:$(VERTAG)-$(GITCOMMIT)"
