@@ -79,16 +79,6 @@ install: $(TARGETOS)
 clean-pbm:
 	@find . -type f -name "*.pb.go" -exec rm -f {} +
 
-clean:
-	@echo "[$(@)] Clean build..."
-	@rm -rf $(BUILDDIR)
-
-check:
-	@echo "GOPATH": $(LOCAL_GOPATH)
-	@echo "HOSTOS: $(HOSTOS)"
-	@echo "HOSTARCH: $(HOSTARCH)"
-	@echo "MAKECMDGOALS $(MAKECMDGOALS)"
-
 docker-build:
 	@echo "[docker-build] Building Docker image with version $(VERTAG)-$(GITCOMMIT)"
 	@docker build --progress=plain \
@@ -102,3 +92,14 @@ docker-build:
 	@echo "  - beatoz-re:latest"
 	@echo "  - beatoz-re:$(VERTAG)"
 	@echo "  - beatoz-re:$(VERTAG)-$(GITCOMMIT)"
+
+
+clean:
+	@echo "[$(@)] Clean build..."
+	@rm -rf $(BUILDDIR)
+
+check:
+	@echo "GOPATH": $(LOCAL_GOPATH)
+	@echo "HOSTOS: $(HOSTOS)"
+	@echo "HOSTARCH: $(HOSTARCH)"
+	@echo "MAKECMDGOALS $(MAKECMDGOALS)"

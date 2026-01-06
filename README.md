@@ -75,6 +75,14 @@ This will create three tagged images:
 
 ### Run with Docker
 
+**Pull Image from Docker Hub:**
+
+```bash
+docker pull beatoz/beatoz-re:latest
+```
+
+**Note**: If you already have the image locally, `docker run` will use the local image. To get the latest version, run `docker pull` first.
+
 **Quick Start (ephemeral):**
 
 Run without data persistence (container data is lost on restart):
@@ -86,7 +94,7 @@ docker run -d \
   -p 26657:26657 \
   -p 26658:26658 \
   --restart unless-stopped \
-  beatoz-re:latest
+  beatoz/beatoz-re:latest
 ```
 
 **With Data Persistence:**
@@ -99,9 +107,9 @@ docker run -d \
   -p 26656:26656 \
   -p 26657:26657 \
   -p 26658:26658 \
-  -v $(pwd)/beatoz-docker:/root/.beatoz \
+  -v ./beatoz-docker:/root/.beatoz \
   --restart unless-stopped \
-  beatoz-re:latest
+  beatoz/beatoz-re:latest
 ```
 
 **View Logs:**
@@ -138,28 +146,3 @@ The following environment variables are set in the Docker image:
 - `BEATOZ_WALKEY_SECRET`: Password for wallet keys (default: "unsafe_password")
 
 **⚠️ WARNING**: The pre-generated keys are for testing only. **DO NOT USE THESE KEYS ON MAINNET!**
-
-### Advanced: Docker Compose
-
-For convenience, you can also use docker-compose:
-
-```bash
-# Start
-docker-compose -f docker/docker-compose.yml up -d
-
-# View logs
-docker-compose -f docker/docker-compose.yml logs -f
-
-# Stop
-docker-compose -f docker/docker-compose.yml down
-```
-
-**Note**: By default, docker-compose mounts `./beatoz-docker` directory to persist blockchain data. The volume is defined in `docker/docker-compose.yml`:
-
-```yaml
-volumes:
-  - ./beatoz-docker:/root/.beatoz
-```
-
-To disable data persistence and use the pre-initialized config from the Docker image, comment out the `volumes` section in `docker/docker-compose.yml`.
-

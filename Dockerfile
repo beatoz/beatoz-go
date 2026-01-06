@@ -6,20 +6,20 @@ ARG VERSION
 ARG GITCOMMIT
 
 # Install build dependencies
-RUN apk add --no-cache git make gcc musl-dev linux-headers
+RUN apk add --no-cache git make gcc musl-dev linux-headers protobuf-dev protoc
 
-# Set working directory
-WORKDIR /build
+# Set working directory to match GOPATH structure
+WORKDIR /go/src/github.com/beatoz/beatoz-go
 
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source code
+# Copy all source code
 COPY . .
 
+# Download dependencies and install protoc-gen-go plugin
+RUN go mod download && \
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
 # Build the binary with version info
-RUN VERTAG=${VERSION} GITCOMMIT=${GITCOMMIT} make linux
+RUN make pbm && VERTAG=${VERSION} GITCOMMIT=${GITCOMMIT} make linux
 
 # Runtime stage
 FROM alpine:latest
@@ -28,7 +28,7 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates
 
 # Copy binary and entrypoint script from builder
-COPY --from=builder /build/build/linux/beatoz /usr/local/bin/beatoz
+COPY --from=builder /go/src/github.com/beatoz/beatoz-go/build/linux/beatoz /usr/local/bin/beatoz
 COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Set working directory

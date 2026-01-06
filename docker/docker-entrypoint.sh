@@ -1,10 +1,12 @@
 #!/bin/sh
 set -e
 
+CHAIN_ID="0x1234"
+
 # Initialize if needed (for volume mount scenarios)
 if [ ! -f /root/.beatoz/config/genesis.json ]; then
-  echo 'Config not found. Initializing beatoz...'
-  beatoz init --chain_id 0x1234 --home /root/.beatoz --assumed_block_interval 1s
+  echo 'Config not found genesis.json. Initializing beatoz...'
+  beatoz init --chain_id ${CHAIN_ID} --home /root/.beatoz --assumed_block_interval 1s
   echo 'Initialization complete.'
 fi
 
@@ -26,7 +28,7 @@ echo '=== DO NOT USE THESE PRIVATE KEYS ON MAINNET !!! ==='
 echo '===                                              ==='
 echo '===================================================='
 echo ''
-echo 'ChainID: 0x1234'
+echo "ChainID: ${CHAIN_ID}"
 nodeId=$(beatoz show-node-id --home /root/.beatoz)
 echo "NodeID:  $nodeId"
 echo ''
