@@ -35,4 +35,4 @@ echo ''
 echo "Starting beatoz $(beatoz version) ..."
 
 # Execute beatoz with passed arguments
-exec beatoz "$@" --rpc.laddr "tcp://0.0.0.0:26657" --rpc.cors_allowed_origins "*"
+exec beatoz "$@"
