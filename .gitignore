@@ -5,3 +5,7 @@
 any_test/
 build/
 documents/site/
+beatoz-docker/
+
+# Generated protobuf files
+*.pb.go
