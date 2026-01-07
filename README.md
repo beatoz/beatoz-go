@@ -144,3 +144,41 @@ The following environment variables are set in the Docker image:
 - `BEATOZ_WALKEY_SECRET`: Password for wallet keys (default: "unsafe_password")
 
 **⚠️ WARNING**: The pre-generated keys are for testing only. **DO NOT USE THESE KEYS ON MAINNET!**
+
+## API Documentation
+
+BEATOZ provides a comprehensive JSON-RPC API for interacting with the blockchain.
+
+### Generate API Documentation
+
+Generate OpenAPI specification and Swagger UI:
+
+```bash
+make docs
+```
+
+This will create:
+- `docs/openapi.yaml` - OpenAPI 3.0 specification
+- `docs/swagger/index.html` - Interactive Swagger UI
+
+### View API Documentation
+
+Open `docs/swagger/index.html` in your web browser to view the interactive API documentation.
+
+The documentation includes:
+- All available RPC endpoints
+- Request/response schemas
+- Try-it-out functionality
+- Example requests and responses
+
+### API Endpoints
+
+The BEATOZ RPC API is available at `http://localhost:26657` by default.
+
+**Available API endpoints:**
+- Account queries (`/account`, `/delegatee`, `/stakes`, `/reward`)
+- Blockchain queries (`/validators`, `/total_supply`, `/total_txfee`)
+- Transaction queries (`/tx_search`, `/txn`)
+- Governance queries (`/gov_params`, `/proposal`, `/proposals`)
+- VM operations (`/vm_call`, `/vm_estimate_gas`)
+- Event subscription (`/subscribe`, `/unsubscribe`)

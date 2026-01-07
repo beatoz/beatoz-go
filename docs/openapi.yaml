@@ -1,0 +1,1675 @@
+openapi: 3.0.3
+info:
+  title: BEATOZ Blockchain RPC API
+  description: |
+    BEATOZ Blockchain JSON-RPC API Documentation
+
+    This API provides access to the BEATOZ blockchain data and functionality.
+
+    **Base URL**: http://localhost:26657
+
+    **Note**: This is a JSON-RPC API. All endpoints are accessed via HTTP GET requests with query parameters.
+  version: 1.0.0
+  contact:
+    name: BEATOZ Team
+    url: https://github.com/beatoz/beatoz-go
+
+servers:
+  - url: https://rpc-devnet0.beatoz.io
+    description: Development Network
+  - url: https://rpc-testnet0.beatoz.io
+    description: Test Network
+  - url: http://localhost:26657
+    description: Local development server
+
+paths:
+  /account:
+    get:
+      summary: Query account information by address
+      operationId: account
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: addr
+          in: query
+          required: true
+          description: "Account address (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /delegatee:
+    get:
+      summary: Query delegatee information by address
+      operationId: delegatee
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: addr
+          in: query
+          required: true
+          description: "Delegatee address (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /stakes:
+    get:
+      summary: Query stakes information by address
+      operationId: stakes
+      tags:
+        - Staking
+      parameters:
+        - name: addr
+          in: query
+          required: true
+          description: "Address (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /stakes/total_power:
+    get:
+      summary: Query total staking power
+      operationId: stakes/total_power
+      tags:
+        - Staking
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /stakes/voting_power:
+    get:
+      summary: Query total voting power
+      operationId: stakes/voting_power
+      tags:
+        - Staking
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /reward:
+    get:
+      summary: Query reward information by address
+      operationId: reward
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: addr
+          in: query
+          required: true
+          description: "Address (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /total_supply:
+    get:
+      summary: Query total token supply
+      operationId: total_supply
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /total_txfee:
+    get:
+      summary: Query total transaction fees
+      operationId: total_txfee
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /proposals:
+    get:
+      summary: Query proposal information
+      operationId: proposals
+      tags:
+        - Governance
+      parameters:
+        - name: txhash
+          in: query
+          required: true
+          description: "Transaction hash (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /proposal:
+    get:
+      summary: Query proposal information
+      operationId: proposal
+      tags:
+        - Governance
+      parameters:
+        - name: txhash
+          in: query
+          required: true
+          description: "Transaction hash (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /rule:
+    get:
+      summary: Query governance parameters (deprecated, use gov_params)
+      operationId: rule
+      tags:
+        - Governance
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /gov_params:
+    get:
+      summary: Query governance parameters
+      operationId: gov_params
+      tags:
+        - Governance
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscribe:
+    get:
+      summary: Subscribe to events (WebSocket only)
+      operationId: subscribe
+      tags:
+        - WebSocket
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: "Event query string"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultSubscribe'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /unsubscribe:
+    get:
+      summary: Unsubscribe from events (WebSocket only)
+      operationId: unsubscribe
+      tags:
+        - WebSocket
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: "Event query string"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultUnsubscribe'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /tx_search:
+    get:
+      summary: Search transactions
+      operationId: tx_search
+      tags:
+        - WebSocket
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: "Search query"
+          schema:
+            type: string
+        - name: prove
+          in: query
+          required: false
+          description: "Include proof"
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          description: "Page number"
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          required: false
+          description: "Results per page"
+          schema:
+            type: integer
+        - name: order_by
+          in: query
+          required: false
+          description: "Order by (asc/desc)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultTxSearch'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /validators:
+    get:
+      summary: Query validators
+      operationId: validators
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+        - name: page
+          in: query
+          required: false
+          description: "Page number"
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          required: false
+          description: "Results per page"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultValidators'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /vm_call:
+    get:
+      summary: Call VM (read-only)
+      operationId: vm_call
+      tags:
+        - Virtual Machine
+      parameters:
+        - name: addr
+          in: query
+          required: true
+          description: "Caller address (hex bytes)"
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          description: "Contract address (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+        - name: data
+          in: query
+          required: true
+          description: "Call data (hex bytes)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /vm_estimate_gas:
+    get:
+      summary: Estimate gas for VM call
+      operationId: vm_estimate_gas
+      tags:
+        - Virtual Machine
+      parameters:
+        - name: addr
+          in: query
+          required: true
+          description: "Caller address (hex bytes)"
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          description: "Contract address (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+        - name: data
+          in: query
+          required: true
+          description: "Call data (hex bytes)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /txn:
+    get:
+      summary: Query transaction information
+      operationId: txn
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /health:
+    get:
+      summary: Check node health
+      operationId: health
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultHealth'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /status:
+    get:
+      summary: Get node status
+      operationId: status
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultStatus'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /net_info:
+    get:
+      summary: Get network info
+      operationId: net_info
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultNetInfo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /blockchain:
+    get:
+      summary: Get blockchain info between min and max height
+      operationId: blockchain
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: minHeight
+          in: query
+          required: false
+          description: "Minimum block height"
+          schema:
+            type: integer
+        - name: maxHeight
+          in: query
+          required: false
+          description: "Maximum block height"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBlockchainInfo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /genesis:
+    get:
+      summary: Get genesis file
+      operationId: genesis
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultGenesis'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /genesis_chunked:
+    get:
+      summary: Get genesis file in chunks
+      operationId: genesis_chunked
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: chunk
+          in: query
+          required: true
+          description: "Chunk number"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultGenesisChunk'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /block:
+    get:
+      summary: Get block at a given height
+      operationId: block
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBlock'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /block_by_hash:
+    get:
+      summary: Get block by hash
+      operationId: block_by_hash
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: hash
+          in: query
+          required: true
+          description: "Block hash (hex bytes)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBlock'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /block_results:
+    get:
+      summary: Get ABCI results for a block
+      operationId: block_results
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBlockResults'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /commit:
+    get:
+      summary: Get block commit at a given height
+      operationId: commit
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultCommit'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /check_tx:
+    get:
+      summary: Check transaction validity
+      operationId: check_tx
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: tx
+          in: query
+          required: true
+          description: "Transaction bytes (hex encoded)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultCheckTx'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /tx:
+    get:
+      summary: Get transaction by hash
+      operationId: tx
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: hash
+          in: query
+          required: true
+          description: "Transaction hash (hex bytes)"
+          schema:
+            type: string
+        - name: prove
+          in: query
+          required: false
+          description: "Include proof"
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultTx'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /block_search:
+    get:
+      summary: Search for blocks
+      operationId: block_search
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: "Search query"
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: "Page number"
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          required: false
+          description: "Results per page"
+          schema:
+            type: integer
+        - name: order_by
+          in: query
+          required: false
+          description: "Order by (asc/desc)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBlockSearch'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /consensus_params:
+    get:
+      summary: Get consensus parameters
+      operationId: consensus_params
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultConsensusParams'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /consensus_state:
+    get:
+      summary: Get consensus state
+      operationId: consensus_state
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultConsensusState'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /dump_consensus_state:
+    get:
+      summary: Dump consensus state
+      operationId: dump_consensus_state
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultDumpConsensusState'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /unconfirmed_txs:
+    get:
+      summary: Get unconfirmed transactions
+      operationId: unconfirmed_txs
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: "Maximum number of txs to return"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultUnconfirmedTxs'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /num_unconfirmed_txs:
+    get:
+      summary: Get number of unconfirmed transactions
+      operationId: num_unconfirmed_txs
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultNumUnconfirmedTxs'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /broadcast_tx_commit:
+    get:
+      summary: Broadcast transaction and wait for commit
+      operationId: broadcast_tx_commit
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: tx
+          in: query
+          required: true
+          description: "Transaction bytes (hex encoded)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBroadcastTxCommit'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /broadcast_tx_sync:
+    get:
+      summary: Broadcast transaction synchronously
+      operationId: broadcast_tx_sync
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: tx
+          in: query
+          required: true
+          description: "Transaction bytes (hex encoded)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBroadcastTx'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /broadcast_tx_async:
+    get:
+      summary: Broadcast transaction asynchronously
+      operationId: broadcast_tx_async
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: tx
+          in: query
+          required: true
+          description: "Transaction bytes (hex encoded)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBroadcastTx'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /abci_query:
+    get:
+      summary: Query the application
+      operationId: abci_query
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: path
+          in: query
+          required: true
+          description: "Query path"
+          schema:
+            type: string
+        - name: data
+          in: query
+          required: false
+          description: "Query data (hex bytes)"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+        - name: prove
+          in: query
+          required: false
+          description: "Include proof"
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultABCIQuery'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /abci_info:
+    get:
+      summary: Get ABCI application info
+      operationId: abci_info
+      tags:
+        - BEATOZ RPC
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultABCIInfo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /broadcast_evidence:
+    get:
+      summary: Broadcast evidence of misbehavior
+      operationId: broadcast_evidence
+      tags:
+        - BEATOZ RPC
+      parameters:
+        - name: evidence
+          in: query
+          required: true
+          description: "Evidence JSON"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultBroadcastEvidence'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    QueryResult:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: uint32
+          description: Response code (0 = success)
+        log:
+          type: string
+          description: Log message
+        info:
+          type: string
+          description: Additional info
+        index:
+          type: integer
+          format: int64
+          description: Index
+        key:
+          type: string
+          description: Key (hex bytes)
+        value:
+          type: object
+          description: Result value (JSON)
+        proof_ops:
+          type: object
+          description: Proof operations
+        height:
+          type: integer
+          format: int64
+          description: Block height
+        codespace:
+          type: string
+          description: Codespace
+
+    ResultSubscribe:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Subscribed query
+
+    ResultUnsubscribe:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Unsubscribed query
+
+    ResultTxSearch:
+      type: object
+      properties:
+        txs:
+          type: array
+          items:
+            type: object
+          description: List of transactions
+        total_count:
+          type: integer
+          description: Total number of results
+
+    ResultValidators:
+      type: object
+      properties:
+        block_height:
+          type: integer
+          format: int64
+          description: Block height
+        validators:
+          type: array
+          items:
+            type: object
+          description: List of validators
+        count:
+          type: integer
+          description: Number of validators
+        total:
+          type: integer
+          description: Total validators
+
+    ResultBlock:
+      type: object
+      properties:
+        block_id:
+          type: object
+          description: Block ID
+        block:
+          type: object
+          description: Block data
+
+    ResultHealth:
+      type: object
+      description: Node health response
+
+    ResultStatus:
+      type: object
+      description: Node status information
+
+    ResultNetInfo:
+      type: object
+      description: Network information
+
+    ResultBlockchainInfo:
+      type: object
+      description: Blockchain information
+
+    ResultGenesis:
+      type: object
+      description: Genesis file
+
+    ResultGenesisChunk:
+      type: object
+      description: Genesis chunk
+
+    ResultBlockResults:
+      type: object
+      description: Block results
+
+    ResultCommit:
+      type: object
+      description: Block commit
+
+    ResultCheckTx:
+      type: object
+      description: Check transaction result
+
+    ResultTx:
+      type: object
+      description: Transaction result
+
+    ResultBlockSearch:
+      type: object
+      description: Block search results
+
+    ResultConsensusParams:
+      type: object
+      description: Consensus parameters
+
+    ResultConsensusState:
+      type: object
+      description: Consensus state
+
+    ResultDumpConsensusState:
+      type: object
+      description: Consensus state dump
+
+    ResultUnconfirmedTxs:
+      type: object
+      description: Unconfirmed transactions
+
+    ResultNumUnconfirmedTxs:
+      type: object
+      description: Number of unconfirmed transactions
+
+    ResultBroadcastTxCommit:
+      type: object
+      description: Broadcast transaction commit result
+
+    ResultBroadcastTx:
+      type: object
+      description: Broadcast transaction result
+
+    ResultABCIQuery:
+      type: object
+      description: ABCI query result
+
+    ResultABCIInfo:
+      type: object
+      description: ABCI info
+
+    ResultBroadcastEvidence:
+      type: object
+      description: Broadcast evidence result
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        data:
+          type: string
+          description: Additional error data
