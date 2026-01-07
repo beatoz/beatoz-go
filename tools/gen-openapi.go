@@ -422,15 +422,15 @@ var endpoints = []Endpoint{
 
 const openapiTemplate = `openapi: 3.0.3
 info:
-  title: BEATOZ Blockchain RPC API
+  title: BEATOZ Blockchain API
   description: |
-    BEATOZ Blockchain JSON-RPC API Documentation
+    BEATOZ Blockchain API Documentation
 
     This API provides access to the BEATOZ blockchain data and functionality.
 
-    **Base URL**: http://localhost:26657
+    **Base URL**: https://rpc-devnet0.beatoz.io
 
-    **Note**: This is a JSON-RPC API. All endpoints are accessed via HTTP GET requests with query parameters.
+    **Note**: All endpoints are accessed via HTTP GET requests with query parameters.
   version: 1.0.0
   contact:
     name: BEATOZ Team
