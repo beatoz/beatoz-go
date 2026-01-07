@@ -51,7 +51,7 @@ ifeq ($(HOSTOS), windows)
 	OUTPUT=$(BUILDDIR)/beatoz.exe
 endif
 
-.PHONY: all pbm $(TARGETOS) docker-build
+.PHONY: all pbm $(TARGETOS) docker-push
 
 all: pbm $(TARGETOS)
 
@@ -79,19 +79,21 @@ install: $(TARGETOS)
 clean-pbm:
 	@find . -type f -name "*.pb.go" -exec rm -f {} +
 
-docker-build:
-	@echo "[docker-build] Building Docker image with version $(VERTAG)-$(GITCOMMIT)"
-	@docker build --progress=plain \
+docker-push:
+	@echo "[docker-push] Building and pushing Docker image for linux/amd64, linux/arm64"
+	@echo "[docker-push] Version: $(VERTAG)-$(GITCOMMIT)"
+	@docker buildx build --progress=plain \
+		--platform linux/amd64,linux/arm64 \
 		--build-arg VERSION=$(VERTAG) \
 		--build-arg GITCOMMIT=$(GITCOMMIT) \
-		-t beatoz-re:latest \
-		-t beatoz-re:$(VERTAG) \
-		-t beatoz-re:$(VERTAG)-$(GITCOMMIT) \
+		-t beatoz/beatoz-re:latest \
+		-t beatoz/beatoz-re:$(VERTAG) \
+		--push \
 		.
-	@echo "[docker-build] Docker images created:"
-	@echo "  - beatoz-re:latest"
-	@echo "  - beatoz-re:$(VERTAG)"
-	@echo "  - beatoz-re:$(VERTAG)-$(GITCOMMIT)"
+	@echo "[docker-push] Images pushed to Docker Hub:"
+	@echo "  - beatoz/beatoz-re:latest"
+	@echo "  - beatoz/beatoz-re:$(VERTAG)"
+	@echo "[docker-push] Platform: linux/$(HOSTARCH)"
 
 
 clean:

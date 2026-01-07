@@ -88,12 +88,11 @@ docker pull beatoz/beatoz-re:latest
 Run without data persistence (container data is lost on restart):
 
 ```bash
-docker run -d \
+docker run -it --rm \
   --name beatoz-node \
   -p 26656:26656 \
   -p 26657:26657 \
   -p 26658:26658 \
-  --restart unless-stopped \
   beatoz/beatoz-re:latest
 ```
 
@@ -102,13 +101,12 @@ docker run -d \
 Run with volume mount to persist blockchain data:
 
 ```bash
-docker run -d \
+docker run -it --rm \
   --name beatoz-node \
   -p 26656:26656 \
   -p 26657:26657 \
   -p 26658:26658 \
   -v ./beatoz-docker:/root/.beatoz \
-  --restart unless-stopped \
   beatoz/beatoz-re:latest
 ```
 

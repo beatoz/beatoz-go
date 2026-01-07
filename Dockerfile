@@ -52,4 +52,4 @@ EXPOSE 26656 26657 26658
 
 # Use entrypoint script
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["start", "--home", "/root/.beatoz", "--consensus.create_empty_blocks=false"]
+CMD ["start", "--home", "/root/.beatoz", "--consensus.create_empty_blocks=false",  "--rpc.laddr", "tcp://0.0.0.0:26657", "--rpc.cors_allowed_origins", "*"]
