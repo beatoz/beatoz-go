@@ -17,7 +17,6 @@ import (
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
-	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -138,29 +137,24 @@ func (ctrler *BeatozApp) SetLocalClient(client abcicli.Client) {
 func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	ctrler.logger.Info("Info", "version", tmver.ABCIVersion, "AppVersion", version.String())
 
-	var appHash bytes.HexBytes
-	var lastHeight int64
 	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
 	if ctrler.lastBlockCtx == nil {
 		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
 					ChainID: ctrler.rootConfig.ChainIdHex(),
-					Height:  lastHeight,
+					Height:  0,
 					Time:    tmtime.Canonical(time.Now()),
 				},
 			},
 			ctrler.govCtrler, ctrler.acctCtrler, ctrler.vmCtrler, ctrler.supplyCtrler, ctrler.vpowCtrler,
 		)
-		ctrler.lastBlockCtx.SetAppHash(appHash)
 	} else {
 		ctrler.lastBlockCtx.GovHandler = ctrler.govCtrler
 		ctrler.lastBlockCtx.AcctHandler = ctrler.acctCtrler
 		ctrler.lastBlockCtx.EVMHandler = ctrler.vmCtrler
 		ctrler.lastBlockCtx.SupplyHandler = ctrler.supplyCtrler
 		ctrler.lastBlockCtx.VPowerHandler = ctrler.vpowCtrler
-		lastHeight = ctrler.lastBlockCtx.Height()
-		appHash = ctrler.lastBlockCtx.AppHash()
 	}
 
 	// get chain_id
@@ -183,14 +177,15 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		"height", ctrler.lastBlockCtx.Height(),
 		"appHash", ctrler.lastBlockCtx.AppHash(),
 		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
-		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit())
+		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit(),
+		"nxBlockGasLimit", ctrler.lastBlockCtx.GetNxBlockGasLimit())
 
 	return abcitypes.ResponseInfo{
 		Data:             "",
 		Version:          tmver.ABCIVersion,
 		AppVersion:       version.Major(),
-		LastBlockHeight:  lastHeight,
-		LastBlockAppHash: appHash,
+		LastBlockHeight:  ctrler.lastBlockCtx.Height(),
+		LastBlockAppHash: ctrler.lastBlockCtx.AppHash(),
 	}
 }
 
@@ -234,6 +229,7 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.lastBlockCtx.SetChainID(req.GetChainId())
 	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
 	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
+	ctrler.lastBlockCtx.SetNxBlockGasLimit(req.ConsensusParams.Block.MaxGas)
 	ctrler.lastBlockCtx.SetAppHash(appHash)
 
 	ctrler.logger.Info("InitChain",
@@ -241,7 +237,8 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		"height", ctrler.lastBlockCtx.Height(),
 		"appHash", ctrler.lastBlockCtx.AppHash(),
 		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
-		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit())
+		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit(),
+		"nxBlockGasLimit", ctrler.lastBlockCtx.GetNxBlockGasLimit())
 
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{
@@ -423,7 +420,7 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 		ctrler.vpowCtrler,
 	)
 	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
-	ctrler.currBlockCtx.SetBlockGasLimit(ctrler.lastBlockCtx.GetBlockGasLimit())
+	ctrler.currBlockCtx.SetBlockGasLimit(ctrler.lastBlockCtx.GetNxBlockGasLimit())
 
 	var beginBlockEvents []abcitypes.Event
 
@@ -659,6 +656,7 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 				MaxGas:   newBlockGasLimit,
 			},
 		}
+		ctrler.currBlockCtx.SetNxBlockGasLimit(newBlockGasLimit)
 
 		ctrler.logger.Info("Update block gas limit",
 			"height", req.Height,

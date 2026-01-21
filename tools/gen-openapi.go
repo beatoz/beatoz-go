@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"text/template"
 )
 
@@ -12,6 +13,7 @@ type Endpoint struct {
 	Description string
 	Parameters  []Parameter
 	Response    string
+	Tag         string
 }
 
 type Parameter struct {
@@ -420,15 +422,15 @@ var endpoints = []Endpoint{
 
 const openapiTemplate = `openapi: 3.0.3
 info:
-  title: BEATOZ Blockchain RPC API
+  title: BEATOZ Blockchain API
   description: |
-    BEATOZ Blockchain JSON-RPC API Documentation
+    BEATOZ Blockchain API Documentation
 
     This API provides access to the BEATOZ blockchain data and functionality.
 
-    **Base URL**: http://localhost:26657
+    **Base URL**: https://rpc-devnet0.beatoz.io
 
-    **Note**: This is a JSON-RPC API. All endpoints are accessed via HTTP GET requests with query parameters.
+    **Note**: All endpoints are accessed via HTTP GET requests with query parameters.
   version: 1.0.0
   contact:
     name: BEATOZ Team
@@ -449,7 +451,7 @@ paths:
       summary: {{ .Description }}
       operationId: {{ .Name }}
       tags:
-        - {{ if hasPrefix .Name "vm_" }}Virtual Machine{{ else if eq .Name "subscribe" }}WebSocket{{ else if eq .Name "unsubscribe" }}WebSocket{{ else if eq .Name "tx_search" }}WebSocket{{ else if hasSuffix .Name "stakes" }}Staking{{ else if hasSuffix .Name "stakes/total_power" }}Staking{{ else if hasSuffix .Name "stakes/voting_power" }}Staking{{ else if eq .Name "gov_params" }}Governance{{ else if eq .Name "rule" }}Governance{{ else if eq .Name "proposal" }}Governance{{ else if eq .Name "proposals" }}Governance{{ else }}BEATOZ RPC{{ end }}
+        - {{ .Tag }}
 {{- if .Parameters }}
       parameters:
 {{- range .Parameters }}
@@ -671,19 +673,55 @@ components:
           description: Additional error data
 `
 
+func getTag(name string) string {
+	if len(name) >= 3 && name[:3] == "vm_" {
+		return "Virtual Machine"
+	}
+	switch name {
+	case "subscribe", "unsubscribe", "tx_search":
+		return "WebSocket"
+	case "stakes", "stakes/total_power", "stakes/voting_power":
+		return "Staking"
+	case "gov_params", "rule", "proposal", "proposals":
+		return "Governance"
+	default:
+		return "BEATOZ RPC"
+	}
+}
+
 func main() {
+	// Assign tags to all endpoints
+	for i := range endpoints {
+		endpoints[i].Tag = getTag(endpoints[i].Name)
+	}
+
+	// Group endpoints by tag
+	tagMap := make(map[string][]Endpoint)
+	for _, ep := range endpoints {
+		tagMap[ep.Tag] = append(tagMap[ep.Tag], ep)
+	}
+
+	// Sort endpoints within each tag alphabetically
+	for tag := range tagMap {
+		sort.Slice(tagMap[tag], func(i, j int) bool {
+			return tagMap[tag][i].Name < tagMap[tag][j].Name
+		})
+	}
+
+	// Define tag order
+	tagOrder := []string{"BEATOZ RPC", "Governance", "Staking", "Virtual Machine", "WebSocket"}
+
+	// Create sorted endpoint list by tag order, then alphabetically within each tag
+	var sortedEndpoints []Endpoint
+	for _, tag := range tagOrder {
+		if eps, ok := tagMap[tag]; ok {
+			sortedEndpoints = append(sortedEndpoints, eps...)
+		}
+	}
+
 	funcMap := template.FuncMap{
 		"lower": func(s string) string {
 			return "get"
-		},
-		"hasPrefix": func(s, prefix string) bool {
-			return len(s) >= len(prefix) && s[:len(prefix)] == prefix
-		},
-		"hasSuffix": func(s, suffix string) bool {
-			return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
-		},
-		"eq": func(a, b string) bool {
-			return a == b
 		},
 	}
 
@@ -696,7 +734,7 @@ func main() {
 	data := struct {
 		Endpoints []Endpoint
 	}{
-		Endpoints: endpoints,
+		Endpoints: sortedEndpoints,
 	}
 
 	if err := tmpl.Execute(os.Stdout, data); err != nil {
