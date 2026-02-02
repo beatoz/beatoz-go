@@ -31,7 +31,7 @@ func NewGovParams(interval int) *GovParams {
 
 	ret := &GovParams{
 		_v: GovParamsProto{
-			Version:                   1,
+			Version:                   2,
 			AssumedBlockInterval:      int32(interval), // `interval` seconds
 			MaxValidatorCnt:           21,
 			MinValidatorPower:         100_000, // 100,000 BEATOZ
