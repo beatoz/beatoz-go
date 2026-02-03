@@ -56,7 +56,7 @@ func NewGovParams(interval int) *GovParams {
 			SlashRate:                 50,                                                             // 50%
 			XGasPrice:                 uint256.NewInt(48_000_000_000).Bytes(),                         // 48e9 * 21e3(evm_tx_gas) = 1008e12 = 0.001008 BTOZ
 			MinTrxGas:                 5_000,                                                          // 5e3 * 48e9 = 240e12 = 0.00024 BTOZ
-			MinBlockGasLimit:          36_000_000,
+			MinBlockGasLimit:          100_000_000,
 			MaxBlockGasLimit:          150_000_000,
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
 			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks

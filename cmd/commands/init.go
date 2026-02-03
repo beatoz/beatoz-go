@@ -325,7 +325,7 @@ func DefaultInitParams() *InitParams {
 		ChainID:              "0x0001",
 		ValCnt:               1,
 		HolderCnt:            10,
-		BlockGasLimit:        int64(36_000_000),
+		BlockGasLimit:        int64(100_000_000),
 		AssumedBlockInterval: "10s",
 		MaxTotalSupply:       int64(700_000_000),
 		InitTotalSupply:      int64(350_000_000),
