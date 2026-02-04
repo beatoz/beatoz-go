@@ -53,7 +53,7 @@ endif
 
 .PHONY: all pbm $(TARGETOS) docker-push docs serve-docs
 
-all: pbm $(TARGETOS)
+all: $(TARGETOS)
 
 $(TARGETOS):
 ifeq ($(HOSTOS),windows)
