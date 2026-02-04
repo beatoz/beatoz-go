@@ -56,8 +56,8 @@ type IGovParams interface {
 	GasPrice() *uint256.Int
 	MinTrxFee() *uint256.Int
 	MinTrxGas() int64
-	MinBlockGasLimit() int64
-	MaxBlockGasLimit() int64
+	BlockSizeLimit() int64
+	BlockGasLimit() int64
 
 	MaxVotingPeriodBlocks() int64
 	MinVotingPeriodBlocks() int64

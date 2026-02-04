@@ -25,9 +25,9 @@ func DefaultGovParams() *GovParams {
 }
 
 func NewGovParams(interval int) *GovParams {
-	//if interval <= 0 {
-	//	interval = 1
-	//}
+	if interval <= 0 {
+		interval = 1
+	}
 
 	// block interval = `interval` seconds
 	// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
@@ -59,8 +59,8 @@ func NewGovParams(interval int) *GovParams {
 			SlashRate:                 50,                                                             // 50%
 			XGasPrice:                 uint256.NewInt(48_000_000_000).Bytes(),                         // 48e9 * 21e3(evm_tx_gas) = 1008e12 = 0.001008 BTOZ
 			MinTrxGas:                 5_000,                                                          // 5e3 * 48e9 = 240e12 = 0.00024 BTOZ
-			MinBlockGasLimit:          100_000_000,
-			MaxBlockGasLimit:          150_000_000,
+			BlockSizeLimit:            22_020_096,                                                     // 21MB
+			BlockGasLimit:             120_000_000,
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
 			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
 			LazyApplyingBlocks:        DaySeconds / int64(interval),     // 1days blocks
@@ -308,17 +308,17 @@ func (govParams *GovParams) MinTrxGas() int64 {
 
 	return govParams._v.MinTrxGas
 }
-func (govParams *GovParams) MinBlockGasLimit() int64 {
+func (govParams *GovParams) BlockSizeLimit() int64 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.MinBlockGasLimit
+	return govParams._v.BlockSizeLimit
 }
-func (govParams *GovParams) MaxBlockGasLimit() int64 {
+func (govParams *GovParams) BlockGasLimit() int64 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return govParams._v.MaxBlockGasLimit
+	return govParams._v.BlockGasLimit
 }
 func (govParams *GovParams) MaxVotingPeriodBlocks() int64 {
 	govParams.mtx.RLock()

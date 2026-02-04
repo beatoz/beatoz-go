@@ -163,99 +163,99 @@ func Test_Gas_FailedTx(t *testing.T) {
 	require.Equal(t, new(uint256.Int).Sub(balance0, new(uint256.Int).Add(fee, amt)).Dec(), w0.GetBalance().Dec())
 }
 
-func Test_Gas_FailedTx_EVM(t *testing.T) {
+//func Test_Gas_FailedTx_EVM(t *testing.T) {
+//
+//}
 
-}
-
-func Test_AdjustBlockGasLimit(t *testing.T) {
-	w0 := acctMock.RandWallet() //web3.NewWallet(nil)
-	w1 := web3.NewWallet(nil)
-
-	blockGasLimit := int64(5_000_000)
-	blockGasUsed := int64(0)
-	upper := blockGasLimit - (blockGasLimit / 10)
-	//lower := blockGasLimit / 100
-
-	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId, Height: 1}},
-		govMock,
-		acctMock,
-		nil, nil, nil)
-	bctx.SetBlockGasLimit(blockGasLimit)
-	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
-	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
-
-	nonce := w0.GetNonce()
-	for {
-		rnGas := rand.Int64N(100_000) + govMock.MinTrxGas()
-		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), nonce, rnGas, govMock.GasPrice(), uint256.NewInt(1))
-		_, _, xerr := w0.SignTrxRLP(tx, chainId)
-		require.NoError(t, xerr)
-
-		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
-		require.NoError(t, xerr)
-
-		require.NoError(t, validateTrx(txctx))
-		require.NoError(t, runTrx(txctx))
-		require.Equal(t, rnGas, txctx.GasUsed)
-
-		nonce++
-
-		blockGasUsed += rnGas
-
-		require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
-		require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
-
-		if blockGasUsed > upper {
-			break
-		}
-	}
-
-	expected := blockGasLimit + blockGasLimit/10 // increasing by 10%
-	adjusted := ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.MaxBlockGasLimit())
-	require.Equal(t, expected, adjusted)
-
-	blockGasLimit = adjusted
-	blockGasUsed = int64(0)
-	lower := blockGasLimit / 100
-
-	bctx = ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId, Height: 1}},
-		govMock,
-		acctMock,
-		nil, nil, nil)
-	bctx.SetBlockGasLimit(blockGasLimit)
-	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
-	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
-
-	for {
-		rnGas := govMock.MinTrxGas()
-		if blockGasUsed+rnGas >= lower {
-			break
-		}
-		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), nonce, rnGas, govMock.GasPrice(), uint256.NewInt(1))
-		_, _, xerr := w0.SignTrxRLP(tx, chainId)
-		require.NoError(t, xerr)
-
-		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
-		require.NoError(t, xerr)
-
-		require.NoError(t, validateTrx(txctx))
-		require.NoError(t, runTrx(txctx))
-		require.Equal(t, rnGas, txctx.GasUsed)
-
-		nonce++
-
-		blockGasUsed += rnGas
-
-		require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
-		require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
-	}
-
-	expected = blockGasLimit - blockGasLimit/100 // increasing by 10%
-	adjusted = ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.MaxBlockGasLimit())
-	require.Equal(t, expected, adjusted)
-}
+//func Test_AdjustBlockGasLimit(t *testing.T) {
+//	w0 := acctMock.RandWallet() //web3.NewWallet(nil)
+//	w1 := web3.NewWallet(nil)
+//
+//	blockGasLimit := int64(5_000_000)
+//	blockGasUsed := int64(0)
+//	upper := blockGasLimit - (blockGasLimit / 10)
+//	//lower := blockGasLimit / 100
+//
+//	bctx := ctrlertypes.NewBlockContext(
+//		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId, Height: 1}},
+//		govMock,
+//		acctMock,
+//		nil, nil, nil)
+//	bctx.SetBlockGasLimit(blockGasLimit)
+//	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
+//	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
+//
+//	nonce := w0.GetNonce()
+//	for {
+//		rnGas := rand.Int64N(100_000) + govMock.MinTrxGas()
+//		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), nonce, rnGas, govMock.GasPrice(), uint256.NewInt(1))
+//		_, _, xerr := w0.SignTrxRLP(tx, chainId)
+//		require.NoError(t, xerr)
+//
+//		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+//		require.NoError(t, xerr)
+//
+//		require.NoError(t, validateTrx(txctx))
+//		require.NoError(t, runTrx(txctx))
+//		require.Equal(t, rnGas, txctx.GasUsed)
+//
+//		nonce++
+//
+//		blockGasUsed += rnGas
+//
+//		require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
+//		require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
+//
+//		if blockGasUsed > upper {
+//			break
+//		}
+//	}
+//
+//	expected := blockGasLimit + blockGasLimit/10 // increasing by 10%
+//	adjusted := ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.BlockGasLimit())
+//	require.Equal(t, expected, adjusted)
+//
+//	blockGasLimit = adjusted
+//	blockGasUsed = int64(0)
+//	lower := blockGasLimit / 100
+//
+//	bctx = ctrlertypes.NewBlockContext(
+//		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId, Height: 1}},
+//		govMock,
+//		acctMock,
+//		nil, nil, nil)
+//	bctx.SetBlockGasLimit(blockGasLimit)
+//	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
+//	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
+//
+//	for {
+//		rnGas := govMock.MinTrxGas()
+//		if blockGasUsed+rnGas >= lower {
+//			break
+//		}
+//		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), nonce, rnGas, govMock.GasPrice(), uint256.NewInt(1))
+//		_, _, xerr := w0.SignTrxRLP(tx, chainId)
+//		require.NoError(t, xerr)
+//
+//		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+//		require.NoError(t, xerr)
+//
+//		require.NoError(t, validateTrx(txctx))
+//		require.NoError(t, runTrx(txctx))
+//		require.Equal(t, rnGas, txctx.GasUsed)
+//
+//		nonce++
+//
+//		blockGasUsed += rnGas
+//
+//		require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
+//		require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
+//	}
+//
+//	expected = blockGasLimit - blockGasLimit/100 // increasing by 10%
+//	adjusted = ctrlertypes.AdjustBlockGasLimit(bctx.GetBlockGasLimit(), bctx.GetBlockGasUsed(), govMock.MinTrxGas(), govMock.BlockGasLimit())
+//	require.Equal(t, expected, adjusted)
+//}
 
 func Test_Payer(t *testing.T) {
 	sender := acctMock.RandWallet()

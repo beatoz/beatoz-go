@@ -68,12 +68,17 @@ func AddInitFlags(cmd *cobra.Command) {
 			"if there is more than one validator, the rest will be created in the $BEATOZHOME/walkeys/vals directory.",
 	)
 	cmd.Flags().Int64Var(
+		&initParams.BlockSizeLimit,
+		"block_size_limit",
+		initParams.BlockSizeLimit,
+		"the maximum size of a block in bytes.\nthis value must be greater than 0.",
+	)
+	cmd.Flags().Int64Var(
 		&initParams.BlockGasLimit,
 		"block_gas_limit",
 		initParams.BlockGasLimit,
 		"the maximum gas that can be used in one block.\n"+
-			"this value is deterministically adjusted based on the gas usage in the blockchain network.\n"+
-			"however, it cannot exceed the `maxBlockGas` of Governance Parameters.",
+			"this value is deterministically adjusted based on the gas usage in the blockchain network.",
 	)
 	cmd.Flags().Int64Var(
 		&initParams.MaxTotalSupply,
@@ -205,6 +210,7 @@ func InitFilesWith(
 				AppVersion: version.Major(),
 			},
 		}
+		consensusParams.Block.MaxBytes = params.BlockSizeLimit
 		consensusParams.Block.MaxGas = params.BlockGasLimit
 
 		defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
@@ -301,6 +307,7 @@ type InitParams struct {
 	ValSecret       []byte
 	HolderCnt       int
 	HolderSecret    []byte
+	BlockSizeLimit  int64
 	BlockGasLimit   int64
 	MaxTotalSupply  int64
 	InitTotalSupply int64
@@ -312,6 +319,7 @@ func DefaultInitParams() *InitParams {
 		ChainID:         "0x0001",
 		ValCnt:          1,
 		HolderCnt:       10,
+		BlockSizeLimit:  int64(22020096),
 		BlockGasLimit:   int64(100_000_000),
 		MaxTotalSupply:  int64(700_000_000),
 		InitTotalSupply: int64(350_000_000),

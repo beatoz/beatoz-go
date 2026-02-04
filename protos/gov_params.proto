@@ -30,8 +30,8 @@ message GovParamsProto {
 
   bytes   _gas_price                     = 24;
   int64   min_trx_gas                    = 25;
-  int64   min_block_gas_limit            = 26;
-  int64   max_block_gas_limit            = 27;
+  int64   block_size_limit               = 26;
+  int64   block_gas_limit                = 27;
 
   int64   min_voting_period_blocks       = 28;
   int64   max_voting_period_blocks       = 29;

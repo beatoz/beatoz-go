@@ -16,14 +16,13 @@ import (
 )
 
 type BlockContext struct {
-	blockInfo       abcitypes.RequestBeginBlock
-	blockSizeLimit  int64
-	blockGasLimit   int64
-	nxBlockGasLimit int64
-	blockGasPool    *ethcore.GasPool
-	feeSum          *uint256.Int
-	txsCnt          int
-	appHash         bytes.HexBytes
+	blockInfo      abcitypes.RequestBeginBlock
+	blockSizeLimit int64
+	blockGasLimit  int64
+	blockGasPool   *ethcore.GasPool
+	feeSum         *uint256.Int
+	txsCnt         int
+	appHash        bytes.HexBytes
 
 	GovHandler    IGovHandler
 	AcctHandler   IAccountHandler
@@ -60,7 +59,8 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 		ValUpdates:    nil,
 	}
 	if g != nil {
-		ret.setBlockGasLimit(g.MaxBlockGasLimit())
+		ret.SetBlockSizeLimit(g.BlockSizeLimit())
+		ret.setBlockGasLimit(g.BlockGasLimit())
 	}
 	return ret
 }
@@ -237,36 +237,11 @@ func (bctx *BlockContext) SetBlockGasLimit(gasLimit int64) {
 	defer bctx.mtx.Unlock()
 
 	bctx.setBlockGasLimit(gasLimit)
-	bctx.setNxBlockGasLimit(gasLimit)
 }
 
 func (bctx *BlockContext) setBlockGasLimit(gasLimit int64) {
 	bctx.blockGasLimit = gasLimit
 	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(gasLimit))
-}
-
-func (bctx *BlockContext) GetNxBlockGasLimit() int64 {
-	bctx.mtx.RLock()
-	defer bctx.mtx.RUnlock()
-
-	// If the previous `BeatozApp` doesn't have `nxBlockGasLimit`, the return value is `0`.
-	// Because of this, `BeatozApp.currBlockCtx.blockGasLimit` is set to `0` in BeaginBlock
-	// and a panic will occur in EndBlock.
-	if bctx.nxBlockGasLimit == 0 {
-		bctx.nxBlockGasLimit = bctx.blockGasLimit
-	}
-	return bctx.nxBlockGasLimit
-}
-
-func (bctx *BlockContext) SetNxBlockGasLimit(gasLimit int64) {
-	bctx.mtx.Lock()
-	defer bctx.mtx.Unlock()
-
-	bctx.setNxBlockGasLimit(gasLimit)
-}
-
-func (bctx *BlockContext) setNxBlockGasLimit(gasLimit int64) {
-	bctx.nxBlockGasLimit = gasLimit
 }
 
 func (bctx *BlockContext) GetBlockGasUsed() int64 {
@@ -324,23 +299,21 @@ func (bctx *BlockContext) MarshalJSON() ([]byte, error) {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
 	_bctx := &struct {
-		BlockInfo       abcitypes.RequestBeginBlock `json:"blockInfo"`
-		BlockSizeLimit  int64                       `json:"blockSizeLimit"`
-		BlockGasLimit   int64                       `json:"blockGasLimit"`
-		NxBlockGasLimit int64                       `json:"nxBlockGasLimit"`
-		BlockGasUsed    int64                       `json:"blockGasUsed"`
-		FeeSum          *uint256.Int                `json:"feeSum"`
-		TxsCnt          int                         `json:"txsCnt"`
-		AppHash         []byte                      `json:"appHash"`
+		BlockInfo      abcitypes.RequestBeginBlock `json:"blockInfo"`
+		BlockSizeLimit int64                       `json:"blockSizeLimit"`
+		BlockGasLimit  int64                       `json:"blockGasLimit"`
+		BlockGasUsed   int64                       `json:"blockGasUsed"`
+		FeeSum         *uint256.Int                `json:"feeSum"`
+		TxsCnt         int                         `json:"txsCnt"`
+		AppHash        []byte                      `json:"appHash"`
 	}{
-		BlockInfo:       bctx.blockInfo,
-		BlockSizeLimit:  bctx.blockSizeLimit,
-		BlockGasLimit:   bctx.blockGasLimit,
-		NxBlockGasLimit: bctx.nxBlockGasLimit,
-		BlockGasUsed:    bctx.GetBlockGasUsed(),
-		FeeSum:          bctx.feeSum,
-		TxsCnt:          bctx.txsCnt,
-		AppHash:         bctx.appHash,
+		BlockInfo:      bctx.blockInfo,
+		BlockSizeLimit: bctx.blockSizeLimit,
+		BlockGasLimit:  bctx.blockGasLimit,
+		BlockGasUsed:   bctx.GetBlockGasUsed(),
+		FeeSum:         bctx.feeSum,
+		TxsCnt:         bctx.txsCnt,
+		AppHash:        bctx.appHash,
 	}
 
 	return jsonx.Marshal(_bctx)
@@ -351,14 +324,13 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	defer bctx.mtx.Unlock()
 
 	_bctx := &struct {
-		BlockInfo       abcitypes.RequestBeginBlock `json:"blockInfo"`
-		BlockSizeLimit  int64                       `json:"blockSizeLimit"`
-		BlockGasLimit   int64                       `json:"blockGasLimit"`
-		NxBlockGasLimit int64                       `json:"nxBlockGasLimit"`
-		BlockGasUsed    int64                       `json:"blockGasUsed"`
-		FeeSum          *uint256.Int                `json:"feeSum"`
-		TxsCnt          int                         `json:"txsCnt"`
-		AppHash         []byte                      `json:"appHash"`
+		BlockInfo      abcitypes.RequestBeginBlock `json:"blockInfo"`
+		BlockSizeLimit int64                       `json:"blockSizeLimit"`
+		BlockGasLimit  int64                       `json:"blockGasLimit"`
+		BlockGasUsed   int64                       `json:"blockGasUsed"`
+		FeeSum         *uint256.Int                `json:"feeSum"`
+		TxsCnt         int                         `json:"txsCnt"`
+		AppHash        []byte                      `json:"appHash"`
 	}{}
 
 	if err := jsonx.Unmarshal(bz, _bctx); err != nil {
@@ -367,36 +339,11 @@ func (bctx *BlockContext) UnmarshalJSON(bz []byte) error {
 	bctx.blockInfo = _bctx.BlockInfo
 	bctx.blockSizeLimit = _bctx.BlockSizeLimit
 	bctx.blockGasLimit = _bctx.BlockGasLimit
-	bctx.nxBlockGasLimit = _bctx.NxBlockGasLimit
 	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(bctx.blockGasLimit - _bctx.BlockGasUsed))
 	bctx.feeSum = _bctx.FeeSum
 	bctx.txsCnt = _bctx.TxsCnt
 	bctx.appHash = _bctx.AppHash
 	return nil
-}
-
-func AdjustBlockGasLimit(preBlockGasLimit, preBlockGasUsed, min, max int64) int64 {
-	blockGasLimit := preBlockGasLimit
-
-	if preBlockGasUsed > 0 {
-		upperThreshold := blockGasLimit - (blockGasLimit / 10) // 90%
-		lowerThreshold := blockGasLimit / 100                  // 1%
-		if preBlockGasUsed > upperThreshold {
-			// increase gas limit
-			blockGasLimit = blockGasLimit + (blockGasLimit / 10) // increase 10%
-
-		} else if preBlockGasUsed < lowerThreshold {
-			// decrease gas limit
-			blockGasLimit = blockGasLimit - (blockGasLimit / 100) // decrease 1%
-		}
-	}
-
-	if blockGasLimit > max {
-		blockGasLimit = max
-	} else if blockGasLimit < min {
-		blockGasLimit = min
-	}
-	return blockGasLimit
 }
 
 // DEPRECATED: Use for test only
