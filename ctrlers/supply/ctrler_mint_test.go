@@ -204,6 +204,10 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 	adjustedHeight := int64(1)
 
 	initialPower := int64(21_000_000)
+	//initialPower := int64(50_000_000)
+	//initialPower := int64(100_000_000)
+	//initialPower := int64(150_000_000)
+	//initialPower := int64(105_000_000)
 	initialDepositAmount := btztypes.PowerToAmount(initialPower)
 
 	powChunks := []*vpower.PowerChunkProto{
@@ -328,9 +332,11 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 					btztypes.FormattedString(mintSupply),
 				)
 				//rate := decimal.NewFromInt(powAnnualMinted * 100).Div(decimal.NewFromInt(powChunks[0].Power))
-				//fmt.Printf("%d %s\n",
+				//fmt.Printf("%d %s %v %v\n",
 				//	currHeightYear+1,
 				//	rate.StringFixed(3),
+				//	powAnnualMinted,
+				//	totalSupply,
 				//)
 
 				powAnnualMinted = int64(0)
