@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -25,14 +26,15 @@ func DefaultGovParams() *GovParams {
 }
 
 func NewGovParams(interval int) *GovParams {
+	fmt.Println("Call NewGovParams with interval(s) =", interval)
+
 	// block interval = `interval` seconds
 	// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
 	// min blocks/1Y = 31,536,000 / `interval` (if all blocks interval `interval` s)
 
 	ret := &GovParams{
 		_v: GovParamsProto{
-			Version:                   2,
-			AssumedBlockInterval:      int32(interval), // `interval` seconds
+			Version:                   3,
 			MaxValidatorCnt:           21,
 			MinValidatorPower:         100_000, // 100,000 BEATOZ
 			MinDelegatorPower:         100,
@@ -237,12 +239,6 @@ func (govParams *GovParams) InflationWeightPermil() int32 {
 	return govParams._v.InflationWeightPermil
 }
 
-func (govParams *GovParams) AssumedBlockInterval() int32 {
-	govParams.mtx.RLock()
-	defer govParams.mtx.RUnlock()
-
-	return govParams._v.AssumedBlockInterval
-}
 func (govParams *GovParams) InflationCycleBlocks() int64 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()

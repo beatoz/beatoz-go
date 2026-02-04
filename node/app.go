@@ -252,7 +252,7 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, time.Duration(ctrler.govCtrler.AssumedBlockInterval())*time.Second)
+		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval)
 		txctx, xerr := ctrlertypes.NewTrxContext(
 			req.Tx,
 			_bctx,

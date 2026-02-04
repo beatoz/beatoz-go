@@ -103,7 +103,6 @@ func (peer *PeerMock) Init(valCnt int) error {
 	initParams.InitVotingPower = int64(1_000_000 * valCnt)
 	initParams.InitTotalSupply = int64(100_000_000*500 + 1_000_000*valCnt)
 	initParams.MaxTotalSupply = int64(100_000_000*500 + 1_000_000*valCnt*2)
-	initParams.AssumedBlockInterval = "1s"
 	return commands.InitFilesWith(peer.Config, initParams, func(genDoc *types.GenesisDoc) {
 		appState := &genesis.GenesisAppState{}
 		_ = jsonx.Unmarshal(genDoc.AppState, appState)

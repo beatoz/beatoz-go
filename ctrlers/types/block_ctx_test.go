@@ -90,9 +90,8 @@ func TestExpectNextBlockContext_DoubleScalingBug(t *testing.T) {
 	bi.Header.Time = start
 	bctx.SetBlockInfo(bi)
 
-	// interval as used by node/app.go: AssumedBlockInterval() returns seconds
-	intervalSecs := int64(7)
-	interval := time.Duration(intervalSecs) * time.Second
+	// interval is 7 seconds
+	interval := time.Duration(int64(7)) * time.Second
 
 	// caller passes interval already scaled to Duration in seconds
 	next := types.ExpectNextBlockContext(bctx, interval)

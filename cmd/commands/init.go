@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/cmd/version"
@@ -76,13 +75,6 @@ func AddInitFlags(cmd *cobra.Command) {
 			"this value is deterministically adjusted based on the gas usage in the blockchain network.\n"+
 			"however, it cannot exceed the `maxBlockGas` of Governance Parameters.",
 	)
-	cmd.Flags().StringVar(
-		&initParams.AssumedBlockInterval,
-		"assumed_block_interval",
-		initParams.AssumedBlockInterval,
-		"assumed time between blocks in seconds, used for estimating time from block count.\n"+
-			"It is not based on actual block production timing.\n"+
-			"Instead, it is used as a constant reference to estimate time from the number of blocks produced.")
 	cmd.Flags().Int64Var(
 		&initParams.MaxTotalSupply,
 		"max_total_supply",
@@ -265,11 +257,7 @@ func InitFilesWith(
 
 		//
 		// Create Governance Parameters
-		blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
-		if err != nil {
-			return err
-		}
-		govParams := types.NewGovParams(int(blockInterval.Seconds()))
+		govParams := types.NewGovParams(int(config.Consensus.CreateEmptyBlocksInterval.Seconds()))
 		govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
 
 		appState := &genesis.GenesisAppState{
@@ -308,28 +296,26 @@ func InitFilesWith(
 }
 
 type InitParams struct {
-	ChainID              string
-	ValCnt               int
-	ValSecret            []byte
-	HolderCnt            int
-	HolderSecret         []byte
-	BlockGasLimit        int64
-	AssumedBlockInterval string
-	MaxTotalSupply       int64
-	InitTotalSupply      int64
-	InitVotingPower      int64
+	ChainID         string
+	ValCnt          int
+	ValSecret       []byte
+	HolderCnt       int
+	HolderSecret    []byte
+	BlockGasLimit   int64
+	MaxTotalSupply  int64
+	InitTotalSupply int64
+	InitVotingPower int64
 }
 
 func DefaultInitParams() *InitParams {
 	return &InitParams{
-		ChainID:              "0x0001",
-		ValCnt:               1,
-		HolderCnt:            10,
-		BlockGasLimit:        int64(100_000_000),
-		AssumedBlockInterval: "10s",
-		MaxTotalSupply:       int64(700_000_000),
-		InitTotalSupply:      int64(350_000_000),
-		InitVotingPower:      int64(35_000_000),
+		ChainID:         "0x0001",
+		ValCnt:          1,
+		HolderCnt:       10,
+		BlockGasLimit:   int64(100_000_000),
+		MaxTotalSupply:  int64(700_000_000),
+		InitTotalSupply: int64(350_000_000),
+		InitVotingPower: int64(35_000_000),
 	}
 }
 

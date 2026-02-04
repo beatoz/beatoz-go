@@ -52,7 +52,7 @@ func Test_Mint(t *testing.T) {
 		//wa = wa.Truncate(precision)
 
 		sd := Sd(
-			heightYears(currHeight, govMock.AssumedBlockInterval()),
+			heightYears(currHeight, 1),
 			totalSupply, govMock.MaxTotalSupply(), govMock.InflationWeightPermil(), wa).Floor()
 		expectedChange := uint256.MustFromBig(sd.BigInt())
 		expectedTotalSupply := new(uint256.Int).Add(totalSupply, expectedChange)
@@ -169,7 +169,7 @@ func Test_Mint(t *testing.T) {
 //
 //		wa := weightInfo.SumWeight()
 //
-//		scaledH := heightYears(currHeight-adjustedHeight, govMock.AssumedBlockInterval())
+//		scaledH := heightYears(currHeight-adjustedHeight, 1)
 //
 //		decSd := Sd(
 //			scaledH,
@@ -217,7 +217,6 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 	fmt.Println("init.amount", initialDepositAmount)
 	fmt.Println("inflation.cycle", govMock.InflationCycleBlocks())
 	fmt.Println("ripening.blocks", govMock.RipeningBlocks())
-	fmt.Println("block.interval", govMock.AssumedBlockInterval())
 
 	burned := false
 	preSupply := totalSupply.Clone()
@@ -282,7 +281,7 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 			govMock.BondingBlocksWeightPermil(),
 			totalSupply)
 
-		scaledH := heightYears(currHeight-adjustedHeight, govMock.AssumedBlockInterval())
+		scaledH := heightYears(currHeight-adjustedHeight, 1)
 
 		decSd := Sd(
 			scaledH,
@@ -318,8 +317,8 @@ func Test_Annual_Supply_AdjustTo0(t *testing.T) {
 
 		{
 			// log annual total supply
-			currHeightYear := currHeight * int64(govMock.AssumedBlockInterval()) / types.YearSeconds
-			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) * int64(govMock.AssumedBlockInterval()) / types.YearSeconds
+			currHeightYear := currHeight / types.YearSeconds
+			nextHeightYear := (currHeight + govMock.InflationCycleBlocks()) / types.YearSeconds
 			if currHeightYear != nextHeightYear {
 				fmt.Printf("year: %2d, height: %10v(%v), preSupply: %s, totalSupply: %s, weight: %s, scaledH:%s, exp: %v, minted: %s\n",
 					currHeightYear+1, currHeight, 1,
@@ -366,7 +365,6 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 	fmt.Println("init.amount", initialDepositAmount)
 	fmt.Println("inflation.cycle", govMock.InflationCycleBlocks())
 	fmt.Println("ripening.blocks", govMock.RipeningBlocks())
-	fmt.Println("block.interval", govMock.AssumedBlockInterval())
 
 	burned := false
 	preSupply := totalSupply.Clone()
@@ -392,7 +390,7 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 			//	govMock.MaxTotalSupply(),
 			//	powChunks[0].Power,
 			//	govMock.InflationWeightPermil(),
-			//	govMock.AssumedBlockInterval(),
+			//	1,
 			//)
 			estimatedHeight := decimal.NewFromInt(currHeight).Mul(remainRate).IntPart()
 			adjustedHeight = currHeight - estimatedHeight
@@ -442,7 +440,7 @@ func Test_Annual_Supply_AdjustToN(t *testing.T) {
 			govMock.BondingBlocksWeightPermil(),
 			totalSupply)
 
-		scaledH := heightYears(currHeight-adjustedHeight, govMock.AssumedBlockInterval())
+		scaledH := heightYears(currHeight-adjustedHeight, 1)
 
 		decSd := Sd(
 			scaledH,
@@ -502,7 +500,7 @@ func Benchmark_AdjustHeight(b *testing.B) {
 		vp := bytes.RandInt64N(btztypes.FromGrans(lastSi))
 		b.StartTimer()
 
-		_ = adjustHeight(si, lastSi, smax, vp, govMock.InflationWeightPermil(), govMock.AssumedBlockInterval())
+		_ = adjustHeight(si, lastSi, smax, vp, govMock.InflationWeightPermil(), 1)
 	}
 }
 

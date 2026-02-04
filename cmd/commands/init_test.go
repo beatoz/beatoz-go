@@ -1,12 +1,10 @@
 package commands
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
@@ -34,15 +32,14 @@ func Test_ChainId(t *testing.T) {
 		{"1234", true},
 	}
 	params := &InitParams{
-		ValCnt:               1,
-		ValSecret:            bytes.RandBytes(12),
-		HolderCnt:            1,
-		HolderSecret:         bytes.RandBytes(12),
-		BlockGasLimit:        rand.Int63n(100_000_000),
-		AssumedBlockInterval: "1s",
-		MaxTotalSupply:       1000,
-		InitTotalSupply:      1000,
-		InitVotingPower:      1000,
+		ValCnt:          1,
+		ValSecret:       bytes.RandBytes(12),
+		HolderCnt:       1,
+		HolderSecret:    bytes.RandBytes(12),
+		BlockGasLimit:   rand.Int63n(100_000_000),
+		MaxTotalSupply:  1000,
+		InitTotalSupply: 1000,
+		InitVotingPower: 1000,
 	}
 
 	for _, c := range cases {
@@ -71,16 +68,15 @@ func Test_InitialAmounts(t *testing.T) {
 
 		// gloval variables
 		params := &InitParams{
-			ChainID:              "0x01",
-			ValCnt:               rand.Intn(100) + 1,
-			ValSecret:            bytes.RandBytes(12),
-			HolderCnt:            rand.Intn(100) + 1,
-			HolderSecret:         bytes.RandBytes(12),
-			BlockGasLimit:        rand.Int63n(100_000_000),
-			AssumedBlockInterval: fmt.Sprintf("%ds", rand.Int31n(3600)+1),
-			MaxTotalSupply:       rand.Int63n(1000) + 100,
-			InitTotalSupply:      rand.Int63n(1000) + 100,
-			InitVotingPower:      rand.Int63n(1000) + 100,
+			ChainID:         "0x01",
+			ValCnt:          rand.Intn(100) + 1,
+			ValSecret:       bytes.RandBytes(12),
+			HolderCnt:       rand.Intn(100) + 1,
+			HolderSecret:    bytes.RandBytes(12),
+			BlockGasLimit:   rand.Int63n(100_000_000),
+			MaxTotalSupply:  rand.Int63n(1000) + 100,
+			InitTotalSupply: rand.Int63n(1000) + 100,
+			InitVotingPower: rand.Int63n(1000) + 100,
 		}
 
 		err := InitFilesWith(config, params)
@@ -134,9 +130,6 @@ func Test_InitialAmounts(t *testing.T) {
 		//
 		// GovParams
 		govParams := appState.GovParams
-		bintv, err := time.ParseDuration(params.AssumedBlockInterval)
-		require.NoError(t, err)
-		require.Equal(t, int32(bintv.Seconds()), govParams.AssumedBlockInterval(), params.AssumedBlockInterval)
 		require.Equal(t, types2.ToGrans(params.MaxTotalSupply).Dec(), govParams.MaxTotalSupply().Dec())
 
 		require.NoError(t, os.RemoveAll(config.RootDir))

@@ -29,7 +29,6 @@ type ITrxHandler interface {
 
 type IGovParams interface {
 	Version() int32
-	AssumedBlockInterval() int32
 
 	MaxValidatorCnt() int32
 	MinValidatorPower() int64

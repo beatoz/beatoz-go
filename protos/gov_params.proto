@@ -4,8 +4,7 @@ option go_package = "github.com/beatoz/beatoz-go/ctrlers/types";
 
 message GovParamsProto {
   int32   version                        = 1;
-  int32   assumed_block_interval         = 2;
-
+  reserved 2;
   int32   max_validator_cnt              = 3;
   int64   min_validator_power            = 4;
   int64   min_delegator_power            = 5;
