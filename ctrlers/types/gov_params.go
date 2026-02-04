@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -26,7 +25,9 @@ func DefaultGovParams() *GovParams {
 }
 
 func NewGovParams(interval int) *GovParams {
-	fmt.Println("Call NewGovParams with interval(s) =", interval)
+	//if interval <= 0 {
+	//	interval = 1
+	//}
 
 	// block interval = `interval` seconds
 	// max blocks/1Y = 31,536,000 (if all blocks interval 1s)
