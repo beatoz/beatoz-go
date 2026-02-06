@@ -1,7 +1,9 @@
 package evm
 
 import (
+	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -13,6 +15,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -241,12 +244,27 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	// Although the tx is failed, the gas should be still used.
 	// Gas pool is already decreased by buyGas and refundGas in EVM
 	ctx.GasUsed = int64(evmResult.UsedGas)
-	ctx.RetData = evmResult.ReturnData
+	// ReturnData only when tx is successful
+	ctx.RetData = evmResult.Return()
 
 	if evmResult.Failed() {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
 		ctrler.stateDBWrapper.Finish()
-		return xerrors.From(evmResult.Err)
+
+		revertReason := ""
+		revertData := evmResult.Revert()
+		if revertData != nil {
+			reason, err := abi.UnpackRevert(revertData)
+			if err != nil {
+				// Not Error(string) type (custom error)
+				revertReason = base64.StdEncoding.EncodeToString(revertData)
+			} else {
+				revertReason = reason
+			}
+			return xerrors.From(evmResult.Unwrap()).Wrapf("reason: %s", revertReason)
+		}
+		return xerrors.From(evmResult.Err).Wrap(errors.New(revertReason))
+
 	}
 
 	ctrler.stateDBWrapper.Finish()
