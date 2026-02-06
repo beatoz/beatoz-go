@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -244,8 +243,11 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	// Although the tx is failed, the gas should be still used.
 	// Gas pool is already decreased by buyGas and refundGas in EVM
 	ctx.GasUsed = int64(evmResult.UsedGas)
-	// ReturnData only when tx is successful
-	ctx.RetData = evmResult.Return()
+
+	// For compatibility with older clients.
+	// TODO: Only set ctx.RetData to ReturnData on successful transactions.
+	//       e.g. `ctx.RetData = evmResult.Return()`
+	ctx.RetData = evmResult.ReturnData
 
 	if evmResult.Failed() {
 		ctrler.stateDBWrapper.RevertToSnapshot(snap)
@@ -257,7 +259,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 			reason, err := abi.UnpackRevert(revertData)
 			if err != nil {
 				// Not Error(string) type (custom error)
-				revertReason = base64.StdEncoding.EncodeToString(revertData)
+				revertReason = bytes.HexBytes(revertData).String()
 			} else {
 				revertReason = reason
 			}
