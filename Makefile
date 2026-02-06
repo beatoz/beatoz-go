@@ -51,7 +51,7 @@ ifeq ($(HOSTOS), windows)
 	OUTPUT=$(BUILDDIR)/beatoz.exe
 endif
 
-.PHONY: all pbm $(TARGETOS) docker-push docs serve-docs
+.PHONY: all pbm $(TARGETOS) docker-push swagger serve-swagger
 
 all: $(TARGETOS)
 
@@ -95,7 +95,7 @@ docker-push:
 	@echo "  - beatoz/beatoz-re:$(VERTAG)"
 	@echo "[docker-push] Platform: linux/$(HOSTARCH)"
 
-docs:
+swagger:
 	@echo "[docs] Generating OpenAPI documentation..."
 	@mkdir -p docs/swagger
 	@go run tools/gen-openapi.go > docs/openapi.yaml
@@ -105,7 +105,7 @@ docs:
 	@echo ""
 	@echo "To view the documentation, run: make serve-docs"
 
-serve-docs: docs
+swagger-serve: swagger
 	@echo "[serve-docs] Starting HTTP server on http://localhost:8080"
 	@echo "[serve-docs] Swagger UI: http://localhost:8080/swagger/"
 	@echo "[serve-docs] Press Ctrl+C to stop the server"
@@ -120,4 +120,5 @@ check:
 	@echo "GOPATH": $(LOCAL_GOPATH)
 	@echo "HOSTOS: $(HOSTOS)"
 	@echo "HOSTARCH: $(HOSTARCH)"
-	@echo "MAKECMDGOALS $(MAKECMDGOALS)"
+	@echo "MAKECMDGOALS: $(MAKECMDGOALS)"
+	@echo "VERSION: $(VERTAG)-$(GITCOMMIT)"

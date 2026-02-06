@@ -6,3 +6,4 @@ any_test/
 build/
 documents/site/
 beatoz-docker/
+.claude/
