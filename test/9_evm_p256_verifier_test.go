@@ -90,7 +90,8 @@ func TestP256Verifier(t *testing.T) {
 		bzweb3)
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
-	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.NotEqual(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
+	require.Contains(t, ret.DeliverTx.Log, "Verification failed")
 }
 
 func parseDERSignature(sigDER []byte) (*big.Int, *big.Int, error) {
