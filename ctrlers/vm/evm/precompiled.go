@@ -1,61 +1,64 @@
 package evm
 
 import (
-	beatoz_crypto "github.com/beatoz/beatoz-go/types/crypto"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"errors"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 func init() {
-	//vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
-	//vm.PrecompiledContractsByzantium[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
-	//vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
-	//vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{1})] = &beatoz_ecrecover{}
+	// P256(secp256r1) signature verification
+	vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
+	vm.PrecompiledContractsByzantium[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
+	vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
+	vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
 }
 
-// ECRECOVER implemented as a native contract.
-type beatoz_ecrecover struct{}
+const (
+	P256VerifyGas         = 6900
+	P256VerifyInputLength = 160
+)
 
-func (c *beatoz_ecrecover) RequiredGas(input []byte) uint64 {
-	return params.EcrecoverGas
+var (
+	true32Byte = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+)
+
+// P256VERIFY (secp256r1 signature verification)
+// implemented as a native contract
+type beatoz_p256Verify struct{}
+
+// RequiredGas returns the gas required to execute the precompiled contract
+func (c *beatoz_p256Verify) RequiredGas(input []byte) uint64 {
+	return P256VerifyGas
 }
 
-func (c *beatoz_ecrecover) Run(input []byte) ([]byte, error) {
-	const ecRecoverInputLength = 128
-
-	input = common.RightPadBytes(input, ecRecoverInputLength)
-	// "input" is (hash, v, r, s), each 32 bytes
-	// but for ecrecover we want (r, s, v)
-
-	r := new(big.Int).SetBytes(input[64:96])
-	s := new(big.Int).SetBytes(input[96:128])
-	v := input[63] // - 27 : it's only for ethereum.
-
-	// tighter sig s values input homestead only apply to tx sigs
-	if !allZero(input[32:63]) || !crypto.ValidateSignatureValues(v, r, s, false) {
-		return nil, nil
-	}
-	// We must make sure not to modify the 'input', so placing the 'v' along with
-	// the signature needs to be done on a new allocation
-	sig := make([]byte, 65)
-	copy(sig, input[64:128])
-	sig[64] = v
-	// v needs to be at the end for libsecp256k1
-	publicKey, err := crypto.SigToPub(input[:32], sig)
-	if err != nil {
-		return nil, err
+// Run executes the precompiled contract with given 160 bytes of param, returning the output and the used gas
+func (c *beatoz_p256Verify) Run(input []byte) ([]byte, error) {
+	if len(input) != P256VerifyInputLength {
+		return nil, errors.New("p256:invalid input length")
 	}
 
-	return common.LeftPadBytes(beatoz_crypto.Pub2Addr(publicKey), 32), nil
+	// Extract hash, r, s, x, y from the input.
+	hash := input[0:32]
+	r, s := new(big.Int).SetBytes(input[32:64]), new(big.Int).SetBytes(input[64:96])
+	x, y := new(big.Int).SetBytes(input[96:128]), new(big.Int).SetBytes(input[128:160])
+
+	// Verify the signature.
+	if x == nil || y == nil || !elliptic.P256().IsOnCurve(x, y) {
+		return nil, errors.New("p256:invalid public key")
+	}
+	pk := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	if ecdsa.Verify(pk, hash, r, s) {
+		return true32Byte, nil
+	}
+
+	return nil, errors.New("p256: failed verification")
 }
 
-func allZero(b []byte) bool {
-	for _, b0 := range b {
-		if b0 != 0 {
-			return false
-		}
-	}
-	return true
+func (c *beatoz_p256Verify) Name() string {
+	return "P256VERIFY"
 }

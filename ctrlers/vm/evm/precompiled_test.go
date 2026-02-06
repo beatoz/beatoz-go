@@ -1,45 +1,91 @@
 package evm
 
 import (
-	"github.com/beatoz/beatoz-go/types/bytes"
-	beatoz_crypto "github.com/beatoz/beatoz-go/types/crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"errors"
+	"math/big"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"golang.org/x/crypto/cryptobyte"
+	"golang.org/x/crypto/cryptobyte/asn1"
 )
 
-var (
-	prvKeyHex       = "83b8749ffd3b90bb26bdfa430f8df21d881df9962eb96b4ee68b3f60c57c5ccb"
-	expectedETHAddr = "44087362E1D64596743A3D4AC3CFE874544CA7FA"
-)
-
-func TestEcRecover(t *testing.T) {
-	// create and check signature
-	prvKey, err := beatoz_crypto.ImportPrvKeyHex(prvKeyHex)
+func TestP256Verify(t *testing.T) {
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
-	pubKey := prvKey.PublicKey
+	msgH := sha256.Sum256([]byte("hello world"))
 
-	randBytes := bytes.RandBytes(1024)
-	sig, err := beatoz_crypto.Sign(randBytes, prvKey)
+	// Sign the hash
+	sigDER, err := privKey.Sign(rand.Reader, msgH[:], nil)
 	require.NoError(t, err)
-	require.True(t, beatoz_crypto.VerifySig(beatoz_crypto.CompressPubkey(&pubKey), randBytes, sig))
 
-	addr0, _, err := beatoz_crypto.Sig2Addr(randBytes, sig)
+	// Parse DER signature to get R and S
+	r, s, err := parseDERSignature(sigDER)
 	require.NoError(t, err)
-	require.Equal(t, expectedETHAddr, addr0.String())
 
-	// test for beatoz_ecrecover
-	ecr_input := make([]byte, 128)
-	copy(ecr_input, beatoz_crypto.DefaultHash(randBytes))
-	ecr_input[63] = sig[64] + 27 // v + 27
-	copy(ecr_input[64:], sig)    // r+s
+	contractInput := make([]byte, P256VerifyInputLength)
+	copy(contractInput[0:32], msgH[:])
+	copy(contractInput[32:64], common.LeftPadBytes(r.Bytes(), 32))
+	copy(contractInput[64:96], common.LeftPadBytes(s.Bytes(), 32))
+	copy(contractInput[96:128], common.LeftPadBytes(privKey.PublicKey.X.Bytes(), 32))
+	copy(contractInput[128:160], common.LeftPadBytes(privKey.PublicKey.Y.Bytes(), 32))
 
-	//ecr := &beatoz_ecrecover{}
-	ecr := vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{1})]
-	addr1, err := ecr.Run(ecr_input)
+	// ecr := &beatoz_p256Verify{}
+	ecr := vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{0x1, 0x00})]
+
+	ret, err := ecr.Run(contractInput)
 	require.NoError(t, err)
-	require.Equal(t, common.LeftPadBytes(addr0, 32), addr1)
-	require.Equal(t, expectedETHAddr, bytes.HexBytes(common.TrimLeftZeroes(addr1)).String())
+	require.Equal(t, true32Byte, ret)
+
+	// invalid length
+	ret, err = ecr.Run(contractInput[:159])
+	require.NotEqual(t, true32Byte, ret)
+	require.ErrorContains(t, err, "invalid input length")
+
+	// wrong pubKey
+	wrongKey := privKey.PublicKey.X.Bytes()
+	wrongKey[0] = 0xff
+	copy(contractInput[0:32], msgH[:])
+	copy(contractInput[32:64], common.LeftPadBytes(r.Bytes(), 32))
+	copy(contractInput[64:96], common.LeftPadBytes(s.Bytes(), 32))
+	copy(contractInput[96:128], common.LeftPadBytes(wrongKey, 32))
+	copy(contractInput[128:160], common.LeftPadBytes(privKey.PublicKey.Y.Bytes(), 32))
+	ret, err = ecr.Run(contractInput)
+	require.NotEqual(t, true32Byte, ret)
+	require.ErrorContains(t, err, "p256:invalid public key")
+
+	// wrong message
+	wrongMsgH := sha256.Sum256([]byte("wrong msg"))
+	copy(contractInput[0:32], wrongMsgH[:])
+	copy(contractInput[32:64], common.LeftPadBytes(r.Bytes(), 32))
+	copy(contractInput[64:96], common.LeftPadBytes(s.Bytes(), 32))
+	copy(contractInput[96:128], common.LeftPadBytes(privKey.PublicKey.X.Bytes(), 32))
+	copy(contractInput[128:160], common.LeftPadBytes(privKey.PublicKey.Y.Bytes(), 32))
+
+	ret, err = ecr.Run(contractInput)
+	require.NotEqual(t, true32Byte, ret)
+}
+
+func parseDERSignature(sigDER []byte) (*big.Int, *big.Int, error) {
+	var (
+		r, s  = new(big.Int), new(big.Int)
+		inner cryptobyte.String
+	)
+	input := cryptobyte.String(sigDER)
+	if !input.ReadASN1(&inner, asn1.SEQUENCE) ||
+		!input.Empty() ||
+		!inner.ReadASN1Integer(r) ||
+		!inner.ReadASN1Integer(s) ||
+		!inner.Empty() {
+		return nil, nil, errors.New("invalid DER signature")
+	}
+	return r, s, nil
 }
