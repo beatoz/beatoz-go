@@ -37,30 +37,31 @@ var (
 	// testnet0 = 12496258 /*0xBEAD82*/
 	// mainnet  = 12496259 /*0xBEAD83*/
 	defaultEVMChainConfig = &params.ChainConfig{
-		big.NewInt(0),
-		big.NewInt(0),
-		nil,
-		false,
-		big.NewInt(0),
-		common.Hash{},
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		nil,
-		nil,
-		nil,
-		nil,
-		false,
-		new(params.EthashConfig),
-		nil,
+		ChainID:                       big.NewInt(1),
+		HomesteadBlock:                big.NewInt(0),
+		DAOForkBlock:                  nil,
+		DAOForkSupport:                false,
+		EIP150Block:                   big.NewInt(0),
+		EIP155Block:                   big.NewInt(0),
+		EIP158Block:                   big.NewInt(0),
+		ByzantiumBlock:                big.NewInt(0),
+		ConstantinopleBlock:           big.NewInt(0),
+		PetersburgBlock:               big.NewInt(0),
+		IstanbulBlock:                 big.NewInt(0),
+		MuirGlacierBlock:              big.NewInt(0),
+		BerlinBlock:                   big.NewInt(0),
+		LondonBlock:                   big.NewInt(0),
+		ArrowGlacierBlock:             big.NewInt(0),
+		GrayGlacierBlock:              big.NewInt(0),
+		MergeNetsplitBlock:            nil,
+		ShanghaiTime:                  new(uint64), // 0
+		CancunTime:                    new(uint64), // 0
+		PragueTime:                    nil,
+		VerkleTime:                    nil,
+		TerminalTotalDifficulty:       nil,
+		TerminalTotalDifficultyPassed: false,
+		Ethash:                        new(params.EthashConfig),
+		Clique:                        nil,
 	}
 )
 
@@ -149,8 +150,10 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 	}
 
 	beneficiary := bytes.HexBytes(bctx.BlockInfo().Header.ProposerAddress).Array20()
-	blockContext := evmBlockContext(beneficiary, bctx.Height(), bctx.TimeSeconds(), bctx.GetBlockGasLimit())
-	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{}, stdb, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
+	blockContext := evmBlockContext(beneficiary, bctx.GetBlockGasLimit(), bctx.Height(), bctx.TimeSeconds())
+	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{
+		GasPrice: bctx.GovHandler.GasPrice().ToBig(),
+	}, stdb, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
 	ctrler.stateDBWrapper = stdb
 	ctrler.blockGasPool = bctx.GetBlockGasPool()
 
@@ -176,8 +179,7 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	}
 
 	// Check intrinsic gas if everything is correct
-	bn := big.NewInt(ctx.Height())
-	gas, err := ethcore.IntrinsicGas(inputData, nil, types.IsZeroAddress(ctx.Tx.To), ctrler.ethChainConfig.IsHomestead(bn), ctrler.ethChainConfig.IsIstanbul(bn))
+	gas, err := ethcore.IntrinsicGas(inputData, nil, types.IsZeroAddress(ctx.Tx.To), true, true, true)
 	if err != nil {
 		return xerrors.From(err)
 	}
@@ -213,10 +215,10 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	// issue #69 - in order to pass `snap` to `Prepare`, call `Snapshot` before `Prepare`
+	// issue #69 - in order to pass `snap` to `Initiate`, call `Snapshot` before `Initiate`
 	snap := ctrler.stateDBWrapper.Snapshot()
 	// issue #48 - prepare hash and index of tx
-	ctrler.stateDBWrapper.Prepare(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, snap, ctx.Exec)
+	ctrler.stateDBWrapper.Initiate(ctx.TxHash, ctx.TxIdx, ctx.Tx.From, ctx.Tx.To, snap, ctx.Exec)
 
 	inputData := []byte(nil)
 	payload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract)
@@ -338,7 +340,7 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas int64, gasPri
 
 func (ctrler *EVMCtrler) evmLogsToEvent(txHash common.Hash) []abcitypes.Event {
 	var evts []abcitypes.Event // log : event = 1 : 1
-	logs := ctrler.stateDBWrapper.GetLogs(txHash, common.Hash{})
+	logs := ctrler.stateDBWrapper.GetLogs(txHash, 0, common.Hash{})
 	if logs != nil && len(logs) > 0 {
 		for _, l := range logs {
 			evt := abcitypes.Event{
@@ -405,11 +407,11 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	rootHash, err := ctrler.stateDBWrapper.Commit(true)
+	rootHash, err := ctrler.stateDBWrapper.Commit(uint64(ctrler.lastBlockHeight)+1, true)
 	if err != nil {
 		panic(err)
 	}
-	if err := ctrler.stateDBWrapper.Database().TrieDB().Commit(rootHash, true, nil); err != nil {
+	if err := ctrler.stateDBWrapper.Database().TrieDB().Commit(rootHash, true); err != nil {
 		panic(err)
 	}
 	ctrler.lastBlockHeight++

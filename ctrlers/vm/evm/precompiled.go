@@ -16,6 +16,7 @@ func init() {
 	vm.PrecompiledContractsByzantium[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
 	vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
 	vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
+	vm.PrecompiledContractsCancun[common.BytesToAddress([]byte{0x1, 0x00})] = &beatoz_p256Verify{}
 }
 
 const (
