@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/cmd/version"
@@ -15,6 +16,7 @@ import (
 	btztypes "github.com/beatoz/beatoz-go/types"
 	acrypto "github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/spf13/cobra"
+	"github.com/tendermint/tendermint/config"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -99,9 +101,26 @@ func AddInitFlags(cmd *cobra.Command) {
 		initParams.InitVotingPower,
 		"initial voting power at genesis, shared equally by all validators",
 	)
+
+	// consensus flags
+	cmd.Flags().BoolVar(
+		&initParams.CreateEmptyBlocks,
+		"consensus.create_empty_blocks",
+		initParams.CreateEmptyBlocks,
+		"set this to false to only produce blocks when there are txs or when the AppHash changes")
+	cmd.Flags().StringVar(
+		&initParams.CreateEmptyBlocksInterval,
+		"consensus.create_empty_blocks_interval",
+		initParams.CreateEmptyBlocksInterval,
+		"the possible interval between empty blocks")
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
+	// for config.toml
+	rootConfig.Consensus.CreateEmptyBlocks = initParams.CreateEmptyBlocks
+	rootConfig.Consensus.CreateEmptyBlocksInterval, _ = time.ParseDuration(initParams.CreateEmptyBlocksInterval)
+	config.WriteConfigFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"), rootConfig.Config)
+
 	var s0, s1 []byte
 
 	_secret := os.Getenv("BEATOZ_VALIDATOR_SECRET")
@@ -302,6 +321,11 @@ func InitFilesWith(
 }
 
 type InitParams struct {
+	// for config.toml
+	CreateEmptyBlocks         bool
+	CreateEmptyBlocksInterval string
+
+	// for genesis.json
 	ChainID         string
 	ValCnt          int
 	ValSecret       []byte
@@ -316,6 +340,9 @@ type InitParams struct {
 
 func DefaultInitParams() *InitParams {
 	return &InitParams{
+		CreateEmptyBlocks:         true,
+		CreateEmptyBlocksInterval: "1s",
+
 		ChainID:         "0x0001",
 		ValCnt:          1,
 		HolderCnt:       10,
@@ -338,6 +365,9 @@ func (params *InitParams) Validate() error {
 	}
 	if params.InitVotingPower > params.InitTotalSupply {
 		return fmt.Errorf("init_voting_power (%d) cannot exceed init_total_supply (%d)", params.InitVotingPower, params.InitTotalSupply)
+	}
+	if _, err := time.ParseDuration(params.CreateEmptyBlocksInterval); err != nil {
+		return fmt.Errorf("invalid create_empty_blocks_interval: %s", params.CreateEmptyBlocksInterval)
 	}
 	return nil
 }
