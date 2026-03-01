@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	chainId  = "0x0abc"
+	chainId  = uint256.MustFromHex("0xabc")
 	govMock  = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	acctMock = acct.NewAcctHandlerMock(1000)
 )
@@ -35,14 +35,14 @@ func Test_NewTrxContext(t *testing.T) {
 	//
 	// Small Gas
 	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas()-1, govMock.GasPrice(), uint256.NewInt(0))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr := newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGas.Error())
 
 	//
 	// 0 GasPrice
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), uint256.NewInt(0), uint256.NewInt(0))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
@@ -53,14 +53,14 @@ func Test_NewTrxContext(t *testing.T) {
 	neg := uint256.NewInt(0).SetBytes32(b[:])
 	require.Negative(t, neg.Sign())
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), neg, uint256.NewInt(0))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
 	//
 	// too much GasPrice
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), uint256.NewInt(10_000_000_001), uint256.NewInt(0))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidGasPrice.Error())
 
@@ -73,7 +73,7 @@ func Test_NewTrxContext(t *testing.T) {
 	//
 	// Wrong Signature - other's signature
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(0))
-	_, _, _ = w1.SignTrxRLP(tx, chainId)
+	_, _, _ = w1.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
 
@@ -88,14 +88,14 @@ func Test_NewTrxContext(t *testing.T) {
 	// To nil address (not contract transaction)
 	// todo: move this case to trx_test.go
 	tx = web3.NewTrxTransfer(w0.Address(), nil, 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrInvalidAddress.Error())
 
 	//
 	// To nil address (contract transaction)
 	tx = web3.NewTrxContract(w0.Address(), nil, 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(0), bytes.RandBytes(32))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Sender)
@@ -107,7 +107,7 @@ func Test_NewTrxContext(t *testing.T) {
 	//
 	// To Zero Address
 	tx = web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Sender)
@@ -120,7 +120,7 @@ func Test_NewTrxContext(t *testing.T) {
 	//
 	// Success
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-	_, _, _ = w0.SignTrxRLP(tx, chainId)
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Sender)
@@ -134,9 +134,9 @@ func Test_NewTrxContext(t *testing.T) {
 	// Payer: not found payer account
 	payer := web3.NewWallet(nil)
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-	_, _, err := w0.SignTrxRLP(tx, chainId)
+	_, _, err := w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
-	_, _, err = payer.SignPayerTrxRLP(tx, chainId)
+	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.ErrorContains(t, xerr, xerrors.ErrNotFoundAccount.Error())
@@ -145,9 +145,9 @@ func Test_NewTrxContext(t *testing.T) {
 	// Payer: not Sender
 	payer = acctMock.RandWallet()
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-	_, _, err = w0.SignTrxRLP(tx, chainId)
+	_, _, err = w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
-	_, _, err = payer.SignPayerTrxRLP(tx, chainId)
+	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
@@ -156,7 +156,7 @@ func Test_NewTrxContext(t *testing.T) {
 }
 
 func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
-	bctx := ctrlertypes.TempBlockContext(chainId, height, time.Now(), govMock, acctMock, nil, nil, nil)
+	bctx := ctrlertypes.TempBlockContext(chainId.Hex(), height, time.Now(), govMock, acctMock, nil, nil, nil)
 	bz, _ := tx.Encode()
 	return ctrlertypes.NewTrxContext(bz, bctx, true)
 }

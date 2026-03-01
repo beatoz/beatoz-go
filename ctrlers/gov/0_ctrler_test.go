@@ -31,7 +31,7 @@ var (
 )
 
 func init() {
-	ctrlertypes.InitSigner(config.ChainIdHex())
+	ctrlertypes.InitSigner(config.ChainId())
 
 	config.DBPath = filepath.Join(os.TempDir(), "gov-ctrler-test")
 	_ = os.RemoveAll(config.DBPath)

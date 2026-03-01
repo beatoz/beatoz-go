@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -131,19 +132,19 @@ func TestX509Verify(t *testing.T) {
 	issuerCert, err := x509.ParseCertificate(issuerBlock.Bytes)
 	require.NoError(t, err)
 
-	t.Logf("=== Issuer Certificate ===")
-	t.Logf("  Subject:      %s", issuerCert.Subject)
-	t.Logf("  Issuer:       %s", issuerCert.Issuer)
-	//t.Logf("  SerialNumber: %s", issuerCert.SerialNumber)
-	//t.Logf("  NotBefore:    %s", issuerCert.NotBefore)
-	//t.Logf("  NotAfter:     %s", issuerCert.NotAfter)
-	//t.Logf("  IsCA:         %v", issuerCert.IsCA)
-	//t.Logf("  SigAlgorithm: %s", issuerCert.SignatureAlgorithm)
+	fmt.Println("=== Issuer Certificate ===")
+	fmt.Printf("  Subject:      %s\n", issuerCert.Subject)
+	fmt.Printf("  Issuer:       %s\n", issuerCert.Issuer)
+	//fmt.Printf("  SerialNumber: %s\n", issuerCert.SerialNumber)
+	//fmt.Printf("  NotBefore:    %s\n", issuerCert.NotBefore)
+	//fmt.Printf("  NotAfter:     %s\n", issuerCert.NotAfter)
+	//fmt.Printf("  IsCA:         %v\n", issuerCert.IsCA)
+	//fmt.Printf("  SigAlgorithm: %s\n", issuerCert.SignatureAlgorithm)
 
 	issuerPubKey, ok := issuerCert.PublicKey.(*ecdsa.PublicKey)
 	require.True(t, ok, "issuer public key is not ECDSA")
-	t.Logf("  PubKey.X:     %x", issuerPubKey.X)
-	t.Logf("  PubKey.Y:     %x", issuerPubKey.Y)
+	fmt.Printf("  PubKey.X:     %x\n", issuerPubKey.X)
+	fmt.Printf("  PubKey.Y:     %x\n", issuerPubKey.Y)
 
 	// 2. Parse subject certificate and print info
 	subjectBlock, _ := pem.Decode(subject)
@@ -151,20 +152,20 @@ func TestX509Verify(t *testing.T) {
 	subjectCert, err := x509.ParseCertificate(subjectBlock.Bytes)
 	require.NoError(t, err)
 
-	t.Logf("=== Subject Certificate ===")
-	t.Logf("  Subject:      %s", subjectCert.Subject)
-	t.Logf("  Issuer:       %s", subjectCert.Issuer)
-	//t.Logf("  SerialNumber: %s", subjectCert.SerialNumber)
-	//t.Logf("  OU:           %v", subjectCert.Subject.OrganizationalUnit)
-	//t.Logf("  NotBefore:    %s", subjectCert.NotBefore)
-	//t.Logf("  NotAfter:     %s", subjectCert.NotAfter)
-	//t.Logf("  IsCA:         %v", subjectCert.IsCA)
-	//t.Logf("  SigAlgorithm: %s", subjectCert.SignatureAlgorithm)
+	fmt.Println("=== Subject Certificate ===")
+	fmt.Printf("  Subject:      %s\n", subjectCert.Subject)
+	fmt.Printf("  Issuer:       %s\n", subjectCert.Issuer)
+	//fmt.Printf("  SerialNumber: %s\n", subjectCert.SerialNumber)
+	//fmt.Printf("  OU:           %v\n", subjectCert.Subject.OrganizationalUnit)
+	//fmt.Printf("  NotBefore:    %s\n", subjectCert.NotBefore)
+	//fmt.Printf("  NotAfter:     %s\n", subjectCert.NotAfter)
+	//fmt.Printf("  IsCA:         %v\n", subjectCert.IsCA)
+	//fmt.Printf("  SigAlgorithm: %s\n", subjectCert.SignatureAlgorithm)
 
 	subjectPubKey, ok := subjectCert.PublicKey.(*ecdsa.PublicKey)
 	require.True(t, ok, "subject public key is not ECDSA")
-	t.Logf("  PubKey.X:     %x", subjectPubKey.X)
-	t.Logf("  PubKey.Y:     %x", subjectPubKey.Y)
+	fmt.Printf("  PubKey.X:     %x\n", subjectPubKey.X)
+	fmt.Printf("  PubKey.Y:     %x\n", subjectPubKey.Y)
 
 	// 3. Verify certificate chain using beatoz_x509Verify
 	//    Input: [4B len][issuer DER][4B len][subject DER]
@@ -192,11 +193,11 @@ func TestX509Verify(t *testing.T) {
 	retSerial := new(big.Int).SetBytes(ret[64:96])
 	retOU := string(ret[96:])
 
-	t.Logf("=== beatoz_x509Verify Result ===")
-	t.Logf("  PubKey.X:     %x", retX)
-	t.Logf("  PubKey.Y:     %x", retY)
-	t.Logf("  SerialNumber: %s", retSerial)
-	t.Logf("  OU:           %s", retOU)
+	fmt.Println("=== beatoz_x509Verify Result ===")
+	fmt.Printf("  PubKey.X:     %x\n", retX)
+	fmt.Printf("  PubKey.Y:     %x\n", retY)
+	fmt.Printf("  SerialNumber: %s\n", retSerial)
+	fmt.Printf("  OU:           %s\n", retOU)
 
 	// Verify returned values match the last (subject) certificate
 	require.Equal(t, subjectPubKey.X, retX)

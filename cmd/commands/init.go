@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"github.com/beatoz/beatoz-go/libs"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	acrypto "github.com/beatoz/beatoz-go/types/crypto"
+	"github.com/holiman/uint256"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/config"
 	tmos "github.com/tendermint/tendermint/libs/os"
@@ -293,12 +293,11 @@ func InitFilesWith(
 		//
 		// Create genesis
 
-		bigChainId, err := btztypes.ChainIdInt(params.ChainID)
 		if err != nil {
 			return err
 		}
 		genDoc, err = genesis.NewGenesisDoc(
-			"0x"+hex.EncodeToString(bigChainId.Bytes()), // write chainId as hex string
+			params.ChainID, // write chainId as hex string
 			consensusParams,
 			valset,
 			appState,
@@ -355,11 +354,15 @@ func DefaultInitParams() *InitParams {
 }
 
 func (params *InitParams) Validate() error {
-	if !btztypes.IsHexByteString(params.ChainID) &&
-		!btztypes.IsNumericString(params.ChainID) {
-		return fmt.Errorf("invalid chain_id: %s", params.ChainID)
+	if strings.HasPrefix(params.ChainID, "0x") {
+		if _, err := uint256.FromHex(params.ChainID); err != nil {
+			return fmt.Errorf("invalid chain_id: %s (%v)", params.ChainID, err)
+		}
+	} else {
+		if _, err := uint256.FromDecimal(params.ChainID); err != nil {
+			return fmt.Errorf("invalid chain_id: %s (%v)", params.ChainID, err)
+		}
 	}
-
 	if params.InitTotalSupply > params.MaxTotalSupply {
 		return fmt.Errorf("init_total_supply (%d) cannot exceed max_total_supply (%d)", params.InitTotalSupply, params.MaxTotalSupply)
 	}

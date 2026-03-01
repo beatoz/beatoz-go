@@ -29,7 +29,7 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 	root := filepath.Dir(dbPath)
 	base := filepath.Base(dbPath)
 
-	bcfg := config.DefaultConfig(chainId)
+	bcfg := config.DefaultConfig(chainId.Hex())
 	bcfg.SetRoot(root)
 	bcfg.DBPath = base
 
@@ -49,7 +49,7 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 
 		// randomly create transfer transactions
 		tx := web3.NewTrxTransfer(w.Address(), types2.RandAddress(), w.GetNonce(), govHandler.MinTrxGas(), govHandler.GasPrice(), uint256.NewInt(rand.Uint64()))
-		if bz, _, err := w.SignTrxRLP(tx, bcfg.ChainIdHex()); err != nil {
+		if bz, _, err := w.SignTrxRLP(tx, bcfg.ChainId().Hex()); err != nil {
 			panic(err)
 		} else if tx.Sig = bz; tx.Sig == nil {
 			panic("not reachable")
@@ -79,7 +79,7 @@ func Benchmark_AcctCtrler_ASync_ByChannel(b *testing.B) {
 		chIn := make(chan int, mempoolSize/runtime.NumCPU()+1)
 		chIns = append(chIns, chIn)
 		go makeTrxCtxRoutineEx(chIn, txs,
-			bcfg.ChainIdHex(),
+			bcfg.ChainId().Hex(),
 			govHandler,
 			acctCtrler,
 			func(_txctx *types.TrxContext) xerrors.XError {
@@ -139,7 +139,7 @@ func Benchmark_AcctCtrler_ASync(b *testing.B) {
 				defer wg.Done()
 
 				txbz := txs[rand.Intn(len(txs))]
-				txctx := _makeTrxCtx(txbz, bcfg.ChainIdHex(), govHandler, acctCtrler)
+				txctx := _makeTrxCtx(txbz, bcfg.ChainId().Hex(), govHandler, acctCtrler)
 
 				mtx.Lock()
 				txctxs = append(txctxs, txctx)
@@ -170,7 +170,7 @@ func Benchmark_AcctCtrler_Sync(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < mempoolSize; j++ {
-			bctx := types.TempBlockContext(bcfg.ChainIdHex(), rand.Int63(), time.Now(), govHandler, acctCtrler, nil, nil, nil)
+			bctx := types.TempBlockContext(bcfg.ChainId().Hex(), rand.Int63(), time.Now(), govHandler, acctCtrler, nil, nil, nil)
 			txbz := txs[rand.Intn(len(txs))]
 			txctx, xerr := types.NewTrxContext(txbz,
 				bctx, // issue #39: set block time expected to be executed.

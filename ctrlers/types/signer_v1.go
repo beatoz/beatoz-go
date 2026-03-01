@@ -2,20 +2,20 @@ package types
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 type SignerV1 struct {
-	chainId *big.Int
+	chainId *uint256.Int
 }
 
-func NewSignerV1(chainId *big.Int) *SignerV1 {
+func NewSignerV1(chainId *uint256.Int) *SignerV1 {
 	return &SignerV1{chainId: chainId}
 }
 

@@ -1,14 +1,15 @@
 package node
 
 import (
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"testing"
-	"time"
 )
 
 var (
@@ -27,7 +28,7 @@ func init() {
 		//
 		// Invalid nonce
 		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 1, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-		_, _, _ = w0.SignTrxRLP(tx, chainId)
+		_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 
 		bztx, _ := tx.Encode()
 		txReqs = append(txReqs, &abcitypes.RequestDeliverTx{Tx: bztx})
@@ -38,7 +39,7 @@ func Benchmark_prepareTrxContext(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for _, req := range txReqs {
 			txPreparer.Add(req, func(*abcitypes.RequestDeliverTx, int) (*types.TrxContext, *abcitypes.ResponseDeliverTx) {
-				txctx, xerr := mocks.MakeTrxCtxWithBz(req.Tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+				txctx, xerr := mocks.MakeTrxCtxWithBz(req.Tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
 				require.NoError(b, xerr)
 				return txctx, nil
 			})
@@ -52,7 +53,7 @@ func Benchmark_prepareTrxContext(b *testing.B) {
 func Benchmark_sequentialTrxContext(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for _, req := range txReqs {
-			_, xerr := mocks.MakeTrxCtxWithBz(req.Tx, chainId, 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+			_, xerr := mocks.MakeTrxCtxWithBz(req.Tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
 			require.NoError(b, xerr)
 		}
 	}

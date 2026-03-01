@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -161,17 +162,23 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	// get chain_id
 	if ctrler.lastBlockCtx.ChainID() != "" {
 		// it's not first time to run
-		chainId, err := types.ChainIdInt(ctrler.lastBlockCtx.ChainID())
-		if err != nil {
-			panic(err)
+		var chainId *uint256.Int
+		_cidstr := ctrler.lastBlockCtx.ChainID()
+		if strings.HasPrefix(_cidstr, "0x") {
+			chainId = uint256.MustFromHex(_cidstr)
+		} else {
+			chainId = uint256.MustFromDecimal(_cidstr)
 		}
+
 		if chainId.Cmp(ctrler.rootConfig.ChainId()) != 0 {
 			panic(fmt.Errorf("chain_id is not same: genesis(%v), actual(%v)", ctrler.rootConfig.ChainId(), chainId))
 		}
+	} else {
+		ctrler.lastBlockCtx.SetChainID(ctrler.rootConfig.ChainIdHex())
 	}
 
 	// create signers
-	ctrlertypes.InitSigner(ctrler.rootConfig.ChainIdHex())
+	ctrlertypes.InitSigner(ctrler.rootConfig.ChainId())
 
 	// Reset CreateEmptyBlocksInterval of consensus engine
 	// Note that the `create_empty_blocks_interval` of `config.toml` does not work anymore.

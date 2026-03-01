@@ -115,7 +115,7 @@ func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, l
 
 	lg := logger.With("module", "beatoz_EVMCtrler")
 
-	defaultEVMChainConfig.ChainID = config.ChainId()
+	defaultEVMChainConfig.ChainID = config.ChainId().ToBig()
 	return &EVMCtrler{
 		ethChainConfig:  defaultEVMChainConfig,
 		ethDB:           db,

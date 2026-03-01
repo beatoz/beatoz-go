@@ -91,7 +91,7 @@ func TestRLP_TrxPayloadContract(t *testing.T) {
 			Data: bytes.RandHexBytes(10234),
 		},
 	}
-	_, _, err := w.SignTrxRLP(tx0, chainId)
+	_, _, err := w.SignTrxRLP(tx0, chainId.Hex())
 
 	require.NoError(t, err)
 	_, _, xerr := types2.VerifyTrxRLP(tx0)
@@ -133,7 +133,7 @@ func TestRLP_TrxPayloadSetDoc(t *testing.T) {
 			URL:  "https://test.account.doc/1",
 		},
 	}
-	_, _, err := w.SignTrxRLP(tx0, chainId)
+	_, _, err := w.SignTrxRLP(tx0, chainId.Hex())
 
 	require.NoError(t, err)
 	_, _, xerr := types2.VerifyTrxRLP(tx0)
@@ -184,7 +184,7 @@ func TestRLP_TrxPayloadProposal(t *testing.T) {
 	}
 
 	// check signature
-	_, _, err := w.SignTrxRLP(tx0, chainId)
+	_, _, err := w.SignTrxRLP(tx0, chainId.Hex())
 	require.NoError(t, err)
 	_, _, xerr := types2.VerifyTrxRLP(tx0)
 	require.NoError(t, xerr)

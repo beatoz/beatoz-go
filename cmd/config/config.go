@@ -1,30 +1,30 @@
 package config
 
 import (
-	"math/big"
+	"strings"
 
-	"github.com/beatoz/beatoz-go/types"
+	"github.com/holiman/uint256"
 	tmcfg "github.com/tendermint/tendermint/config"
 )
 
 type Config struct {
 	*tmcfg.Config
-	chainId *big.Int
+	chainId *uint256.Int
 }
 
 func DefaultConfig(chainId ...string) *Config {
-	_chainId := big.NewInt(0)
+	cid := uint256.NewInt(0)
 	if len(chainId) > 0 {
-		cid, err := types.ChainIdInt(chainId[0])
-		if err != nil {
-			panic(err)
+		if strings.HasPrefix(chainId[0], "0x") {
+			cid = uint256.MustFromHex(chainId[0])
+		} else {
+			cid = uint256.MustFromDecimal(chainId[0])
 		}
-		_chainId = cid
 	}
 
 	return &Config{
 		Config:  tmcfg.DefaultConfig(),
-		chainId: _chainId,
+		chainId: cid,
 	}
 }
 
@@ -35,22 +35,24 @@ func DefaultConfigWith(cfg *tmcfg.Config, chainId ...string) *Config {
 }
 
 func (c *Config) SetChainId(chainId string) {
-	cid, err := types.ChainIdInt(chainId)
-	if err != nil {
-		panic(err)
+	cid := uint256.NewInt(0)
+	if strings.HasPrefix(chainId, "0x") {
+		cid = uint256.MustFromHex(chainId)
+	} else {
+		cid = uint256.MustFromDecimal(chainId)
 	}
 	c.chainId = cid
 }
 
-func (c *Config) ChainId() *big.Int {
+func (c *Config) ChainId() *uint256.Int {
 	return c.chainId
 }
 
 // ChainID is override BaseConfig.ChainID() of tendermint
-func (c *Config) ChainID() *big.Int {
+func (c *Config) ChainID() *uint256.Int {
 	return c.chainId
 }
 
 func (c *Config) ChainIdHex() string {
-	return types.ChainIdHex(c.chainId)
+	return c.chainId.Hex() // include prefix '0x' and lowercase
 }

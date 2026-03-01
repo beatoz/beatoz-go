@@ -27,8 +27,8 @@ func Test_ChainId(t *testing.T) {
 		{"12aa", false},
 		{"0X12aa", false},
 		{"0x123Z", false},
-		{"0x123", false},
-		{"0x0123", true},
+		{"0x123", true},
+		{"0x0123", false},
 		{"1234", true},
 	}
 	params := &InitParams{
@@ -73,7 +73,7 @@ func Test_InitialAmounts(t *testing.T) {
 		params := &InitParams{
 			CreateEmptyBlocks:         true,
 			CreateEmptyBlocksInterval: "1s",
-			ChainID:                   "0x01",
+			ChainID:                   "0x1",
 			ValCnt:                    rand.Intn(100) + 1,
 			ValSecret:                 bytes.RandBytes(12),
 			HolderCnt:                 rand.Intn(100) + 1,

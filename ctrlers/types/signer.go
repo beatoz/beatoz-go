@@ -7,6 +7,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 type ISigner interface {
@@ -19,14 +20,9 @@ type ISigner interface {
 var signerV0 *SignerV0
 var signerV1 *SignerV1
 
-func InitSigner(chainId string) {
+func InitSigner(chainId *uint256.Int) {
 	signerV0 = NewSignerV0(chainId)
-
-	_chainId, err := types.ChainIdInt(chainId)
-	if err != nil {
-		panic(err)
-	}
-	signerV1 = NewSignerV1(_chainId)
+	signerV1 = NewSignerV1(chainId)
 }
 
 func getSigner(v byte) (ISigner, xerrors.XError) {
