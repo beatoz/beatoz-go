@@ -173,12 +173,17 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	// create signers
 	ctrlertypes.InitSigner(ctrler.rootConfig.ChainIdHex())
 
+	// Reset CreateEmptyBlocksInterval of consensus engine
+	// Note that the `create_empty_blocks_interval` of `config.toml` does not work anymore.
+	ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval = time.Duration(ctrler.govCtrler.EmptyBlockIntervalSecs()) * time.Second
+
 	ctrler.logger.Info("last block information",
 		"chainID", ctrler.lastBlockCtx.ChainID(),
 		"height", ctrler.lastBlockCtx.Height(),
 		"appHash", ctrler.lastBlockCtx.AppHash(),
 		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
 		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit(),
+		"blockInterval", ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval.String(),
 	)
 
 	return abcitypes.ResponseInfo{
@@ -232,12 +237,17 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
 	ctrler.lastBlockCtx.SetAppHash(appHash)
 
+	// Reset CreateEmptyBlocksInterval of consensus engine
+	// Note that the `create_empty_blocks_interval` of `config.toml` does not work anymore.
+	ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval = time.Duration(ctrler.govCtrler.EmptyBlockIntervalSecs()) * time.Second
+
 	ctrler.logger.Info("InitChain",
 		"chainID", ctrler.lastBlockCtx.ChainID(),
 		"height", ctrler.lastBlockCtx.Height(),
 		"appHash", ctrler.lastBlockCtx.AppHash(),
 		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
 		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit(),
+		"blockInterval", ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval.String(),
 	)
 
 	// these values will be saved as state of the consensus engine.
@@ -252,7 +262,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval)
+		_bctx := ctrlertypes.ExpectNextBlockContext(
+			ctrler.lastBlockCtx,
+			time.Duration(ctrler.govCtrler.EmptyBlockIntervalSecs())*time.Second,
+		)
 		txctx, xerr := ctrlertypes.NewTrxContext(
 			req.Tx,
 			_bctx,
