@@ -47,8 +47,8 @@ func AddInitFlags(cmd *cobra.Command) {
 		initParams.ChainID, // default name
 		"the id of chain to generate.\n"+
 			"mainnet = 12494594(0xBEA702)\n"+
-			"testnet = 12494593(0xBEA701)\n"+
-			"devnet  = 12494592(0xBEA700) and others")
+			"testnet0 = 12494593(0xBEA701)\n"+
+			"devnet0  = 12494592(0xBEA700) and others")
 	cmd.Flags().IntVar(
 		&initParams.HolderCnt,
 		"holders",
@@ -116,7 +116,7 @@ func AddInitFlags(cmd *cobra.Command) {
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
-	// for config.toml
+	// write the empty block parameters to config.toml
 	rootConfig.Consensus.CreateEmptyBlocks = initParams.CreateEmptyBlocks
 	rootConfig.Consensus.CreateEmptyBlocksInterval, _ = time.ParseDuration(initParams.CreateEmptyBlocksInterval)
 	config.WriteConfigFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"), rootConfig.Config)

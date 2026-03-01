@@ -88,16 +88,6 @@ func AddNodeFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("p2p.seed_mode", rootConfig.P2P.SeedMode, "enable/disable seed mode")
 	cmd.Flags().String("p2p.private_peer_ids", rootConfig.P2P.PrivatePeerIDs, "comma-delimited private peer IDs")
 
-	// consensus flags
-	cmd.Flags().Bool(
-		"consensus.create_empty_blocks",
-		rootConfig.Consensus.CreateEmptyBlocks,
-		"set this to false to only produce blocks when there are txs or when the AppHash changes")
-	cmd.Flags().String(
-		"consensus.create_empty_blocks_interval",
-		rootConfig.Consensus.CreateEmptyBlocksInterval.String(),
-		"the possible interval between empty blocks")
-
 	// db flags
 	cmd.Flags().String(
 		"db_backend",
