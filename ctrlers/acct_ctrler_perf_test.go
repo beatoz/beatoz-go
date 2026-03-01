@@ -29,10 +29,9 @@ func prepare() (*account.AcctCtrler, *config.Config, [][]byte) {
 	root := filepath.Dir(dbPath)
 	base := filepath.Base(dbPath)
 
-	bcfg := config.DefaultConfig()
+	bcfg := config.DefaultConfig(chainId)
 	bcfg.SetRoot(root)
 	bcfg.DBPath = base
-	bcfg.SetChainId("1234")
 
 	_ctrler, xerr := account.NewAcctCtrler(bcfg, tmlog.NewNopLogger())
 	if xerr != nil {

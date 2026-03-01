@@ -42,7 +42,7 @@ func TestSignerV0_Recover(t *testing.T) {
 	_, preimg0, err := senderWal.SignTrxRLP(tx, chainId)
 	require.NoError(t, err)
 
-	addr0, pubKey0, err := ctrtypes.VerifyTrxRLP(tx, chainId)
+	addr0, pubKey0, err := ctrtypes.VerifyTrxRLP(tx)
 	require.NoError(t, err)
 	require.Equal(t, senderWal.Address(), addr0)
 	require.Equal(t, senderWal.GetPubKey(), pubKey0)
@@ -62,7 +62,7 @@ func TestSignerV0_Recover(t *testing.T) {
 	_, preimg0, err = payerWal.SignPayerTrxRLP(tx, chainId)
 	require.NoError(t, err)
 
-	addr0, pubKey0, err = ctrtypes.VerifyPayerTrxRLP(tx, chainId)
+	addr0, pubKey0, err = ctrtypes.VerifyPayerTrxRLP(tx)
 	require.NoError(t, err)
 	require.Equal(t, payerWal.Address(), addr0)
 	require.Equal(t, payerWal.GetPubKey(), pubKey0)

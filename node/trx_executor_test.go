@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	chainId  = "0x1234"
+	chainId  = "0x0abc"
 	govMock  = gov.NewGovHandlerMock(ctrlertypes.DefaultGovParams())
 	acctMock = acct.NewAcctHandlerMock(1000)
 	balance  = uint64(10_000_000_000_000_000_000)

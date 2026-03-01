@@ -1,6 +1,12 @@
 package gov
 
 import (
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	mockacct "github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	govmock "github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
@@ -10,15 +16,10 @@ import (
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 var (
-	config      = cfg.DefaultConfig()
+	config      = cfg.DefaultConfig("0x1234")
 	govCtrler   *GovCtrler
 	acctMock    *mockacct.AcctHandlerMock
 	vpowMock    *mockvpower.VPowerHandlerMock //*mockstake.StakeHandlerMock
@@ -30,6 +31,8 @@ var (
 )
 
 func init() {
+	ctrlertypes.InitSigner(config.ChainIdHex())
+
 	config.DBPath = filepath.Join(os.TempDir(), "gov-ctrler-test")
 	_ = os.RemoveAll(config.DBPath)
 	_ = os.MkdirAll(config.DBPath, 0700)

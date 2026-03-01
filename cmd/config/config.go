@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/hex"
 	"math/big"
 
 	"github.com/beatoz/beatoz-go/types"
@@ -53,5 +52,5 @@ func (c *Config) ChainID() *big.Int {
 }
 
 func (c *Config) ChainIdHex() string {
-	return "0x" + hex.EncodeToString(c.chainId.Bytes())
+	return types.ChainIdHex(c.chainId)
 }

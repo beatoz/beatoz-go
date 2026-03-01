@@ -29,15 +29,12 @@ func InitSigner(chainId string) {
 	signerV1 = NewSignerV1(_chainId)
 }
 
-func getSigner(chainId string, v byte) (ISigner, xerrors.XError) {
+func getSigner(v byte) (ISigner, xerrors.XError) {
+	if signerV0 == nil || signerV1 == nil {
+		panic("signer not initialized")
+	}
 	switch v {
 	case 0, 1:
-		// In signerV0, the type of chainId is string. If chainId is a hex string,
-		// case-sensitivity issues may occur. Therefore, it is safer to enforce using
-		// the chainId recorded in the current block.
-		// The signing side will use the chainId from genesis, which is the same
-		// as the chainId in the block.
-		signerV0.chainId = chainId
 		return signerV0, nil
 	case 27, 28:
 		return signerV1, nil
@@ -46,16 +43,16 @@ func getSigner(chainId string, v byte) (ISigner, xerrors.XError) {
 	}
 }
 
-func VerifyTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
-	signer, xerr := getSigner(chainId, tx.Sig[64])
+func VerifyTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
+	signer, xerr := getSigner(tx.Sig[64])
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 	return signer.VerifySender(tx)
 }
 
-func VerifyPayerTrxRLP(tx *Trx, chainId string) (types.Address, bytes.HexBytes, xerrors.XError) {
-	signer, xerr := getSigner(chainId, tx.PayerSig[64])
+func VerifyPayerTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
+	signer, xerr := getSigner(tx.PayerSig[64])
 	if xerr != nil {
 		return nil, nil, xerr
 	}

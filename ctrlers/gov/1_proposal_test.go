@@ -19,14 +19,11 @@ type Case struct {
 }
 
 var (
-	govTestChainId = "0x1234"
-	cases1         []*Case
-	cases2         []*Case
+	cases1 []*Case
+	cases2 []*Case
 )
 
 func init() {
-	ctrlertypes.InitSigner(govTestChainId)
-
 	bzOpt, err := jsonx.Marshal(govParams0)
 	if err != nil {
 		panic(err)
@@ -40,7 +37,7 @@ func init() {
 		govCtrler.MinVotingPeriodBlocks(),
 		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks()-1,
 		proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(tx0, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId)
+	_ = signTrx(tx0, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex())
 
 	// expect error: not validator
 	tx1 := web3.NewTrxProposal(
@@ -50,7 +47,7 @@ func init() {
 		govCtrler.MinVotingPeriodBlocks(),
 		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
 		proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt+1), govTestChainId) // not validator
+	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt+1), config.ChainIdHex()) // not validator
 
 	// expect error: too small period
 	tx3 := web3.NewTrxProposal(
@@ -61,7 +58,7 @@ func init() {
 		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
 		proposal.PROPOSAL_GOVPARAMS, bzOpt,
 	)
-	_ = signTrx(tx3, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId)
+	_ = signTrx(tx3, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex())
 
 	//expect error: wrong start height
 	tx4 := web3.NewTrxProposal(
@@ -72,13 +69,13 @@ func init() {
 		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
 		proposal.PROPOSAL_GOVPARAMS, bzOpt,
 	)
-	_ = signTrx(tx4, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId)
+	_ = signTrx(tx4, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex())
 
 	// expect success
 	tx5 := web3.NewTrxProposal(
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt) // all right
-	_ = signTrx(tx5, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId)
+	_ = signTrx(tx5, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex())
 
 	cases1 = []*Case{
 		{txctx: makeTrxCtx(tx0, 1, true), err: xerrors.ErrInvalidTrxPayloadParams},  // too small applying height
@@ -92,7 +89,7 @@ func init() {
 	tx6 := web3.NewTrxProposal(
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal2", 11, 259200, 518400+11, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(tx6, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId)
+	_ = signTrx(tx6, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex())
 
 	cases2 = []*Case{
 		// the tx6 will be submitted two times.
@@ -144,7 +141,7 @@ func TestOverflowBlockHeight(t *testing.T) {
 	tx := web3.NewTrxProposal(
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", math.MaxInt64, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId))
+	require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 	xerr := runTrx(makeTrxCtx(tx, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "overflow occurs")
@@ -157,21 +154,21 @@ func TestApplyingHeight(t *testing.T) {
 	tx0 := web3.NewTrxProposal( // applyingHeight : 518410
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	require.NoError(t, signTrx(tx0, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId))
+	require.NoError(t, signTrx(tx0, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 	xerr := runTrx(makeTrxCtx(tx0, 1, true))
 	require.NoError(t, xerr)
 
 	tx1 := web3.NewTrxProposal( // applyingHeight : start + period + lazyApplyingBlocks
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, ctrlertypes.DefaultGovParams().LazyApplyingBlocks()+259200+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	require.NoError(t, signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId))
+	require.NoError(t, signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 	xerr = runTrx(makeTrxCtx(tx1, 1, true))
 	require.NoError(t, xerr)
 
 	tx2 := web3.NewTrxProposal( // wrong applyingHeight
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, 1, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	require.NoError(t, signTrx(tx2, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId))
+	require.NoError(t, signTrx(tx2, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 	xerr = runTrx(makeTrxCtx(tx2, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "wrong applyingHeight")
@@ -179,7 +176,7 @@ func TestApplyingHeight(t *testing.T) {
 	tx3 := web3.NewTrxProposal( // applyingHeight : start + period + lazyApplyingBlocks - 1
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, ctrlertypes.DefaultGovParams().LazyApplyingBlocks()+259200+10-1, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	require.NoError(t, signTrx(tx3, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId))
+	require.NoError(t, signTrx(tx3, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 	xerr = runTrx(makeTrxCtx(tx3, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "wrong applyingHeight")
@@ -187,7 +184,7 @@ func TestApplyingHeight(t *testing.T) {
 	tx4 := web3.NewTrxProposal( // applyingHeight : -518410
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, 259200, -518410, proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	require.NoError(t, signTrx(tx4, vpowMock.PickAddress(vpowMock.ValCnt-1), govTestChainId))
+	require.NoError(t, signTrx(tx4, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 	xerr = runTrx(makeTrxCtx(tx4, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "wrong applyingHeight")
