@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -693,10 +694,12 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	ctrler.logger.Debug("BeatozApp::Commit", "height", ctrler.currBlockCtx.Height())
+	height := ctrler.currBlockCtx.Height()
+	ctrler.logger.Debug("BeatozApp::Commit", "height", height)
 
-	ver0 := int64(0)
 	hasher := crypto.DefaultHasher()
+
+	// NOTE: DON'T CHANGE the controllers order.
 	ctrlers := []ctrlertypes.ILedgerHandler{
 		ctrler.govCtrler,
 		ctrler.acctCtrler,
@@ -710,10 +713,9 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 		if xerr != nil {
 			panic(xerr)
 		}
-		if ver0 == 0 {
-			ver0 = ver
-		} else if ver != ver0 {
-			panic(fmt.Sprintf("Not same versions: expected: %v, actual: %v", ver0, ver))
+		if height != ver {
+			panic(fmt.Sprintf("Not same version: expected(height): %d, actual: %d, controller: %s",
+				height, ver, reflect.TypeOf(ctr).Elem().Name()))
 		}
 		_, _ = hasher.Write(hash)
 	}
@@ -722,7 +724,7 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 
 	ctrler.currBlockCtx.SetAppHash(appHash)
 	ctrler.logger.Debug("Finish BeatozApp::Commit",
-		"height", ver0,
+		"height", height,
 		"txs", ctrler.currBlockCtx.TxsCnt(),
 		"appHash", ctrler.currBlockCtx.AppHash())
 	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
