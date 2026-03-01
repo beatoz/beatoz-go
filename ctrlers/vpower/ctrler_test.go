@@ -29,10 +29,10 @@ var (
 
 func init() {
 	rootDir := filepath.Join(os.TempDir(), "test-vpowctrler")
-	config = beatozcfg.DefaultConfig("0xabcd")
+	config = beatozcfg.DefaultConfig("0x123")
 	config.SetRoot(rootDir)
 
-	ctrlertypes.InitSigner(config.ChainIdHex())
+	ctrlertypes.InitSigner(config.ChainId())
 
 	acctMock = acct.NewAcctHandlerMock(1000)
 	acctMock.Iterate(func(idx int, w *web3.Wallet) bool {

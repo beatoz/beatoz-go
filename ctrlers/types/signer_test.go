@@ -39,10 +39,10 @@ func TestSignerV0_Recover(t *testing.T) {
 	}
 
 	// for Sender
-	_, preimg0, err := senderWal.SignTrxRLP(tx, chainId)
+	_, preimg0, err := senderWal.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 
-	addr0, pubKey0, err := ctrtypes.VerifyTrxRLP(tx, chainId)
+	addr0, pubKey0, err := ctrtypes.VerifyTrxRLP(tx)
 	require.NoError(t, err)
 	require.Equal(t, senderWal.Address(), addr0)
 	require.Equal(t, senderWal.GetPubKey(), pubKey0)
@@ -59,10 +59,10 @@ func TestSignerV0_Recover(t *testing.T) {
 	require.Equal(t, pubKey0, pubKey1)
 
 	// for Payer
-	_, preimg0, err = payerWal.SignPayerTrxRLP(tx, chainId)
+	_, preimg0, err = payerWal.SignPayerTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 
-	addr0, pubKey0, err = ctrtypes.VerifyPayerTrxRLP(tx, chainId)
+	addr0, pubKey0, err = ctrtypes.VerifyPayerTrxRLP(tx)
 	require.NoError(t, err)
 	require.Equal(t, payerWal.Address(), addr0)
 	require.Equal(t, payerWal.GetPubKey(), pubKey0)
@@ -101,12 +101,10 @@ func TestSignerV1_Recover(t *testing.T) {
 	}
 
 	//
-	chainIdInt, err := types.ChainIdInt(chainId)
-	require.NoError(t, err)
-	signer := ctrtypes.NewSignerV1(chainIdInt)
+	signer := ctrtypes.NewSignerV1(chainId)
 
 	// for Sender
-	_, err = signer.SignSender(tx, senderPrvBz)
+	_, err := signer.SignSender(tx, senderPrvBz)
 	require.NoError(t, err)
 
 	addr, pubBytes1, err := signer.VerifySender(tx)

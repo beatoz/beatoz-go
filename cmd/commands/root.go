@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	rootConfig = cfg.DefaultConfig("0")
+	rootConfig = cfg.DefaultConfig()
 	logger     = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
 )
 

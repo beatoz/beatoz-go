@@ -1,6 +1,9 @@
 package evm
 
 import (
+	"sort"
+	"sync"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -9,11 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"math/big"
-	"sort"
-	"sync"
 )
 
 type StateDBWrapper struct {
@@ -44,10 +45,10 @@ func NewStateDBWrapper(db ethdb.Database, rootHash bytes.HexBytes, acctHandler c
 	}, nil
 }
 
-func (s *StateDBWrapper) Prepare(txhash bytes.HexBytes, txidx int, from, to types2.Address, snap int, exec bool) {
+func (s *StateDBWrapper) Initiate(txhash bytes.HexBytes, txidx int, from, to types2.Address, snap int, exec bool) {
 	s.exec = exec
 	s.snapshot = snap
-	s.StateDB.Prepare(txhash.Array32(), txidx)
+	s.StateDB.SetTxContext(txhash.Array32(), txidx)
 
 	s.AddAddressToAccessList(from.Array20())
 	if !types2.IsZeroAddress(to) {
@@ -69,7 +70,7 @@ func (s *StateDBWrapper) Finish() {
 	})
 
 	for _, addr := range sortedKeys {
-		amt := uint256.MustFromBig(s.StateDB.GetBalance(addr))
+		amt := s.StateDB.GetBalance(addr)
 		codeSize := s.StateDB.GetCodeSize(addr)
 
 		acct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
@@ -107,15 +108,15 @@ func (s *StateDBWrapper) CreateAccount(addr common.Address) {
 	s.StateDB.CreateAccount(addr)
 }
 
-func (s *StateDBWrapper) SubBalance(addr common.Address, amt *big.Int) {
+func (s *StateDBWrapper) SubBalance(addr common.Address, amt *uint256.Int) {
 	s.StateDB.SubBalance(addr, amt)
 }
 
-func (s *StateDBWrapper) AddBalance(addr common.Address, amt *big.Int) {
+func (s *StateDBWrapper) AddBalance(addr common.Address, amt *uint256.Int) {
 	s.StateDB.AddBalance(addr, amt)
 }
 
-func (s *StateDBWrapper) GetBalance(addr common.Address) *big.Int {
+func (s *StateDBWrapper) GetBalance(addr common.Address) *uint256.Int {
 	return s.StateDB.GetBalance(addr)
 }
 
@@ -167,13 +168,13 @@ func (s *StateDBWrapper) SetState(addr common.Address, key, value common.Hash) {
 	s.StateDB.SetState(addr, key, value)
 }
 
-func (s *StateDBWrapper) Suicide(addr common.Address) bool {
-	return s.StateDB.Suicide(addr)
-}
-
-func (s *StateDBWrapper) HasSuicided(addr common.Address) bool {
-	return s.StateDB.HasSuicided(addr)
-}
+//func (s *StateDBWrapper) Suicide(addr common.Address) bool {
+//	return s.StateDB.Suicide(addr)
+//}
+//
+//func (s *StateDBWrapper) HasSuicided(addr common.Address) bool {
+//	return s.StateDB.HasSuicided(addr)
+//}
 
 func (s *StateDBWrapper) Exist(addr common.Address) bool {
 	return s.StateDB.Exist(addr)
@@ -183,31 +184,31 @@ func (s *StateDBWrapper) Empty(addr common.Address) bool {
 	return s.StateDB.Empty(addr)
 }
 
-func (s *StateDBWrapper) PrepareAccessList(addr common.Address, dest *common.Address, precompiles []common.Address, txAccesses types.AccessList) {
-	s.addAccessedObjAddr(addr)
-	if dest != nil {
-		s.addAccessedObjAddr(*dest)
-	}
+func (s *StateDBWrapper) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
+	if rules.IsBerlin {
+		s.addAccessedObjAddr(sender)
+		if dst != nil {
+			s.addAccessedObjAddr(*dst)
+		}
+		for _, preaddr := range precompiles {
+			s.addAccessedObjAddr(preaddr)
+		}
+		for _, el := range list {
+			s.addAccessedObjAddr(el.Address)
 
-	//
-	// NOTE: Keep the order of addresses.
-	// sort `precompiles`.
-	sort.Slice(precompiles, func(i, j int) bool {
-		ret := bytes.Compare(precompiles[i][:], precompiles[j][:])
-		return ret < 0 // ascending
-	})
-
-	for _, preaddr := range precompiles {
-		s.addAccessedObjAddr(preaddr)
-	}
-	for _, el := range txAccesses {
-		s.addAccessedObjAddr(el.Address)
-		for _, key := range el.StorageKeys {
-			s.AddSlotToAccessList(el.Address, key)
+			//
+			// the following is executed in s.StateDB.Prepare.
+			//
+			//for _, key := range el.StorageKeys {
+			//	s.AddSlotToAccessList(el.Address, key)
+			//}
+		}
+		if rules.IsShanghai { // EIP-3651: warm coinbase
+			s.addAccessedObjAddr(coinbase)
 		}
 	}
 
-	s.StateDB.PrepareAccessList(addr, dest, precompiles, txAccesses)
+	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 
 func (s *StateDBWrapper) AddressInAccessList(addr common.Address) bool {
@@ -225,16 +226,13 @@ func (s *StateDBWrapper) AddAddressToAccessList(addr common.Address) {
 
 func (s *StateDBWrapper) addAccessedObjAddr(addr common.Address) {
 	if _, ok := s.accessedObjAddrs[addr]; !ok {
-		stateObject := s.GetOrNewStateObject(addr)
-		if stateObject != nil {
-			beatozAcct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
-			stateObject.SetNonce(uint64(beatozAcct.Nonce))
-			stateObject.SetBalance(beatozAcct.Balance.ToBig())
+		beatozAcct := s.acctHandler.FindOrNewAccount(addr[:], s.exec)
+		s.SetNonce(addr, uint64(beatozAcct.Nonce))
+		s.SetBalance(addr, beatozAcct.Balance)
 
-			s.accessedObjAddrs[addr] = s.snapshot + 1
+		s.accessedObjAddrs[addr] = s.snapshot + 1
 
-			//s.logger.Debug("addAccessedObjAddr", "address", beatozAcct.Address, "nonce", beatozAcct.Nonce, "balance", beatozAcct.Balance.Dec(), "snap", s.snapshot+1)
-		}
+		//s.logger.Debug("addAccessedObjAddr", "address", beatozAcct.Address, "nonce", beatozAcct.Nonce, "balance", beatozAcct.Balance.Dec(), "snap", s.snapshot+1)
 	}
 }
 
@@ -274,6 +272,6 @@ func (s *StateDBWrapper) AddPreimage(hash common.Hash, preimage []byte) {
 	s.StateDB.AddPreimage(hash, preimage)
 }
 
-func (s *StateDBWrapper) ForEachStorage(addr common.Address, cb func(common.Hash, common.Hash) bool) error {
-	return s.StateDB.ForEachStorage(addr, cb)
-}
+//func (s *StateDBWrapper) ForEachStorage(addr common.Address, cb func(common.Hash, common.Hash) bool) error {
+//	return s.StateDB.ForEachStorage(addr, cb)
+//}

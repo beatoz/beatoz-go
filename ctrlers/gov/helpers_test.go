@@ -10,7 +10,7 @@ import (
 
 func makeTrxCtx(tx *ctrlertypes.Trx, height int64, exec bool) *ctrlertypes.TrxContext {
 
-	txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, govTestChainId, height, time.Now(), exec, govCtrler, acctMock, nil, nil, vpowMock)
+	txctx, xerr := mocks.MakeTrxCtxWithTrx(tx, config.ChainIdHex(), height, time.Now(), exec, govCtrler, acctMock, nil, nil, vpowMock)
 	if xerr != nil {
 		panic(xerr)
 	}

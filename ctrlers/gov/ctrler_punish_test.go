@@ -21,11 +21,11 @@ import (
 )
 
 func Test_Punish_By_BlockProcess(t *testing.T) {
-	// Use `localGovCtrler` instead of `govCtrler` to avoid interference with other tests.
+	// Use `localGovCtrler` instead of `govCtrler`
+	// to avoid interference with other tests.
 	rootPath := filepath.Join(os.TempDir(), "gov-punish-test")
-	localCfg := cfg.DefaultConfig()
+	localCfg := cfg.DefaultConfig("0x1234")
 	localCfg.SetRoot(rootPath)
-	localCfg.SetChainId("1234")
 
 	require.NoError(t, os.RemoveAll(rootPath))
 
@@ -44,7 +44,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	require.NoError(t, err)
 	tx := web3.NewTrxProposal(
 		voterAddr, btztypes.ZeroAddress(), 1, defMinGas, defGasPrice,
-		localCfg.ChainIdHex(),
+		"test govparams proposal",
 		10,
 		localGovCtrler.MinVotingPeriodBlocks(),
 		10+localGovCtrler.MinVotingPeriodBlocks()+localGovCtrler.LazyApplyingBlocks(),
@@ -111,10 +111,10 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 		propVoter = prop.FindVoter(voterAddr)
 		require.NotNil(t, propVoter)
 
-		//fmt.Println("voter", bytes.HexBytes(propVoter.Address),
-		//	"voterPower", propVoter.Power,
-		//	"prop", bytes.HexBytes(prop.Header().TxHash),
-		//	"totalPower", prop.Header().TotalVotingPower)
+		fmt.Println("voter", bytes.HexBytes(propVoter.Address),
+			"voterPower", propVoter.Power,
+			"prop", bytes.HexBytes(prop.Header().TxHash),
+			"totalPower", prop.Header().TotalVotingPower)
 
 		require.NotNil(t, propVoter)
 		require.Equal(t, expectedvoterPower, propVoter.Power)

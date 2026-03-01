@@ -1,10 +1,11 @@
 package gov
 
 import (
+	"math"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/holiman/uint256"
-	"math"
 )
 
 func ForTest1GovParams() *ctrlertypes.GovParams {
@@ -18,8 +19,8 @@ func ForTest1GovParams() *ctrlertypes.GovParams {
 		v.LazyApplyingBlocks = 10
 		v.XGasPrice = uint256.NewInt(10).Bytes()
 		v.MinTrxGas = 10
-		v.MinBlockGasLimit = math.MaxUint64 / 2
-		v.MaxBlockGasLimit = math.MaxUint64 / 2
+		v.BlockSizeLimit = 22_020_096
+		v.BlockGasLimit = math.MaxUint64 / 2
 		v.MinVotingPeriodBlocks = 10
 		v.MaxVotingPeriodBlocks = 10
 		v.MinSignedBlocks = 3
@@ -43,8 +44,8 @@ func ForTest3GovParams() *ctrlertypes.GovParams {
 		v.LazyApplyingBlocks = 0
 		v.XGasPrice = nil
 		v.MinTrxGas = 0
-		v.MinBlockGasLimit = math.MaxUint64 / 2
-		v.MaxBlockGasLimit = math.MaxUint64 / 2
+		v.BlockSizeLimit = 22_020_096
+		v.BlockGasLimit = math.MaxUint64 / 2
 		v.MinVotingPeriodBlocks = 0
 		v.MaxVotingPeriodBlocks = 0
 		v.MinSelfPowerRate = 0

@@ -8,14 +8,17 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 type SignerV0 struct {
 	chainId string
 }
 
-func NewSignerV0(chainId string) *SignerV0 {
-	return &SignerV0{chainId: chainId}
+func NewSignerV0(chainId *uint256.Int) *SignerV0 {
+	return &SignerV0{
+		chainId: chainId.Hex(),
+	}
 }
 
 func (s *SignerV0) SignSender(tx *Trx, prvBytes bytes.HexBytes) (bytes.HexBytes, error) {

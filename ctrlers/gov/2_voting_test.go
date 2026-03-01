@@ -29,7 +29,7 @@ func init() {
 	txProposal := web3.NewTrxProposal(
 		vpowMock.PickAddress(1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", 10, govCtrler.MinVotingPeriodBlocks(), 10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(), proposal.PROPOSAL_GOVPARAMS, bzOpt)
-	_ = signTrx(txProposal, vpowMock.PickAddress(1), govTestChainId)
+	_ = signTrx(txProposal, vpowMock.PickAddress(1), config.ChainIdHex())
 	trxCtxProposal = makeTrxCtx(txProposal, 1, true)
 	if xerr := runTrx(trxCtxProposal); xerr != nil {
 		panic(xerr)
@@ -41,24 +41,24 @@ func init() {
 	// no error
 	tx0 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx0, vpowMock.PickAddress(0), govTestChainId)
+	_ = signTrx(tx0, vpowMock.PickAddress(0), config.ChainIdHex())
 	// no right
 	tx1 := web3.NewTrxVoting(vpowMock.PickAddress(vpowMock.ValCnt), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 0)
-	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt), govTestChainId)
+	_ = signTrx(tx1, vpowMock.PickAddress(vpowMock.ValCnt), config.ChainIdHex())
 
 	// invalid payload params : wrong choice
 	tx2 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, 1)
-	_ = signTrx(tx2, vpowMock.PickAddress(0), govTestChainId)
+	_ = signTrx(tx2, vpowMock.PickAddress(0), config.ChainIdHex())
 	// invalid payload params : wrong choice
 	tx3 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		trxCtxProposal.TxHash, -1)
-	_ = signTrx(tx3, vpowMock.PickAddress(0), govTestChainId)
+	_ = signTrx(tx3, vpowMock.PickAddress(0), config.ChainIdHex())
 	// not found result
 	tx4 := web3.NewTrxVoting(vpowMock.PickAddress(0), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		bytes.RandBytes(32), 0)
-	_ = signTrx(tx4, vpowMock.PickAddress(0), govTestChainId)
+	_ = signTrx(tx4, vpowMock.PickAddress(0), config.ChainIdHex())
 
 	// test cases #1
 	voteTestCases1 = []*Case{
@@ -82,7 +82,7 @@ func init() {
 		//}
 		tx := web3.NewTrxVoting(addr, types.ZeroAddress(), 1, defMinGas, defGasPrice,
 			trxCtxProposal.TxHash, choice)
-		_ = signTrx(tx, addr, govTestChainId)
+		_ = signTrx(tx, addr, config.ChainIdHex())
 		txs = append(txs, tx)
 	}
 

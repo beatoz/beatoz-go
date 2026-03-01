@@ -10,9 +10,12 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcore "github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	ethvm "github.com/ethereum/go-ethereum/core/vm"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	ethparams "github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 )
 
 var emptyCodeHash = ethcrypto.Keccak256Hash(nil)
@@ -37,109 +40,152 @@ The state transitioning model does all the necessary work to work out a valid ne
 6) Derive new state root
 */
 type VMStateTransition struct {
-	gp         *ethcore.GasPool
-	msg        ethcore.Message
-	gas        uint64
-	gasPrice   *big.Int
-	gasFeeCap  *big.Int
-	gasTipCap  *big.Int
-	initialGas uint64
-	value      *big.Int
-	data       []byte
-	state      ethvm.StateDB
-	evm        *ethvm.EVM
+	gp           *ethcore.GasPool
+	msg          *ethcore.Message
+	gasRemaining uint64
+	initialGas   uint64
+	state        ethvm.StateDB
+	evm          *ethvm.EVM
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewVMStateTransition(evm *ethvm.EVM, msg ethcore.Message, gp *ethcore.GasPool) *VMStateTransition {
+func NewVMStateTransition(evm *ethvm.EVM, msg *ethcore.Message, gp *ethcore.GasPool) *VMStateTransition {
 	return &VMStateTransition{
-		gp:        gp,
-		evm:       evm,
-		msg:       msg,
-		gasPrice:  msg.GasPrice(),
-		gasFeeCap: msg.GasFeeCap(),
-		gasTipCap: msg.GasTipCap(),
-		value:     msg.Value(),
-		data:      msg.Data(),
-		state:     evm.StateDB,
+		gp:    gp,
+		evm:   evm,
+		msg:   msg,
+		state: evm.StateDB,
 	}
 }
 
 // to returns the recipient of the message.
 func (st *VMStateTransition) to() ethcommon.Address {
-	if st.msg == nil || st.msg.To() == nil /* contract creation */ {
+	if st.msg == nil || st.msg.To == nil /* contract creation */ {
 		return ethcommon.Address{}
 	}
-	return *st.msg.To()
+	return *st.msg.To
 }
 
 func (st *VMStateTransition) buyGas() error {
-	mgval := new(big.Int).SetUint64(st.msg.Gas())
-	mgval = mgval.Mul(mgval, st.gasPrice)
-	balanceCheck := mgval
-	if st.gasFeeCap != nil && st.gasFeeCap.BitLen() > 0 {
-		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
-		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
-		balanceCheck.Add(balanceCheck, st.value)
+	mgval := new(big.Int).SetUint64(st.msg.GasLimit)
+	mgval = mgval.Mul(mgval, st.msg.GasPrice)
+	balanceCheck := new(big.Int).Set(mgval)
+	if st.msg.GasFeeCap != nil {
+		balanceCheck.SetUint64(st.msg.GasLimit)
+		balanceCheck = balanceCheck.Mul(balanceCheck, st.msg.GasFeeCap)
+		balanceCheck.Add(balanceCheck, st.msg.Value)
 	}
-	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
-		return fmt.Errorf("%w: address %v have %v want %v", ethcore.ErrInsufficientFunds, st.msg.From().Hex(), have, want)
+	if st.evm.ChainConfig().IsCancun(st.evm.Context.BlockNumber, st.evm.Context.Time) {
+		if blobGas := st.blobGasUsed(); blobGas > 0 {
+			// Check that the user has enough funds to cover blobGasUsed * tx.BlobGasFeeCap
+			blobBalanceCheck := new(big.Int).SetUint64(blobGas)
+			blobBalanceCheck.Mul(blobBalanceCheck, st.msg.BlobGasFeeCap)
+			balanceCheck.Add(balanceCheck, blobBalanceCheck)
+			// Pay for blobGasUsed * actual blob fee
+			blobFee := new(big.Int).SetUint64(blobGas)
+			blobFee.Mul(blobFee, st.evm.Context.BlobBaseFee)
+			mgval.Add(mgval, blobFee)
+		}
 	}
-	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
+	balanceCheckU256, overflow := uint256.FromBig(balanceCheck)
+	if overflow {
+		return fmt.Errorf("%w: address %v required balance exceeds 256 bits", ethcore.ErrInsufficientFunds, st.msg.From.Hex())
+	}
+	if have, want := st.state.GetBalance(st.msg.From), balanceCheckU256; have.Cmp(want) < 0 {
+		return fmt.Errorf("%w: address %v have %v want %v", ethcore.ErrInsufficientFunds, st.msg.From.Hex(), have, want)
+	}
+	if err := st.gp.SubGas(st.msg.GasLimit); err != nil {
 		return err
 	}
-	st.gas += st.msg.Gas()
+	st.gasRemaining += st.msg.GasLimit
 
-	st.initialGas = st.msg.Gas()
+	st.initialGas = st.msg.GasLimit
 
 	// DO NOT change the sender's balance for the tx fee at this point.
 	// This should be handled in postRunTrx in node/trx_executor.go.
-	//st.state.SubBalance(st.msg.From(), mgval)
+	//mgvalU256, _ := uint256.FromBig(mgval)
+	//st.state.SubBalance(st.msg.From, mgvalU256)
+
 	return nil
 }
 
 func (st *VMStateTransition) preCheck() error {
 	// Only check transactions that are not fake
-	if !st.msg.IsFake() {
+	msg := st.msg
+	if !msg.SkipAccountChecks {
 		// Make sure this transaction's nonce is correct.
-		stNonce := st.state.GetNonce(st.msg.From())
-		if msgNonce := st.msg.Nonce(); stNonce < msgNonce {
+		stNonce := st.state.GetNonce(msg.From)
+		if msgNonce := msg.Nonce; stNonce < msgNonce {
 			return fmt.Errorf("%w: address %v, tx: %d state: %d", ethcore.ErrNonceTooHigh,
-				st.msg.From().Hex(), msgNonce, stNonce)
+				msg.From.Hex(), msgNonce, stNonce)
 		} else if stNonce > msgNonce {
 			return fmt.Errorf("%w: address %v, tx: %d state: %d", ethcore.ErrNonceTooLow,
-				st.msg.From().Hex(), msgNonce, stNonce)
+				msg.From.Hex(), msgNonce, stNonce)
 		} else if stNonce+1 < stNonce {
 			return fmt.Errorf("%w: address %v, nonce: %d", ethcore.ErrNonceMax,
-				st.msg.From().Hex(), stNonce)
+				msg.From.Hex(), stNonce)
 		}
 		// Make sure the sender is an EOA
-		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != emptyCodeHash && codeHash != (ethcommon.Hash{}) {
+		codeHash := st.state.GetCodeHash(msg.From)
+		if codeHash != (ethcommon.Hash{}) && codeHash != types.EmptyCodeHash {
 			return fmt.Errorf("%w: address %v, codehash: %s", ethcore.ErrSenderNoEOA,
-				st.msg.From().Hex(), codeHash)
+				msg.From.Hex(), codeHash)
 		}
 	}
+
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
-		if !st.evm.Config.NoBaseFee || st.gasFeeCap.BitLen() > 0 || st.gasTipCap.BitLen() > 0 {
-			if l := st.gasFeeCap.BitLen(); l > 256 {
+		if !st.evm.Config.NoBaseFee || msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
+			if l := msg.GasFeeCap.BitLen(); l > 256 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", ethcore.ErrFeeCapVeryHigh,
-					st.msg.From().Hex(), l)
+					msg.From.Hex(), l)
 			}
-			if l := st.gasTipCap.BitLen(); l > 256 {
+			if l := msg.GasTipCap.BitLen(); l > 256 {
 				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", ethcore.ErrTipVeryHigh,
-					st.msg.From().Hex(), l)
+					msg.From.Hex(), l)
 			}
-			if st.gasFeeCap.Cmp(st.gasTipCap) < 0 {
+			if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
 				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ethcore.ErrTipAboveFeeCap,
-					st.msg.From().Hex(), st.gasTipCap, st.gasFeeCap)
+					msg.From.Hex(), msg.GasTipCap, msg.GasFeeCap)
 			}
 			// This will panic if baseFee is nil, but basefee presence is verified
 			// as part of header validation.
-			if st.gasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
+			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ethcore.ErrFeeCapTooLow,
-					st.msg.From().Hex(), st.gasFeeCap, st.evm.Context.BaseFee)
+					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
+			}
+		}
+	}
+	// Check the blob version validity
+	if msg.BlobHashes != nil {
+		// The to field of a blob tx type is mandatory, and a `BlobTx` transaction internally
+		// has it as a non-nillable value, so any msg derived from blob transaction has it non-nil.
+		// However, messages created through RPC (eth_call) don't have this restriction.
+		if msg.To == nil {
+			return ethcore.ErrBlobTxCreate
+		}
+		if len(msg.BlobHashes) == 0 {
+			return ethcore.ErrMissingBlobHashes
+		}
+		for i, hash := range msg.BlobHashes {
+			if !kzg4844.IsValidVersionedHash(hash[:]) {
+				return fmt.Errorf("blob %d has invalid hash version", i)
+			}
+		}
+	}
+	// Check that the user is paying at least the current blob fee
+	if st.evm.ChainConfig().IsCancun(st.evm.Context.BlockNumber, st.evm.Context.Time) {
+		if st.blobGasUsed() > 0 {
+			// Skip the checks if gas fields are zero and blobBaseFee was explicitly disabled (eth_call)
+			skipCheck := st.evm.Config.NoBaseFee && msg.BlobGasFeeCap.BitLen() == 0
+			if !skipCheck {
+				// This will panic if blobBaseFee is nil, but blobBaseFee presence
+				// is verified as part of header validation.
+				if msg.BlobGasFeeCap.Cmp(st.evm.Context.BlobBaseFee) < 0 {
+					return fmt.Errorf("%w: address %v blobGasFeeCap: %v, blobBaseFee: %v", ethcore.ErrBlobFeeCapTooLow,
+						msg.From.Hex(), msg.BlobGasFeeCap, st.evm.Context.BlobBaseFee)
+				}
 			}
 		}
 	}
@@ -175,57 +221,68 @@ func (st *VMStateTransition) TransitionDb() (*ethcore.ExecutionResult, error) {
 		return nil, err
 	}
 
-	if st.evm.Config.Debug {
-		st.evm.Config.Tracer.CaptureTxStart(st.initialGas)
+	if tracer := st.evm.Config.Tracer; tracer != nil {
+		tracer.CaptureTxStart(st.initialGas)
 		defer func() {
-			st.evm.Config.Tracer.CaptureTxEnd(st.gas)
+			tracer.CaptureTxEnd(st.gasRemaining)
 		}()
 	}
 
 	var (
 		msg              = st.msg
-		sender           = ethvm.AccountRef(msg.From())
-		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil)
-		contractCreation = msg.To() == nil
+		sender           = ethvm.AccountRef(msg.From)
+		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil, st.evm.Context.Time)
+		contractCreation = msg.To == nil
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := ethcore.IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, rules.IsHomestead, rules.IsIstanbul)
+	gas, err := ethcore.IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai)
 	if err != nil {
 		return nil, err
 	}
-	if st.gas < gas {
-		return nil, fmt.Errorf("%w: have %d, want %d", ethcore.ErrIntrinsicGas, st.gas, gas)
+	if st.gasRemaining < gas {
+		return nil, fmt.Errorf("%w: have %d, want %d", ethcore.ErrIntrinsicGas, st.gasRemaining, gas)
 	}
-	st.gas -= gas
+	st.gasRemaining -= gas
 
 	// Check clause 6
-	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
-		return nil, fmt.Errorf("%w: address %v", ethcore.ErrInsufficientFundsForTransfer, msg.From().Hex())
+	value, overflow := uint256.FromBig(msg.Value)
+	if overflow {
+		return nil, fmt.Errorf("%w: address %v", ethcore.ErrInsufficientFundsForTransfer, msg.From.Hex())
+	}
+	if !value.IsZero() && !st.evm.Context.CanTransfer(st.state, msg.From, value) {
+		return nil, fmt.Errorf("%w: address %v", ethcore.ErrInsufficientFundsForTransfer, msg.From.Hex())
 	}
 
-	// Set up the initial access list.
-	if rules.IsBerlin {
-		st.state.PrepareAccessList(msg.From(), msg.To(), ethvm.ActivePrecompiles(rules), msg.AccessList())
+	// Check whether the init code size has been exceeded.
+	if rules.IsShanghai && contractCreation && len(msg.Data) > ethparams.MaxInitCodeSize {
+		return nil, fmt.Errorf("%w: code size %v limit %v", ethcore.ErrMaxInitCodeSizeExceeded, len(msg.Data), ethparams.MaxInitCodeSize)
 	}
+
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin)
+	// - reset transient storage(eip 1153)
+	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, ethvm.ActivePrecompiles(rules), msg.AccessList)
+
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 	if contractCreation {
-		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		ret, _, st.gasRemaining, vmerr = st.evm.Create(sender, msg.Data, st.gasRemaining, value)
 	} else {
 		// Increment the nonce for the next transaction
-		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		st.state.SetNonce(msg.From, st.state.GetNonce(sender.Address())+1)
+		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, value)
 	}
 
+	var gasRefund uint64
 	if !rules.IsLondon {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
-		st.refundGas(ethparams.RefundQuotient)
+		gasRefund = st.refundGas(ethparams.RefundQuotient)
 	} else {
 		// After EIP-3529: refunds are capped to gasUsed / 5
-		st.refundGas(ethparams.RefundQuotientEIP3529)
+		gasRefund = st.refundGas(ethparams.RefundQuotientEIP3529)
 	}
 
 	//
@@ -248,19 +305,20 @@ func (st *VMStateTransition) TransitionDb() (*ethcore.ExecutionResult, error) {
 	//}
 
 	return &ethcore.ExecutionResult{
-		UsedGas:    st.gasUsed(),
-		Err:        vmerr,
-		ReturnData: ret,
+		UsedGas:     st.gasUsed(),
+		RefundedGas: gasRefund,
+		Err:         vmerr,
+		ReturnData:  ret,
 	}, nil
 }
 
-func (st *VMStateTransition) refundGas(refundQuotient uint64) {
+func (st *VMStateTransition) refundGas(refundQuotient uint64) uint64 {
 	// Apply refund counter, capped to a refund quotient
 	refund := st.gasUsed() / refundQuotient
 	if refund > st.state.GetRefund() {
 		refund = st.state.GetRefund()
 	}
-	st.gas += refund
+	st.gasRemaining += refund
 
 	// DO NOT change the sender's balance for the tx fee at this point.
 	// This should be handled in postRunTrx in node/trx_executor.go.
@@ -271,10 +329,17 @@ func (st *VMStateTransition) refundGas(refundQuotient uint64) {
 
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.
-	st.gp.AddGas(st.gas)
+	st.gp.AddGas(st.gasRemaining)
+
+	return refund
 }
 
 // gasUsed returns the amount of gas used up by the state transition.
 func (st *VMStateTransition) gasUsed() uint64 {
-	return st.initialGas - st.gas
+	return st.initialGas - st.gasRemaining
+}
+
+// blobGasUsed returns the amount of blob gas used by the message.
+func (st *VMStateTransition) blobGasUsed() uint64 {
+	return uint64(len(st.msg.BlobHashes) * ethparams.BlobTxBlobGasPerBlob)
 }

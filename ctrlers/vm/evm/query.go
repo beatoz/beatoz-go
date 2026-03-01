@@ -10,10 +10,8 @@ import (
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	ethcoretypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -71,7 +69,7 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		return nil, xerr
 	}
 
-	state.Prepare(nil, 0, from, to, 0, false)
+	state.Initiate(nil, 0, from, to, 0, false)
 	defer func() { state = nil }()
 
 	var sender common.Address
@@ -83,18 +81,20 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		copy(toAddr[:], to)
 	}
 
-	vmmsg := callMsg{
-		ethereum.CallMsg{
-			From:     sender,
-			To:       toAddr,
-			Data:     data,
-			Gas:      50000000,
-			GasPrice: new(big.Int), GasFeeCap: new(big.Int), GasTipCap: new(big.Int),
-			Value: new(big.Int),
-		},
+	vmmsg := &core.Message{
+		From:              sender,
+		To:                toAddr,
+		Value:             new(big.Int),
+		GasLimit:          math.MaxInt64,
+		GasPrice:          new(big.Int),
+		GasFeeCap:         new(big.Int),
+		GasTipCap:         new(big.Int),
+		Data:              data,
+		AccessList:        nil,
+		SkipAccountChecks: true,
 	}
 
-	blockContext := evmBlockContext(sender, height, blockTime, math.MaxInt64)
+	blockContext := evmBlockContext(sender, math.MaxInt64, height, blockTime)
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
@@ -110,24 +110,10 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		return nil, xerrors.From(fmt.Errorf("execution aborted (timeout ???)"))
 	}
 	if err != nil {
-		return nil, xerrors.From(fmt.Errorf("err: %w (supplied gas %d)", err, vmmsg.Gas()))
+		return nil, xerrors.From(fmt.Errorf("err: %w (supplied gasLimit %d)", err, vmmsg.GasLimit))
 	}
+
+	// todo: Improve handling result
 
 	return result, nil
 }
-
-type callMsg struct {
-	ethereum.CallMsg
-}
-
-func (m callMsg) From() common.Address                { return m.CallMsg.From }
-func (m callMsg) Nonce() uint64                       { return 0 }
-func (m callMsg) IsFake() bool                        { return true }
-func (m callMsg) To() *common.Address                 { return m.CallMsg.To }
-func (m callMsg) GasPrice() *big.Int                  { return m.CallMsg.GasPrice }
-func (m callMsg) GasFeeCap() *big.Int                 { return m.CallMsg.GasFeeCap }
-func (m callMsg) GasTipCap() *big.Int                 { return m.CallMsg.GasTipCap }
-func (m callMsg) Gas() uint64                         { return m.CallMsg.Gas }
-func (m callMsg) Value() *big.Int                     { return m.CallMsg.Value }
-func (m callMsg) Data() []byte                        { return m.CallMsg.Data }
-func (m callMsg) AccessList() ethcoretypes.AccessList { return m.CallMsg.AccessList }

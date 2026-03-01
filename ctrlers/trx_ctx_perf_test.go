@@ -2,6 +2,11 @@ package ctrlers
 
 import (
 	"fmt"
+	"math/rand"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -10,25 +15,23 @@ import (
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	"math/rand"
-	"sync"
-	"testing"
-	"time"
 )
 
 var (
+	chainId     = uint256.MustFromHex("0xabc")
 	txbzs       [][]byte
 	acctHandler *acct.AcctHandlerMock
 	govHandler  *gov.GovHandlerMock
 )
 
 func init() {
+	types2.InitSigner(chainId)
 	govHandler = gov.NewGovHandlerMock(types2.DefaultGovParams())
 	acctHandler = acct.NewAcctHandlerMock(20000)
 	wals := acctHandler.GetAllWallets()
 	for _, w0 := range wals {
 		tx := web3.NewTrxTransfer(w0.Address(), types.RandAddress(), rand.Int63(), govHandler.MinTrxGas(), govHandler.GasPrice(), bytes.RandU256IntN(uint256.NewInt(1_000_000_000_000_000)))
-		if bz, _, err := w0.SignTrxRLP(tx, "test_chain_id"); err != nil {
+		if bz, _, err := w0.SignTrxRLP(tx, chainId.Hex()); err != nil {
 			panic(err)
 		} else if tx.Sig = bz; tx.Sig == nil {
 			panic("not reachable")
@@ -44,7 +47,7 @@ func BenchmarkNewTrxContext_Sync(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, xerr := types2.NewTrxContext(txbzs[i%len(txbzs)],
 			types2.TempBlockContext(
-				"test_chain_id", rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil),
+				chainId.Hex(), rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil),
 			true,
 		)
 		require.NoError(b, xerr, fmt.Sprintf("index: %v", i))
@@ -58,7 +61,7 @@ func BenchmarkNewTrxContext_ASync(b *testing.B) {
 		go func() {
 			_, xerr := types2.NewTrxContext(txbzs[i%len(txbzs)],
 				types2.TempBlockContext(
-					"test_chain_id", rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil),
+					chainId.Hex(), rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil),
 				true,
 			)
 			require.NoError(b, xerr, fmt.Sprintf("index: %v", i))

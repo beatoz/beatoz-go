@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -61,7 +62,7 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 
 	//
 	// verify signature.
-	_, pubKeyBytes, xerr := VerifyTrxRLP(tx, txctx.BlockContext.ChainID())
+	_, pubKeyBytes, xerr := VerifyTrxRLP(tx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -71,7 +72,7 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 	// verify payer's signature.
 	var payerAddr types.Address
 	if tx.PayerSig != nil {
-		payerAddr, _, xerr = VerifyPayerTrxRLP(tx, txctx.BlockContext.ChainID())
+		payerAddr, _, xerr = VerifyPayerTrxRLP(tx)
 		if xerr != nil {
 			return nil, xerr.Wrap(errors.New("payer signature is invalid"))
 		}

@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -139,6 +140,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 
 	ctrler.lastBlockCtx = ctrler.metaDB.LastBlockContext()
 	if ctrler.lastBlockCtx == nil {
+		// genesis ???
 		ctrler.lastBlockCtx = ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{
 				Header: tmproto.Header{
@@ -160,17 +162,27 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	// get chain_id
 	if ctrler.lastBlockCtx.ChainID() != "" {
 		// it's not first time to run
-		chainId, err := types.ChainIdInt(ctrler.lastBlockCtx.ChainID())
-		if err != nil {
-			panic(err)
+		var chainId *uint256.Int
+		_cidstr := ctrler.lastBlockCtx.ChainID()
+		if strings.HasPrefix(_cidstr, "0x") {
+			chainId = uint256.MustFromHex(_cidstr)
+		} else {
+			chainId = uint256.MustFromDecimal(_cidstr)
 		}
+
 		if chainId.Cmp(ctrler.rootConfig.ChainId()) != 0 {
 			panic(fmt.Errorf("chain_id is not same: genesis(%v), actual(%v)", ctrler.rootConfig.ChainId(), chainId))
 		}
+	} else {
+		ctrler.lastBlockCtx.SetChainID(ctrler.rootConfig.ChainIdHex())
 	}
 
 	// create signers
-	ctrlertypes.InitSigner(ctrler.rootConfig.ChainIdHex())
+	ctrlertypes.InitSigner(ctrler.rootConfig.ChainId())
+
+	// Reset CreateEmptyBlocksInterval of consensus engine
+	// Note that the `create_empty_blocks_interval` of `config.toml` does not work anymore.
+	ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval = time.Duration(ctrler.govCtrler.EmptyBlockIntervalSecs()) * time.Second
 
 	ctrler.logger.Info("last block information",
 		"chainID", ctrler.lastBlockCtx.ChainID(),
@@ -178,7 +190,8 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		"appHash", ctrler.lastBlockCtx.AppHash(),
 		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
 		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit(),
-		"nxBlockGasLimit", ctrler.lastBlockCtx.GetNxBlockGasLimit())
+		"blockInterval", ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval.String(),
+	)
 
 	return abcitypes.ResponseInfo{
 		Data:             "",
@@ -189,7 +202,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 	}
 }
 
-// InitChain is called only when the ResponseInfo::LastBlockHeight which is returned in Info() is 0.
+// InitChain is called only when Info returns 0 as the ResponseInfo::LastBlockHeight.
 func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	appState, initTotalSupply, xerr := checkRequestInitChain(req)
 	if xerr != nil {
@@ -229,8 +242,11 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 	ctrler.lastBlockCtx.SetChainID(req.GetChainId())
 	ctrler.lastBlockCtx.SetBlockSizeLimit(req.ConsensusParams.Block.MaxBytes)
 	ctrler.lastBlockCtx.SetBlockGasLimit(req.ConsensusParams.Block.MaxGas)
-	ctrler.lastBlockCtx.SetNxBlockGasLimit(req.ConsensusParams.Block.MaxGas)
 	ctrler.lastBlockCtx.SetAppHash(appHash)
+
+	// Reset CreateEmptyBlocksInterval of consensus engine
+	// Note that the `create_empty_blocks_interval` of `config.toml` does not work anymore.
+	ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval = time.Duration(ctrler.govCtrler.EmptyBlockIntervalSecs()) * time.Second
 
 	ctrler.logger.Info("InitChain",
 		"chainID", ctrler.lastBlockCtx.ChainID(),
@@ -238,7 +254,8 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 		"appHash", ctrler.lastBlockCtx.AppHash(),
 		"blockSizeLimit", ctrler.lastBlockCtx.GetBlockSizeLimit(),
 		"blockGasLimit", ctrler.lastBlockCtx.GetBlockGasLimit(),
-		"nxBlockGasLimit", ctrler.lastBlockCtx.GetNxBlockGasLimit())
+		"blockInterval", ctrler.rootConfig.Consensus.CreateEmptyBlocksInterval.String(),
+	)
 
 	// these values will be saved as state of the consensus engine.
 	return abcitypes.ResponseInitChain{
@@ -252,7 +269,10 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 
 	switch req.Type {
 	case abcitypes.CheckTxType_New:
-		_bctx := ctrlertypes.ExpectNextBlockContext(ctrler.lastBlockCtx, time.Duration(ctrler.govCtrler.AssumedBlockInterval())*time.Second)
+		_bctx := ctrlertypes.ExpectNextBlockContext(
+			ctrler.lastBlockCtx,
+			time.Duration(ctrler.govCtrler.EmptyBlockIntervalSecs())*time.Second,
+		)
 		txctx, xerr := ctrlertypes.NewTrxContext(
 			req.Tx,
 			_bctx,
@@ -419,8 +439,8 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 		ctrler.supplyCtrler,
 		ctrler.vpowCtrler,
 	)
-	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.lastBlockCtx.GetBlockSizeLimit())
-	ctrler.currBlockCtx.SetBlockGasLimit(ctrler.lastBlockCtx.GetNxBlockGasLimit())
+	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.govCtrler.BlockSizeLimit())
+	ctrler.currBlockCtx.SetBlockGasLimit(ctrler.govCtrler.BlockGasLimit())
 
 	var beginBlockEvents []abcitypes.Event
 
@@ -639,31 +659,27 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	}
 	beginBlockEvents = append(beginBlockEvents, evts...)
 
-	//
-	// adjust block gas limit
-	newBlockGasLimit := ctrlertypes.AdjustBlockGasLimit(
-		ctrler.currBlockCtx.GetBlockGasLimit(),
-		ctrler.currBlockCtx.GetBlockGasUsed(),
-		ctrler.govCtrler.MinBlockGasLimit(), // minimum block gas limit
-		ctrler.govCtrler.MaxBlockGasLimit(),
-	)
-
 	var consensusParams *abcitypes.ConsensusParams
-	if newBlockGasLimit != ctrler.currBlockCtx.GetBlockGasLimit() {
+	nxBlockSizeLimit := ctrler.govCtrler.BlockSizeLimit()
+	nxBlockGasLimit := ctrler.govCtrler.BlockGasLimit()
+
+	if nxBlockSizeLimit != ctrler.currBlockCtx.GetBlockSizeLimit() ||
+		nxBlockGasLimit != ctrler.currBlockCtx.GetBlockGasLimit() {
+
 		consensusParams = &abcitypes.ConsensusParams{
 			Block: &abcitypes.BlockParams{
-				MaxBytes: ctrler.currBlockCtx.GetBlockSizeLimit(),
-				MaxGas:   newBlockGasLimit,
+				MaxBytes: nxBlockSizeLimit,
+				MaxGas:   nxBlockGasLimit,
 			},
 		}
-		ctrler.currBlockCtx.SetNxBlockGasLimit(newBlockGasLimit)
 
-		ctrler.logger.Info("Update block gas limit",
+		ctrler.logger.Info("Update BlockParams",
 			"height", req.Height,
-			"used", ctrler.currBlockCtx.GetBlockGasUsed(),
-			"origin", ctrler.currBlockCtx.GetBlockGasLimit(),
-			"ratio(%)", ctrler.currBlockCtx.GetBlockGasUsed()*100/ctrler.currBlockCtx.GetBlockGasLimit(),
-			"new", newBlockGasLimit)
+			"block size limit(origin)", ctrler.currBlockCtx.GetBlockSizeLimit(),
+			"block size limit(new)   ", nxBlockSizeLimit,
+			"block size limit(origin)", ctrler.currBlockCtx.GetBlockGasLimit(),
+			"block size limit(origin)", nxBlockGasLimit,
+		)
 	}
 
 	return abcitypes.ResponseEndBlock{

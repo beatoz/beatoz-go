@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,7 +14,9 @@ import (
 	"github.com/beatoz/beatoz-go/libs"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	acrypto "github.com/beatoz/beatoz-go/types/crypto"
+	"github.com/holiman/uint256"
 	"github.com/spf13/cobra"
+	"github.com/tendermint/tendermint/config"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -45,9 +46,9 @@ func AddInitFlags(cmd *cobra.Command) {
 		"chain_id",
 		initParams.ChainID, // default name
 		"the id of chain to generate.\n"+
-			"mainnet = 12495059(0xBEA8D3)\n"+
-			"testnet = 13543635(0xCEA8D3)\n"+
-			"devnet  = 14592211(0xDEA8D3) and others")
+			"mainnet = 12494594(0xBEA702)\n"+
+			"testnet0 = 12494593(0xBEA701)\n"+
+			"devnet0  = 12494592(0xBEA700) and others")
 	cmd.Flags().IntVar(
 		&initParams.HolderCnt,
 		"holders",
@@ -69,20 +70,18 @@ func AddInitFlags(cmd *cobra.Command) {
 			"if there is more than one validator, the rest will be created in the $BEATOZHOME/walkeys/vals directory.",
 	)
 	cmd.Flags().Int64Var(
+		&initParams.BlockSizeLimit,
+		"block_size_limit",
+		initParams.BlockSizeLimit,
+		"the maximum size of a block in bytes.\nthis value must be greater than 0.",
+	)
+	cmd.Flags().Int64Var(
 		&initParams.BlockGasLimit,
 		"block_gas_limit",
 		initParams.BlockGasLimit,
 		"the maximum gas that can be used in one block.\n"+
-			"this value is deterministically adjusted based on the gas usage in the blockchain network.\n"+
-			"however, it cannot exceed the `maxBlockGas` of Governance Parameters.",
+			"this value is deterministically adjusted based on the gas usage in the blockchain network.",
 	)
-	cmd.Flags().StringVar(
-		&initParams.AssumedBlockInterval,
-		"assumed_block_interval",
-		initParams.AssumedBlockInterval,
-		"assumed time between blocks in seconds, used for estimating time from block count.\n"+
-			"It is not based on actual block production timing.\n"+
-			"Instead, it is used as a constant reference to estimate time from the number of blocks produced.")
 	cmd.Flags().Int64Var(
 		&initParams.MaxTotalSupply,
 		"max_total_supply",
@@ -102,9 +101,26 @@ func AddInitFlags(cmd *cobra.Command) {
 		initParams.InitVotingPower,
 		"initial voting power at genesis, shared equally by all validators",
 	)
+
+	// consensus flags
+	cmd.Flags().BoolVar(
+		&initParams.CreateEmptyBlocks,
+		"consensus.create_empty_blocks",
+		initParams.CreateEmptyBlocks,
+		"set this to false to only produce blocks when there are txs or when the AppHash changes")
+	cmd.Flags().StringVar(
+		&initParams.CreateEmptyBlocksInterval,
+		"consensus.create_empty_blocks_interval",
+		initParams.CreateEmptyBlocksInterval,
+		"the possible interval between empty blocks")
 }
 
 func initFiles(cmd *cobra.Command, args []string) error {
+	// write the empty block parameters to config.toml
+	rootConfig.Consensus.CreateEmptyBlocks = initParams.CreateEmptyBlocks
+	rootConfig.Consensus.CreateEmptyBlocksInterval, _ = time.ParseDuration(initParams.CreateEmptyBlocksInterval)
+	config.WriteConfigFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"), rootConfig.Config)
+
 	var s0, s1 []byte
 
 	_secret := os.Getenv("BEATOZ_VALIDATOR_SECRET")
@@ -213,6 +229,7 @@ func InitFilesWith(
 				AppVersion: version.Major(),
 			},
 		}
+		consensusParams.Block.MaxBytes = params.BlockSizeLimit
 		consensusParams.Block.MaxGas = params.BlockGasLimit
 
 		defaultWalkeyDirPath := filepath.Join(config.RootDir, acrypto.DefaultWalletKeyDir)
@@ -265,11 +282,7 @@ func InitFilesWith(
 
 		//
 		// Create Governance Parameters
-		blockInterval, err := time.ParseDuration(params.AssumedBlockInterval)
-		if err != nil {
-			return err
-		}
-		govParams := types.NewGovParams(int(blockInterval.Seconds()))
+		govParams := types.NewGovParams(int(config.Consensus.CreateEmptyBlocksInterval.Seconds()))
 		govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
 
 		appState := &genesis.GenesisAppState{
@@ -280,12 +293,11 @@ func InitFilesWith(
 		//
 		// Create genesis
 
-		bigChainId, err := btztypes.ChainIdInt(params.ChainID)
 		if err != nil {
 			return err
 		}
 		genDoc, err = genesis.NewGenesisDoc(
-			"0x"+hex.EncodeToString(bigChainId.Bytes()), // write chainId as hex string
+			params.ChainID, // write chainId as hex string
 			consensusParams,
 			valset,
 			appState,
@@ -308,42 +320,57 @@ func InitFilesWith(
 }
 
 type InitParams struct {
-	ChainID              string
-	ValCnt               int
-	ValSecret            []byte
-	HolderCnt            int
-	HolderSecret         []byte
-	BlockGasLimit        int64
-	AssumedBlockInterval string
-	MaxTotalSupply       int64
-	InitTotalSupply      int64
-	InitVotingPower      int64
+	// for config.toml
+	CreateEmptyBlocks         bool
+	CreateEmptyBlocksInterval string
+
+	// for genesis.json
+	ChainID         string
+	ValCnt          int
+	ValSecret       []byte
+	HolderCnt       int
+	HolderSecret    []byte
+	BlockSizeLimit  int64
+	BlockGasLimit   int64
+	MaxTotalSupply  int64
+	InitTotalSupply int64
+	InitVotingPower int64
 }
 
 func DefaultInitParams() *InitParams {
 	return &InitParams{
-		ChainID:              "0x0001",
-		ValCnt:               1,
-		HolderCnt:            10,
-		BlockGasLimit:        int64(36_000_000),
-		AssumedBlockInterval: "10s",
-		MaxTotalSupply:       int64(700_000_000),
-		InitTotalSupply:      int64(350_000_000),
-		InitVotingPower:      int64(35_000_000),
+		CreateEmptyBlocks:         true,
+		CreateEmptyBlocksInterval: "1s",
+
+		ChainID:         "0x0001",
+		ValCnt:          1,
+		HolderCnt:       10,
+		BlockSizeLimit:  int64(22020096),
+		BlockGasLimit:   int64(100_000_000),
+		MaxTotalSupply:  int64(700_000_000),
+		InitTotalSupply: int64(350_000_000),
+		InitVotingPower: int64(35_000_000),
 	}
 }
 
 func (params *InitParams) Validate() error {
-	if !btztypes.IsHexByteString(params.ChainID) &&
-		!btztypes.IsNumericString(params.ChainID) {
-		return fmt.Errorf("invalid chain_id: %s", params.ChainID)
+	if strings.HasPrefix(params.ChainID, "0x") {
+		if _, err := uint256.FromHex(params.ChainID); err != nil {
+			return fmt.Errorf("invalid chain_id: %s (%v)", params.ChainID, err)
+		}
+	} else {
+		if _, err := uint256.FromDecimal(params.ChainID); err != nil {
+			return fmt.Errorf("invalid chain_id: %s (%v)", params.ChainID, err)
+		}
 	}
-
 	if params.InitTotalSupply > params.MaxTotalSupply {
 		return fmt.Errorf("init_total_supply (%d) cannot exceed max_total_supply (%d)", params.InitTotalSupply, params.MaxTotalSupply)
 	}
 	if params.InitVotingPower > params.InitTotalSupply {
 		return fmt.Errorf("init_voting_power (%d) cannot exceed init_total_supply (%d)", params.InitVotingPower, params.InitTotalSupply)
+	}
+	if _, err := time.ParseDuration(params.CreateEmptyBlocksInterval); err != nil {
+		return fmt.Errorf("invalid create_empty_blocks_interval: %s", params.CreateEmptyBlocksInterval)
 	}
 	return nil
 }

@@ -102,7 +102,7 @@ func computeIssuanceAndRewardRoutine(reqCh chan *reqMint, respCh chan *respMint)
 		waVals := retWeight.ValWeight()
 
 		addedSupply := Sd(
-			heightYears(bctx.Height(), bctx.GovHandler.AssumedBlockInterval()),
+			heightYears(bctx.Height(), 1), // heightYears always returns `1`
 			lastTotalSupply,
 			bctx.GovHandler.MaxTotalSupply(), bctx.GovHandler.InflationWeightPermil(),
 			waAll,
@@ -175,6 +175,7 @@ func scaledHeight(height, base int64) fxnum.FxNum {
 	return fxnum.FromInt(height).Div(fxnum.FromInt(base))
 }
 
+// DEPRECATED: heightYears always returns `1`
 func heightYears(height int64, intval int32) fxnum.FxNum {
 	// Previously returned block height scaled to years
 	// using block interval since genesis.
