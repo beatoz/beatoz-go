@@ -35,7 +35,8 @@ func NewGovParams(interval int) *GovParams {
 
 	ret := &GovParams{
 		_v: GovParamsProto{
-			Version:                   3,
+			Version:                   4,
+			EmptyBlockIntervalSecs:    int32(interval),
 			MaxValidatorCnt:           21,
 			MinValidatorPower:         100_000, // 100,000 BEATOZ
 			MinDelegatorPower:         100,
@@ -159,6 +160,13 @@ func (govParams *GovParams) Version() int32 {
 	defer govParams.mtx.RUnlock()
 
 	return govParams._v.Version
+}
+
+func (govParams *GovParams) EmptyBlockIntervalSecs() int32 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.EmptyBlockIntervalSecs
 }
 
 func (govParams *GovParams) MaxValidatorCnt() int32 {

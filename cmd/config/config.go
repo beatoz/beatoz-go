@@ -30,18 +30,9 @@ func DefaultConfig(chainId ...string) *Config {
 }
 
 func DefaultConfigWith(cfg *tmcfg.Config, chainId ...string) *Config {
-	_chainId := big.NewInt(0)
-	if len(chainId) > 0 {
-		cid, err := types.ChainIdInt(chainId[0])
-		if err != nil {
-			panic(err)
-		}
-		_chainId = cid
-	}
-	return &Config{
-		Config:  cfg,
-		chainId: _chainId,
-	}
+	conf := DefaultConfig(chainId...)
+	conf.Config = cfg
+	return conf
 }
 
 func (c *Config) SetChainId(chainId string) {
