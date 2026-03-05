@@ -108,30 +108,30 @@ func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
 		certs[i] = cert
 	}
 
-	// 3. Verify chain: certs[i] (issuer) verifies certs[i+1] (subject)
+	// 3. Verify chain: certs[i] (subject) verifies certs[i+1] (issuer)
 	for i := 0; i < len(certs)-1; i++ {
-		issuer := certs[i]
-		subject := certs[i+1]
+		subject := certs[i]
+		issuer := certs[i+1]
 		if err := subject.CheckSignatureFrom(issuer); err != nil {
 			return nil, fmt.Errorf("x509: cert[%d] failed verification by cert[%d]: %v", i+1, i, err)
 		}
 	}
 
-	// 4. Extract public key (x, y), serial number, and OU from the last certificate
-	lastCert := certs[len(certs)-1]
+	// 4. Extract public key (x, y), serial number, and OU from the subject certificate
+	subjectCert := certs[0]
 
-	ecdsaKey, ok := lastCert.PublicKey.(*ecdsa.PublicKey)
+	ecdsaKey, ok := subjectCert.PublicKey.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, fmt.Errorf("x509: unsupported public key type %T", lastCert.PublicKey)
+		return nil, fmt.Errorf("x509: unsupported public key type %T", subjectCert.PublicKey)
 	}
 
 	// Return format: [32B pubkey.x][32B pubkey.y][32B serialNumber][OU string bytes]
 	var result []byte
 	result = append(result, common.LeftPadBytes(ecdsaKey.X.Bytes(), 32)...)
 	result = append(result, common.LeftPadBytes(ecdsaKey.Y.Bytes(), 32)...)
-	result = append(result, common.LeftPadBytes(lastCert.SerialNumber.Bytes(), 32)...)
-	if len(lastCert.Subject.OrganizationalUnit) > 0 {
-		result = append(result, []byte(lastCert.Subject.OrganizationalUnit[0])...)
+	result = append(result, common.LeftPadBytes(subjectCert.SerialNumber.Bytes(), 32)...)
+	if len(subjectCert.Subject.OrganizationalUnit) > 0 {
+		result = append(result, []byte(subjectCert.Subject.OrganizationalUnit[0])...)
 	}
 
 	return result, nil

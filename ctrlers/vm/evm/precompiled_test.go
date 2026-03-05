@@ -171,15 +171,15 @@ func TestX509Verify(t *testing.T) {
 	//    Input: [4B len][issuer DER][4B len][subject DER]
 	var contractInput []byte
 	// append issuer DER (length-prefixed)
+	subjectLen := make([]byte, 4)
+	binary.BigEndian.PutUint32(subjectLen, uint32(len(subjectBlock.Bytes)))
+	contractInput = append(contractInput, subjectLen...)
+	contractInput = append(contractInput, subjectBlock.Bytes...)
 	issuerLen := make([]byte, 4)
 	binary.BigEndian.PutUint32(issuerLen, uint32(len(issuerBlock.Bytes)))
 	contractInput = append(contractInput, issuerLen...)
 	contractInput = append(contractInput, issuerBlock.Bytes...)
 	// append subject DER (length-prefixed)
-	subjectLen := make([]byte, 4)
-	binary.BigEndian.PutUint32(subjectLen, uint32(len(subjectBlock.Bytes)))
-	contractInput = append(contractInput, subjectLen...)
-	contractInput = append(contractInput, subjectBlock.Bytes...)
 
 	verifier := &beatoz_x509Verify{}
 	ret, err := verifier.Run(contractInput)
