@@ -305,7 +305,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 				Attributes: []abcitypes.EventAttribute{
 					{
 						Key:   []byte("contractAddress"),
-						Value: []byte(hex.EncodeToString(ctx.RetData)),
+						Value: []byte(hex.EncodeToString(createdAddr[:])),
 						Index: false,
 					},
 				},
