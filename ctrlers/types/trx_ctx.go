@@ -5,6 +5,7 @@ import (
 
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/merkle"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -113,4 +114,25 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 func (ctx *TrxContext) IsHandledByEVM() bool {
 	b := ctx.Tx.GetType() == TRX_CONTRACT || (ctx.Tx.GetType() == TRX_TRANSFER && ctx.Receiver.Code != nil)
 	return b
+}
+
+// EventRoot returns the merkle tree instance and root hash of the event log.
+// The merkle tree's leaf are constructed as follows:
+//
+//	[event type + attribute key + attribute value]
+func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
+	if len(ctx.Events) == 0 {
+		return nil, nil
+	}
+
+	var leaves [][]byte
+	for _, evt := range ctx.Events {
+		ety := evt.Type
+		for _, attr := range evt.Attributes {
+			leaves = append(leaves, append(append([]byte(ety), attr.Key...), attr.Value...))
+		}
+	}
+
+	tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves))
+	return tree, tree.Root()
 }
