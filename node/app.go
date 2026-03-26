@@ -295,15 +295,12 @@ func (ctrler *BeatozApp) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Respons
 			return abcitypes.ResponseCheckTx{
 				Code:      xerr.Code(),
 				Log:       xerr.Error(),
-				Data:      txctx.RetData, // in case of evm, there may be return data when tx is failed.
 				GasWanted: txctx.Tx.Gas,
 			}
 		}
 
 		return abcitypes.ResponseCheckTx{
 			Code:      abcitypes.CodeTypeOK,
-			Log:       "",
-			Data:      txctx.RetData,
 			GasWanted: txctx.Tx.Gas,
 			GasUsed:   txctx.GasUsed,
 		}
@@ -535,12 +532,13 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 			},
 		})
 
+		_, evtRoot := txctx.EventRoot()
 		return &abcitypes.ResponseDeliverTx{
 			Code:      xerr.Code(),
 			Log:       xerr.Error(),
 			GasWanted: txctx.Tx.Gas,
 			GasUsed:   txctx.GasUsed,
-			Data:      txctx.RetData, // in case of evm, there may be return data when tx is failed.
+			Data:      evtRoot,
 			Events:    txctx.Events,
 		}
 	} else {
@@ -560,11 +558,12 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 			},
 		})
 
+		_, evtRoot := txctx.EventRoot()
 		return &abcitypes.ResponseDeliverTx{
 			Code:      abcitypes.CodeTypeOK,
 			GasWanted: txctx.Tx.Gas,
 			GasUsed:   txctx.GasUsed,
-			Data:      txctx.RetData,
+			Data:      evtRoot,
 			Events:    txctx.Events,
 		}
 	}
