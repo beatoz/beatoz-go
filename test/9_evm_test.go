@@ -159,7 +159,6 @@ func testDeploy(t *testing.T, abiFile string, args []interface{}) {
 	require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 
 	addr0 := ethcrypto.CreateAddress(creator.Address().Array20(), uint64(creator.GetNonce()))
-	require.EqualValues(t, addr0[:], txRet.TxResult.Data)
 	require.EqualValues(t, addr0[:], contract.GetAddress())
 	for _, evt := range txRet.TxResult.Events {
 		if evt.Type == "evm" {
@@ -528,10 +527,10 @@ func testPayer_Deploy(t *testing.T, abiFile string, args []interface{}) {
 	require.NoError(t, err)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.CheckTx.Code, ret.CheckTx.Log)
 	require.Equal(t, xerrors.ErrCodeSuccess, ret.DeliverTx.Code, ret.DeliverTx.Log)
-	require.Equal(t, 20, len(ret.DeliverTx.Data)) // contract address
-	contract.SetAddress(ret.DeliverTx.Data)
 
 	//fmt.Println("testDeploy", "usedGas", ret.DeliverTx.GasUsed)
+	addr0 := ethcrypto.CreateAddress(sender.Address().Array20(), uint64(sender.GetNonce()))
+	contract.SetAddress(addr0[:])
 	contAcct, err := bzweb3.QueryAccount(contract.GetAddress())
 	require.NoError(t, err)
 	require.NotNil(t, contAcct.Code)
@@ -540,9 +539,6 @@ func testPayer_Deploy(t *testing.T, abiFile string, args []interface{}) {
 	//require.NoError(t, err, err)
 	//require.Equal(t, xerrors.ErrCodeSuccess, txRet.TxResult.Code, txRet.TxResult.Log)
 
-	addr0 := ethcrypto.CreateAddress(sender.Address().Array20(), uint64(sender.GetNonce()))
-	require.EqualValues(t, addr0[:], ret.DeliverTx.Data)
-	require.EqualValues(t, addr0[:], contract.GetAddress())
 	for _, evt := range ret.DeliverTx.Events {
 		if evt.Type == "evm" {
 			require.GreaterOrEqual(t, len(evt.Attributes), 1)
