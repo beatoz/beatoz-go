@@ -1,0 +1,131 @@
+{
+  "genesis_time": "2026-03-29T13:41:24.892694Z",
+  "chain_id": "0xbea701",
+  "initial_height": "0",
+  "consensus_params": {
+    "block": {
+      "max_bytes": "22020096",
+      "max_gas": "100000000",
+      "time_iota_ms": "1000"
+    },
+    "evidence": {
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "172800000000000",
+      "max_bytes": "1048576"
+    },
+    "validator": {
+      "pub_key_types": [
+        "secp256k1"
+      ]
+    },
+    "version": {
+      "app_version": "1"
+    }
+  },
+  "validators": [
+    {
+      "address": "90F2118E0F16C94E0A5A7AD6C0F889173BC8C3AD",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "A2db7Ab7AWXpA3KWb0aRvwbEiQvH82+jUYkLtX7/jwWY"
+      },
+      "power": "5000000",
+      "name": ""
+    },
+    {
+      "address": "B244D59138E8B326EC0DCA971143DDB92DCC02C4",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "Avs2ROJS9oOdpCwM82i6YQDaSJbFsEMR+BL42pde6943"
+      },
+      "power": "5000000",
+      "name": ""
+    },
+    {
+      "address": "13BB453C5D5FE390D2AF30F345E679B3E6AB9D74",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "AkbWqTKt82MkQZRsAyma+W3l9umm04M4Bf0rTm4zj8ar"
+      },
+      "power": "5000000",
+      "name": ""
+    },
+    {
+      "address": "FDC21D6517DE111AE2C05A5EF349CF466CDF1EDD",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "Asz0mKORMnx0CcMJX6RB48dpTlruRW/NwHIglHF7wCqp"
+      },
+      "power": "5000000",
+      "name": ""
+    },
+    {
+      "address": "BDF82271F256974E694761B447C34D0ADE273A94",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "A4KJt5Bq01fwAaHFCi2GG/JiDFf5PPtdRONzdFiLUiaf"
+      },
+      "power": "5000000",
+      "name": ""
+    },
+    {
+      "address": "2FD3FBD0E08DDAA6A9585A3C78EB35A5F8FDBDA2",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "A7QXAdhu/1FNrz17wXMfJtbZioZ7OrSK2+9q1ldFUlw8"
+      },
+      "power": "5000000",
+      "name": ""
+    },
+    {
+      "address": "E655CADEF8CF96F46070C29F36A6914F122377D0",
+      "pub_key": {
+        "type": "tendermint/PubKeySecp256k1",
+        "value": "Av9ZNotuYg4ulvx7ta7MCExnKhBfOIdW9JiN5PMZ0w2i"
+      },
+      "power": "5000000",
+      "name": ""
+    }
+  ],
+  "app_hash": "ABB097C01DACD99BE54179791CBAF9C2BFDD6F0E4EE9A04302203CDE4AF6D4FF",
+  "app_state": {
+    "assetHolders": [
+      {
+        "address": "27682812EDEC365AFEF66765E85E1A3B3C8E9719",
+        "balance": "315000000000000000000000000"
+      }
+    ],
+    "govParams": {
+      "blockGasLimit": "120000000",
+      "blockSizeLimit": "22020096",
+      "bondingBlocksWeightPermil": 500,
+      "deadAddress": "000000000000000000000000000000000000DEAD",
+      "emptyBlockIntervalSecs": 60,
+      "gasPrice": "48000000000",
+      "inflationCycleBlocks": "10080",
+      "inflationWeightPermil": 3,
+      "lazyApplyingBlocks": "1440",
+      "lazyUnbondingBlocks": "43200",
+      "maxDelegatorsOfValidator": 1000,
+      "maxIndividualPowerRate": 33,
+      "maxTotalSupply": "700000000000000000000000000",
+      "maxUpdatablePowerRate": 33,
+      "maxValidatorCnt": 21,
+      "maxValidatorsOfDelegator": 1,
+      "maxVotingPeriodBlocks": "10080",
+      "minBondingBlocks": "20160",
+      "minDelegatorPower": "100",
+      "minSelfPowerRate": 50,
+      "minSignedBlocks": "500",
+      "minTrxGas": "5000",
+      "minValidatorPower": "100000",
+      "minVotingPeriodBlocks": "1440",
+      "rewardPoolAddress": "0000000000000000000000000000000000000000",
+      "ripeningBlocks": "525600",
+      "slashRate": 50,
+      "txFeeRewardRate": 90,
+      "validatorRewardRate": 30,
+      "version": 4
+    }
+  }
+}

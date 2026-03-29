@@ -6,7 +6,7 @@ info:
 
     This API provides access to the BEATOZ blockchain data and functionality.
 
-    **Base URL**: https://rpc-devnet0.beatoz.io
+    **Base URL**: https://rpc-testnet0.beatoz.io
 
     **Note**: All endpoints are accessed via HTTP GET requests with query parameters.
   version: 1.0.0
@@ -15,8 +15,6 @@ info:
     url: https://github.com/beatoz/beatoz-go
 
 servers:
-  - url: https://rpc-devnet0.beatoz.io
-    description: Development Network
   - url: https://rpc-testnet0.beatoz.io
     description: Test Network
   - url: http://localhost:26657
