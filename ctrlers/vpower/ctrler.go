@@ -234,7 +234,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by vpow.SumPower
-		if xerr := ctrler.vpowLimiter.CheckLimit(vpow.SumPower, SUB_POWER); xerr != nil {
+		if xerr := ctrler.vpowLimiter.CheckLimit(pc.Power, SUB_POWER); xerr != nil {
 			return xerr
 		}
 

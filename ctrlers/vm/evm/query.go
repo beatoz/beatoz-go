@@ -31,18 +31,14 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 		return nil, xerr
 	}
 
-	retData := execRet.ReturnData
-	if req.Path == "vm_estimate_gas" {
-		retData = nil
-	}
 	vmCallRet := &ctrlertypes.VMCallResult{
-		UsedGas:    int64(execRet.UsedGas),
-		ReturnData: retData,
+		UsedGas: int64(execRet.UsedGas),
 	}
 	if execRet.Err != nil {
 		vmCallRet.Err = execRet.Err.Error()
-	} else {
-		vmCallRet.Err = ""
+		vmCallRet.ReturnData = execRet.Revert()
+	} else if req.Path == "vm_call" {
+		vmCallRet.ReturnData = execRet.Return()
 	}
 
 	retbz, err := jsonx.Marshal(vmCallRet)

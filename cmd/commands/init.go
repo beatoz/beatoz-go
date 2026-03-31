@@ -45,10 +45,10 @@ func AddInitFlags(cmd *cobra.Command) {
 		&initParams.ChainID,
 		"chain_id",
 		initParams.ChainID, // default name
-		"the id of chain to generate.\n"+
-			"mainnet = 12494594(0xBEA702)\n"+
-			"testnet0 = 12494593(0xBEA701)\n"+
-			"devnet0  = 12494592(0xBEA700) and others")
+		"the ID of the chain to be created;\nit must be a decimal or 0x-prefixed hexadecimal number;\n"+
+			"devnet0  = 12494592(0xbea700)\n"+
+			"testnet0 = 12494593(0xbea701)\n"+
+			"mainnet  = 12494594(0xbea702)")
 	cmd.Flags().IntVar(
 		&initParams.HolderCnt,
 		"holders",
@@ -56,8 +56,7 @@ func AddInitFlags(cmd *cobra.Command) {
 		"the number of holder's account files to be generated.\n"+
 			"if you create a new genesis of your own blockchain, "+
 			"you need to generate accounts of genesis holders and "+
-			"these accounts will be saved at $BEATOZHOME/walkeys directory.\n"+
-			"if `--chain_id` is `mainnet`, the holder's accounts is not generated.",
+			"these accounts will be saved at $BEATOZHOME/walkeys directory.",
 	)
 	cmd.Flags().IntVar(
 		&initParams.ValCnt,

@@ -51,31 +51,34 @@ func (limiter *VPowerLimiter) CheckLimit(power int64, op OP_POWER) xerrors.XErro
 	return nil
 }
 
-// checkTotalPower returns error when the newly added power is greater than the new total power.
-// After any changes (whether some amount is added or removed) the new total should be seen as: newly added amount + remaining(previously existing) amount.
-// To ensure stability, the existing amount must still represent at least 'X%' of the total after the change.
-// Therefore, the newly added amount is only allowed if it stays within '(100 - X)%' of the new total.
+// checkTotalPower checks whether the voting power change is within the allowed rate.
+// It calculates the new total voting power after applying the `diff`,
+// then verifies that the ratio of remaining power to the new total does not
+// exceed `limiter.allowRate`. If the change rate exceeds the allowed rate, it returns an error.
 func (limiter *VPowerLimiter) checkTotalPower(diff int64, op OP_POWER) xerrors.XError {
-	var rate int32
-	var changes int64
-	var newtotal int64
-	if op == ADD_POWER {
-		changes, newtotal = limiter.addingPower+diff, limiter.estimatedTotalPower+diff
-	} else if limiter.estimatedTotalPower >= diff {
-		changes, newtotal = limiter.addingPower, limiter.estimatedTotalPower-diff
-	} else {
-		return xerrors.ErrOverFlow.Wrapf("estimatedTotalPower(%v) > subtractedPower(%v)", limiter.estimatedTotalPower, diff)
+	remainTotal, newTotal := limiter.lastTotalPower-limiter.subingPower, limiter.estimatedTotalPower
+
+	if op == SUB_POWER && remainTotal <= diff {
+		return xerrors.ErrOverFlow.Wrapf("remained total power (%v) > diff (%v)", remainTotal, diff)
 	}
 
-	rate = changeRate(changes, newtotal)
-	if rate >= limiter.allowRate {
+	if op == ADD_POWER {
+		newTotal = newTotal + diff
+	} else {
+		remainTotal, newTotal = remainTotal-diff, newTotal-diff
+	}
+
+	remainRate := int32(remainTotal * 100 / newTotal)
+
+	if (100 - remainRate) > limiter.allowRate {
 		return xerrors.ErrUpdatableStakeRatio.Wrapf(
-			"combinedAddingPower(%v) / estimatedTotalPower(%v) = rate(%v%%) >= allowedRate(%v%%)",
-			changes, newtotal, rate, limiter.allowRate)
+			"remainedTotalPower(%v) / estimatedTotalPower(%v) = remainRate(%v%%) => changeRate(%v) >= allowedRate(%v%%)",
+			remainTotal, newTotal, remainRate, (100 - remainRate), limiter.allowRate)
 	}
 	return nil
 }
 
+// DEPRECATED
 func (limiter *VPowerLimiter) ChangeRate(power int64, op OP_POWER) (int32, xerrors.XError) {
 	var rate int32
 	if op == ADD_POWER {
@@ -92,6 +95,7 @@ func (limiter *VPowerLimiter) ChangeRate(power int64, op OP_POWER) (int32, xerro
 	return rate, nil
 }
 
+// DEPRECATED
 func changeRate(part, total int64) int32 {
 	return int32(part * 100 / total)
 }

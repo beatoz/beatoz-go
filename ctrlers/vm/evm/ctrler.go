@@ -246,9 +246,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 	// Gas pool is already decreased by buyGas and refundGas in EVM
 	ctx.GasUsed = int64(evmResult.UsedGas)
 
-	// For compatibility with older clients.
-	// TODO: Only set ctx.RetData to ReturnData on successful transactions.
-	//       e.g. `ctx.RetData = evmResult.Return()`
+	// ReturnData is revert data or returned value from evm execution.
 	ctx.RetData = evmResult.ReturnData
 
 	if evmResult.Failed() {
@@ -305,7 +303,7 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 				Attributes: []abcitypes.EventAttribute{
 					{
 						Key:   []byte("contractAddress"),
-						Value: []byte(hex.EncodeToString(ctx.RetData)),
+						Value: []byte(hex.EncodeToString(createdAddr[:])),
 						Index: false,
 					},
 				},

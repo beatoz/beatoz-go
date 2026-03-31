@@ -16,10 +16,10 @@ func Test_limiter(t *testing.T) {
 	expectedSubed := int64(0)
 	expectedNewTotal := lastTotal
 
-	// now    : last.total=100
-	// applied: new.total=107, added=7, subed=0
+	// applied: added=11, subed=0, remain.total=100, new.total=111
+	// remain.total / new.total = 0.90
 	// expected: no error
-	diffPower := int64(7)
+	diffPower := int64(11)
 	expectedAdded += diffPower
 	expectedNewTotal += diffPower
 	require.NoError(t, limiter.CheckLimit(diffPower, ADD_POWER))
@@ -28,32 +28,8 @@ func Test_limiter(t *testing.T) {
 	require.EqualValues(t, expectedAdded, limiter.addingPower)
 	require.EqualValues(t, expectedSubed, limiter.subingPower)
 
-	// now    : last.total=107
-	// applied: new.total=110, added=10, subed=0
-	// expected: no error
-	diffPower = int64(3)
-	expectedAdded += diffPower
-	expectedNewTotal += diffPower
-	require.NoError(t, limiter.CheckLimit(diffPower, ADD_POWER))
-	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
-	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
-	require.EqualValues(t, expectedAdded, limiter.addingPower)
-	require.EqualValues(t, expectedSubed, limiter.subingPower)
-
-	// now    : last.total=110
-	// applied: new.total=111, added=11, subed=0
-	// expected: no error
-	diffPower = int64(1)
-	expectedAdded += diffPower
-	expectedNewTotal += diffPower
-	require.NoError(t, limiter.CheckLimit(diffPower, ADD_POWER))
-	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
-	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
-	require.EqualValues(t, expectedAdded, limiter.addingPower)
-	require.EqualValues(t, expectedSubed, limiter.subingPower)
-
-	// now    : last.total=111
-	// applied: new.total=112, added=12, subed=0
+	// applied: added=12, subed=0, remain.total=100, new.total=112
+	// remain.total / new.total = 0.89
 	// expected: error
 	diffPower = int64(1)
 	require.Error(t, limiter.CheckLimit(diffPower, ADD_POWER))
@@ -67,10 +43,9 @@ func Test_limiter(t *testing.T) {
 	expectedSubed = int64(0)
 	expectedNewTotal = lastTotal
 
-	// now    : new.total=100, added=0, subed=0
-	// applied: new.total=99, added=0, subed=1
-	// expected: error =
-	diffPower = int64(1)
+	// applied: added=0, subed=10, remain.total=90, new.total=90
+	// expected: no error
+	diffPower = int64(10)
 	expectedSubed += diffPower
 	expectedNewTotal -= diffPower
 	require.NoError(t, limiter.CheckLimit(diffPower, SUB_POWER))
@@ -79,4 +54,25 @@ func Test_limiter(t *testing.T) {
 	require.EqualValues(t, expectedAdded, limiter.addingPower)
 	require.EqualValues(t, expectedSubed, limiter.subingPower)
 
+	// applied: added=10, subed=10, remain.total=90, new.total=100
+	// expected: no error
+	// remain.total/new.total = 0.9
+	diffPower = int64(10)
+	expectedAdded += diffPower
+	expectedNewTotal += diffPower
+	require.NoError(t, limiter.CheckLimit(diffPower, ADD_POWER))
+	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
+	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
+	require.EqualValues(t, expectedAdded, limiter.addingPower)
+	require.EqualValues(t, expectedSubed, limiter.subingPower)
+
+	// applied: added=11, subed=10, remain.total=90, new.total=101
+	// expected: no error
+	// remain.total/new.total = 0.8910
+	diffPower = int64(1)
+	require.Error(t, limiter.CheckLimit(diffPower, ADD_POWER))
+	require.EqualValues(t, lastTotal, limiter.lastTotalPower)
+	require.EqualValues(t, expectedNewTotal, limiter.estimatedTotalPower)
+	require.EqualValues(t, expectedAdded, limiter.addingPower)
+	require.EqualValues(t, expectedSubed, limiter.subingPower)
 }

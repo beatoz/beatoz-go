@@ -4,7 +4,7 @@
 
 ### golang
 
-Install golang v1.21+
+Install golang v1.23+
 
 ### protoc (protobuf compiler)
 
@@ -43,7 +43,7 @@ make
 ## Run BEATOZ
 
 ```bash
-build/darwin/beatoz init --chain_id local_test_net --priv_validator_secret 1234
+build/darwin/beatoz init --chain_id 1234 --priv_validator_secret "mypassword"
 
 ...
 
@@ -55,8 +55,10 @@ build/darwin/beatoz start
 * Genesis file is `$HOME/.beatoz/config/gebesus.json`.
 * Validator private key file is  `$HOME/.beatoz/config/priv_validator_key.json`.
 * Initial wallet files are in `$HOME/.beatoz/walkeys/`.
-* To show private key, run `build/darwin/beatoz show-wallet-key {Wallet Key Files}`.
-  (e.g. run `build/darwin/beatoz show-wallet-key ~/.beatoz/config/priv_validator_key.json`)
+* To show private key, run `build/darwin/beatoz wallet-key {Wallet Key Files}`.
+  (e.g. run `build/darwin/beatoz wallet-key ~/.beatoz/config/priv_validator_key.json`)
+
+If you want to participate in the network `testnet0(chainId:0xbea701` of BEATOZ, refer to [testnet0](docs/testnet0/README.md).
 
 ## Docker
 

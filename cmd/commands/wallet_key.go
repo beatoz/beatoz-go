@@ -1,15 +1,16 @@
 package commands
 
 import (
+	"encoding/hex"
 	"fmt"
-	"github.com/beatoz/beatoz-go/libs"
-	"github.com/beatoz/beatoz-go/libs/jsonx"
-	"github.com/beatoz/beatoz-go/types/bytes"
-	"github.com/beatoz/beatoz-go/types/crypto"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/beatoz/beatoz-go/libs"
+	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/crypto"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -89,10 +90,65 @@ func showWalletKeyDir(path string) error {
 	return err
 }
 
-func showWalletKeyFile(path string) error {
+func parseWalletKeyFile(path string, hideSecret ...bool) (*crypto.WalletKey, error) {
+	_hideSecret := false
+	if len(hideSecret) > 0 {
+		_hideSecret = hideSecret[0]
+	}
 
 	if wk, err := crypto.OpenWalletKey(libs.NewFileReader(path)); err != nil {
+		return nil, err
+	} else if !_hideSecret {
+		s := libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
+		defer libs.ClearCredential(s)
+
+		if err := wk.Unlock(s); err != nil {
+			return nil, err
+		}
+		return wk, nil
+	} else {
+		return wk, nil
+	}
+}
+
+func showWalletKeyFile(path string, hideSecret ...bool) error {
+	var addr, prvKey, pubKey string
+
+	if wk, err := parseWalletKeyFile(path, hideSecret...); err != nil {
 		return err
+	} else {
+		defer wk.Lock()
+
+		addr = wk.Address.String()
+		if !wk.IsLock() {
+			pubKey = hex.EncodeToString(wk.PubKey())
+			prvKey = hex.EncodeToString(wk.PrvKey())
+		}
+	}
+
+	fmt.Println("wallet file :", path)
+	fmt.Println("address     :", addr)
+	if pubKey != "" {
+		fmt.Println("public key  :", pubKey)
+	}
+	if prvKey != "" {
+		fmt.Println("private key :", prvKey)
+	}
+	return nil
+}
+
+func _showWalletKeyFile(path string, hideSecret ...bool) error {
+	var addr, prvKey, pubKey string
+
+	_hideSecret := false
+	if len(hideSecret) > 0 {
+		_hideSecret = hideSecret[0]
+	}
+	if wk, err := crypto.OpenWalletKey(libs.NewFileReader(path)); err != nil {
+		return err
+	} else if _hideSecret {
+		addr = wk.Address.String()
+		pubKey = hex.EncodeToString(wk.PubKey())
 	} else {
 		s := libs.ReadCredential(fmt.Sprintf("Passphrase for %v: ", filepath.Base(path)))
 		defer libs.ClearCredential(s)
@@ -102,23 +158,18 @@ func showWalletKeyFile(path string) error {
 		}
 		defer wk.Lock()
 
-		tmp := &struct {
-			*crypto.WalletKey `json:"walletKey"`
-			PrvKey            bytes.HexBytes `json."prvKey"`
-			PubKey            bytes.HexBytes `json."pubKey"`
-		}{
-			WalletKey: wk,
-			PrvKey:    wk.PrvKey(),
-			PubKey:    wk.PubKey(),
-		}
-		if bz, err := jsonx.MarshalIndent(tmp, "", " "); err != nil {
-			return err
-		} else {
-			fmt.Println(string(bz))
-		}
+		addr = wk.Address.String()
+		pubKey = hex.EncodeToString(wk.PubKey())
+		prvKey = hex.EncodeToString(wk.PrvKey())
+	}
+
+	fmt.Println("wallet file :", path)
+	fmt.Println("address     :", addr)
+	if !_hideSecret {
+		fmt.Println("public key  :", pubKey)
+		fmt.Println("private key :", prvKey)
 	}
 	return nil
-
 }
 
 func resetPassphrase(path string) error {

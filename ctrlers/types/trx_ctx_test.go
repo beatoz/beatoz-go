@@ -9,10 +9,12 @@ import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/merkle"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
 var (
@@ -153,6 +155,46 @@ func Test_NewTrxContext(t *testing.T) {
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Payer)
 	require.Equal(t, payer.Address(), txctx.Payer.Address)
+}
+
+func Test_TrxContext_EventRoot(t *testing.T) {
+
+	txctx := &ctrlertypes.TrxContext{}
+	txctx.Events = append(txctx.Events, abcitypes.Event{
+		Type: "tx",
+		Attributes: []abcitypes.EventAttribute{
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte("TestTransfer"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte("123456"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte("abcdef"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte("1111"), Index: false},
+		},
+	})
+	tree, root := txctx.EventRoot()
+	require.NotNil(t, tree)
+	require.NotNil(t, root)
+
+	targetIdx := 1
+	targetData := append([]byte("tx"), append([]byte(ctrlertypes.EVENT_ATTR_TXSENDER), []byte("123456")...)...)
+
+	_, siblings, err := tree.Proof(targetIdx)
+	require.NoError(t, err)
+
+	err = merkle.VerifyProof(targetIdx, targetData, siblings, root)
+	require.NoError(t, err)
+
+	// wrong index
+	err = merkle.VerifyProof(targetIdx+1, targetData, siblings, root)
+	require.Error(t, err)
+
+	// wrong data
+	err = merkle.VerifyProof(targetIdx, []byte("wrong data"), siblings, root)
+	require.Error(t, err)
+
+	// other siblings
+	_, otherSiblings, err := tree.Proof(targetIdx + 1)
+	require.NoError(t, err)
+	err = merkle.VerifyProof(targetIdx, targetData, otherSiblings, root)
+	require.Error(t, err)
 }
 
 func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {

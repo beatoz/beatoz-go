@@ -16,6 +16,7 @@ func main() {
 		commands.NewRunNodeCmd(node.NewBeatozNode),
 		commands.ShowNodeIDCmd,
 		commands.NewWalletKeyCmd(),
+		commands.NewValidatorCmd(),
 		commands.VersionCmd,
 	)
 
