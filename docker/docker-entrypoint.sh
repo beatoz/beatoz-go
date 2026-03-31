@@ -6,7 +6,7 @@ CHAIN_ID="0x1234"
 # Initialize if needed (for volume mount scenarios)
 if [ ! -f /root/.beatoz/config/genesis.json ]; then
   echo 'Config not found genesis.json. Initializing beatoz...'
-  beatoz init --chain_id ${CHAIN_ID} --home /root/.beatoz --assumed_block_interval 1s
+  beatoz init --chain_id ${CHAIN_ID} --home /root/.beatoz --consensus.create_empty_blocks_interval 60s
   echo 'Initialization complete.'
 fi
 
@@ -15,13 +15,11 @@ echo '===================================================='
 echo '=== Wallet Keys ==='
 echo '=== DO NOT USE THESE PRIVATE KEYS ON MAINNET !!! ==='
 echo '===================================================='
+echo ''
 for file in /root/.beatoz/walkeys/wk*.json; do
-  echo ''
-  grep address "$file" | sed 's/.*address/  Address       /' | sed 's/[",:]//g' | awk '{$NF = "0x" tolower($NF); print}'
-  beatoz wallet-key "$file" | grep prvKey | sed 's/.*prvKey/  PrivateKey /' | sed 's/[",:]//g' | awk '{$NF = "0x" tolower($NF); print}'
+  beatoz wallet-key "$file" | grep -v 'wallet file' | awk -F': ' '{print $1 ": 0x" tolower($2)}'
   echo ''
 done
-echo ' '
 echo '===================================================='
 echo '===                                              ==='
 echo '=== DO NOT USE THESE PRIVATE KEYS ON MAINNET !!! ==='
