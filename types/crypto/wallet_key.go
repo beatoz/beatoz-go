@@ -7,6 +7,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
+
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -14,21 +17,12 @@ import (
 	ethec "github.com/ethereum/go-ethereum/crypto/secp256k1"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	"golang.org/x/crypto/pbkdf2"
-	"io"
-	"path/filepath"
 )
 
 const (
-	//Aes128CBC = "aes-128-cbc"
-	Aes256CBC = "aes-256-cbc"
-	//Aes512CBC = "aes-512-cbc"
-
-	Secp256K1 = tmsecp256k1.KeyType
-
-	SymmAlgo = Aes256CBC
-	DKLEN    = 32
-
-	AsymmAlgo = Secp256K1
+	AsymmAlgo = tmsecp256k1.KeyType
+	SymmAlgo  = "aes-256-cbc"
+	DKLEN     = 32
 )
 
 type cipherTextParams struct {
@@ -57,25 +51,29 @@ type WalletKey struct {
 	pubKey []byte
 }
 
+func newDKParams(algo string) *dkParams {
+	salt := make([]byte, DKLEN)
+	_, _ = rand.Read(salt)
+
+	_dkParams := &dkParams{
+		Algo:  algo,
+		Prf:   DefaultHasherName(),
+		Iter:  600000 + int(binary.BigEndian.Uint16(salt[:2])),
+		Salt:  salt,
+		DkLen: DKLEN,
+	}
+	return _dkParams
+}
+
 func NewWalletKeyWith(keyBytes, pass []byte) *WalletKey {
 	var _pubKey, _prvKey []byte
 	var _cipherTextParams *cipherTextParams
 	var _dkParams *dkParams
 
 	if pass != nil {
-		salt := make([]byte, DKLEN)
-		rand.Read(salt)
-		iter := 1 /*600000*/ + int(binary.BigEndian.Uint16(append([]byte{0x00}, salt[:1]...)))
-
-		sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
-
-		_dkParams = &dkParams{
-			Algo:  "pbkdf2",
-			Prf:   DefaultHasherName(),
-			Iter:  iter,
-			Salt:  salt,
-			DkLen: DKLEN,
-		}
+		_dkParams = newDKParams("pbkdf2")
+		sk := pbkdf2.Key(pass, _dkParams.Salt, _dkParams.Iter, DKLEN, DefaultHasher)
+		defer libs.ClearCredential(sk)
 
 		block, err := aes.NewCipher(sk)
 		if err != nil {
@@ -169,19 +167,9 @@ func (wk *WalletKey) LockWith(pass []byte) {
 		wk.prvKey = nil
 	}()
 
-	salt := make([]byte, DKLEN)
-	rand.Read(salt)
-	iter := 600000 + int(binary.BigEndian.Uint16(append([]byte{0x00}, salt[:1]...)))
-
-	sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
-
-	_dkParams := &dkParams{
-		Algo:  "pbkdf2",
-		Prf:   DefaultHasherName(),
-		Iter:  iter,
-		Salt:  salt,
-		DkLen: DKLEN,
-	}
+	_dkParams := newDKParams("pbkdf2")
+	sk := pbkdf2.Key(pass, _dkParams.Salt, _dkParams.Iter, DKLEN, DefaultHasher)
+	defer libs.ClearCredential(sk)
 
 	block, err := aes.NewCipher(sk)
 	if err != nil {

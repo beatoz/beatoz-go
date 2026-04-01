@@ -39,8 +39,8 @@ ifdef MAKECMDGOALS
 	endif
 endif
 
-VERTAG=$(shell git tag --sort=-v:refname | grep '^v[0-9]' | head -n1)
-GITCOMMIT=$(shell git log -1 --pretty=format:"%h")
+VERTAG ?= $(shell git tag --sort=-v:refname | grep '^v[0-9]' | head -n1)
+GITCOMMIT ?= $(shell git log -1 --pretty=format:"%h")
 BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCommit=$(GITCOMMIT)' -X 'github.com/beatoz/beatoz-go/cmd/version.Version=$(VERTAG)'"
 
 LOCAL_GOPATH = $(shell go env GOPATH)

@@ -6,7 +6,7 @@ ARG VERSION
 ARG GITCOMMIT
 
 # Install build dependencies
-RUN apk add --no-cache git make gcc musl-dev linux-headers protobuf-dev protoc
+RUN apk add --no-cache git make gcc musl-dev linux-headers
 
 # Set working directory to match GOPATH structure
 WORKDIR /go/src/github.com/beatoz/beatoz-go
@@ -14,12 +14,11 @@ WORKDIR /go/src/github.com/beatoz/beatoz-go
 # Copy all source code
 COPY . .
 
-# Download dependencies and install protoc-gen-go plugin
-RUN go mod download && \
-    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+# Download dependencies
+RUN go mod download
 
 # Build the binary with version info
-RUN make pbm && VERTAG=${VERSION} GITCOMMIT=${GITCOMMIT} make linux
+RUN VERTAG=${VERSION} GITCOMMIT=${GITCOMMIT} make linux
 
 # Runtime stage
 FROM alpine:latest
@@ -42,14 +41,9 @@ ENV BEATOZ_VALIDATOR_SECRET="unsafe_password" \
     BEATOZ_HOLDER_SECRET="unsafe_password" \
     BEATOZ_WALKEY_SECRET="unsafe_password"
 
-RUN beatoz init \
-    --chain_id 0x1234 \
-    --home /root/.beatoz \
-    --assumed_block_interval 1s
-
 # Expose ports (adjust as needed)
-EXPOSE 26656 26657 26658
+EXPOSE 26656 26657 26658 26660
 
 # Use entrypoint script
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["start", "--home", "/root/.beatoz", "--consensus.create_empty_blocks=false",  "--rpc.laddr", "tcp://0.0.0.0:26657", "--rpc.cors_allowed_origins", "*"]
+CMD ["start", "--home", "/root/.beatoz", "--rpc.laddr", "tcp://0.0.0.0:26657", "--rpc.cors_allowed_origins", "*"]
