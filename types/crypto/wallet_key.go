@@ -7,6 +7,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
+
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -14,21 +17,12 @@ import (
 	ethec "github.com/ethereum/go-ethereum/crypto/secp256k1"
 	tmsecp256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	"golang.org/x/crypto/pbkdf2"
-	"io"
-	"path/filepath"
 )
 
 const (
-	//Aes128CBC = "aes-128-cbc"
-	Aes256CBC = "aes-256-cbc"
-	//Aes512CBC = "aes-512-cbc"
-
-	Secp256K1 = tmsecp256k1.KeyType
-
-	SymmAlgo = Aes256CBC
-	DKLEN    = 32
-
-	AsymmAlgo = Secp256K1
+	AsymmAlgo = tmsecp256k1.KeyType
+	SymmAlgo  = "aes-256-cbc"
+	DKLEN     = 32
 )
 
 type cipherTextParams struct {
@@ -64,8 +58,8 @@ func NewWalletKeyWith(keyBytes, pass []byte) *WalletKey {
 
 	if pass != nil {
 		salt := make([]byte, DKLEN)
-		rand.Read(salt)
-		iter := 1 /*600000*/ + int(binary.BigEndian.Uint16(append([]byte{0x00}, salt[:1]...)))
+		_, _ = rand.Read(salt)
+		iter := 600000 + int(binary.BigEndian.Uint16(salt[:2]))
 
 		sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
 
@@ -170,8 +164,8 @@ func (wk *WalletKey) LockWith(pass []byte) {
 	}()
 
 	salt := make([]byte, DKLEN)
-	rand.Read(salt)
-	iter := 600000 + int(binary.BigEndian.Uint16(append([]byte{0x00}, salt[:1]...)))
+	_, _ = rand.Read(salt)
+	iter := 600000 + int(binary.BigEndian.Uint16(salt[:2]))
 
 	sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
 
