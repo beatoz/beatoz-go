@@ -51,25 +51,29 @@ type WalletKey struct {
 	pubKey []byte
 }
 
+func newDKParams(algo string) *dkParams {
+	salt := make([]byte, DKLEN)
+	_, _ = rand.Read(salt)
+
+	_dkParams := &dkParams{
+		Algo:  algo,
+		Prf:   DefaultHasherName(),
+		Iter:  600000 + int(binary.BigEndian.Uint16(salt[:2])),
+		Salt:  salt,
+		DkLen: DKLEN,
+	}
+	return _dkParams
+}
+
 func NewWalletKeyWith(keyBytes, pass []byte) *WalletKey {
 	var _pubKey, _prvKey []byte
 	var _cipherTextParams *cipherTextParams
 	var _dkParams *dkParams
 
 	if pass != nil {
-		salt := make([]byte, DKLEN)
-		_, _ = rand.Read(salt)
-		iter := 600000 + int(binary.BigEndian.Uint16(salt[:2]))
-
-		sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
-
-		_dkParams = &dkParams{
-			Algo:  "pbkdf2",
-			Prf:   DefaultHasherName(),
-			Iter:  iter,
-			Salt:  salt,
-			DkLen: DKLEN,
-		}
+		_dkParams = newDKParams("pbkdf2")
+		sk := pbkdf2.Key(pass, _dkParams.Salt, _dkParams.Iter, DKLEN, DefaultHasher)
+		defer libs.ClearCredential(sk)
 
 		block, err := aes.NewCipher(sk)
 		if err != nil {
@@ -163,19 +167,9 @@ func (wk *WalletKey) LockWith(pass []byte) {
 		wk.prvKey = nil
 	}()
 
-	salt := make([]byte, DKLEN)
-	_, _ = rand.Read(salt)
-	iter := 600000 + int(binary.BigEndian.Uint16(salt[:2]))
-
-	sk := pbkdf2.Key(pass, salt, iter, DKLEN, DefaultHasher)
-
-	_dkParams := &dkParams{
-		Algo:  "pbkdf2",
-		Prf:   DefaultHasherName(),
-		Iter:  iter,
-		Salt:  salt,
-		DkLen: DKLEN,
-	}
+	_dkParams := newDKParams("pbkdf2")
+	sk := pbkdf2.Key(pass, _dkParams.Salt, _dkParams.Iter, DKLEN, DefaultHasher)
+	defer libs.ClearCredential(sk)
 
 	block, err := aes.NewCipher(sk)
 	if err != nil {
