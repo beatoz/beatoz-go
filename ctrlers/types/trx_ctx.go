@@ -136,3 +136,25 @@ func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
 	tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves))
 	return tree, tree.Root()
 }
+
+func (ctx *TrxContext) EventRootEx() (*merkle.MerkleTree, []byte) {
+	if len(ctx.Events) == 0 {
+		return nil, nil
+	}
+
+	// 1. Each Event -> merkle tree -> root
+	roots := make([][]byte, len(ctx.Events))
+	for i, evt := range ctx.Events {
+		leaves := make([][]byte, len(evt.Attributes))
+		ety := evt.Type
+		for j, attr := range evt.Attributes {
+			leaves[j] = append(append([]byte(ety), attr.Key...), attr.Value...)
+		}
+		t := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves))
+		roots[i] = t.Root()
+	}
+
+	// 2. Roots -> merkle tree -> final root (roots are already hashed)
+	tree := merkle.NewMerkleTree(merkle.WithHashedLeaves(roots))
+	return tree, tree.Root()
+}

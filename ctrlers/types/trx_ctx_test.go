@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -157,6 +158,16 @@ func Test_NewTrxContext(t *testing.T) {
 	require.Equal(t, payer.Address(), txctx.Payer.Address)
 }
 
+func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
+	bctx := ctrlertypes.TempBlockContext(chainId.Hex(), height, time.Now(), govMock, acctMock, nil, nil, nil)
+	bz, _ := tx.Encode()
+	return ctrlertypes.NewTrxContext(bz, bctx, true)
+}
+
+//
+// test code for `EventRoot()` and `EventRootEx()`
+//
+
 func Test_TrxContext_EventRoot(t *testing.T) {
 
 	txctx := &ctrlertypes.TrxContext{}
@@ -197,8 +208,151 @@ func Test_TrxContext_EventRoot(t *testing.T) {
 	require.Error(t, err)
 }
 
-func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
-	bctx := ctrlertypes.TempBlockContext(chainId.Hex(), height, time.Now(), govMock, acctMock, nil, nil, nil)
-	bz, _ := tx.Encode()
-	return ctrlertypes.NewTrxContext(bz, bctx, true)
+func Test_TrxContext_EventRootEx(t *testing.T) {
+	// empty events
+	txctx := &ctrlertypes.TrxContext{}
+	tree, root := txctx.EventRootEx()
+	require.Nil(t, tree)
+	require.Nil(t, root)
+
+	// two events
+	txctx.Events = append(txctx.Events, abcitypes.Event{
+		Type: "tx",
+		Attributes: []abcitypes.EventAttribute{
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte("TestTransfer"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte("sender1"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte("recver1"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte("1000"), Index: false},
+		},
+	})
+	txctx.Events = append(txctx.Events, abcitypes.Event{
+		Type: "tx",
+		Attributes: []abcitypes.EventAttribute{
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte("TestTransfer"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte("sender2"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte("recver2"), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte("2000"), Index: false},
+		},
+	})
+
+	tree, root = txctx.EventRootEx()
+	require.NotNil(t, tree)
+	require.NotNil(t, root)
+
+	// Verify proof for the first event root (index 0) in the top-level tree.
+	// The top-level tree leaves are already hashed, so use preHashed=true for VerifyProof.
+	leafHash, siblings, err := tree.Proof(0)
+	require.NoError(t, err)
+	err = merkle.VerifyProof(0, leafHash, siblings, root, true)
+	require.NoError(t, err)
+
+	// Verify proof for the second event root (index 1)
+	leafHash, siblings, err = tree.Proof(1)
+	require.NoError(t, err)
+	err = merkle.VerifyProof(1, leafHash, siblings, root, true)
+	require.NoError(t, err)
+
+	// wrong data should fail
+	err = merkle.VerifyProof(0, []byte("wrong"), siblings, root, true)
+	require.Error(t, err)
+
+	// Verify that per-event merkle root matches the leaf in the top-level tree.
+	// Reconstruct the first event's merkle root manually.
+	evt0 := txctx.Events[0]
+	var leaves [][]byte
+	for _, attr := range evt0.Attributes {
+		leaves = append(leaves, append(append([]byte(evt0.Type), attr.Key...), attr.Value...))
+	}
+	evt0Tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves))
+	evt0Root := evt0Tree.Root()
+
+	leaf0, _, err := tree.Proof(0)
+	require.NoError(t, err)
+	require.Equal(t, evt0Root, leaf0)
+
+	// Verify a specific attribute in the per-event merkle tree.
+	// Events[0].Attributes[1] (TXSENDER, "sender1")
+	targetIdx := 1
+	targetData := append(append([]byte(evt0.Type), []byte(ctrlertypes.EVENT_ATTR_TXSENDER)...), []byte("sender1")...)
+	_, evt0Siblings, err := evt0Tree.Proof(targetIdx)
+	require.NoError(t, err)
+	err = merkle.VerifyProof(targetIdx, targetData, evt0Siblings, evt0Root)
+	require.NoError(t, err)
+
+	// wrong attribute data should fail
+	err = merkle.VerifyProof(targetIdx, []byte("wrong"), evt0Siblings, evt0Root)
+	require.Error(t, err)
+
+	// Events[1].Attributes[2] (TXRECVER, "recver2")
+	evt1 := txctx.Events[1]
+	var leaves1 [][]byte
+	for _, attr := range evt1.Attributes {
+		leaves1 = append(leaves1, append(append([]byte(evt1.Type), attr.Key...), attr.Value...))
+	}
+	evt1Tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves1))
+	evt1Root := evt1Tree.Root()
+
+	targetIdx = 2
+	targetData = append(append([]byte(evt1.Type), []byte(ctrlertypes.EVENT_ATTR_TXRECVER)...), []byte("recver2")...)
+	_, evt1Siblings, err := evt1Tree.Proof(targetIdx)
+	require.NoError(t, err)
+	err = merkle.VerifyProof(targetIdx, targetData, evt1Siblings, evt1Root)
+	require.NoError(t, err)
+}
+
+func newBenchTrxContext(eventCount, attrCount int) *ctrlertypes.TrxContext {
+	txctx := &ctrlertypes.TrxContext{}
+	for i := 0; i < eventCount; i++ {
+		var attrs []abcitypes.EventAttribute
+		for j := 0; j < attrCount; j++ {
+			attrs = append(attrs, abcitypes.EventAttribute{
+				Key:   []byte(fmt.Sprintf("key_%d_%d", i, j)),
+				Value: []byte(fmt.Sprintf("value_%d_%d", i, j)),
+				Index: true,
+			})
+		}
+		txctx.Events = append(txctx.Events, abcitypes.Event{
+			Type:       fmt.Sprintf("event_%d", i),
+			Attributes: attrs,
+		})
+	}
+	return txctx
+}
+
+func Benchmark_EventRoot(b *testing.B) {
+	for _, bc := range []struct {
+		name       string
+		eventCount int
+		attrCount  int
+	}{
+		{"10events_4attrs", 10, 4},
+		{"100events_4attrs", 100, 4},
+		{"100events_10attrs", 100, 10},
+	} {
+		txctx := newBenchTrxContext(bc.eventCount, bc.attrCount)
+		b.Run(bc.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				txctx.EventRoot()
+			}
+		})
+	}
+}
+
+func Benchmark_EventRootEx(b *testing.B) {
+	for _, bc := range []struct {
+		name       string
+		eventCount int
+		attrCount  int
+	}{
+		{"10events_4attrs", 10, 4},
+		{"100events_4attrs", 100, 4},
+		{"100events_10attrs", 100, 10},
+	} {
+		txctx := newBenchTrxContext(bc.eventCount, bc.attrCount)
+		b.Run(bc.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				txctx.EventRootEx()
+			}
+		})
+	}
 }
