@@ -116,11 +116,18 @@ func (ctx *TrxContext) IsHandledByEVM() bool {
 	return b
 }
 
-// EventRoot returns the merkle tree instance and root hash of the event log.
+func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
+	if types.IsForkedStr(ctx.ChainID(), ctx.Height(), types.Bud) {
+		return ctx.eventRootEx()
+	}
+	return ctx.eventRoot()
+}
+
+// eventRoot returns the merkle tree instance and root hash of the event log.
 // The merkle tree's leaf are constructed as follows:
 //
 //	[event type + attribute key + attribute value]
-func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
+func (ctx *TrxContext) eventRoot() (*merkle.MerkleTree, []byte) {
 	if len(ctx.Events) == 0 {
 		return nil, nil
 	}
@@ -137,7 +144,22 @@ func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
 	return tree, tree.Root()
 }
 
-func (ctx *TrxContext) EventRootEx() (*merkle.MerkleTree, []byte) {
+// eventRootEx returns the merkle tree instance and root hash of the event log
+// using a two-level merkle tree construction.
+//
+// Unlike [eventRoot], which flattens all event attributes into a single merkle tree,
+// eventRootEx builds the tree in two stages:
+//
+//  1. For each event, a merkle tree is constructed from its attributes, where each
+//     leaf is formed as [event type + attribute key + attribute value]. The root hash
+//     of this per-event tree is used as a summary of that event.
+//
+//  2. The per-event root hashes (already hashed) are then used as leaves of a second
+//     merkle tree. The root of this top-level tree is the final merkle root.
+//
+// This two-level approach preserves event boundaries, allowing efficient proof
+// generation and verification at the individual event level.
+func (ctx *TrxContext) eventRootEx() (*merkle.MerkleTree, []byte) {
 	if len(ctx.Events) == 0 {
 		return nil, nil
 	}
