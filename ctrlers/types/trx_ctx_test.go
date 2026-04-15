@@ -180,7 +180,7 @@ func Test_TrxContext_EventRoot(t *testing.T) {
 			{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte("1111"), Index: false},
 		},
 	})
-	tree, root := txctx.EventRoot()
+	tree, root := ctrlertypes.EventRoot(txctx)
 	require.NotNil(t, tree)
 	require.NotNil(t, root)
 
@@ -211,7 +211,7 @@ func Test_TrxContext_EventRoot(t *testing.T) {
 func Test_TrxContext_EventRootEx(t *testing.T) {
 	// empty events
 	txctx := &ctrlertypes.TrxContext{}
-	tree, root := txctx.EventRootEx()
+	tree, root := ctrlertypes.EventRootEx(txctx)
 	require.Nil(t, tree)
 	require.Nil(t, root)
 
@@ -235,7 +235,7 @@ func Test_TrxContext_EventRootEx(t *testing.T) {
 		},
 	})
 
-	tree, root = txctx.EventRootEx()
+	tree, root = ctrlertypes.EventRootEx(txctx)
 	require.NotNil(t, tree)
 	require.NotNil(t, root)
 
@@ -332,7 +332,7 @@ func Benchmark_EventRoot(b *testing.B) {
 		txctx := newBenchTrxContext(bc.eventCount, bc.attrCount)
 		b.Run(bc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				txctx.EventRoot()
+				ctrlertypes.EventRoot(txctx)
 			}
 		})
 	}
@@ -351,7 +351,7 @@ func Benchmark_EventRootEx(b *testing.B) {
 		txctx := newBenchTrxContext(bc.eventCount, bc.attrCount)
 		b.Run(bc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				txctx.EventRootEx()
+				ctrlertypes.EventRootEx(txctx)
 			}
 		})
 	}

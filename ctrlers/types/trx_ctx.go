@@ -117,7 +117,7 @@ func (ctx *TrxContext) IsHandledByEVM() bool {
 }
 
 func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
-	if types.IsForkedStr(ctx.ChainID(), ctx.Height(), types.Bud) {
+	if types.IsBud(ctx.ChainID(), ctx.Height()) {
 		return ctx.eventRootEx()
 	}
 	return ctx.eventRoot()
@@ -179,4 +179,14 @@ func (ctx *TrxContext) eventRootEx() (*merkle.MerkleTree, []byte) {
 	// 2. Roots -> merkle tree -> final root (roots are already hashed)
 	tree := merkle.NewMerkleTree(merkle.WithHashedLeaves(roots))
 	return tree, tree.Root()
+}
+
+// EventRoot is used only for testing to avoid cyclic import.
+func EventRoot(ctx *TrxContext) (*merkle.MerkleTree, []byte) {
+	return ctx.eventRoot()
+}
+
+// EventRootEx is used only for testing to avoid cyclic import.
+func EventRootEx(ctx *TrxContext) (*merkle.MerkleTree, []byte) {
+	return ctx.eventRootEx()
 }

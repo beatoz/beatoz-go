@@ -10,8 +10,8 @@ import (
 func Test_ForkBlocks(t *testing.T) {
 	chainId := uint256.MustFromHex("0xbea701")
 
-	require.False(t, IsForkedBig(chainId, 0, Bud))
-	require.False(t, IsForkedBig(chainId, 100, Bud))
-	require.True(t, IsForkedBig(chainId, 100_000, Bud))
-	require.True(t, IsForkedBig(chainId, 1_000_000, Bud))
+	require.False(t, IsBud(chainId.Hex(), 0))
+	require.False(t, IsBud(chainId.Hex(), 100))
+	require.True(t, IsBud(chainId.Hex(), 100_000))
+	require.True(t, IsBud(chainId.Hex(), 1_000_000))
 }

@@ -1,40 +1,37 @@
 package types
 
-import (
-	"strings"
-
-	"github.com/holiman/uint256"
-)
-
-const (
-	Bud = "Bud"
-)
+type ForkBlocks struct {
+	Bud int64
+}
 
 var (
-	devnetForkBlocks = map[string]int64{
+	devnetForkBlocks = ForkBlocks{
 		Bud: 0,
 	}
-	testnetForkBlocks = map[string]int64{
+	testnetForkBlocks = ForkBlocks{
 		Bud: 100_000,
 	}
 
-	mainnetForkBlocks = map[string]int64{
+	mainnetForkBlocks = ForkBlocks{
 		Bud: 0,
 	}
 
-	chainForkBlocks = map[string]map[string]int64{
+	chainForkBlocks = map[string]ForkBlocks{
 		"0xbea700": devnetForkBlocks,
 		"0xbea701": testnetForkBlocks,
 		"0xbea702": mainnetForkBlocks,
 	}
 )
 
-func IsForkedBig(chainId *uint256.Int, height int64, forkName string) bool {
-	cid := chainId.Hex()
-	return IsForkedStr(cid, height, forkName)
+func IsBud(chainId string, height int64) bool {
+	forkBlocks, ok := chainForkBlocks[chainId]
+	if !ok {
+		return false
+	}
+	return isBlockForked(forkBlocks.Bud, height)
 }
 
-func IsForkedStr(chainId string, height int64, forkName string) bool {
-	h0 := chainForkBlocks[strings.ToLower(chainId)][forkName]
-	return height >= h0
+func isBlockForked(h0, head int64) bool {
+
+	return head >= h0
 }

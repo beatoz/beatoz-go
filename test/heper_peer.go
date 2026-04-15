@@ -38,7 +38,7 @@ type PeerMock struct {
 }
 
 func NewPeerMock(id int, p2pPort, rpcPort int, logLevel string) *PeerMock {
-	config := cfg.DefaultConfig("1212")
+	config := cfg.DefaultConfig("0x1234")
 	config.LogLevel = logLevel
 	config.P2P.AllowDuplicateIP = true
 	config.P2P.ListenAddress = fmt.Sprintf("tcp://127.0.0.1:%d", p2pPort)
