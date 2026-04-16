@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"testing"
 
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
@@ -20,9 +21,10 @@ import (
 )
 
 const (
-	AsymmAlgo = tmsecp256k1.KeyType
-	SymmAlgo  = "aes-256-cbc"
-	DKLEN     = 32
+	AsymmAlgo  = tmsecp256k1.KeyType
+	SymmAlgo   = "aes-256-cbc"
+	DKLEN      = 32
+	DKBaseIter = 600000
 )
 
 type cipherTextParams struct {
@@ -55,10 +57,15 @@ func newDKParams(algo string) *dkParams {
 	salt := make([]byte, DKLEN)
 	_, _ = rand.Read(salt)
 
+	iter := DKBaseIter + int(binary.BigEndian.Uint16(salt[:2]))
+	if testing.Testing() {
+		iter = 1
+	}
+
 	_dkParams := &dkParams{
 		Algo:  algo,
 		Prf:   DefaultHasherName(),
-		Iter:  600000 + int(binary.BigEndian.Uint16(salt[:2])),
+		Iter:  iter,
 		Salt:  salt,
 		DkLen: DKLEN,
 	}
