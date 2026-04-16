@@ -3,7 +3,6 @@ package node
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -522,50 +521,34 @@ func (ctrler *BeatozApp) asyncExecTrxContext(txctx *ctrlertypes.TrxContext) *abc
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("asyncExecTrxContext", "error", xerr)
 
-		// add event
-		txctx.Events = append(txctx.Events, abcitypes.Event{
-			Type: "tx",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte(strconv.Itoa(int(xerr.Code()))), Index: false},
-			},
-		})
-
-		_, evtRoot := txctx.EventRoot()
 		return &abcitypes.ResponseDeliverTx{
 			Code:      xerr.Code(),
 			Log:       xerr.Error(),
 			GasWanted: txctx.Tx.Gas,
 			GasUsed:   txctx.GasUsed,
-			Data:      evtRoot,
-			Events:    txctx.Events,
 		}
-	} else {
+	}
 
-		ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+	ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
-		// add event
-		txctx.Events = append(txctx.Events, abcitypes.Event{
-			Type: "tx",
-			Attributes: []abcitypes.EventAttribute{
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_ADDRPAIR), Value: []byte(txctx.Tx.From.String() + txctx.Tx.To.String()), Index: true},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
-				{Key: []byte(ctrlertypes.EVENT_ATTR_TXSTATUS), Value: []byte("0"), Index: false},
-			},
-		})
+	// add event
+	txctx.Events = append(txctx.Events, abcitypes.Event{
+		Type: "tx",
+		Attributes: []abcitypes.EventAttribute{
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXTYPE), Value: []byte(txctx.Tx.TypeString()), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXSENDER), Value: []byte(txctx.Tx.From.String()), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_TXRECVER), Value: []byte(txctx.Tx.To.String()), Index: true},
+			{Key: []byte(ctrlertypes.EVENT_ATTR_AMOUNT), Value: []byte(txctx.Tx.Amount.Dec()), Index: false},
+		},
+	})
 
-		_, evtRoot := txctx.EventRoot()
-		return &abcitypes.ResponseDeliverTx{
-			Code:      abcitypes.CodeTypeOK,
-			GasWanted: txctx.Tx.Gas,
-			GasUsed:   txctx.GasUsed,
-			Data:      evtRoot,
-			Events:    txctx.Events,
-		}
+	_, evtRoot := txctx.EventRoot()
+	return &abcitypes.ResponseDeliverTx{
+		Code:      abcitypes.CodeTypeOK,
+		GasWanted: txctx.Tx.Gas,
+		GasUsed:   txctx.GasUsed,
+		Data:      evtRoot,
+		Events:    txctx.Events,
 	}
 }
 
