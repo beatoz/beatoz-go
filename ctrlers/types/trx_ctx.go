@@ -168,9 +168,8 @@ func (ctx *TrxContext) eventRootEx() (*merkle.MerkleTree, []byte) {
 	roots := make([][]byte, len(ctx.Events))
 	for i, evt := range ctx.Events {
 		leaves := make([][]byte, len(evt.Attributes))
-		ety := evt.Type
 		for j, attr := range evt.Attributes {
-			leaves[j] = append(append([]byte(ety), attr.Key...), attr.Value...)
+			leaves[j] = attr.Value
 		}
 		t := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves))
 		roots[i] = t.Root()
