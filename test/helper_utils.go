@@ -3,6 +3,12 @@ package test
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs"
 	btztypes "github.com/beatoz/beatoz-go/types"
@@ -15,11 +21,6 @@ import (
 	"github.com/tendermint/tendermint/libs/rand"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 )
 
 var (

@@ -261,7 +261,7 @@ func Test_TrxContext_EventRootEx(t *testing.T) {
 	evt0 := txctx.Events[0]
 	var leaves [][]byte
 	for _, attr := range evt0.Attributes {
-		leaves = append(leaves, append(append([]byte(evt0.Type), attr.Key...), attr.Value...))
+		leaves = append(leaves, attr.Value)
 	}
 	evt0Tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves))
 	evt0Root := evt0Tree.Root()
@@ -273,7 +273,7 @@ func Test_TrxContext_EventRootEx(t *testing.T) {
 	// Verify a specific attribute in the per-event merkle tree.
 	// Events[0].Attributes[1] (TXSENDER, "sender1")
 	targetIdx := 1
-	targetData := append(append([]byte(evt0.Type), []byte(ctrlertypes.EVENT_ATTR_TXSENDER)...), []byte("sender1")...)
+	targetData := []byte("sender1")
 	_, evt0Siblings, err := evt0Tree.Proof(targetIdx)
 	require.NoError(t, err)
 	err = merkle.VerifyProof(targetIdx, targetData, evt0Siblings, evt0Root)
@@ -287,13 +287,13 @@ func Test_TrxContext_EventRootEx(t *testing.T) {
 	evt1 := txctx.Events[1]
 	var leaves1 [][]byte
 	for _, attr := range evt1.Attributes {
-		leaves1 = append(leaves1, append(append([]byte(evt1.Type), attr.Key...), attr.Value...))
+		leaves1 = append(leaves1, attr.Value)
 	}
 	evt1Tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves1))
 	evt1Root := evt1Tree.Root()
 
 	targetIdx = 2
-	targetData = append(append([]byte(evt1.Type), []byte(ctrlertypes.EVENT_ATTR_TXRECVER)...), []byte("recver2")...)
+	targetData = []byte("recver2")
 	_, evt1Siblings, err := evt1Tree.Proof(targetIdx)
 	require.NoError(t, err)
 	err = merkle.VerifyProof(targetIdx, targetData, evt1Siblings, evt1Root)

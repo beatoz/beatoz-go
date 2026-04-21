@@ -19,6 +19,7 @@ const (
 	TRX_PROPOSAL
 	TRX_VOTING
 	TRX_CONTRACT
+	// deprecated
 	TRX_SETDOC
 	TRX_WITHDRAW
 	TRX_MIN_TYPE = TRX_TRANSFER
@@ -26,9 +27,13 @@ const (
 )
 
 const (
+	// deprecated
+	EVENT_ATTR_TXSTATUS = "status"
 	EVENT_ATTR_TXTYPE   = "type"
 	EVENT_ATTR_TXSENDER = "sender"
 	EVENT_ATTR_TXRECVER = "receiver"
+	// deprecated
+	EVENT_ATTR_ADDRPAIR = "addrpair"
 	EVENT_ATTR_AMOUNT   = "amount"
 )
 

@@ -117,8 +117,8 @@ func (ctx *TrxContext) IsHandledByEVM() bool {
 }
 
 func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
-	if types.IsBud(ctx.ChainID(), ctx.Height()) {
-		return ctx.eventRootEx()
+	if types.IsBTIP27(ctx.ChainID(), ctx.Height()) {
+		return ctx.eventRootBTIP27()
 	}
 	return ctx.eventRoot()
 }
@@ -144,11 +144,11 @@ func (ctx *TrxContext) eventRoot() (*merkle.MerkleTree, []byte) {
 	return tree, tree.Root()
 }
 
-// eventRootEx returns the merkle tree instance and root hash of the event log
-// using a two-level merkle tree construction.
+// eventRootBTIP27 returns the merkle tree instance and root hash of the event log
+// using a two-level merkle tree construction defined in BTIP27.
 //
 // Unlike [eventRoot], which flattens all event attributes into a single merkle tree,
-// eventRootEx builds the tree in two stages:
+// eventRootBTIP27 builds the tree in two stages:
 //
 //  1. For each event, a merkle tree is constructed from its attributes, where each
 //     leaf is formed as [event type + attribute key + attribute value]. The root hash
@@ -159,7 +159,7 @@ func (ctx *TrxContext) eventRoot() (*merkle.MerkleTree, []byte) {
 //
 // This two-level approach preserves event boundaries, allowing efficient proof
 // generation and verification at the individual event level.
-func (ctx *TrxContext) eventRootEx() (*merkle.MerkleTree, []byte) {
+func (ctx *TrxContext) eventRootBTIP27() (*merkle.MerkleTree, []byte) {
 	if len(ctx.Events) == 0 {
 		return nil, nil
 	}
@@ -187,5 +187,5 @@ func EventRoot(ctx *TrxContext) (*merkle.MerkleTree, []byte) {
 
 // EventRootEx is used only for testing to avoid cyclic import.
 func EventRootEx(ctx *TrxContext) (*merkle.MerkleTree, []byte) {
-	return ctx.eventRootEx()
+	return ctx.eventRootBTIP27()
 }

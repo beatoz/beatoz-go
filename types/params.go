@@ -1,19 +1,21 @@
 package types
 
 type ForkBlocks struct {
-	Bud int64
+	BTIP27Block int64
+	BTIP35Block int64
 }
 
 var (
 	devnetForkBlocks = ForkBlocks{
-		Bud: 0,
+		// all forks are enabled
 	}
 	testnetForkBlocks = ForkBlocks{
-		Bud: 100_000,
+		BTIP27Block: 100_000,
+		BTIP35Block: 100_000,
 	}
 
 	mainnetForkBlocks = ForkBlocks{
-		Bud: 0,
+		// all forks are enabled
 	}
 
 	chainForkBlocks = map[string]ForkBlocks{
@@ -23,15 +25,25 @@ var (
 	}
 )
 
-func IsBud(chainId string, height int64) bool {
-	forkBlocks, ok := chainForkBlocks[chainId]
-	if !ok {
-		return false
+func IsBTIP27(chainId string, height int64) bool {
+	h0 := int64(0)
+	if forkBlocks, ok := chainForkBlocks[chainId]; ok {
+		h0 = forkBlocks.BTIP27Block
 	}
-	return isBlockForked(forkBlocks.Bud, height)
+	// If there is no forkBlocks then `h0` is 0; BTIP27 is enabled by default.
+	return isBlockForked(h0, height)
+}
+
+func IsBTIP35(chainId string, height int64) bool {
+	h0 := int64(0)
+	if forkBlocks, ok := chainForkBlocks[chainId]; ok {
+		h0 = forkBlocks.BTIP35Block
+	}
+	// If there is no forkBlocks then `h0` is 0; BTIP27 is enabled by default.
+	return isBlockForked(h0, height)
 }
 
 func isBlockForked(h0, head int64) bool {
-
-	return head >= h0
+	// If `h0` is `0`, any `head` is forked.
+	return h0 <= head
 }
