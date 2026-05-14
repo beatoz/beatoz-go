@@ -89,6 +89,8 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		response.Value, xerr = ctrler.govCtrler.Query(req)
 	case "vm_call", "vm_estimate_gas":
 		response.Value, xerr = ctrler.vmCtrler.Query(req)
+	case "eth_getStorageAt":
+		response.Value, xerr = ctrler.vmCtrler.QueryStorageAt(req)
 	case "txn":
 		txn := ctrler.metaDB.Txn()
 		response.Value, xerr = []byte(fmt.Sprintf("\"%d\"", txn)), nil

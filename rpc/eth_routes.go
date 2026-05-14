@@ -9,4 +9,5 @@ func AddEthRoutes() {
 	tmrpccore.Routes["eth_chainId"] = tmrpccore_server.NewRPCFunc(EthChainId, "")
 	tmrpccore.Routes["eth_blockNumber"] = tmrpccore_server.NewRPCFunc(EthGetBlockNumber, "")
 	tmrpccore.Routes["eth_getBlockByNumber"] = tmrpccore_server.NewRPCFunc(EthGetBlockByNumber, "blockNumber, txDetails")
+	tmrpccore.Routes["eth_getStorageAt"] = tmrpccore_server.NewRPCFunc(EthGetStorageAt, "address,storageSlot,blockNumber")
 }

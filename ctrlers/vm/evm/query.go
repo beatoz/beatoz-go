@@ -49,6 +49,20 @@ func (ctrler *EVMCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.O
 	return retbz, nil
 }
 
+func (ctrler *EVMCtrler) QueryStorageAt(req abcitypes.RequestQuery) ([]byte, xerrors.XError) {
+	if len(req.Data) != types.AddrSize+common.HashLength {
+		return nil, xerrors.From(fmt.Errorf("invalid eth_getStorageAt query data length: %d", len(req.Data)))
+	}
+
+	addr := types.Address(req.Data[:types.AddrSize])
+	slot := common.BytesToHash(req.Data[types.AddrSize:])
+	value, xerr := ctrler.GetStorageAt(addr, slot, req.Height)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return value.Bytes(), nil
+}
+
 func (ctrler *EVMCtrler) GetCode(addr types.Address, height int64) ([]byte, xerrors.XError) {
 	state, xerr := ctrler.MemStateAt(height)
 	if xerr != nil {
@@ -57,6 +71,16 @@ func (ctrler *EVMCtrler) GetCode(addr types.Address, height int64) ([]byte, xerr
 
 	return state.GetCode(addr.Array20()), nil
 }
+
+func (ctrler *EVMCtrler) GetStorageAt(addr types.Address, slot common.Hash, height int64) (common.Hash, xerrors.XError) {
+	state, xerr := ctrler.MemStateAt(height)
+	if xerr != nil {
+		return common.Hash{}, xerr
+	}
+
+	return state.GetState(addr.Array20(), slot), nil
+}
+
 func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
 
 	// Get the stateDB at block<height> and the `stateDBWrapper` that has account ledger(acctCtrler)
