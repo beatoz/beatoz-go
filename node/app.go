@@ -490,6 +490,7 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 	// Parallel tx processing.
 	// Just request to create `TrxContext` with `req RequestDeliverTx`.
 	// The executions for this `req RequestDeliverTx` will be done in `EncBlockSync`
+	ctrler.currBlockCtx.AddTxsCnt(1)
 	ctrler.txExecutor.Add(
 		&req,
 		func(req *abcitypes.RequestDeliverTx, idx int) (*ctrlertypes.TrxContext, *abcitypes.ResponseDeliverTx) {
@@ -506,7 +507,7 @@ func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Res
 				}
 			}
 
-			ctrler.currBlockCtx.AddTxsCnt(1)
+			txctx.TxIdx = idx
 			return txctx, nil
 		},
 	)
@@ -629,8 +630,9 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 		ctrler.txExecutor.TrxPreparer.Wait()
 		// for debugging
 		if ctrler.txExecutor.TrxPreparer.resultCount() != ctrler.currBlockCtx.TxsCnt() {
-			panic(fmt.Sprintf("error: len(client.deliverTxReqs)(%v) != txs count in block(%v)",
-				ctrler.txExecutor.TrxPreparer.resultCount(), ctrler.currBlockCtx.TxsCnt()))
+			ctrler.logger.Error("transaction count mismatch",
+				"prepared", ctrler.txExecutor.TrxPreparer.resultCount(),
+				"blockTxs", ctrler.currBlockCtx.TxsCnt())
 		}
 
 		// Execute every transaction in its own `TrxContext` sequentially
