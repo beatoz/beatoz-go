@@ -134,6 +134,58 @@ func TestProposalDuplicate(t *testing.T) {
 	}
 }
 
+func TestInvalidGovParamsProposalValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*ctrlertypes.GovParamsProto)
+		wantMsg string
+	}{
+		{
+			name: "negative_max_validator_count",
+			mutate: func(v *ctrlertypes.GovParamsProto) {
+				v.MaxValidatorCnt = -1
+			},
+			wantMsg: "maxValidatorCnt",
+		},
+		{
+			name: "tx_fee_reward_rate_over_100",
+			mutate: func(v *ctrlertypes.GovParamsProto) {
+				v.TxFeeRewardRate = 200
+			},
+			wantMsg: "txFeeRewardRate",
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newGovParams := &ctrlertypes.GovParams{}
+			newGovParams.SetValue(tt.mutate)
+			bzOpt, err := jsonx.Marshal(newGovParams)
+			require.NoError(t, err)
+
+			tx := web3.NewTrxProposal(
+				vpowMock.PickAddress(vpowMock.ValCnt-1),
+				types.ZeroAddress(),
+				int64(100+i),
+				defMinGas,
+				defGasPrice,
+				"invalid govparams proposal",
+				10,
+				govCtrler.MinVotingPeriodBlocks(),
+				10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+				proposal.PROPOSAL_GOVPARAMS,
+				bzOpt,
+			)
+			require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
+
+			xerr := runTrx(makeTrxCtx(tx, 1, true))
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), xerr)
+			require.Contains(t, xerr.Error(), tt.wantMsg)
+		})
+	}
+}
+
 func TestOverflowBlockHeight(t *testing.T) {
 	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)

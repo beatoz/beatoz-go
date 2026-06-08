@@ -37,3 +37,59 @@ func Test_JsonCodec(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, jz, jz2)
 }
+
+func TestGovParamsValidateBasic(t *testing.T) {
+	require.NoError(t, DefaultGovParams().ValidateBasic())
+}
+
+func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*GovParamsProto)
+	}{
+		{
+			name: "negative_max_validator_count",
+			mutate: func(v *GovParamsProto) {
+				v.MaxValidatorCnt = -1
+			},
+		},
+		{
+			name: "zero_inflation_cycle_blocks",
+			mutate: func(v *GovParamsProto) {
+				v.InflationCycleBlocks = 0
+			},
+		},
+		{
+			name: "negative_inflation_cycle_blocks",
+			mutate: func(v *GovParamsProto) {
+				v.InflationCycleBlocks = -1
+			},
+		},
+		{
+			name: "negative_block_gas_limit",
+			mutate: func(v *GovParamsProto) {
+				v.BlockGasLimit = -1
+			},
+		},
+		{
+			name: "tx_fee_reward_rate_over_100",
+			mutate: func(v *GovParamsProto) {
+				v.TxFeeRewardRate = 200
+			},
+		},
+		{
+			name: "slash_rate_over_100",
+			mutate: func(v *GovParamsProto) {
+				v.SlashRate = 200
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := DefaultGovParams()
+			params.SetValue(tt.mutate)
+			require.Error(t, params.ValidateBasic())
+		})
+	}
+}
