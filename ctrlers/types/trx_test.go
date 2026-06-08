@@ -44,6 +44,48 @@ func TestTrxEncode(t *testing.T) {
 	require.Equal(t, bzTx0, bzTx1)
 }
 
+func TestTrxValidateInvalidSignature(t *testing.T) {
+	validSig := bytes.HexBytes(bytes.ZeroBytes(65))
+	tests := []struct {
+		name     string
+		sig      bytes.HexBytes
+		payer    types.Address
+		payerSig bytes.HexBytes
+	}{
+		{name: "nil_sender_sig", sig: nil},
+		{name: "one_byte_sender_sig", sig: bytes.HexBytes{0x01}},
+		{name: "sixty_four_byte_sender_sig", sig: bytes.HexBytes(bytes.ZeroBytes(64))},
+		{name: "sixty_six_byte_sender_sig", sig: bytes.HexBytes(bytes.ZeroBytes(66))},
+		{name: "nil_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: nil},
+		{name: "one_byte_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: bytes.HexBytes{0x01}},
+		{name: "sixty_four_byte_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: bytes.HexBytes(bytes.ZeroBytes(64))},
+		{name: "sixty_six_byte_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: bytes.HexBytes(bytes.ZeroBytes(66))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := &types2.Trx{
+				Version:  1,
+				Time:     time.Now().UnixNano(),
+				Nonce:    rand.Int63(),
+				From:     types.RandAddress(),
+				To:       types.RandAddress(),
+				Amount:   uint256.NewInt(0),
+				Gas:      rand.Int63(),
+				GasPrice: uint256.NewInt(rand.Uint64()),
+				Type:     types2.TRX_TRANSFER,
+				Sig:      tt.sig,
+				Payer:    tt.payer,
+				PayerSig: tt.payerSig,
+			}
+
+			xerr := tx.Validate()
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "unexpected error: %v", xerr)
+		})
+	}
+}
+
 func TestTrxDecodeWithMaliciousPayload(t *testing.T) {
 	// The malicious users can exploit this by submitting a large number of TRX_TRANSFER and TRX_STAKING transactions,
 	// each with a large payload but under 1MB in size.

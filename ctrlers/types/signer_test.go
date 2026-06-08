@@ -8,6 +8,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
+	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,56 @@ import (
 
 func init() {
 	ctrtypes.InitSigner(chainId)
+}
+
+func TestVerifyTrxRLPInvalidSignature(t *testing.T) {
+	tests := []struct {
+		name string
+		sig  bytes.HexBytes
+	}{
+		{name: "nil", sig: nil},
+		{name: "one_byte", sig: bytes.HexBytes{0x01}},
+		{name: "sixty_four_bytes", sig: bytes.HexBytes(bytes.ZeroBytes(64))},
+		{name: "invalid_v", sig: bytes.HexBytes(append(bytes.ZeroBytes(64), 99))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := &ctrtypes.Trx{Sig: tt.sig}
+			var xerr xerrors.XError
+
+			require.NotPanics(t, func() {
+				_, _, xerr = ctrtypes.VerifyTrxRLP(tx)
+			})
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "unexpected error: %v", xerr)
+		})
+	}
+}
+
+func TestVerifyPayerTrxRLPInvalidSignature(t *testing.T) {
+	tests := []struct {
+		name string
+		sig  bytes.HexBytes
+	}{
+		{name: "nil", sig: nil},
+		{name: "one_byte", sig: bytes.HexBytes{0x01}},
+		{name: "sixty_four_bytes", sig: bytes.HexBytes(bytes.ZeroBytes(64))},
+		{name: "invalid_v", sig: bytes.HexBytes(append(bytes.ZeroBytes(64), 99))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := &ctrtypes.Trx{PayerSig: tt.sig}
+			var xerr xerrors.XError
+
+			require.NotPanics(t, func() {
+				_, _, xerr = ctrtypes.VerifyPayerTrxRLP(tx)
+			})
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "unexpected error: %v", xerr)
+		})
+	}
 }
 
 func TestSignerV0_Recover(t *testing.T) {
