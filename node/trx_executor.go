@@ -18,7 +18,7 @@ type TrxExecutor struct {
 
 func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 	return &TrxExecutor{
-		TrxPreparer: newTrxPreparer(),
+		TrxPreparer: newTrxPreparer(logger),
 		logger:      logger,
 	}
 }

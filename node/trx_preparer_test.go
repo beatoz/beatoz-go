@@ -6,14 +6,16 @@ import (
 
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 var (
-	txPreparer = newTrxPreparer()
+	txPreparer = newTrxPreparer(log.NewNopLogger())
 	txReqs     []*abcitypes.RequestDeliverTx
 )
 
@@ -75,4 +77,59 @@ func TestNilResult(t *testing.T) {
 
 		txPreparer.reset()
 	}
+}
+
+func TestTrxPreparerPanic(t *testing.T) {
+	tp := newTrxPreparer(log.NewNopLogger())
+	tp.start()
+	defer tp.stop()
+
+	reqCount := len(tp.chReqParams) + 1
+	reqs := make([]*abcitypes.RequestDeliverTx, reqCount)
+	for i := 0; i < reqCount; i++ {
+		reqs[i] = &abcitypes.RequestDeliverTx{Tx: []byte{byte(i)}}
+		tp.Add(reqs[i], func(_ *abcitypes.RequestDeliverTx, idx int) (*types.TrxContext, *abcitypes.ResponseDeliverTx) {
+			if idx == 0 {
+				panic("prepare panic")
+			}
+			return &types.TrxContext{}, nil
+		})
+	}
+
+	done := make(chan struct{})
+	go func() {
+		tp.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("TrxPreparer.Wait() hung after prepare panic")
+	}
+
+	require.Equal(t, reqCount, tp.resultCount())
+
+	panicRet := tp.resultAt(0)
+	require.NotNil(t, panicRet)
+	require.Equal(t, 0, panicRet.idx)
+	require.Same(t, reqs[0], panicRet.reqDeliverTx)
+	require.Nil(t, panicRet.txctx)
+	require.NotNil(t, panicRet.resDeliverTx)
+
+	expectedErr := xerrors.ErrDeliverTx.Wrapf("transaction preparation failed")
+	require.Equal(t, expectedErr.Code(), panicRet.resDeliverTx.Code)
+	require.Equal(t, expectedErr.Error(), panicRet.resDeliverTx.Log)
+
+	for idx, ret := range tp.resultList() {
+		require.NotNil(t, ret, "result is nil at index %d", idx)
+		require.Equal(t, idx, ret.idx)
+		require.Same(t, reqs[idx], ret.reqDeliverTx)
+	}
+
+	// Index 0 and reqCount-1 are assigned to the same worker.
+	// A non-nil result confirms that the worker continued after recovering.
+	lastRet := tp.resultAt(reqCount - 1)
+	require.NotNil(t, lastRet.txctx)
+	require.Nil(t, lastRet.resDeliverTx)
 }

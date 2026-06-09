@@ -1,11 +1,15 @@
 package node
 
 import (
-	"github.com/beatoz/beatoz-go/ctrlers/types"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
+
+	"github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/types/xerrors"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 type requestParam struct {
@@ -34,13 +38,15 @@ type TrxPreparer struct {
 	started uint32 // atomic
 	stopped uint32 // atomic
 	mtx     sync.RWMutex
+	logger  log.Logger
 }
 
-func newTrxPreparer() *TrxPreparer {
+func newTrxPreparer(logger log.Logger) *TrxPreparer {
 	return &TrxPreparer{
 		WaitGroup:   &sync.WaitGroup{},
 		chDone:      make(chan struct{}),
 		chReqParams: make([]chan *requestParam, runtime.GOMAXPROCS(0)),
+		logger:      logger,
 	}
 }
 
@@ -48,7 +54,7 @@ func (tp *TrxPreparer) start() {
 	if atomic.CompareAndSwapUint32(&tp.started, 0, 1) {
 		for i := 0; i < len(tp.chReqParams); i++ {
 			tp.chReqParams[i] = make(chan *requestParam, 5000)
-			go trxPreparerRoutine(tp.chReqParams[i], tp.chDone, i)
+			go tp.trxPreparerRoutine(tp.chReqParams[i], tp.chDone, i)
 		}
 	}
 }
@@ -113,13 +119,44 @@ func (tp *TrxPreparer) resultList() []*resultValue {
 	return tp.resultValues
 }
 
-func trxPreparerRoutine(chReqParams chan *requestParam, done chan struct{}, no int) {
+func (tp *TrxPreparer) prepareSafe(param *requestParam, workerNo int) (ret *resultValue) {
+	ret = &resultValue{
+		idx:          param.idx,
+		reqDeliverTx: param.req,
+	}
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			xerr := xerrors.ErrDeliverTx.Wrapf("transaction preparation failed")
+			ret.txctx = nil
+			ret.resDeliverTx = &abcitypes.ResponseDeliverTx{
+				Code: xerr.Code(),
+				Log:  xerr.Error(),
+			}
+
+			if tp.logger != nil {
+				tp.logger.Error(
+					"panic while preparing transaction",
+					"worker", workerNo,
+					"txIndex", param.idx,
+					"panic", recovered,
+					"stack", string(debug.Stack()),
+				)
+			}
+		}
+	}()
+
+	ret.txctx, ret.resDeliverTx = param.onPrepare(param.req, param.idx)
+	return ret
+}
+
+func (tp *TrxPreparer) trxPreparerRoutine(chReqParams chan *requestParam, done chan struct{}, no int) {
 STOP:
 	for {
 		select {
 		case param := <-chReqParams:
-			_txctx, _resp := param.onPrepare(param.req, param.idx)
-			param.onCompleted(&resultValue{param.idx, param.req, _resp, _txctx})
+			ret := tp.prepareSafe(param, no)
+			param.onCompleted(ret)
 		case <-done:
 			break STOP
 		}
