@@ -196,34 +196,40 @@ func (ledger *MutableLedger) Del(key LedgerKey) xerrors.XError {
 	return nil
 }
 
-func (ledger *MutableLedger) Snapshot() int {
+func (ledger *MutableLedger) Snapshot() Snapshot {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	return ledger.revisions.snapshot()
 }
 
-func (ledger *MutableLedger) RevertToSnapshot(snap int) xerrors.XError {
+func (ledger *MutableLedger) RevertToSnapshot(snap Snapshot) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	restores := ledger.revisions.revs[snap:]
+	if xerr := ledger.revisions.validateSnapshot(snap); xerr != nil {
+		return xerr
+	}
+
+	// A failed restore can leave the tree partially reverted. Do not allow
+	// callers to read objects cached from before the revert attempt.
+	ledger.cachedObjs = make(map[string]ILedgerItem)
+
+	restores := ledger.revisions.revs[snap.revision:]
 	for i := len(restores) - 1; i >= 0; i-- {
 		kv := restores[i]
 		if kv.val != nil {
 			if _, err := ledger.tree.Set(kv.key, kv.val); err != nil {
-				return xerrors.From(err)
+				return xerrors.ErrFatalLedger.Wrap(
+					xerrors.Wrap(err, "revert snapshot set failed"),
+				)
 			}
-			restoreItem := ledger.newItemFor(kv.key)
-			if xerr := restoreItem.Decode(kv.key, kv.val); xerr != nil {
-				return xerr
-			}
-			ledger.cachedObjs[unsafe.String(&kv.key[0], len(kv.key))] = restoreItem
 		} else {
 			if _, _, err := ledger.tree.Remove(kv.key); err != nil {
-				return xerrors.From(err)
+				return xerrors.ErrFatalLedger.Wrap(
+					xerrors.Wrap(err, "revert snapshot remove failed"),
+				)
 			}
-			delete(ledger.cachedObjs, unsafe.String(&kv.key[0], len(kv.key)))
 		}
 	}
 	ledger.revisions.revert(snap)

@@ -131,12 +131,16 @@ func TestMemLedger_RevertToSnapshot_Set1(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		oriItems = append(oriItems, newItem(i, fmt.Sprintf("d%d", i)))
 	}
-	for _, it := range oriItems {
+	var firstSnap Snapshot
+	for i, it := range oriItems {
 		require.NoError(t, ledger.Set(it.Key(), it))
+		if i == 0 {
+			firstSnap = ledger.Snapshot()
+		}
 	}
 
 	snap := ledger.Snapshot()
-	require.Equal(t, 10000, snap)
+	require.Equal(t, 10000, snap.revision)
 
 	var newItems []*Item
 	for i := 0; i < 10000; i++ {
@@ -164,7 +168,7 @@ func TestMemLedger_RevertToSnapshot_Set1(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("d%d", i), item.(*Item).data)
 	}
 
-	require.NoError(t, ledger.RevertToSnapshot(1))
+	require.NoError(t, ledger.RevertToSnapshot(firstSnap))
 	k := make([]byte, 4)
 	binary.BigEndian.PutUint32(k, uint32(0))
 	item, xerr := ledger.Get(k)
@@ -185,18 +189,21 @@ func TestMemLedger_RevertToSnapshot_Set2(t *testing.T) {
 	require.NoError(t, xerr)
 
 	staticKey := 123
+	snapshots := make([]Snapshot, 10001)
+	snapshots[0] = ledger.Snapshot()
 	for i := 0; i < 10000; i++ {
 		// key 고정
 		item := newItem(staticKey, strconv.Itoa(i))
 		xerr := ledger.Set(item.Key(), item)
 		require.NoError(t, xerr)
+		snapshots[i+1] = ledger.Snapshot()
 	}
 
-	require.Equal(t, 10000, ledger.Snapshot())
+	require.Equal(t, 10000, ledger.Snapshot().revision)
 
 	for i := 10000; i >= 0; i-- {
 		// partially revert
-		require.NoError(t, ledger.RevertToSnapshot(i))
+		require.NoError(t, ledger.RevertToSnapshot(snapshots[i]))
 
 		k := make([]byte, 4)
 		binary.BigEndian.PutUint32(k, uint32(staticKey))
@@ -225,7 +232,7 @@ func TestMemLedger_RevertToSnapshot_Set_Updated(t *testing.T) {
 	require.NoError(t, xerr)
 
 	snap := ledger.Snapshot()
-	require.Equal(t, 1, snap)
+	require.Equal(t, 1, snap.revision)
 
 	_item0, xerr := ledger.Get(item.Key())
 	require.NoError(t, xerr)
@@ -259,7 +266,7 @@ func TestMemLedger_RevertToSnapshot_Del(t *testing.T) {
 
 	// get snapshot
 	snap := ledger.Snapshot()
-	require.Equal(t, 1, snap)
+	require.Equal(t, 1, snap.revision)
 
 	// delete item
 	require.NoError(t, ledger.Del(item.Key()))
@@ -272,4 +279,165 @@ func TestMemLedger_RevertToSnapshot_Del(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, item.Key(), _item.(*Item).Key())
 	require.Equal(t, item.data, _item.(*Item).data)
+}
+
+func TestMemLedger_RevertToSnapshot_DelCommittedItem(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	snap := ledger.Snapshot()
+	require.NoError(t, ledger.Del(preExistedItem.Key()))
+	require.Equal(t, snap.revision+1, ledger.Snapshot().revision)
+
+	_, xerr = ledger.Get(preExistedItem.Key())
+	require.Error(t, xerr)
+	require.True(t, xerr.Contains(xerrors.ErrNotFoundResult))
+
+	require.NoError(t, ledger.RevertToSnapshot(snap))
+	restored, xerr := ledger.Get(preExistedItem.Key())
+	require.NoError(t, xerr)
+	require.Equal(t, preExistedItem.data, restored.(*Item).data)
+}
+
+func TestMemLedger_DelDoesNotRecordDuplicateRevision(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	require.NoError(t, ledger.Del(preExistedItem.Key()))
+	afterFirstDelete := ledger.Snapshot()
+	require.NoError(t, ledger.Del(preExistedItem.Key()))
+	require.Equal(t, afterFirstDelete, ledger.Snapshot())
+
+	missingKey := newItem(987654, "").Key()
+	beforeMissingDelete := ledger.Snapshot()
+	require.NoError(t, ledger.Del(missingKey))
+	require.Equal(t, beforeMissingDelete, ledger.Snapshot())
+}
+
+func TestMemLedger_RevertToSnapshotRejectsInvalidSnapshot(t *testing.T) {
+	ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+	require.NoError(t, xerr)
+
+	t.Run("zero value", func(t *testing.T) {
+		require.NotPanics(t, func() {
+			xerr := ledger.RevertToSnapshot(Snapshot{})
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidSnapshot))
+		})
+	})
+
+	t.Run("foreign ledger", func(t *testing.T) {
+		otherLedger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+		require.NoError(t, xerr)
+
+		require.NotPanics(t, func() {
+			xerr = ledger.RevertToSnapshot(otherLedger.Snapshot())
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidSnapshot))
+		})
+	})
+
+	t.Run("generation mismatch", func(t *testing.T) {
+		snap := ledger.Snapshot()
+		snap.generation++
+
+		require.NotPanics(t, func() {
+			xerr := ledger.RevertToSnapshot(snap)
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidSnapshot))
+		})
+	})
+
+	t.Run("revision out of range", func(t *testing.T) {
+		snap := ledger.Snapshot()
+		snap.revision++
+
+		require.NotPanics(t, func() {
+			xerr := ledger.RevertToSnapshot(snap)
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidSnapshot))
+		})
+	})
+
+	t.Run("negative revision", func(t *testing.T) {
+		snap := ledger.Snapshot()
+		snap.revision = -1
+
+		require.NotPanics(t, func() {
+			xerr := ledger.RevertToSnapshot(snap)
+			require.Error(t, xerr)
+			require.True(t, xerr.Contains(xerrors.ErrInvalidSnapshot))
+		})
+	})
+}
+
+func TestMemLedger_SnapshotLifecycle(t *testing.T) {
+	newLedger := func(t *testing.T) *MemLedger {
+		t.Helper()
+
+		ledger, xerr := NewMemLedgerAt(1, sourceLedger, log.NewNopLogger())
+		require.NoError(t, xerr)
+		return ledger
+	}
+
+	t.Run("inner then outer revert", func(t *testing.T) {
+		ledger := newLedger(t)
+		key := newItem(701, "").Key()
+
+		require.NoError(t, ledger.Set(key, newItem(701, "base")))
+		outer := ledger.Snapshot()
+		require.NoError(t, ledger.Set(key, newItem(701, "outer")))
+		inner := ledger.Snapshot()
+		require.NoError(t, ledger.Set(key, newItem(701, "inner")))
+
+		require.NoError(t, ledger.RevertToSnapshot(inner))
+		requireSnapshotItemData(t, ledger, key, "outer")
+		require.NoError(t, ledger.RevertToSnapshot(outer))
+		requireSnapshotItemData(t, ledger, key, "base")
+	})
+
+	t.Run("outer then inner revert is rejected while out of range", func(t *testing.T) {
+		ledger := newLedger(t)
+		key := newItem(702, "").Key()
+
+		outer := ledger.Snapshot()
+		require.NoError(t, ledger.Set(key, newItem(702, "outer")))
+		inner := ledger.Snapshot()
+		require.NoError(t, ledger.Set(key, newItem(702, "inner")))
+
+		require.NoError(t, ledger.RevertToSnapshot(outer))
+		xerr := ledger.RevertToSnapshot(inner)
+		require.Error(t, xerr)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidSnapshot))
+	})
+
+	t.Run("same snapshot can be reused as no-op", func(t *testing.T) {
+		ledger := newLedger(t)
+		key := newItem(703, "").Key()
+
+		snap := ledger.Snapshot()
+		require.NoError(t, ledger.Set(key, newItem(703, "created")))
+		require.NoError(t, ledger.RevertToSnapshot(snap))
+		require.NoError(t, ledger.RevertToSnapshot(snap))
+
+		_, xerr := ledger.Get(key)
+		require.Error(t, xerr)
+		require.True(t, xerr.Contains(xerrors.ErrNotFoundResult))
+	})
+
+	t.Run("old marker is valid when revision position is reused", func(t *testing.T) {
+		ledger := newLedger(t)
+		firstKey := newItem(704, "").Key()
+		secondKey := newItem(705, "").Key()
+
+		outer := ledger.Snapshot()
+		require.NoError(t, ledger.Set(firstKey, newItem(704, "first")))
+		oldInner := ledger.Snapshot()
+		require.NoError(t, ledger.RevertToSnapshot(outer))
+
+		require.NoError(t, ledger.Set(secondKey, newItem(705, "second")))
+		require.Equal(t, oldInner.revision, ledger.Snapshot().revision)
+		require.NoError(t, ledger.RevertToSnapshot(oldInner))
+		requireSnapshotItemData(t, ledger, secondKey, "second")
+	})
 }

@@ -94,14 +94,14 @@ func (ledger *StateLedger) Del(key LedgerKey, exec bool) xerrors.XError {
 	return nil
 }
 
-func (ledger *StateLedger) Snapshot(exec bool) int {
+func (ledger *StateLedger) Snapshot(exec bool) Snapshot {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	return ledger.getLedger(exec).Snapshot()
 }
 
-func (ledger *StateLedger) RevertToSnapshot(snap int, exec bool) xerrors.XError {
+func (ledger *StateLedger) RevertToSnapshot(snap Snapshot, exec bool) xerrors.XError {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
