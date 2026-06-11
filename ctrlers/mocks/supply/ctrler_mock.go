@@ -43,6 +43,10 @@ func (mock *SupplyHandlerMock) RequestMint(bctx *types.BlockContext) {
 	panic("implement me")
 }
 
+func (mock *SupplyHandlerMock) TotalSupply() *uint256.Int {
+	return new(uint256.Int)
+}
+
 func (mock *SupplyHandlerMock) Burn(bctx *types.BlockContext, amt *uint256.Int) xerrors.XError {
 	return nil
 }

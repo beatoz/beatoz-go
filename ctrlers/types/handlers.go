@@ -110,6 +110,7 @@ type IVPowerHandler interface {
 type ISupplyHandler interface {
 	ITrxHandler
 	IBlockHandler
+	TotalSupply() *uint256.Int
 	RequestMint(bctx *BlockContext)
 	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError
 }

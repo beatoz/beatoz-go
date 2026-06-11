@@ -10,6 +10,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
 
@@ -132,6 +133,40 @@ func TestProposalDuplicate(t *testing.T) {
 	for i, c := range cases2 {
 		require.Error(t, xerrors.ErrDuplicatedKey, runCase(c), "index", i)
 	}
+}
+
+func TestInvalidMaxSupply(t *testing.T) {
+	newGovParams := &ctrlertypes.GovParams{}
+	newGovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.XMaxTotalSupply = uint256.NewInt(99).Bytes()
+	})
+	bzOpt, err := jsonx.Marshal(newGovParams)
+	require.NoError(t, err)
+
+	tx := web3.NewTrxProposal(
+		vpowMock.PickAddress(vpowMock.ValCnt-1),
+		types.ZeroAddress(),
+		200,
+		defMinGas,
+		defGasPrice,
+		"max supply below current supply",
+		10,
+		govCtrler.MinVotingPeriodBlocks(),
+		10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+		proposal.PROPOSAL_GOVPARAMS,
+		bzOpt,
+	)
+	require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
+
+	txctx := makeTrxCtx(tx, 1, true)
+	txctx.SupplyHandler = &proposalSupplyHandlerStub{
+		totalSupply: uint256.NewInt(100),
+	}
+
+	xerr := govCtrler.ValidateTrx(txctx)
+	require.Error(t, xerr)
+	require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), xerr)
+	require.Contains(t, xerr.Error(), "maxTotalSupply")
 }
 
 func TestOverflowBlockHeight(t *testing.T) {
