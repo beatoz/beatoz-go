@@ -12,6 +12,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
@@ -74,6 +75,14 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	var currentTotalSupply *uint256.Int
+	if ctx.Tx.GetType() == ctrlertypes.TRX_PROPOSAL {
+		txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
+		if ok && txpayload.OptType == proposal.PROPOSAL_GOVPARAMS {
+			currentTotalSupply = ctx.SupplyHandler.TotalSupply()
+		}
+	}
+
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -122,6 +131,9 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 				}
 				ctrlertypes.MergeGovParams(&ctrler.GovParams, checkGovParams)
 				if xerr := checkGovParams.ValidateBasic(); xerr != nil {
+					return xerrors.ErrInvalidTrxPayloadParams.Wrap(xerr)
+				}
+				if xerr := checkGovParams.ValidateCurrentSupply(currentTotalSupply); xerr != nil {
 					return xerrors.ErrInvalidTrxPayloadParams.Wrap(xerr)
 				}
 			}

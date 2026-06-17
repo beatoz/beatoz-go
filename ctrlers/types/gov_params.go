@@ -364,6 +364,19 @@ func (govParams *GovParams) MaxTotalSupply() *uint256.Int {
 
 	return new(uint256.Int).SetBytes(govParams._v.XMaxTotalSupply)
 }
+
+func (govParams *GovParams) ValidateCurrentSupply(currentTotalSupply *uint256.Int) xerrors.XError {
+	maxTotalSupply := govParams.MaxTotalSupply()
+	if maxTotalSupply.Cmp(currentTotalSupply) < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf(
+			"maxTotalSupply(%s) must be greater than or equal to currentTotalSupply(%s)",
+			maxTotalSupply.Dec(),
+			currentTotalSupply.Dec(),
+		)
+	}
+	return nil
+}
+
 func (govParams *GovParams) InflationWeightPermil() int32 {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()

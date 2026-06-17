@@ -190,6 +190,10 @@ func heightYears(height int64, intval int32) fxnum.FxNum {
 // When FxNum uses `robaho/fixed` package, it supports only up to 7 decimal places.
 // Therefore, you must always use the shopspring/decimal package for final quantity calculations.
 func Sd(scaledHeight fxnum.FxNum, lastSupply, smax *uint256.Int, lambda int32, wa fxnum.FxNum) decimal.Decimal {
+	if smax.Cmp(lastSupply) <= 0 {
+		return decimal.Zero
+	}
+
 	return decimalSd(scaledHeight, lastSupply, smax, lambda, wa)
 }
 
