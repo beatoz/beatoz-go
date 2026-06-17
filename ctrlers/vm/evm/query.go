@@ -90,7 +90,7 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		SkipAccountChecks: true,
 	}
 
-	blockContext := evmBlockContext(sender, math.MaxInt64, height, blockTime)
+	blockContext := evmBlockContext(sender, math.MaxInt64, height, blockTime, ctrler.blockHashProvider(height))
 
 	txContext := core.NewEVMTxContext(vmmsg)
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})

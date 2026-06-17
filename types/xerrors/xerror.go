@@ -81,6 +81,7 @@ var (
 	ErrNotVotingPeriod       = NewOrdinary("not voting period")
 	ErrDuplicatedKey         = NewOrdinary("already existed key")
 	ErrInvalidWeight         = NewOrdinary("invalid weight")
+	ErrBlockHashLookup       = NewOrdinary("failed to lookup block hash")
 )
 
 type XError interface {
