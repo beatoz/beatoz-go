@@ -69,6 +69,10 @@ func blockKey(h int64) []byte {
 	return []byte(fmt.Sprintf("bn%v", h))
 }
 
+func blockHashKey(h int64) []byte {
+	return []byte(fmt.Sprintf("bh%v", h))
+}
+
 type EVMCtrler struct {
 	vmevm          *ethvm.EVM
 	ethChainConfig *params.ChainConfig
@@ -77,9 +81,10 @@ type EVMCtrler struct {
 	acctHandler    ctrlertypes.IAccountHandler
 	blockGasPool   *ethcore.GasPool
 
-	metadb          tmdb.DB
-	lastRootHash    bytes.HexBytes
-	lastBlockHeight int64
+	metadb           tmdb.DB
+	lastRootHash     bytes.HexBytes
+	lastBlockHeight  int64
+	currentBlockHash common.Hash
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
@@ -140,8 +145,15 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
-	if ctrler.lastBlockHeight+1 != bctx.Height() {
-		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, bctx.Height())
+	height := bctx.Height()
+	blockInfo := bctx.BlockInfo()
+	if ctrler.lastBlockHeight+1 != height {
+		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, height)
+	}
+
+	prevBlockHash := common.BytesToHash(blockInfo.Header.LastBlockId.Hash)
+	if xerr := ctrler.syncPrevBlockHash(height, prevBlockHash); xerr != nil {
+		return nil, xerr
 	}
 
 	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, bctx.AcctHandler, ctrler.logger)
@@ -149,8 +161,15 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 		return nil, xerrors.From(err)
 	}
 
-	beneficiary := bytes.HexBytes(bctx.BlockInfo().Header.ProposerAddress).Array20()
-	blockContext := evmBlockContext(beneficiary, bctx.GetBlockGasLimit(), bctx.Height(), bctx.TimeSeconds())
+	beneficiary := bytes.HexBytes(blockInfo.Header.ProposerAddress).Array20()
+	ctrler.currentBlockHash = common.BytesToHash(blockInfo.Hash)
+	blockContext := evmBlockContext(
+		beneficiary,
+		bctx.GetBlockGasLimit(),
+		height,
+		bctx.TimeSeconds(),
+		ctrler.blockHashProvider(height),
+	)
 	ctrler.vmevm = ethvm.NewEVM(blockContext, ethvm.TxContext{
 		GasPrice: bctx.GovHandler.GasPrice().ToBig(),
 	}, stdb, ctrler.ethChainConfig, ethvm.Config{NoBaseFee: true})
@@ -158,6 +177,55 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 	ctrler.blockGasPool = bctx.GetBlockGasPool()
 
 	return nil, nil
+}
+
+func (ctrler *EVMCtrler) syncPrevBlockHash(height int64, hash common.Hash) xerrors.XError {
+	if height <= 1 || hash == (common.Hash{}) {
+		return nil
+	}
+
+	prevHeight := height - 1
+	storedHash, ok, err := ctrler.lookupBlockHash(prevHeight)
+	if err != nil {
+		return xerrors.ErrBlockHashLookup.Wrap(err)
+	}
+	if ok {
+		if storedHash != hash {
+			return xerrors.ErrBeginBlock.Wrapf(
+				"previous block hash mismatch - height: %d, stored: %x, header: %x",
+				prevHeight,
+				storedHash.Bytes(),
+				hash.Bytes(),
+			)
+		}
+		return nil
+	}
+
+	if err := ctrler.metadb.SetSync(blockHashKey(prevHeight), hash.Bytes()); err != nil {
+		return xerrors.From(err)
+	}
+	return nil
+}
+
+func (ctrler *EVMCtrler) blockHashProvider(currentHeight int64) ethvm.GetHashFunc {
+	return newBlockHashProvider(currentHeight, func(height int64) (common.Hash, bool) {
+		hash, ok, err := ctrler.lookupBlockHash(height)
+		if err != nil {
+			return common.Hash{}, false
+		}
+		return hash, ok
+	})
+}
+
+func (ctrler *EVMCtrler) lookupBlockHash(height int64) (common.Hash, bool, error) {
+	bz, err := ctrler.metadb.Get(blockHashKey(height))
+	if err != nil {
+		return common.Hash{}, false, err
+	}
+	if len(bz) != common.HashLength {
+		return common.Hash{}, false, nil
+	}
+	return common.BytesToHash(bz), true, nil
 }
 
 func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
@@ -418,6 +486,9 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	batch := ctrler.metadb.NewBatch()
 	batch.Set(lastBlockHeightKey, []byte(strconv.FormatInt(ctrler.lastBlockHeight, 10)))
 	batch.Set(blockKey(ctrler.lastBlockHeight), ctrler.lastRootHash)
+	if ctrler.currentBlockHash != (common.Hash{}) {
+		batch.Set(blockHashKey(ctrler.lastBlockHeight), ctrler.currentBlockHash.Bytes())
+	}
 	batch.WriteSync()
 	batch.Close()
 
