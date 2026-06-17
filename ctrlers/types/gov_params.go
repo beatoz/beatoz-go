@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -246,12 +247,25 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 	}
 
 	for k, v := range tmp {
-		if k == "maxTotalSupply" || k == "gasPrice" {
-			tmp[k] = base64.StdEncoding.EncodeToString(uint256.MustFromDecimal(v.(string)).Bytes())
-		} else if k == "deadAddress" || k == "rewardPoolAddress" {
-			_v, err := hex.DecodeString(v.(string))
+		switch k {
+		case "maxTotalSupply", "gasPrice", "deadAddress", "rewardPoolAddress":
+			strValue, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("invalid %s: expected string", k)
+			}
+
+			if k == "maxTotalSupply" || k == "gasPrice" {
+				_v, err := uint256.FromDecimal(strValue)
+				if err != nil {
+					return fmt.Errorf("invalid %s: %w", k, err)
+				}
+				tmp[k] = base64.StdEncoding.EncodeToString(_v.Bytes())
+				continue
+			}
+
+			_v, err := hex.DecodeString(strValue)
 			if err != nil {
-				return err
+				return fmt.Errorf("invalid %s: %w", k, err)
 			}
 			tmp[k] = base64.StdEncoding.EncodeToString(_v)
 		}
