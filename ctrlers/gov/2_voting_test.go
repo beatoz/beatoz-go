@@ -280,3 +280,43 @@ func TestApplyingProposal(t *testing.T) {
 	require.NotEqual(t, oriParams, govCtrler.GovParams)
 	require.True(t, govParams1.Equal(&govCtrler.GovParams))
 }
+
+func TestApplyInvalidGovParamsProposalRejected(t *testing.T) {
+	oriParams := govCtrler.GovParams
+	govCtrler.newGovParams = nil
+
+	invalidGovParams := &ctrlertypes.GovParams{}
+	invalidGovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxValidatorCnt = -1
+	})
+	bzOpt, err := jsonx.Marshal(invalidGovParams)
+	require.NoError(t, err)
+
+	txHash := bytes.RandBytes(32)
+	applyHeight := int64(100)
+	prop := proposal.NewGovProposal(proposal.PROPOSAL_GOVPARAMS, txHash, 1, 1, 1, applyHeight)
+	prop.AddOption(bzOpt)
+	require.NotNil(t, prop.UpdateMajorOption())
+
+	frozenKey := v1.LedgerKeyFrozenProp(txHash)
+	require.NoError(t, govCtrler.govState.Set(frozenKey, prop, true))
+
+	bctx := &ctrlertypes.BlockContext{}
+	bctx.SetHeight(applyHeight)
+	evts, xerr := govCtrler.EndBlock(bctx)
+	require.NoError(t, xerr)
+	require.Nil(t, govCtrler.newGovParams)
+	require.True(t, oriParams.Equal(&govCtrler.GovParams))
+
+	require.Len(t, evts, 1)
+	require.Equal(t, "proposal", evts[0].Type)
+	require.Len(t, evts[0].Attributes, 1)
+	require.Equal(t, "rejected", string(evts[0].Attributes[0].Key))
+
+	_, _, xerr = govCtrler.Commit()
+	require.NoError(t, xerr)
+
+	frozenProp, xerr := govCtrler.govState.Get(frozenKey, false)
+	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+	require.Nil(t, frozenProp)
+}

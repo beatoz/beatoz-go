@@ -50,7 +50,7 @@ func TestIncorrectProposal(t *testing.T) {
 	newGovParams := &types.GovParams{}
 	newGovParams.SetValue(func(v *types.GovParamsProto) {
 		v.Version = rand.Int32()
-		v.SlashRate = rand.Int32()
+		v.SlashRate = int32(rand.Intn(101))
 		v.XRewardPoolAddress = bytes.RandBytes(20)
 	})
 	bzOpt, err = jsonx.Marshal(newGovParams)
@@ -108,7 +108,7 @@ func TestProposalAndVoting(t *testing.T) {
 	newGovParams := &types.GovParams{}
 	newGovParams.SetValue(func(v *types.GovParamsProto) {
 		v.Version = rand.Int32()
-		v.SlashRate = rand.Int32()
+		v.SlashRate = int32(rand.Intn(101))
 		v.XRewardPoolAddress = bytes.RandBytes(20)
 	})
 	bzOpt, err := jsonx.Marshal(newGovParams)

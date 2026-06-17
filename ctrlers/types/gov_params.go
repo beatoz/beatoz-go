@@ -93,6 +93,115 @@ func (govParams *GovParams) Decode(k, v []byte) xerrors.XError {
 	return nil
 }
 
+func (govParams *GovParams) ValidateBasic() xerrors.XError {
+	govParams.mtx.RLock()
+	v := govParams._v
+	govParams.mtx.RUnlock()
+
+	if v.EmptyBlockIntervalSecs <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("emptyBlockIntervalSecs must be positive")
+	}
+	if v.MaxValidatorCnt <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxValidatorCnt must be positive")
+	}
+	if v.MinValidatorPower < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minValidatorPower must be non-negative")
+	}
+	if v.MinDelegatorPower < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minDelegatorPower must be non-negative")
+	}
+	if v.MaxValidatorsOfDelegator <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxValidatorsOfDelegator must be positive")
+	}
+	if v.MaxDelegatorsOfValidator <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxDelegatorsOfValidator must be positive")
+	}
+	if xerr := validatePercentRate("minSelfPowerRate", v.MinSelfPowerRate); xerr != nil {
+		return xerr
+	}
+	if xerr := validatePercentRate("maxUpdatablePowerRate", v.MaxUpdatablePowerRate); xerr != nil {
+		return xerr
+	}
+	if xerr := validatePercentRate("maxIndividualPowerRate", v.MaxIndividualPowerRate); xerr != nil {
+		return xerr
+	}
+	if v.MinBondingBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minBondingBlocks must be non-negative")
+	}
+	if v.MinSignedBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minSignedBlocks must be non-negative")
+	}
+	if v.LazyUnbondingBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("lazyUnbondingBlocks must be non-negative")
+	}
+	if new(uint256.Int).SetBytes(v.XMaxTotalSupply).IsZero() {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxTotalSupply must be positive")
+	}
+	if xerr := validatePermilRate("inflationWeightPermil", v.InflationWeightPermil); xerr != nil {
+		return xerr
+	}
+	if v.InflationCycleBlocks <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("inflationCycleBlocks must be positive")
+	}
+	if xerr := validatePermilRate("bondingBlocksWeightPermil", v.BondingBlocksWeightPermil); xerr != nil {
+		return xerr
+	}
+	if v.RipeningBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("ripeningBlocks must be non-negative")
+	}
+	if len(v.XRewardPoolAddress) != types.AddrSize {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("rewardPoolAddress must be %d bytes", types.AddrSize)
+	}
+	if len(v.XDeadAddress) != types.AddrSize {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("deadAddress must be %d bytes", types.AddrSize)
+	}
+	if xerr := validatePercentRate("validatorRewardRate", v.ValidatorRewardRate); xerr != nil {
+		return xerr
+	}
+	if xerr := validatePercentRate("txFeeRewardRate", v.TxFeeRewardRate); xerr != nil {
+		return xerr
+	}
+	if xerr := validatePercentRate("slashRate", v.SlashRate); xerr != nil {
+		return xerr
+	}
+	if new(uint256.Int).SetBytes(v.XGasPrice).IsZero() {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("gasPrice must be positive")
+	}
+	if v.MinTrxGas <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minTrxGas must be positive")
+	}
+	if v.BlockSizeLimit <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("blockSizeLimit must be positive")
+	}
+	if v.BlockGasLimit <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("blockGasLimit must be positive")
+	}
+	if v.MinVotingPeriodBlocks <= 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minVotingPeriodBlocks must be positive")
+	}
+	if v.MaxVotingPeriodBlocks < v.MinVotingPeriodBlocks {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxVotingPeriodBlocks must be greater than or equal to minVotingPeriodBlocks")
+	}
+	if v.LazyApplyingBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("lazyApplyingBlocks must be non-negative")
+	}
+	return nil
+}
+
+func validatePercentRate(name string, rate int32) xerrors.XError {
+	if rate < 0 || rate > 100 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("%s must be in [0, 100]", name)
+	}
+	return nil
+}
+
+func validatePermilRate(name string, rate int32) xerrors.XError {
+	if rate < 0 || rate > 1000 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("%s must be in [0, 1000]", name)
+	}
+	return nil
+}
+
 func (govParams *GovParams) MarshalJSON() ([]byte, error) {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
