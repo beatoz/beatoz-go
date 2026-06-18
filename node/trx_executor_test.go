@@ -10,6 +10,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -313,4 +314,153 @@ func Test_Payer(t *testing.T) {
 
 	actualSender = acctMock.FindAccount(sender.Address(), true)
 	require.Equal(t, expectedSenderBalance.Dec(), actualSender.GetBalance().Dec())
+}
+
+func Test_RunTrx_Rollback(t *testing.T) {
+	t.Run("failed_non_evm", func(t *testing.T) {
+		sender := web3.NewWallet(nil)
+		receiver := web3.NewWallet(nil)
+		gas := govMock.MinTrxGas()
+		amt := uint256.NewInt(100)
+		senderBalance := uint256.NewInt(balance)
+
+		acctHandler := newFailingAcctHandler(
+			accountWithBalance(sender.Address(), senderBalance),
+			accountWithBalance(receiver.Address(), uint256.NewInt(0)),
+		)
+		acctHandler.executeErr = xerrors.ErrInvalidTrx
+		bctx := mocks.InitBlockCtxWith(chainId.Hex(), 1, govMock, acctHandler, nil, nil, nil)
+		bctx.SetBlockGasLimit(gas * 10)
+
+		tx := web3.NewTrxTransfer(sender.Address(), receiver.Address(), 0, gas, govMock.GasPrice(), amt)
+		_, _, err := sender.SignTrxRLP(tx, chainId.Hex())
+		require.NoError(t, err)
+		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+		require.NoError(t, xerr)
+
+		xerr = runTrx(txctx)
+		require.Error(t, xerr)
+		require.Equal(t, 1, acctHandler.SnapshotCount())
+		require.Equal(t, 1, acctHandler.RevertCount())
+		require.Equal(t, gas, txctx.GasUsed)
+		require.Equal(t, gas, bctx.GetBlockGasUsed())
+
+		fee := types.GasToFee(gas, govMock.GasPrice())
+		expectedSenderBalance := new(uint256.Int).Sub(senderBalance, fee)
+		actualSender := acctHandler.FindAccount(sender.Address(), true)
+		require.Equal(t, expectedSenderBalance.Dec(), actualSender.GetBalance().Dec())
+		require.Equal(t, int64(1), actualSender.GetNonce())
+
+		actualReceiver := acctHandler.FindAccount(receiver.Address(), true)
+		require.Equal(t, "0", actualReceiver.GetBalance().Dec())
+	})
+
+	t.Run("rollback_panic", func(t *testing.T) {
+		sender := web3.NewWallet(nil)
+		receiver := web3.NewWallet(nil)
+		gas := govMock.MinTrxGas()
+
+		acctHandler := newFailingAcctHandler(
+			accountWithBalance(sender.Address(), uint256.NewInt(balance)),
+			accountWithBalance(receiver.Address(), uint256.NewInt(0)),
+		)
+		acctHandler.executeErr = xerrors.ErrInvalidTrx
+		acctHandler.revertErr = xerrors.ErrInvalidSnapshot
+		bctx := mocks.InitBlockCtxWith(chainId.Hex(), 1, govMock, acctHandler, nil, nil, nil)
+		bctx.SetBlockGasLimit(gas * 10)
+
+		tx := web3.NewTrxTransfer(sender.Address(), receiver.Address(), 0, gas, govMock.GasPrice(), uint256.NewInt(100))
+		_, _, err := sender.SignTrxRLP(tx, chainId.Hex())
+		require.NoError(t, err)
+		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+		require.NoError(t, xerr)
+
+		require.Panics(t, func() {
+			_ = runTrx(txctx)
+		})
+		require.Equal(t, int64(0), bctx.GetBlockGasUsed())
+	})
+
+	t.Run("evm_skip", func(t *testing.T) {
+		sender := web3.NewWallet(nil)
+		receiver := web3.NewWallet(nil)
+		gas := govMock.MinTrxGas()
+		receiverAcct := accountWithBalance(receiver.Address(), uint256.NewInt(0))
+		receiverAcct.SetCode([]byte{0x01})
+
+		acctHandler := newFailingAcctHandler(
+			accountWithBalance(sender.Address(), uint256.NewInt(balance)),
+			receiverAcct,
+		)
+		evmHandler := &errEVMHandler{xerr: xerrors.ErrInvalidTrx}
+		bctx := mocks.InitBlockCtxWith(chainId.Hex(), 1, govMock, acctHandler, evmHandler, nil, nil)
+		bctx.SetBlockGasLimit(gas * 10)
+
+		tx := web3.NewTrxTransfer(sender.Address(), receiver.Address(), 0, gas, govMock.GasPrice(), uint256.NewInt(100))
+		_, _, err := sender.SignTrxRLP(tx, chainId.Hex())
+		require.NoError(t, err)
+		txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, false)
+		require.NoError(t, xerr)
+
+		require.Error(t, runTrx(txctx))
+		require.Equal(t, 0, acctHandler.SnapshotCount())
+		require.Equal(t, 1, evmHandler.executeCount)
+		require.Equal(t, int64(0), bctx.GetBlockGasUsed())
+	})
+}
+
+type failingAcctHandler struct {
+	*acct.AcctHandlerMock
+	executeErr xerrors.XError
+	revertErr  xerrors.XError
+}
+
+func newFailingAcctHandler(accounts ...*ctrlertypes.Account) *failingAcctHandler {
+	ret := &failingAcctHandler{
+		AcctHandlerMock: acct.NewAcctHandlerMock(0),
+	}
+	for _, acct := range accounts {
+		ret.AddAccount(acct.Clone())
+	}
+	return ret
+}
+
+func accountWithBalance(addr types.Address, balance *uint256.Int) *ctrlertypes.Account {
+	acct := ctrlertypes.NewAccount(addr)
+	acct.SetBalance(balance)
+	return acct
+}
+
+func (handler *failingAcctHandler) RevertToSnapshot(snap v1.Snapshot, exec bool) xerrors.XError {
+	if handler.revertErr != nil {
+		return handler.revertErr
+	}
+	return handler.AcctHandlerMock.RevertToSnapshot(snap, exec)
+}
+
+func (handler *failingAcctHandler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
+		return xerr
+	}
+	if xerr := handler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
+		return xerr
+	}
+	if handler.executeErr != nil {
+		return handler.executeErr
+	}
+	if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+		return xerr
+	}
+	return handler.SetAccount(ctx.Receiver, ctx.Exec)
+}
+
+type errEVMHandler struct {
+	ctrlertypes.IEVMHandler
+	xerr         xerrors.XError
+	executeCount int
+}
+
+func (handler *errEVMHandler) ExecuteTrx(*ctrlertypes.TrxContext) xerrors.XError {
+	handler.executeCount++
+	return handler.xerr
 }

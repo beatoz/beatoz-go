@@ -2,6 +2,7 @@ package acct
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -11,8 +12,16 @@ import (
 )
 
 type AcctHandlerMock struct {
+	wallets     []*web3.Wallet
+	accounts    []*ctrlertypes.Account // has no private key
+	snapshots   []acctHandlerSnapshot
+	snapshotCnt int
+	revertCnt   int
+}
+
+type acctHandlerSnapshot struct {
 	wallets  []*web3.Wallet
-	accounts []*ctrlertypes.Account // has no private key
+	accounts []*ctrlertypes.Account
 }
 
 func NewAcctHandlerMock(walCnt int) *AcctHandlerMock {
@@ -144,7 +153,57 @@ func (mock *AcctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHand
 	return &AcctHandlerMock{}, nil
 }
 func (mock *AcctHandlerMock) SetAccount(acct *ctrlertypes.Account, b bool) xerrors.XError {
+	if w := mock.FindWallet(acct.Address); w != nil {
+		copyAccount(w.GetAccount(), acct)
+		return nil
+	}
+	for i, old := range mock.accounts {
+		if acct.Address.Compare(old.Address) == 0 {
+			mock.accounts[i] = acct.Clone()
+			return nil
+		}
+	}
+	mock.accounts = append(mock.accounts, acct.Clone())
 	return nil
+}
+
+func (mock *AcctHandlerMock) Snapshot(bool) v1.Snapshot {
+	mock.snapshotCnt++
+	mock.snapshots = append(mock.snapshots, acctHandlerSnapshot{
+		wallets:  cloneWallets(mock.wallets),
+		accounts: cloneAccounts(mock.accounts),
+	})
+	return v1.Snapshot{}
+}
+
+func (mock *AcctHandlerMock) RevertToSnapshot(v1.Snapshot, bool) xerrors.XError {
+	if len(mock.snapshots) == 0 {
+		return xerrors.ErrInvalidSnapshot
+	}
+	mock.revertCnt++
+	snap := mock.snapshots[len(mock.snapshots)-1]
+	mock.snapshots = mock.snapshots[:len(mock.snapshots)-1]
+
+	if len(mock.wallets) > len(snap.wallets) {
+		mock.wallets = mock.wallets[:len(snap.wallets)]
+	}
+	for i, snapWallet := range snap.wallets {
+		if i < len(mock.wallets) {
+			copyAccount(mock.wallets[i].GetAccount(), snapWallet.GetAccount())
+		} else {
+			mock.wallets = append(mock.wallets, snapWallet.Clone())
+		}
+	}
+	mock.accounts = cloneAccounts(snap.accounts)
+	return nil
+}
+
+func (mock *AcctHandlerMock) SnapshotCount() int {
+	return mock.snapshotCnt
+}
+
+func (mock *AcctHandlerMock) RevertCount() int {
+	return mock.revertCnt
 }
 
 func (mock *AcctHandlerMock) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
@@ -176,4 +235,29 @@ func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	return nil
 }
 
+func cloneWallets(src []*web3.Wallet) []*web3.Wallet {
+	ret := make([]*web3.Wallet, len(src))
+	for i, w := range src {
+		ret[i] = w.Clone()
+	}
+	return ret
+}
+
+func cloneAccounts(src []*ctrlertypes.Account) []*ctrlertypes.Account {
+	ret := make([]*ctrlertypes.Account, len(src))
+	for i, acct := range src {
+		ret[i] = acct.Clone()
+	}
+	return ret
+}
+
+func copyAccount(dst, src *ctrlertypes.Account) {
+	dst.SetName(src.GetName())
+	dst.SetDocURL(src.GetDocURL())
+	dst.SetNonce(src.GetNonce())
+	dst.SetBalance(src.GetBalance())
+	dst.SetCode(src.GetCode())
+}
+
 var _ ctrlertypes.IAccountHandler = (*AcctHandlerMock)(nil)
+var _ ctrlertypes.ITrxLedgerSnapshotter = (*AcctHandlerMock)(nil)

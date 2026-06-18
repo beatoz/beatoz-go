@@ -153,7 +153,7 @@ func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	if xerr != nil && rollbackEnabled {
 		executeErr := xerr
 		if rollbackErr := revertTrxLedgers(snaps, ctx.Exec); rollbackErr != nil {
-			return rollbackErr.Wrap(executeErr)
+			panic(rollbackErr.Wrap(executeErr))
 		}
 		if reloadErr := reloadTrxAccounts(ctx); reloadErr != nil {
 			return reloadErr.Wrap(executeErr)
