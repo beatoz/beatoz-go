@@ -36,6 +36,12 @@ func Test_Contains(t *testing.T) {
 	require.False(t, xerr1.Contains(xerrNotContained))
 }
 
+func Test_FatalLedger(t *testing.T) {
+	xerr := ErrFatalLedger.Wrap(errors.New("revert snapshot set failed"))
+
+	require.True(t, xerr.Contains(ErrFatalLedger))
+}
+
 func Test_Equal(t *testing.T) {
 	xerr := ErrNotFoundResult
 	require.Equal(t, ErrNotFoundResult, xerr)

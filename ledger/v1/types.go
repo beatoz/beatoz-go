@@ -10,6 +10,14 @@ import (
 type FuncNewItemFor func(LedgerKey) ILedgerItem
 type FuncIterate func(LedgerKey, ILedgerItem) xerrors.XError
 
+// Snapshot is an opaque handle to a ledger revision position.
+// Its lifecycle and validity are managed by the ledger that issued it.
+type Snapshot struct {
+	ledgerID   uint64
+	generation uint64
+	revision   int
+}
+
 type IGettable interface {
 	Get(LedgerKey) (ILedgerItem, xerrors.XError)
 	Iterate(FuncIterate) xerrors.XError
@@ -19,8 +27,8 @@ type IGettable interface {
 type ISettable interface {
 	Set(LedgerKey, ILedgerItem) xerrors.XError
 	Del(LedgerKey) xerrors.XError
-	Snapshot() int
-	RevertToSnapshot(int) xerrors.XError
+	Snapshot() Snapshot
+	RevertToSnapshot(Snapshot) xerrors.XError
 }
 
 type ICommittable interface {
@@ -47,8 +55,8 @@ type IStateLedger interface {
 	Iterate(FuncIterate, bool) xerrors.XError
 	Seek([]byte, bool, FuncIterate, bool) xerrors.XError
 	Set(LedgerKey, ILedgerItem, bool) xerrors.XError
-	Snapshot(bool) int
-	RevertToSnapshot(int, bool) xerrors.XError
+	Snapshot(bool) Snapshot
+	RevertToSnapshot(Snapshot, bool) xerrors.XError
 	Del(LedgerKey, bool) xerrors.XError
 	Commit() ([]byte, int64, xerrors.XError)
 	Close() xerrors.XError

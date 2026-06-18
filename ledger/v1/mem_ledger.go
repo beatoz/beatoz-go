@@ -188,27 +188,39 @@ func (ledger *MemLedger) Del(key LedgerKey) xerrors.XError {
 	defer ledger.mtx.Unlock()
 
 	keystr := unsafe.String(&key[0], len(key))
-	if oldVal, ok := ledger.memStorage[keystr]; ok {
-		ledger.revisions.set(key, oldVal)
+	oldVal, ok := ledger.memStorage[keystr]
+	if !ok && ledger.immuTree != nil {
+		var err error
+		oldVal, err = ledger.immuTree.Get(key)
+		if err != nil {
+			return xerrors.From(err)
+		}
+	}
+	if oldVal == nil {
+		return nil
 	}
 
+	ledger.revisions.set(key, oldVal)
 	ledger.memStorage[keystr] = nil // delete from memory. don't read from immuTree.
-
 	return nil
 }
 
-func (ledger *MemLedger) Snapshot() int {
+func (ledger *MemLedger) Snapshot() Snapshot {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()
 
 	return ledger.revisions.snapshot()
 }
 
-func (ledger *MemLedger) RevertToSnapshot(snap int) xerrors.XError {
+func (ledger *MemLedger) RevertToSnapshot(snap Snapshot) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	restores := ledger.revisions.revs[snap:]
+	if xerr := ledger.revisions.validateSnapshot(snap); xerr != nil {
+		return xerr
+	}
+
+	restores := ledger.revisions.revs[snap.revision:]
 	for i := len(restores) - 1; i >= 0; i-- {
 		kv := restores[i]
 		keystr := unsafe.String(&kv.key[0], len(kv.key))
