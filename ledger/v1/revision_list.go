@@ -28,6 +28,7 @@ func newSnapshotList[T any]() *revisionList[T] {
 		generation: 1,
 	}
 }
+
 func (revlist *revisionList[T]) set(key []byte, val T) {
 	revlist.revs = append(revlist.revs, &kvPair[T]{
 		key: key,

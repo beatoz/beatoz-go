@@ -152,7 +152,7 @@ func (mock *AcctHandlerMock) SetBalance(addr types.Address, amt *uint256.Int, ex
 func (mock *AcctHandlerMock) SimuAcctCtrlerAt(i int64) (ctrlertypes.IAccountHandler, xerrors.XError) {
 	return &AcctHandlerMock{}, nil
 }
-func (mock *AcctHandlerMock) SetAccount(acct *ctrlertypes.Account, b bool) xerrors.XError {
+func (mock *AcctHandlerMock) SetAccount(acct *ctrlertypes.Account, _ bool) xerrors.XError {
 	if w := mock.FindWallet(acct.Address); w != nil {
 		copyAccount(w.GetAccount(), acct)
 		return nil
