@@ -149,7 +149,22 @@ func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	return nil
 }
 
+func (ctrler *SupplyCtrler) Snapshot(exec bool) v1.Snapshot {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.supplyState.Snapshot(exec)
+}
+
+func (ctrler *SupplyCtrler) RevertToSnapshot(snap v1.Snapshot, exec bool) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.supplyState.RevertToSnapshot(snap, exec)
+}
+
 var _ ctrlertypes.ISupplyHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.ILedgerHandler = (*SupplyCtrler)(nil)
+var _ ctrlertypes.ITrxLedgerSnapshotter = (*SupplyCtrler)(nil)

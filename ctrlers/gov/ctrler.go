@@ -379,6 +379,20 @@ func (ctrler *GovCtrler) Close() xerrors.XError {
 	return nil
 }
 
+func (ctrler *GovCtrler) Snapshot(exec bool) v1.Snapshot {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.govState.Snapshot(exec)
+}
+
+func (ctrler *GovCtrler) RevertToSnapshot(snap v1.Snapshot, exec bool) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.govState.RevertToSnapshot(snap, exec)
+}
+
 func (ctrler *GovCtrler) ReadAllProposals(exec bool) ([]*proposal.GovProposal, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
@@ -418,3 +432,4 @@ var _ ctrlertypes.ILedgerHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*GovCtrler)(nil)
 var _ ctrlertypes.IGovParams = (*GovCtrler)(nil)
+var _ ctrlertypes.ITrxLedgerSnapshotter = (*GovCtrler)(nil)

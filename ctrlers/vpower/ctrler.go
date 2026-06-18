@@ -487,7 +487,22 @@ func (ctrler *VPowerCtrler) ImitableState(h int64) (v1.IImitable, xerrors.XError
 	return ctrler.vpowerState.ImitableLedgerAt(h)
 }
 
+func (ctrler *VPowerCtrler) Snapshot(exec bool) v1.Snapshot {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.vpowerState.Snapshot(exec)
+}
+
+func (ctrler *VPowerCtrler) RevertToSnapshot(snap v1.Snapshot, exec bool) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.vpowerState.RevertToSnapshot(snap, exec)
+}
+
 var _ ctrlertypes.ILedgerHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IVPowerHandler = (*VPowerCtrler)(nil)
+var _ ctrlertypes.ITrxLedgerSnapshotter = (*VPowerCtrler)(nil)

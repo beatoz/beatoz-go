@@ -1,6 +1,7 @@
 package types
 
 import (
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -25,6 +26,11 @@ type IBlockHandler interface {
 type ITrxHandler interface {
 	ValidateTrx(*TrxContext) xerrors.XError
 	ExecuteTrx(*TrxContext) xerrors.XError
+}
+
+type ITrxLedgerSnapshotter interface {
+	Snapshot(exec bool) v1.Snapshot
+	RevertToSnapshot(snap v1.Snapshot, exec bool) xerrors.XError
 }
 
 type IGovParams interface {

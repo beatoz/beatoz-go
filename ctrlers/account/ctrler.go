@@ -307,6 +307,20 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 	return ctrler.setAccount(acct, exec)
 }
 
+func (ctrler *AcctCtrler) Snapshot(exec bool) v1.Snapshot {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.acctState.Snapshot(exec)
+}
+
+func (ctrler *AcctCtrler) RevertToSnapshot(snap v1.Snapshot, exec bool) xerrors.XError {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.acctState.RevertToSnapshot(snap, exec)
+}
+
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
 	return ctrler.acctState.Set(v1.LedgerKeyAccount(acct.Address), acct, exec)
 }
@@ -328,6 +342,7 @@ var _ btztypes.ILedgerHandler = (*AcctCtrler)(nil)
 var _ btztypes.ITrxHandler = (*AcctCtrler)(nil)
 var _ btztypes.IBlockHandler = (*AcctCtrler)(nil)
 var _ btztypes.IAccountHandler = (*AcctCtrler)(nil)
+var _ btztypes.ITrxLedgerSnapshotter = (*AcctCtrler)(nil)
 
 type SimuAcctCtrler struct {
 	simuLedger v1.IImitable

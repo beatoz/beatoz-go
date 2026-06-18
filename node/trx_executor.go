@@ -1,9 +1,11 @@
 package node
 
 import (
+	"errors"
 	"fmt"
 
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v1 "github.com/beatoz/beatoz-go/ledger/v1"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -14,6 +16,11 @@ import (
 type TrxExecutor struct {
 	*TrxPreparer
 	logger log.Logger
+}
+
+type trxLedgerSnapshot struct {
+	handler ctrlertypes.ITrxLedgerSnapshotter
+	snap    v1.Snapshot
 }
 
 func NewTrxExecutor(logger log.Logger) *TrxExecutor {
@@ -111,46 +118,131 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	var xerr xerrors.XError
-	defer func() {
-		if ctx.Exec || xerr == nil {
-			_xerr0 := postRunTrx(ctx)
-			if xerr != nil {
-				xerr = xerr.Wrap(_xerr0)
-			} else {
-				xerr = _xerr0
-			}
-		}
-	}()
+	snaps, rollbackEnabled := snapshotTrxLedgers(ctx)
 
+	var xerr xerrors.XError
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
 		if xerr = ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
-			return xerr
+			break
 		}
 	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
 		if xerr = ctx.GovHandler.ExecuteTrx(ctx); xerr != nil {
-			return xerr
+			break
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
 		if ctx.IsHandledByEVM() {
 			if xerr = ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
-				return xerr
+				break
 			}
 		} else if xerr = ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil {
-			return xerr
+			break
 		}
 	case ctrlertypes.TRX_WITHDRAW:
 		if xerr = ctx.SupplyHandler.ExecuteTrx(ctx); xerr != nil {
-			return xerr
+			break
 		}
 	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
 		if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
-			return xerr
+			break
 		}
 	default:
-		return xerrors.ErrUnknownTrxType
+		xerr = xerrors.ErrUnknownTrxType
 	}
+
+	if xerr != nil && rollbackEnabled {
+		executeErr := xerr
+		if rollbackErr := revertTrxLedgers(snaps, ctx.Exec); rollbackErr != nil {
+			return rollbackErr.Wrap(executeErr)
+		}
+		if reloadErr := reloadTrxAccounts(ctx); reloadErr != nil {
+			return reloadErr.Wrap(executeErr)
+		}
+		xerr = executeErr
+	}
+	if !ctx.Exec && xerr != nil {
+		return xerr
+	}
+
+	postErr := postRunTrx(ctx)
+	if postErr == nil {
+		return xerr
+	}
+	if xerr != nil {
+		return xerr.Wrap(postErr)
+	}
+	return postErr
+}
+
+func snapshotTrxLedgers(ctx *ctrlertypes.TrxContext) ([]trxLedgerSnapshot, bool) {
+	if ctx.IsHandledByEVM() {
+		return nil, false
+	}
+
+	handlers := trxSnapshotHandlers(ctx)
+	snaps := make([]trxLedgerSnapshot, 0, len(handlers))
+	for _, handler := range handlers {
+		snapshotter, ok := handler.(ctrlertypes.ITrxLedgerSnapshotter)
+		if !ok {
+			continue
+		}
+		snaps = append(snaps, trxLedgerSnapshot{
+			handler: snapshotter,
+			snap:    snapshotter.Snapshot(ctx.Exec),
+		})
+	}
+	return snaps, true
+}
+
+func trxSnapshotHandlers(ctx *ctrlertypes.TrxContext) []interface{} {
+	// Snapshot every non-EVM controller so rollback does not depend on static tx write-set mapping.
+	return []interface{}{
+		ctx.AcctHandler,
+		ctx.GovHandler,
+		ctx.SupplyHandler,
+		ctx.VPowerHandler,
+	}
+}
+
+func revertTrxLedgers(snaps []trxLedgerSnapshot, exec bool) xerrors.XError {
+	for i := len(snaps) - 1; i >= 0; i-- {
+		if xerr := snaps[i].handler.RevertToSnapshot(snaps[i].snap, exec); xerr != nil {
+			return xerr
+		}
+	}
+	return nil
+}
+
+func reloadTrxAccounts(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	sender := ctx.AcctHandler.FindAccount(ctx.Tx.From, ctx.Exec)
+	if sender == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", ctx.Tx.From)
+	}
+	ctx.Sender = sender
+
+	if ctx.Tx.PayerSig != nil {
+		payerAddr, _, xerr := ctrlertypes.VerifyPayerTrxRLP(ctx.Tx)
+		if xerr != nil {
+			return xerr.Wrap(errors.New("payer signature is invalid"))
+		}
+		payer := ctx.AcctHandler.FindAccount(payerAddr, ctx.Exec)
+		if payer == nil {
+			return xerrors.ErrNotFoundAccount.Wrapf("payer address: %v", payerAddr)
+		}
+		ctx.Payer = payer
+	} else {
+		ctx.Payer = ctx.Sender
+	}
+
+	toAddr := ctx.Tx.To
+	if toAddr == nil {
+		toAddr = types.ZeroAddress()
+	}
+	receiver := ctx.AcctHandler.FindOrNewAccount(toAddr, ctx.Exec)
+	if receiver == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", toAddr)
+	}
+	ctx.Receiver = receiver
 
 	return nil
 }
