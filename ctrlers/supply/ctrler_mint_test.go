@@ -9,6 +9,7 @@ import (
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
+	"github.com/beatoz/beatoz-go/libs/fxnum"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -16,6 +17,38 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSdSupplyLimit(t *testing.T) {
+	tests := []struct {
+		name          string
+		currentSupply uint64
+		maxSupply     uint64
+	}{
+		{
+			name:          "equal",
+			currentSupply: 100,
+			maxSupply:     100,
+		},
+		{
+			name:          "over",
+			currentSupply: 101,
+			maxSupply:     100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addedSupply := Sd(
+				fxnum.FromInt(1),
+				uint256.NewInt(tt.currentSupply),
+				uint256.NewInt(tt.maxSupply),
+				100,
+				fxnum.FromInt(1),
+			)
+			require.True(t, addedSupply.IsZero(), addedSupply)
+		})
+	}
+}
 
 func Test_Mint(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))

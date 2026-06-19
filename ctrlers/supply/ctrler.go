@@ -73,6 +73,13 @@ func (ctrler *SupplyCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
+func (ctrler *SupplyCtrler) TotalSupply() *uint256.Int {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	return ctrler.lastTotalSupply.GetTotalSupply()
+}
+
 func (ctrler *SupplyCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()

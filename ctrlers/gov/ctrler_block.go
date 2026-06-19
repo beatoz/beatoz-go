@@ -49,7 +49,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		return nil, xerr
 	}
 
-	applied, xerr := ctrler.applyProposals(ctx.Height())
+	applied, rejected, xerr := ctrler.applyProposals(ctx.Height())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -75,6 +75,14 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 			Type: "proposal",
 			Attributes: []types2.EventAttribute{
 				{Key: []byte("applied"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
+			},
+		})
+	}
+	for _, k := range rejected {
+		evts = append(evts, types2.Event{
+			Type: "proposal",
+			Attributes: []types2.EventAttribute{
+				{Key: []byte("rejected"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}

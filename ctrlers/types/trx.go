@@ -7,6 +7,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	"google.golang.org/protobuf/proto"
@@ -359,14 +360,14 @@ func (tx *Trx) Validate() xerrors.XError {
 	if tx.Payload != nil && tx.Type != tx.Payload.Type() {
 		return xerrors.ErrInvalidTrxPayloadType
 	}
-	if tx.Sig == nil {
-		return xerrors.ErrInvalidTrxSig
+	if len(tx.Sig) != ethcrypto.SignatureLength {
+		return xerrors.ErrInvalidTrxSig.Wrapf("sig length is invalid - expected: %d, actual: %d", ethcrypto.SignatureLength, len(tx.Sig))
 	}
 	if tx.Payer != nil && len(tx.Payer) != types.AddrSize {
 		return xerrors.ErrInvalidAddress.Wrapf("payer(%v)'s addr is invalid", tx.Payer)
 	}
-	if tx.Payer != nil && tx.PayerSig == nil {
-		return xerrors.ErrInvalidTrxSig.Wrapf("payer(%v)'s sig is nil", tx.Payer)
+	if tx.Payer != nil && len(tx.PayerSig) != ethcrypto.SignatureLength {
+		return xerrors.ErrInvalidTrxSig.Wrapf("payer(%v)'s sig length is invalid - expected: %d, actual: %d", tx.Payer, ethcrypto.SignatureLength, len(tx.PayerSig))
 	}
 	return nil
 }

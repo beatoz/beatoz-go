@@ -12,6 +12,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/holiman/uint256"
 	"github.com/tendermint/tendermint/libs/log"
 	"sync"
 )
@@ -74,6 +75,14 @@ func (ctrler *GovCtrler) InitLedger(req interface{}) xerrors.XError {
 }
 
 func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	var currentTotalSupply *uint256.Int
+	if ctx.Tx.GetType() == ctrlertypes.TRX_PROPOSAL {
+		txpayload, ok := ctx.Tx.Payload.(*ctrlertypes.TrxPayloadProposal)
+		if ok && txpayload.OptType == proposal.PROPOSAL_GOVPARAMS {
+			currentTotalSupply = ctx.SupplyHandler.TotalSupply()
+		}
+	}
+
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
@@ -115,10 +124,17 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		// check governance proposal consistency
 		if txpayload.OptType == proposal.PROPOSAL_GOVPARAMS {
 			//check options
-			checkGovParams := &ctrlertypes.GovParams{}
 			for _, option := range txpayload.Options {
+				checkGovParams := &ctrlertypes.GovParams{}
 				if err := jsonx.Unmarshal(option, checkGovParams); err != nil {
 					return xerrors.ErrInvalidTrxPayloadParams.Wrap(err)
+				}
+				ctrlertypes.MergeGovParams(&ctrler.GovParams, checkGovParams)
+				if xerr := checkGovParams.ValidateBasic(); xerr != nil {
+					return xerrors.ErrInvalidTrxPayloadParams.Wrap(xerr)
+				}
+				if xerr := checkGovParams.ValidateCurrentSupply(currentTotalSupply); xerr != nil {
+					return xerrors.ErrInvalidTrxPayloadParams.Wrap(xerr)
 				}
 			}
 		}
@@ -287,8 +303,9 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]v1.LedgerKey, []v1.Led
 }
 
 // applyProposals is called from EndBlock
-func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.XError) {
+func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, []v1.LedgerKey, xerrors.XError) {
 	var applied []v1.LedgerKey
+	var rejected []v1.LedgerKey
 
 	defer func() {
 		if ctrler.newGovParams != nil {
@@ -296,6 +313,10 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 		}
 
 		for _, k := range applied {
+			// remove
+			_ = ctrler.govState.Del(k, true)
+		}
+		for _, k := range rejected {
 			// remove
 			_ = ctrler.govState.Del(k, true)
 		}
@@ -310,6 +331,8 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 			if prop.MajorOption() == nil {
 				// not reachable.
 				ctrler.logger.Error("Apply proposal", "error", "major option is nil")
+				rejected = append(rejected, key)
+				return nil
 			}
 
 			switch prop.Header().PropType {
@@ -319,10 +342,16 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 				strOpt := string(prop.MajorOption().Option)
 				if err := jsonx.Unmarshal([]byte(strOpt), newGovParams); err != nil {
 					ctrler.logger.Error("Apply proposal", "error", err, "option", string(prop.MajorOption().Option))
-					return xerrors.From(err)
+					rejected = append(rejected, key)
+					return nil
 				}
 
 				ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
+				if xerr := newGovParams.ValidateBasic(); xerr != nil {
+					ctrler.logger.Error("Apply proposal", "error", xerr, "option", string(prop.MajorOption().Option))
+					rejected = append(rejected, key)
+					return nil
+				}
 				ctrler.newGovParams = newGovParams
 			default:
 				ctrler.logger.Debug("Apply proposal", "key(txHash)", prop.Header().TxHash, "type", prop.Header().PropType)
@@ -334,7 +363,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]v1.LedgerKey, xerrors.X
 		return nil
 	}, true)
 
-	return applied, xerr
+	return applied, rejected, xerr
 }
 
 func (ctrler *GovCtrler) Close() xerrors.XError {

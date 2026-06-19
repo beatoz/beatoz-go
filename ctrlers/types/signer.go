@@ -6,6 +6,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 )
@@ -40,6 +41,9 @@ func getSigner(v byte) (ISigner, xerrors.XError) {
 }
 
 func VerifyTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
+	if len(tx.Sig) != ethcrypto.SignatureLength {
+		return nil, nil, xerrors.ErrInvalidTrxSig.Wrapf("sig length is invalid - expected: %d, actual: %d", ethcrypto.SignatureLength, len(tx.Sig))
+	}
 	signer, xerr := getSigner(tx.Sig[64])
 	if xerr != nil {
 		return nil, nil, xerr
@@ -48,6 +52,9 @@ func VerifyTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
 }
 
 func VerifyPayerTrxRLP(tx *Trx) (types.Address, bytes.HexBytes, xerrors.XError) {
+	if len(tx.PayerSig) != ethcrypto.SignatureLength {
+		return nil, nil, xerrors.ErrInvalidTrxSig.Wrapf("payer sig length is invalid - expected: %d, actual: %d", ethcrypto.SignatureLength, len(tx.PayerSig))
+	}
 	signer, xerr := getSigner(tx.PayerSig[64])
 	if xerr != nil {
 		return nil, nil, xerr
