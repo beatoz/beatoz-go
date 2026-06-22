@@ -484,13 +484,32 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	ctrler.lastRootHash = rootHash[:]
 
 	batch := ctrler.metadb.NewBatch()
-	batch.Set(lastBlockHeightKey, []byte(strconv.FormatInt(ctrler.lastBlockHeight, 10)))
-	batch.Set(blockKey(ctrler.lastBlockHeight), ctrler.lastRootHash)
-	if ctrler.currentBlockHash != (common.Hash{}) {
-		batch.Set(blockHashKey(ctrler.lastBlockHeight), ctrler.currentBlockHash.Bytes())
+	closeBatch := func(cause error) xerrors.XError {
+		if err := batch.Close(); err != nil {
+			return xerrors.From(err)
+		}
+		if cause != nil {
+			return xerrors.From(cause)
+		}
+		return nil
 	}
-	batch.WriteSync()
-	batch.Close()
+	if err := batch.Set(lastBlockHeightKey, []byte(strconv.FormatInt(ctrler.lastBlockHeight, 10))); err != nil {
+		return nil, ctrler.lastBlockHeight, closeBatch(err)
+	}
+	if err := batch.Set(blockKey(ctrler.lastBlockHeight), ctrler.lastRootHash); err != nil {
+		return nil, ctrler.lastBlockHeight, closeBatch(err)
+	}
+	if ctrler.currentBlockHash != (common.Hash{}) {
+		if err := batch.Set(blockHashKey(ctrler.lastBlockHeight), ctrler.currentBlockHash.Bytes()); err != nil {
+			return nil, ctrler.lastBlockHeight, closeBatch(err)
+		}
+	}
+	if err := batch.WriteSync(); err != nil {
+		return nil, ctrler.lastBlockHeight, closeBatch(err)
+	}
+	if xerr := closeBatch(nil); xerr != nil {
+		return nil, ctrler.lastBlockHeight, xerr
+	}
 
 	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, ctrler.acctHandler, ctrler.logger)
 	if err != nil {
