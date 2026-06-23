@@ -81,10 +81,10 @@ type EVMCtrler struct {
 	acctHandler    ctrlertypes.IAccountHandler
 	blockGasPool   *ethcore.GasPool
 
-	metadb           tmdb.DB
-	lastRootHash     bytes.HexBytes
-	lastBlockHeight  int64
-	currentBlockHash common.Hash
+	metadb          tmdb.DB
+	lastRootHash    bytes.HexBytes
+	lastBlockHash   common.Hash
+	lastBlockHeight int64
 
 	logger tmlog.Logger
 	mtx    sync.RWMutex
@@ -162,7 +162,7 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 	}
 
 	beneficiary := bytes.HexBytes(blockInfo.Header.ProposerAddress).Array20()
-	ctrler.currentBlockHash = common.BytesToHash(blockInfo.Hash)
+	ctrler.lastBlockHash = common.BytesToHash(blockInfo.Hash)
 	blockContext := evmBlockContext(
 		beneficiary,
 		bctx.GetBlockGasLimit(),
@@ -499,8 +499,8 @@ func (ctrler *EVMCtrler) Commit() ([]byte, int64, xerrors.XError) {
 	if err := batch.Set(blockKey(ctrler.lastBlockHeight), ctrler.lastRootHash); err != nil {
 		return nil, ctrler.lastBlockHeight, closeBatch(err)
 	}
-	if ctrler.currentBlockHash != (common.Hash{}) {
-		if err := batch.Set(blockHashKey(ctrler.lastBlockHeight), ctrler.currentBlockHash.Bytes()); err != nil {
+	if ctrler.lastBlockHash != (common.Hash{}) {
+		if err := batch.Set(blockHashKey(ctrler.lastBlockHeight), ctrler.lastBlockHash.Bytes()); err != nil {
 			return nil, ctrler.lastBlockHeight, closeBatch(err)
 		}
 	}
