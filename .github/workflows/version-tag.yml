@@ -1,0 +1,52 @@
+name: Auto Pre-release Tag
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Version Script (Base Version)
+        id: base
+        run: |
+          chmod +x .github/scripts/gen-version.sh
+          .github/scripts/gen-version.sh > version_output.txt 2>&1
+          base=$(grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' version_output.txt | tail -n 1 || echo "")
+          echo "base=$base" >> $GITHUB_OUTPUT
+
+      - name: Compute RC Tag
+        id: rc
+        if: steps.base.outputs.base != ''
+        run: |
+          base="${{ steps.base.outputs.base }}"
+          last_n=$(git tag | grep -E "^${base}-rc\.[0-9]+$" | sed -E "s/^${base}-rc\.([0-9]+)$/\1/" | sort -n | tail -n 1)
+          if [ -z "$last_n" ]; then
+            next=1
+          else
+            next=$((last_n + 1))
+          fi
+          echo "tag=${base}-rc.${next}" >> $GITHUB_OUTPUT
+
+      - name: Tag and Push
+        if: steps.base.outputs.base != ''
+        run: |
+          git tag ${{ steps.rc.outputs.tag }}
+          git push origin ${{ steps.rc.outputs.tag }}

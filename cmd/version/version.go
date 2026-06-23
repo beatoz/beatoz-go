@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	FMT_VERSTR      = "v%v.%v.%v-%07x@%s"
+	FMT_VERSTR      = "%s-%07x@%s"
 	MASK_MAJOR_VER  = uint64(0xFF00000000000000)
 	MASK_MINOR_VER  = uint64(0x00FF000000000000)
 	MASK_PATCH_VER  = uint64(0x0000FFFF00000000)
@@ -58,7 +58,14 @@ func parseVersions(vers ...string) {
 }
 
 func String() string {
-	return fmt.Sprintf(FMT_VERSTR, majorVer, minorVer, patchVer, commitVer, version.TMCoreSemVer)
+	// Print the version tag string injected at build time as-is so that any
+	// pre-release suffix (e.g. "-rc.2") is preserved. Falls back to a zero
+	// version when no tag was injected.
+	verStr := Version
+	if verStr == "" {
+		verStr = "v0.0.0"
+	}
+	return fmt.Sprintf(FMT_VERSTR, verStr, commitVer, version.TMCoreSemVer)
 }
 
 func Major() uint64 {
