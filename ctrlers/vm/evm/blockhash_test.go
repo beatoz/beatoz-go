@@ -53,9 +53,6 @@ func Test_Blockhash(t *testing.T) {
 				ChainID: config.ChainIdHex(),
 				Height:  2,
 				Time:    time.Now(),
-				LastBlockId: tmproto.BlockID{
-					Hash: block1Hash.Bytes(),
-				},
 			},
 		},
 		govMock, acctHandler, ctrler, nil, nil,
