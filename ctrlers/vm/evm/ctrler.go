@@ -151,11 +151,6 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 		return nil, xerrors.ErrBeginBlock.Wrapf("wrong block height - expected: %v, actual: %v", ctrler.lastBlockHeight+1, height)
 	}
 
-	prevBlockHash := common.BytesToHash(blockInfo.Header.LastBlockId.Hash)
-	if xerr := ctrler.syncPrevBlockHash(height, prevBlockHash); xerr != nil {
-		return nil, xerr
-	}
-
 	stdb, err := NewStateDBWrapper(ctrler.ethDB, ctrler.lastRootHash, bctx.AcctHandler, ctrler.logger)
 	if err != nil {
 		return nil, xerrors.From(err)
@@ -177,34 +172,6 @@ func (ctrler *EVMCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes
 	ctrler.blockGasPool = bctx.GetBlockGasPool()
 
 	return nil, nil
-}
-
-func (ctrler *EVMCtrler) syncPrevBlockHash(height int64, hash common.Hash) xerrors.XError {
-	if height <= 1 || hash == (common.Hash{}) {
-		return nil
-	}
-
-	prevHeight := height - 1
-	storedHash, ok, err := ctrler.lookupBlockHash(prevHeight)
-	if err != nil {
-		return xerrors.ErrBlockHashLookup.Wrap(err)
-	}
-	if ok {
-		if storedHash != hash {
-			return xerrors.ErrBeginBlock.Wrapf(
-				"previous block hash mismatch - height: %d, stored: %x, header: %x",
-				prevHeight,
-				storedHash.Bytes(),
-				hash.Bytes(),
-			)
-		}
-		return nil
-	}
-
-	if err := ctrler.metadb.SetSync(blockHashKey(prevHeight), hash.Bytes()); err != nil {
-		return xerrors.From(err)
-	}
-	return nil
 }
 
 func (ctrler *EVMCtrler) blockHashProvider(currentHeight int64) ethvm.GetHashFunc {
