@@ -2,7 +2,7 @@ package supply
 
 import (
 	"fmt"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -59,7 +59,7 @@ func (rwd *Reward) toProto() {
 	rwd._proto.XCumulated = rwd.cumulated.Bytes()
 }
 
-var _ v1.ILedgerItem = (*Reward)(nil)
+var _ v2.ILedgerItem = (*Reward)(nil)
 
 func (rwd *Reward) MarshalJSON() ([]byte, error) {
 	_tmp := &struct {

@@ -1,7 +1,7 @@
 package vpower
 
 import (
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,4 +41,4 @@ func (x *FrozenVPower) appendPowerChunks(powChunks ...*PowerChunkProto) {
 	}
 }
 
-var _ v1.ILedgerItem = (*FrozenVPower)(nil)
+var _ v2.ILedgerItem = (*FrozenVPower)(nil)

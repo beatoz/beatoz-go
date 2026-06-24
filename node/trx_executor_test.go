@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	btzcfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/ctrlers/account"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
@@ -16,6 +18,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
 	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
@@ -33,6 +36,22 @@ func init() {
 		_ = w.GetAccount().AddBalance(uint256.NewInt(balance))
 		return true
 	})
+}
+
+type failAfterExecuteAcctHandler struct {
+	ctrlertypes.IAccountHandler
+}
+
+func (handler *failAfterExecuteAcctHandler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	if xerr := handler.IAccountHandler.ExecuteTrx(ctx); xerr != nil {
+		return xerr
+	}
+	return xerrors.ErrInvalidTrx.Wrapf("forced account execute failure")
+}
+
+func (handler *failAfterExecuteAcctHandler) CacheHandlerContext(exec bool) (ctrlertypes.IAccountHandler, func() xerrors.XError) {
+	cached, writeCache := handler.IAccountHandler.(ctrlertypes.ICacheableAccountHandler).CacheHandlerContext(exec)
+	return &failAfterExecuteAcctHandler{IAccountHandler: cached}, writeCache
 }
 
 func Test_commonValidation(t *testing.T) {
@@ -83,6 +102,95 @@ func Test_commonValidation(t *testing.T) {
 	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
 	require.NoError(t, xerr)
 	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInsufficientFund.Error())
+}
+
+func TestTxCacheSequence(t *testing.T) {
+	localConfig := btzcfg.DefaultConfig(chainId.Hex())
+	localConfig.SetRoot(t.TempDir())
+
+	acctCtrler, err := account.NewAcctCtrler(localConfig, log.NewNopLogger())
+	require.NoError(t, err)
+	defer func() {
+		if acctCtrler != nil {
+			require.NoError(t, acctCtrler.Close())
+		}
+	}()
+
+	sender := web3.NewWallet(nil)
+	receiver := web3.NewWallet(nil)
+	initialBalance := uint256.NewInt(balance)
+	sender.GetAccount().SetBalance(initialBalance)
+	receiver.GetAccount().SetBalance(uint256.NewInt(0))
+	require.NoError(t, acctCtrler.SetAccount(sender.GetAccount(), true))
+	require.NoError(t, acctCtrler.SetAccount(receiver.GetAccount(), true))
+	_, _, xerr := acctCtrler.Commit()
+	require.NoError(t, xerr)
+
+	bctx := ctrlertypes.TempBlockContext(localConfig.ChainIdHex(), 2, time.Now(), govMock, acctCtrler, nil, nil, nil)
+	txe := NewTrxExecutor(log.NewNopLogger())
+
+	gas := govMock.MinTrxGas()
+	fee := types.GasToFee(gas, govMock.GasPrice())
+	successAmt := uint256.NewInt(1000)
+	rollbackAmt := uint256.NewInt(2000)
+
+	tx1 := web3.NewTrxTransfer(sender.Address(), receiver.Address(), 0, gas, govMock.GasPrice(), successAmt)
+	_, _, err = sender.SignTrxRLP(tx1, localConfig.ChainIdHex())
+	require.NoError(t, err)
+	txctx1, xerr := mocks.MakeTrxCtxWithTrxBctx(tx1, bctx, true)
+	require.NoError(t, xerr)
+
+	tx2 := web3.NewTrxTransfer(sender.Address(), receiver.Address(), 1, gas, govMock.GasPrice(), rollbackAmt)
+	_, _, err = sender.SignTrxRLP(tx2, localConfig.ChainIdHex())
+	require.NoError(t, err)
+	txctx2, xerr := mocks.MakeTrxCtxWithTrxBctx(tx2, bctx, true)
+	require.NoError(t, xerr)
+
+	require.NoError(t, txe.ExecuteSync(txctx1))
+
+	afterTx1Sender := acctCtrler.FindAccount(sender.Address(), true)
+	require.NotNil(t, afterTx1Sender)
+	require.Equal(t, int64(1), afterTx1Sender.GetNonce())
+	require.Equal(t, new(uint256.Int).Sub(initialBalance, new(uint256.Int).Add(successAmt, fee)).Dec(), afterTx1Sender.GetBalance().Dec())
+	afterTx1Receiver := acctCtrler.FindAccount(receiver.Address(), true)
+	require.NotNil(t, afterTx1Receiver)
+	require.Equal(t, successAmt.Dec(), afterTx1Receiver.GetBalance().Dec())
+
+	bctx.AcctHandler = &failAfterExecuteAcctHandler{IAccountHandler: acctCtrler}
+	xerr = txe.ExecuteSync(txctx2)
+	require.Error(t, xerr)
+	require.True(t, xerr.Contains(xerrors.ErrInvalidTrx))
+
+	twoFees := new(uint256.Int).Mul(fee, uint256.NewInt(2))
+	expectedSenderBalance := new(uint256.Int).Sub(initialBalance, new(uint256.Int).Add(successAmt, twoFees))
+	expectedReceiverBalance := successAmt
+
+	afterTx2Sender := acctCtrler.FindAccount(sender.Address(), true)
+	require.NotNil(t, afterTx2Sender)
+	require.Equal(t, int64(2), afterTx2Sender.GetNonce())
+	require.Equal(t, expectedSenderBalance.Dec(), afterTx2Sender.GetBalance().Dec())
+	afterTx2Receiver := acctCtrler.FindAccount(receiver.Address(), true)
+	require.NotNil(t, afterTx2Receiver)
+	require.Equal(t, expectedReceiverBalance.Dec(), afterTx2Receiver.GetBalance().Dec())
+
+	_, _, xerr = acctCtrler.Commit()
+	require.NoError(t, xerr)
+	require.NoError(t, acctCtrler.Close())
+	acctCtrler = nil
+
+	reopened, err := account.NewAcctCtrler(localConfig, log.NewNopLogger())
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, reopened.Close())
+	}()
+
+	committedSender := reopened.FindAccount(sender.Address(), true)
+	require.NotNil(t, committedSender)
+	require.Equal(t, int64(2), committedSender.GetNonce())
+	require.Equal(t, expectedSenderBalance.Dec(), committedSender.GetBalance().Dec())
+	committedReceiver := reopened.FindAccount(receiver.Address(), true)
+	require.NotNil(t, committedReceiver)
+	require.Equal(t, expectedReceiverBalance.Dec(), committedReceiver.GetBalance().Dec())
 }
 
 func Test_Gas_FailedTx(t *testing.T) {

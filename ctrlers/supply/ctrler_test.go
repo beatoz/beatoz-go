@@ -63,6 +63,16 @@ func Test_InitLedger(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 }
 
+func TestDefaultNewItemGuards(t *testing.T) {
+	for _, key := range [][]byte{nil, []byte{0xff}} {
+		require.NotPanics(t, func() {
+			item := defaultNewItem(key)
+			require.NotNil(t, item)
+			require.Error(t, item.Decode(key, nil))
+		})
+	}
+}
+
 func initLedger(initSupply *uint256.Int) (*SupplyCtrler, xerrors.XError) {
 	ctrler, xerr := NewSupplyCtrler(config, log.NewNopLogger() /*log.NewTMLogger(os.Stdout)*/)
 	if xerr != nil {

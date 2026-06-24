@@ -11,6 +11,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -110,6 +111,40 @@ func Test_NewValidatorSet(t *testing.T) {
 	}
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func TestDefaultNewItemGuards(t *testing.T) {
+	for _, key := range [][]byte{nil, []byte{0xff}} {
+		require.NotPanics(t, func() {
+			item := defaultNewItem(key)
+			require.NotNil(t, item)
+			require.Error(t, item.Decode(key, nil))
+		})
+	}
+}
+
+func TestVPowerDecodeKeyGuards(t *testing.T) {
+	for _, key := range [][]byte{
+		nil,
+		v2.KeyPrefixVPower,
+		append(v2.LedgerKeyVPower(btztypes.RandAddress(), btztypes.RandAddress()), 0x00),
+	} {
+		item := &VPower{}
+		require.NotPanics(t, func() {
+			require.Error(t, item.Decode(key, nil))
+		})
+	}
+}
+
+func TestVPowerDecodeKey(t *testing.T) {
+	from := btztypes.RandAddress()
+	to := btztypes.RandAddress()
+	item := &VPower{}
+
+	require.NoError(t, item.Decode(v2.LedgerKeyVPower(from, to), nil))
+	require.EqualValues(t, from, item.from)
+	require.EqualValues(t, to, item.to)
+	require.EqualValues(t, v2.LedgerKeyVPower(from, to), item.key)
 }
 
 func randBonding(ctrler *VPowerCtrler) ([]types.ValidatorUpdate, xerrors.XError) {

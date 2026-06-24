@@ -70,6 +70,11 @@ type IGovHandler interface {
 	IBlockHandler
 }
 
+type ICacheableGovHandler interface {
+	IGovHandler
+	CacheHandlerContext(bool) (IGovHandler, func() xerrors.XError)
+}
+
 type IAccountHandler interface {
 	ITrxHandler
 	IBlockHandler
@@ -83,6 +88,11 @@ type IAccountHandler interface {
 	SubBalance(types.Address, *uint256.Int, bool) xerrors.XError
 	SetBalance(types.Address, *uint256.Int, bool) xerrors.XError
 	SimuAcctCtrlerAt(int64) (IAccountHandler, xerrors.XError)
+}
+
+type ICacheableAccountHandler interface {
+	IAccountHandler
+	CacheHandlerContext(bool) (IAccountHandler, func() xerrors.XError)
 }
 
 type IStakeHandler interface {
@@ -107,10 +117,20 @@ type IVPowerHandler interface {
 	ComputeWeight(int64, int64, int64, int32, *uint256.Int) (IWeightResult, xerrors.XError)
 }
 
+type ICacheableVPowerHandler interface {
+	IVPowerHandler
+	CacheHandlerContext(bool) (IVPowerHandler, func() xerrors.XError)
+}
+
 type ISupplyHandler interface {
 	ITrxHandler
 	IBlockHandler
 	TotalSupply() *uint256.Int
 	RequestMint(bctx *BlockContext)
 	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError
+}
+
+type ICacheableSupplyHandler interface {
+	ISupplyHandler
+	CacheHandlerContext(bool) (ISupplyHandler, func() xerrors.XError)
 }

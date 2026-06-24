@@ -15,6 +15,7 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/require"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 )
 
@@ -73,4 +74,14 @@ func TestMain(m *testing.M) {
 func signTrx(tx *ctrlertypes.Trx, signerAddr types.Address, chainId string) error {
 	_, _, err := acctMock.FindWallet(signerAddr).SignTrxRLP(tx, chainId)
 	return err
+}
+
+func TestDefaultNewItemGuards(t *testing.T) {
+	for _, key := range [][]byte{nil, []byte{0xff}} {
+		require.NotPanics(t, func() {
+			item := defaultNewItemFor(key)
+			require.NotNil(t, item)
+			require.Error(t, item.Decode(key, nil))
+		})
+	}
 }

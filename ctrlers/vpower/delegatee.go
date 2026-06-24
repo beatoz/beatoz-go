@@ -1,7 +1,7 @@
 package vpower
 
 import (
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -12,7 +12,7 @@ import (
 
 type Delegatee struct {
 	DelegateeProto
-	key  v1.LedgerKey
+	key  v2.LedgerKey
 	addr types.Address
 }
 
@@ -23,7 +23,7 @@ func NewDelegatee(pubKey bytes.HexBytes) *Delegatee {
 		},
 	}
 	ret.addr = crypto.PubKeyBytes2Addr(pubKey)
-	ret.key = v1.LedgerKeyDelegatee(ret.addr)
+	ret.key = v2.LedgerKeyDelegatee(ret.addr)
 	return ret
 }
 
@@ -44,7 +44,7 @@ func (x *Delegatee) Decode(k, v []byte) xerrors.XError {
 	return nil
 }
 
-var _ v1.ILedgerItem = (*Delegatee)(nil)
+var _ v2.ILedgerItem = (*Delegatee)(nil)
 
 func (x *Delegatee) Address() types.Address {
 	return x.addr

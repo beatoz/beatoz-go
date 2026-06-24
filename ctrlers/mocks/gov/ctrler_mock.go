@@ -40,4 +40,8 @@ func (mock *GovHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerrors.
 	panic("implement me")
 }
 
+func (mock *GovHandlerMock) CacheHandlerContext(exec bool) (ctrlertypes.IGovHandler, func() xerrors.XError) {
+	return mock, func() xerrors.XError { return nil }
+}
+
 var _ ctrlertypes.IGovHandler = (*GovHandlerMock)(nil)

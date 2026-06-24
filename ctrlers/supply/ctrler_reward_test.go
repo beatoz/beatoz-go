@@ -2,18 +2,37 @@ package supply
 
 import (
 	"fmt"
+	btzcfg "github.com/beatoz/beatoz-go/cmd/config"
+	"github.com/beatoz/beatoz-go/ctrlers"
+	"github.com/beatoz/beatoz-go/ctrlers/account"
+	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tendermint/libs/log"
 	"os"
 	"testing"
 	"time"
 )
+
+type rewardFailingAcctHandler struct {
+	types.IAccountHandler
+}
+
+func (handler *rewardFailingAcctHandler) Reward(_ types2.Address, _ *uint256.Int, _ bool) xerrors.XError {
+	return xerrors.ErrInvalidAmount.Wrapf("forced account reward failure")
+}
+
+func (handler *rewardFailingAcctHandler) CacheHandlerContext(exec bool) (types.IAccountHandler, func() xerrors.XError) {
+	cached, writeCache := handler.IAccountHandler.(types.ICacheableAccountHandler).CacheHandlerContext(exec)
+	return &rewardFailingAcctHandler{IAccountHandler: cached}, writeCache
+}
 
 func Test_Withdraw(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
@@ -62,7 +81,7 @@ func Test_Withdraw(t *testing.T) {
 				beforeWithdrawn := accumRwd.WithdrawnAmount()
 				beforeCummAmt := accumRwd.CumulatedAmount()
 
-				item, xerr := ctrler.supplyState.Get(v1.LedgerKeyReward(mintRwd.addr), true)
+				item, xerr := ctrler.supplyState.Get(v2.LedgerKeyReward(mintRwd.addr), true)
 				require.NoError(t, xerr)
 
 				rwd := item.(*Reward)
@@ -87,4 +106,77 @@ func Test_Withdraw(t *testing.T) {
 	}
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.RootDir))
+}
+
+func TestWithdrawRollback(t *testing.T) {
+	localConfig := btzcfg.DefaultConfig("1234")
+	localConfig.SetRoot(t.TempDir())
+	types.InitSigner(localConfig.ChainId())
+
+	acctCtrler, err := account.NewAcctCtrler(localConfig, log.NewNopLogger())
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, acctCtrler.Close())
+	}()
+
+	supplyCtrler, xerr := NewSupplyCtrler(localConfig, log.NewNopLogger())
+	require.NoError(t, xerr)
+	defer func() {
+		require.NoError(t, supplyCtrler.Close())
+	}()
+
+	wal := web3.NewWallet(nil)
+	acct := wal.GetAccount()
+	acct.SetBalance(uint256.NewInt(1_000_000_000))
+	require.NoError(t, acctCtrler.SetAccount(acct, true))
+	_, _, xerr = acctCtrler.Commit()
+	require.NoError(t, xerr)
+
+	reward := NewReward(wal.Address())
+	require.NoError(t, reward.Issue(uint256.NewInt(1000), 1))
+	require.NoError(t, supplyCtrler.supplyState.Set(v2.LedgerKeyReward(wal.Address()), reward, true))
+	_, _, xerr = supplyCtrler.Commit()
+	require.NoError(t, xerr)
+
+	before, xerr := supplyCtrler.readReward(wal.Address())
+	require.NoError(t, xerr)
+	beforeCumulated := before.CumulatedAmount()
+	beforeWithdrawn := before.WithdrawnAmount()
+	beforeBalance := acct.GetBalance()
+
+	reqAmt := uint256.NewInt(100)
+	tx := web3.NewTrxWithdraw(wal.Address(), wal.Address(), wal.GetNonce(), govMock.MinTrxGas(), govMock.GasPrice(), reqAmt)
+	_, _, err = wal.SignTrxRLP(tx, localConfig.ChainIdHex())
+	require.NoError(t, err)
+
+	failingAcct := &rewardFailingAcctHandler{IAccountHandler: acctCtrler}
+	bctx := types.TempBlockContext(localConfig.ChainIdHex(), 2, time.Now(), govMock, failingAcct, nil, supplyCtrler, nil)
+	txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+	require.NoError(t, xerr)
+	require.NoError(t, supplyCtrler.ValidateTrx(txctx))
+
+	scope := ctrlers.NewBlockCacheContext(bctx, true)
+	require.NotNil(t, scope)
+	defer scope.Restore(bctx)
+
+	xerr = bctx.SupplyHandler.ExecuteTrx(txctx)
+	require.Error(t, xerr)
+	require.True(t, xerr.Contains(xerrors.ErrInvalidAmount))
+	scope.Restore(bctx)
+
+	after, xerr := supplyCtrler.readReward(wal.Address())
+	require.NoError(t, xerr)
+	require.Equal(t, beforeCumulated.Dec(), after.CumulatedAmount().Dec())
+	require.Equal(t, beforeWithdrawn.Dec(), after.WithdrawnAmount().Dec())
+
+	afterAcct := acctCtrler.FindAccount(wal.Address(), true)
+	require.NotNil(t, afterAcct)
+	require.Equal(t, beforeBalance.Dec(), afterAcct.GetBalance().Dec())
+
+	_, _, xerr = supplyCtrler.Commit()
+	require.NoError(t, xerr)
+	committed, xerr := supplyCtrler.readReward(wal.Address())
+	require.NoError(t, xerr)
+	require.Equal(t, beforeCumulated.Dec(), committed.CumulatedAmount().Dec())
+	require.Equal(t, beforeWithdrawn.Dec(), committed.WithdrawnAmount().Dec())
 }

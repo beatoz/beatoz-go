@@ -51,4 +51,8 @@ func (mock *SupplyHandlerMock) Burn(bctx *types.BlockContext, amt *uint256.Int) 
 	return nil
 }
 
+func (mock *SupplyHandlerMock) CacheHandlerContext(exec bool) (types.ISupplyHandler, func() xerrors.XError) {
+	return mock, func() xerrors.XError { return nil }
+}
+
 var _ types.ISupplyHandler = (*SupplyHandlerMock)(nil)

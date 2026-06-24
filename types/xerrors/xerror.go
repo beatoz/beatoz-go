@@ -3,8 +3,9 @@ package xerrors
 import (
 	"errors"
 	"fmt"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"strings"
+
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
 const (
@@ -82,6 +83,7 @@ var (
 	ErrDuplicatedKey         = NewOrdinary("already existed key")
 	ErrInvalidWeight         = NewOrdinary("invalid weight")
 	ErrBlockHashLookup       = NewOrdinary("failed to lookup block hash")
+	ErrInvalidLedgerKey      = NewOrdinary("invalid ledger key")
 )
 
 type XError interface {

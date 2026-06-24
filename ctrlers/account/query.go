@@ -2,7 +2,7 @@ package account
 
 import (
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -16,7 +16,7 @@ func (ctrler *AcctCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertypes.
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	item, xerr := immuLedger.Get(v1.LedgerKeyAccount(req.Data))
+	item, xerr := immuLedger.Get(v2.LedgerKeyAccount(req.Data))
 	if xerr != nil {
 		item = ctrlertypes.NewAccount(req.Data)
 	}

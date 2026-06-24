@@ -3,7 +3,7 @@ package gov
 import (
 	"encoding/hex"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
-	"github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/v2"
 	types3 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	types2 "github.com/tendermint/tendermint/abci/types"
@@ -58,7 +58,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		evts = append(evts, types2.Event{
 			Type: "proposal",
 			Attributes: []types2.EventAttribute{
-				{Key: []byte("frozen"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
+				{Key: []byte("frozen"), Value: []byte(hex.EncodeToString(v2.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}
@@ -66,7 +66,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		evts = append(evts, types2.Event{
 			Type: "proposal",
 			Attributes: []types2.EventAttribute{
-				{Key: []byte("removed"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
+				{Key: []byte("removed"), Value: []byte(hex.EncodeToString(v2.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}
@@ -74,7 +74,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		evts = append(evts, types2.Event{
 			Type: "proposal",
 			Attributes: []types2.EventAttribute{
-				{Key: []byte("applied"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
+				{Key: []byte("applied"), Value: []byte(hex.EncodeToString(v2.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}
@@ -82,7 +82,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		evts = append(evts, types2.Event{
 			Type: "proposal",
 			Attributes: []types2.EventAttribute{
-				{Key: []byte("rejected"), Value: []byte(hex.EncodeToString(v1.UnwrapKeyPrefix(k))), Index: true},
+				{Key: []byte("rejected"), Value: []byte(hex.EncodeToString(v2.UnwrapKeyPrefix(k))), Index: true},
 			},
 		})
 	}

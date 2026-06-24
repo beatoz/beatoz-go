@@ -4,7 +4,7 @@ import (
 	"time"
 
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -54,7 +54,7 @@ func (ctrler *SupplyCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	//
 	// Set supply info to ledger
 	if ctrler.lastTotalSupply.IsChanged() {
-		if xerr := ctrler.supplyState.Set(v1.LedgerKeyTotalSupply(), ctrler.lastTotalSupply, true); xerr != nil {
+		if xerr := ctrler.supplyState.Set(v2.LedgerKeyTotalSupply(), ctrler.lastTotalSupply, true); xerr != nil {
 			return nil, xerr
 		}
 		ctrler.lastTotalSupply.ResetChanged()

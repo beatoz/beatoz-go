@@ -6,7 +6,7 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -15,7 +15,7 @@ import (
 )
 
 type AcctCtrler struct {
-	acctState v1.IStateLedger
+	acctState v2.IStateLedger
 
 	newbiesCheck   map[btztypes.AcctKey]*btztypes.Account
 	newbiesDeliver map[btztypes.AcctKey]*btztypes.Account
@@ -27,7 +27,7 @@ type AcctCtrler struct {
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
 	lg := logger.With("module", "beatoz_AcctCtrler")
 
-	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 10000, func(key v1.LedgerKey) v1.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
+	if _state, xerr := v2.NewStateLedger("accounts", config.DBDir(), 10000, func(key v2.LedgerKey) v2.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
@@ -37,6 +37,23 @@ func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error)
 			logger:         lg,
 		}, nil
 	}
+}
+
+func (ctrler *AcctCtrler) CacheContext(exec bool) (*AcctCtrler, func() xerrors.XError) {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	cachedState, writeCache := ctrler.acctState.CacheContext(exec)
+	return &AcctCtrler{
+		acctState:      cachedState,
+		newbiesCheck:   clonePendingAccounts(ctrler.newbiesCheck),
+		newbiesDeliver: clonePendingAccounts(ctrler.newbiesDeliver),
+		logger:         ctrler.logger,
+	}, writeCache
+}
+
+func (ctrler *AcctCtrler) CacheHandlerContext(exec bool) (btztypes.IAccountHandler, func() xerrors.XError) {
+	return ctrler.CacheContext(exec)
 }
 
 func (ctrler *AcctCtrler) InitLedger(req interface{}) xerrors.XError {
@@ -146,7 +163,7 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *btztypes.A
 }
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *btztypes.Account {
-	if acct, xerr := ctrler.acctState.Get(v1.LedgerKeyAccount(addr), exec); xerr != nil {
+	if acct, xerr := ctrler.acctState.Get(v2.LedgerKeyAccount(addr), exec); xerr != nil {
 		return nil
 	} else {
 		return acct.(*btztypes.Account)
@@ -308,7 +325,18 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.Set(v1.LedgerKeyAccount(acct.Address), acct, exec)
+	return ctrler.acctState.Set(v2.LedgerKeyAccount(acct.Address), acct, exec)
+}
+
+func clonePendingAccounts(src map[btztypes.AcctKey]*btztypes.Account) map[btztypes.AcctKey]*btztypes.Account {
+	dst := make(map[btztypes.AcctKey]*btztypes.Account, len(src))
+	for key, acct := range src {
+		cloned := acct.Clone()
+		cloned.SetDocURL(acct.GetDocURL())
+		cloned.SetCode(append([]byte(nil), acct.GetCode()...))
+		dst[key] = cloned
+	}
+	return dst
 }
 
 func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
@@ -330,14 +358,14 @@ var _ btztypes.IBlockHandler = (*AcctCtrler)(nil)
 var _ btztypes.IAccountHandler = (*AcctCtrler)(nil)
 
 type SimuAcctCtrler struct {
-	simuLedger v1.IImitable
+	simuLedger v2.IImitable
 	newbies    map[btztypes.AcctKey]*btztypes.Account
 	logger     tmlog.Logger
 	mtx        sync.RWMutex
 }
 
 func (memCtrler *SimuAcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return memCtrler.simuLedger.Set(v1.LedgerKeyAccount(acct.Address), acct)
+	return memCtrler.simuLedger.Set(v2.LedgerKeyAccount(acct.Address), acct)
 }
 
 func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btztypes.Account {
@@ -365,7 +393,7 @@ func (memCtrler *SimuAcctCtrler) FindAccount(addr types.Address, exec bool) *btz
 }
 
 func (memCtrler *SimuAcctCtrler) findAccount(addr types.Address) *btztypes.Account {
-	if acct, xerr := memCtrler.simuLedger.Get(v1.LedgerKeyAccount(addr)); xerr != nil {
+	if acct, xerr := memCtrler.simuLedger.Get(v2.LedgerKeyAccount(addr)); xerr != nil {
 		return nil
 	} else {
 		return acct.(*btztypes.Account)

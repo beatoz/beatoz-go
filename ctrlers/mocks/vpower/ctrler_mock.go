@@ -213,4 +213,8 @@ func (mock *VPowerHandlerMock) Commit() ([]byte, int64, xerrors.XError) {
 	panic("implement me")
 }
 
+func (mock *VPowerHandlerMock) CacheHandlerContext(exec bool) (ctrlertypes.IVPowerHandler, func() xerrors.XError) {
+	return mock, func() xerrors.XError { return nil }
+}
+
 var _ ctrlertypes.IVPowerHandler = (*VPowerHandlerMock)(nil)

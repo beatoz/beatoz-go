@@ -3,7 +3,7 @@ package supply
 import (
 	"fmt"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -29,7 +29,7 @@ func (ctrler *SupplyCtrler) queryReward(height int64, address types.Address) ([]
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
-	item, xerr := atledger.Get(v1.LedgerKeyReward(address))
+	item, xerr := atledger.Get(v2.LedgerKeyReward(address))
 	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
@@ -52,7 +52,7 @@ func (ctrler *SupplyCtrler) queryTotalSupply(height int64) ([]byte, xerrors.XErr
 	}
 
 	// get supply info from ledger
-	item, xerr := atledger.Get(v1.LedgerKeyTotalSupply())
+	item, xerr := atledger.Get(v2.LedgerKeyTotalSupply())
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}

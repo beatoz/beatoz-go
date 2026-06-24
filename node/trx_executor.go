@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 
+	"github.com/beatoz/beatoz-go/ctrlers"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -25,6 +26,11 @@ func NewTrxExecutor(logger log.Logger) *TrxExecutor {
 
 func (txe *TrxExecutor) ExecuteSync(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	var xerr xerrors.XError
+
+	xerr = reloadTrxAccounts(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
 	xerr = validateTrx(ctx)
 	if xerr != nil {
@@ -111,47 +117,122 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 }
 
 func runTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	var xerr xerrors.XError
-	defer func() {
-		if ctx.Exec || xerr == nil {
-			_xerr0 := postRunTrx(ctx)
-			if xerr != nil {
-				xerr = xerr.Wrap(_xerr0)
-			} else {
-				xerr = _xerr0
+	if ctx.IsHandledByEVM() {
+		return runExecuteTrx(ctx, nil)
+	}
+
+	scope := ctrlers.NewBlockCacheContext(ctx.BlockContext, ctx.Exec)
+	if scope == nil {
+		return xerrors.NewOrdinary("non-EVM transaction cache context is unavailable")
+	}
+	defer scope.Restore(ctx.BlockContext)
+
+	if xerr := reloadTrxAccounts(ctx); xerr != nil {
+		return xerr
+	}
+
+	return runExecuteTrx(ctx, scope)
+}
+
+func runExecuteTrx(ctx *ctrlertypes.TrxContext, cacheScope *ctrlers.BlockCacheContext) xerrors.XError {
+	withCache := cacheScope != nil
+
+	xerr := executeTrx(ctx)
+	if xerr != nil {
+		if withCache {
+			cacheScope.Restore(ctx.BlockContext)
+			if ctx.Exec {
+				if reloadErr := reloadTrxAccounts(ctx); reloadErr != nil {
+					return reloadErr.Wrap(xerr)
+				}
 			}
 		}
-	}()
+		if !ctx.Exec {
+			return xerr
+		}
+		if postErr := postRunTrx(ctx); postErr != nil {
+			return xerr.Wrap(postErr)
+		}
+		return xerr
+	}
 
+	if xerr = reloadTrxAccounts(ctx); xerr != nil {
+		return xerr
+	}
+	if xerr = postRunTrx(ctx); xerr != nil {
+		return xerr
+	}
+	if withCache {
+		return cacheScope.Write()
+	}
+	return nil
+}
+
+func executeTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 	switch ctx.Tx.GetType() {
 	case ctrlertypes.TRX_CONTRACT:
-		if xerr = ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr := ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_PROPOSAL, ctrlertypes.TRX_VOTING:
-		if xerr = ctx.GovHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr := ctx.GovHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
 		if ctx.IsHandledByEVM() {
-			if xerr = ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
+			if xerr := ctx.EVMHandler.ExecuteTrx(ctx); xerr != nil {
 				return xerr
 			}
-		} else if xerr = ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil {
+		} else if xerr := ctx.AcctHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_WITHDRAW:
-		if xerr = ctx.SupplyHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr := ctx.SupplyHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_STAKING, ctrlertypes.TRX_UNSTAKING:
-		if xerr = ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
+		if xerr := ctx.VPowerHandler.ExecuteTrx(ctx); xerr != nil {
 			return xerr
 		}
 	default:
 		return xerrors.ErrUnknownTrxType
 	}
 
+	return nil
+}
+
+func reloadTrxAccounts(ctx *ctrlertypes.TrxContext) xerrors.XError {
+	sender := ctx.AcctHandler.FindAccount(ctx.Tx.From, ctx.Exec)
+	if sender == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", ctx.Tx.From)
+	}
+
+	toAddr := ctx.Tx.To
+	if toAddr == nil {
+		toAddr = types.ZeroAddress()
+	}
+	receiver := ctx.AcctHandler.FindOrNewAccount(toAddr, ctx.Exec)
+	if receiver == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", toAddr)
+	}
+
+	var payer *ctrlertypes.Account
+	if ctx.Tx.PayerSig != nil {
+		payerAddr, _, xerr := ctrlertypes.VerifyPayerTrxRLP(ctx.Tx)
+		if xerr != nil {
+			return xerr
+		}
+		payer = ctx.AcctHandler.FindAccount(payerAddr, ctx.Exec)
+		if payer == nil {
+			return xerrors.ErrNotFoundAccount.Wrapf("payer address: %v", payerAddr)
+		}
+	} else {
+		payer = sender
+	}
+
+	ctx.Sender = sender
+	ctx.Receiver = receiver
+	ctx.Payer = payer
 	return nil
 }
 

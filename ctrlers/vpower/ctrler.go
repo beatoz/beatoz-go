@@ -9,7 +9,7 @@ import (
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -19,7 +19,7 @@ import (
 )
 
 type VPowerCtrler struct {
-	vpowerState v1.IStateLedger
+	vpowerState v2.IStateLedger
 
 	allDelegatees  []*Delegatee
 	lastValidators []*Delegatee
@@ -30,23 +30,23 @@ type VPowerCtrler struct {
 	mtx    sync.RWMutex
 }
 
-func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
-	if bytes2.HasPrefix(key, v1.KeyPrefixVPower) {
+func defaultNewItem(key v2.LedgerKey) v2.ILedgerItem {
+	if bytes2.HasPrefix(key, v2.KeyPrefixVPower) {
 		return &VPower{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixDelegatee) {
+	} else if bytes2.HasPrefix(key, v2.KeyPrefixDelegatee) {
 		return &Delegatee{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixFrozenVPower) {
+	} else if bytes2.HasPrefix(key, v2.KeyPrefixFrozenVPower) {
 		return &FrozenVPower{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixMissedBlockCount) {
+	} else if bytes2.HasPrefix(key, v2.KeyPrefixMissedBlockCount) {
 		return new(BlockCount)
 	}
-	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
+	return v2.NewInvalidLedgerItem("unknown vpower ledger key prefix: 0x%x", []byte(key))
 }
 
 func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_VPowerCtrler")
 
-	powersState, xerr := v1.NewStateLedger("vpows", config.DBDir(), 21*1000, defaultNewItem, lg)
+	powersState, xerr := v2.NewStateLedger("vpows", config.DBDir(), 21*1000, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -60,6 +60,29 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 		return nil, xerr
 	}
 	return ret, nil
+}
+
+func (ctrler *VPowerCtrler) CacheContext(exec bool) (*VPowerCtrler, func() xerrors.XError) {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	cachedState, writeCache := ctrler.vpowerState.CacheContext(exec)
+	var cachedLimiter *VPowerLimiter
+	if ctrler.vpowLimiter != nil {
+		limiter := *ctrler.vpowLimiter
+		cachedLimiter = &limiter
+	}
+	return &VPowerCtrler{
+		vpowerState:    cachedState,
+		allDelegatees:  copyDelegateeArray(ctrler.allDelegatees),
+		lastValidators: copyDelegateeArray(ctrler.lastValidators),
+		vpowLimiter:    cachedLimiter,
+		logger:         ctrler.logger,
+	}, writeCache
+}
+
+func (ctrler *VPowerCtrler) CacheHandlerContext(exec bool) (ctrlertypes.IVPowerHandler, func() xerrors.XError) {
+	return ctrler.CacheContext(exec)
 }
 
 // InitLedger creates the voting power of the genesis validators.
@@ -465,7 +488,7 @@ func (ctrler *VPowerCtrler) PowerOf(from types.Address) int64 {
 	defer ctrler.mtx.RUnlock()
 
 	delegatePower := int64(0)
-	_ = ctrler.seekVPowersOf(from, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	_ = ctrler.seekVPowersOf(from, func(key v2.LedgerKey, item v2.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		delegatePower += vpow.SumPower
 		return nil
@@ -480,7 +503,7 @@ func (ctrler *VPowerCtrler) DelegatedPowerOf(addr types.Address) int64 {
 }
 
 // DEPRECATED
-func (ctrler *VPowerCtrler) ImitableState(h int64) (v1.IImitable, xerrors.XError) {
+func (ctrler *VPowerCtrler) ImitableState(h int64) (v2.IImitable, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 

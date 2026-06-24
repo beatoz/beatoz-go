@@ -176,4 +176,8 @@ func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	return nil
 }
 
+func (mock *AcctHandlerMock) CacheHandlerContext(exec bool) (ctrlertypes.IAccountHandler, func() xerrors.XError) {
+	return mock, func() xerrors.XError { return nil }
+}
+
 var _ ctrlertypes.IAccountHandler = (*AcctHandlerMock)(nil)
