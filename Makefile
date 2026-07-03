@@ -39,7 +39,7 @@ ifdef MAKECMDGOALS
 	endif
 endif
 
-VERTAG ?= $(shell git tag --sort=-v:refname | grep '^v[0-9]' | head -n1)
+VERTAG ?= $(shell git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null)
 GITCOMMIT ?= $(shell git log -1 --pretty=format:"%h")
 BUILD_FLAGS=-a -ldflags "-w -s -X 'github.com/beatoz/beatoz-go/cmd/version.GitCommit=$(GITCOMMIT)' -X 'github.com/beatoz/beatoz-go/cmd/version.Version=$(VERTAG)'"
 
