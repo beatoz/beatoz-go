@@ -10,8 +10,8 @@ var (
 		// all forks are enabled
 	}
 	testnetForkBlocks = ForkBlocks{
-		BTIP27Block: 100_000,
-		BTIP35Block: 100_000,
+		BTIP27Block: 194_850,
+		BTIP35Block: 194_850,
 	}
 
 	mainnetForkBlocks = ForkBlocks{
