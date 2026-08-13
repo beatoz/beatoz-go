@@ -5,6 +5,7 @@ import (
 	"fmt"
 	v0 "github.com/beatoz/beatoz-go/ledger/v0"
 	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	v2 "github.com/beatoz/beatoz-go/ledger/v2"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/stretchr/testify/require"
@@ -15,10 +16,12 @@ import (
 )
 
 var (
-	testItemsV0 []*TestItemV0
-	testItemsV1 []*TestItemV1
-	dbDirV0     string
-	dbDirV1     string
+	testItemsV0         []*TestItemV0
+	testItemsV1         []*TestItemV1
+	transactionSeedItem *TestItemV1
+	dbDirV0             string
+	dbDirV1             string
+	dbDirV2             string
 )
 
 func init() {
@@ -29,6 +32,7 @@ func init() {
 	for i := 0; i < 100_000; i++ {
 		testItemsV1 = append(testItemsV1, newTestItemV1(bytes.RandHexString(512)))
 	}
+	transactionSeedItem = newTestItemV1("seed")
 }
 
 func Benchmark_Set_V0(b *testing.B) {
@@ -51,12 +55,38 @@ func Benchmark_Set_V0(b *testing.B) {
 }
 
 func Benchmark_Set_V1(b *testing.B) {
+	if dbDirV1 != "" {
+		require.NoError(b, os.RemoveAll(dbDirV1))
+	}
 	dbDir, err := os.MkdirTemp("", "ledger_performance_test_setget_v1")
 	require.NoError(b, err)
 	ledger, err := v1.NewMutableLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
 
 	dbDirV1 = dbDir
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		it := testItemsV1[i%len(testItemsV1)]
+		require.NoError(b, ledger.Set(it.Key(), it))
+	}
+	b.StopTimer()
+
+	_, _, err = ledger.Commit()
+	require.NoError(b, err)
+	require.NoError(b, ledger.Close())
+}
+
+func Benchmark_Set_V2(b *testing.B) {
+	if dbDirV2 != "" {
+		require.NoError(b, os.RemoveAll(dbDirV2))
+	}
+	dbDir, err := os.MkdirTemp("", "ledger_performance_test_setget_v2")
+	require.NoError(b, err)
+	ledger, err := v2.NewMutableLedger("ledgerV2", dbDir, 100_000, emptyTestItemV2, log.NewNopLogger())
+	require.NoError(b, err)
+
+	dbDirV2 = dbDir
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -86,6 +116,102 @@ func Benchmark_Set_V1_Mem(b *testing.B) {
 
 	require.NoError(b, err)
 	require.NoError(b, _ledger.Close())
+}
+
+func Benchmark_Set_V2_Mem(b *testing.B) {
+	_ledger, err := v2.NewMutableLedger("ledgerV2", dbDirV2, 100_000, emptyTestItemV2, log.NewNopLogger())
+	require.NoError(b, err)
+
+	ledger, err := v2.NewMemLedgerAt(_ledger.Version(), _ledger, log.NewNopLogger())
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		it := testItemsV1[i%len(testItemsV1)]
+		require.NoError(b, ledger.Set(it.Key(), it))
+	}
+	b.StopTimer()
+
+	require.NoError(b, err)
+	require.NoError(b, _ledger.Close())
+}
+
+func Benchmark_TransactionSet_V1(b *testing.B) {
+	benchmarkTransactionSetV1(b, true)
+}
+
+func Benchmark_TransactionSet_V2(b *testing.B) {
+	benchmarkTransactionSetV2(b, true)
+}
+
+func Benchmark_TransactionSet_V1_Mem(b *testing.B) {
+	benchmarkTransactionSetV1(b, false)
+}
+
+func Benchmark_TransactionSet_V2_Mem(b *testing.B) {
+	benchmarkTransactionSetV2(b, false)
+}
+
+func benchmarkTransactionSetV1(b *testing.B, exec bool) {
+	dbDir, err := os.MkdirTemp("", "ledger_performance_test_transaction_v1_*")
+	require.NoError(b, err)
+	b.Cleanup(func() {
+		require.NoError(b, os.RemoveAll(dbDir))
+	})
+
+	ledger, err := v1.NewStateLedger("ledgerV1Transaction", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
+	require.NoError(b, err)
+
+	require.NoError(b, ledger.Set(transactionSeedItem.Key(), transactionSeedItem, true))
+	_, _, err = ledger.Commit()
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		it := testItemsV1[i%len(testItemsV1)]
+		if xerr := ledger.Set(it.Key(), it, exec); xerr != nil {
+			b.Fatal(xerr)
+		}
+	}
+	b.StopTimer()
+
+	_, _, err = ledger.Commit()
+	require.NoError(b, err)
+	require.NoError(b, ledger.Close())
+}
+
+func benchmarkTransactionSetV2(b *testing.B, exec bool) {
+	dbDir, err := os.MkdirTemp("", "ledger_performance_test_transaction_v2_*")
+	require.NoError(b, err)
+	b.Cleanup(func() {
+		require.NoError(b, os.RemoveAll(dbDir))
+	})
+
+	ledger, err := v2.NewStateLedger("ledgerV2Transaction", dbDir, 100_000, emptyTestItemV2, log.NewNopLogger())
+	require.NoError(b, err)
+
+	require.NoError(b, ledger.Set(transactionSeedItem.Key(), transactionSeedItem, true))
+	_, _, err = ledger.Commit()
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if xerr := ledger.CreateCache(exec); xerr != nil {
+			b.Fatal(xerr)
+		}
+		it := testItemsV1[i%len(testItemsV1)]
+		if xerr := ledger.Set(it.Key(), it, exec); xerr != nil {
+			b.Fatal(xerr)
+		}
+		if xerr := ledger.WriteCache(exec); xerr != nil {
+			b.Fatal(xerr)
+		}
+	}
+	b.StopTimer()
+
+	_, _, err = ledger.Commit()
+	require.NoError(b, err)
+	require.NoError(b, ledger.Close())
 }
 
 // Benchmark_Get_V0
@@ -120,6 +246,22 @@ func Benchmark_Get_V1(b *testing.B) {
 	require.NoError(b, ledger.Close())
 }
 
+// Benchmark_Get_V2
+// To run this benchmark, Benchmark_Set_V2 must have already been run.
+func Benchmark_Get_V2(b *testing.B) {
+	ledger, err := v2.NewMutableLedger("ledgerV2", dbDirV2, 100_000, emptyTestItemV2, log.NewNopLogger())
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ledger.Get(testItemsV1[i%len(testItemsV1)].Key())
+		require.NoError(b, err, fmt.Sprintf("try to read items[%d], key:%x", i%len(testItemsV1), testItemsV1[i%len(testItemsV1)].Key()))
+	}
+
+	b.StopTimer()
+	require.NoError(b, ledger.Close())
+}
+
 func Benchmark_Get_V1_Mem(b *testing.B) {
 	_ledger, err := v1.NewMutableLedger("ledgerV1", dbDirV1, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
@@ -131,6 +273,23 @@ func Benchmark_Get_V1_Mem(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := ledger.Get(testItemsV1[i%len(testItemsV1)].Key())
 		require.NoError(b, err, fmt.Sprintf("tyr to read items[%d], key:%x", i%len(testItemsV1), testItemsV1[i%len(testItemsV1)].Key()))
+	}
+
+	b.StopTimer()
+	require.NoError(b, _ledger.Close())
+}
+
+func Benchmark_Get_V2_Mem(b *testing.B) {
+	_ledger, err := v2.NewMutableLedger("ledgerV2", dbDirV2, 100_000, emptyTestItemV2, log.NewNopLogger())
+	require.NoError(b, err)
+
+	ledger, err := v2.NewMemLedgerAt(_ledger.Version(), _ledger, log.NewNopLogger())
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ledger.Get(testItemsV1[i%len(testItemsV1)].Key())
+		require.NoError(b, err, fmt.Sprintf("try to read items[%d], key:%x", i%len(testItemsV1), testItemsV1[i%len(testItemsV1)].Key()))
 	}
 
 	b.StopTimer()
@@ -165,6 +324,9 @@ func Benchmark_Commit_V0(b *testing.B) {
 func Benchmark_Commit_V1(b *testing.B) {
 	dbDir, err := os.MkdirTemp("", "ledger_performance_test_commit_v1_*")
 	require.NoError(b, err)
+	b.Cleanup(func() {
+		require.NoError(b, os.RemoveAll(dbDir))
+	})
 	ledger, err := v1.NewMutableLedger("ledgerV1", dbDir, 100_000, emptyTestItemV1, log.NewNopLogger())
 	require.NoError(b, err)
 
@@ -177,6 +339,32 @@ func Benchmark_Commit_V1(b *testing.B) {
 			item := newTestItemV1(bytes.RandHexString(512))
 			require.NoError(b, ledger.Set(item.Key(), item))
 			totalTxs++
+		}
+
+		b.StartTimer()
+		_, _, err = ledger.Commit()
+		require.NoError(b, err)
+	}
+	b.StopTimer()
+	require.NoError(b, ledger.Close())
+}
+
+func Benchmark_Commit_V2(b *testing.B) {
+	dbDir, err := os.MkdirTemp("", "ledger_performance_test_commit_v2_*")
+	require.NoError(b, err)
+	b.Cleanup(func() {
+		require.NoError(b, os.RemoveAll(dbDir))
+	})
+	ledger, err := v2.NewMutableLedger("ledgerV2", dbDir, 100_000, emptyTestItemV2, log.NewNopLogger())
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		// set test data
+		for j := 0; j < 20_000; j++ {
+			item := newTestItemV1(bytes.RandHexString(512))
+			require.NoError(b, ledger.Set(item.Key(), item))
 		}
 
 		b.StartTimer()
@@ -236,6 +424,12 @@ func newTestItemV1(data string) *TestItemV1 {
 }
 
 func emptyTestItemV1(key v1.LedgerKey) v1.ILedgerItem {
+	return &TestItemV1{
+		TestItemV0: &TestItemV0{},
+	}
+}
+
+func emptyTestItemV2(key v2.LedgerKey) v2.ILedgerItem {
 	return &TestItemV1{
 		TestItemV0: &TestItemV0{},
 	}

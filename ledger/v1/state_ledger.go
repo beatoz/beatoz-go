@@ -94,18 +94,16 @@ func (ledger *StateLedger) Del(key LedgerKey, exec bool) xerrors.XError {
 	return nil
 }
 
-func (ledger *StateLedger) Snapshot(exec bool) int {
-	ledger.mtx.RLock()
-	defer ledger.mtx.RUnlock()
-
-	return ledger.getLedger(exec).Snapshot()
+func (ledger *StateLedger) CreateCache(_ bool) xerrors.XError {
+	panic("ledger v1: CreateCache must not be called")
 }
 
-func (ledger *StateLedger) RevertToSnapshot(snap int, exec bool) xerrors.XError {
-	ledger.mtx.RLock()
-	defer ledger.mtx.RUnlock()
+func (ledger *StateLedger) WriteCache(_ bool) xerrors.XError {
+	panic("ledger v1: WriteCache must not be called")
+}
 
-	return ledger.getLedger(exec).RevertToSnapshot(snap)
+func (ledger *StateLedger) ClearCache(_ bool) xerrors.XError {
+	panic("ledger v1: ClearCache must not be called")
 }
 
 func (ledger *StateLedger) Commit() ([]byte, int64, xerrors.XError) {

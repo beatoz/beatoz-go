@@ -20,9 +20,6 @@ type TrxContext struct {
 	Exec   bool
 
 	SenderPubKey []byte
-	Sender       *Account
-	Receiver     *Account
-	Payer        *Account
 	GasUsed      int64
 	RetData      []byte
 	Events       []abcitypes.Event
@@ -71,9 +68,8 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 
 	//
 	// verify payer's signature.
-	var payerAddr types.Address
 	if tx.PayerSig != nil {
-		payerAddr, _, xerr = VerifyPayerTrxRLP(tx)
+		_, _, xerr = VerifyPayerTrxRLP(tx)
 		if xerr != nil {
 			return nil, xerr.Wrap(errors.New("payer signature is invalid"))
 		}
@@ -82,37 +78,46 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 	//
 	//
 
-	txctx.Sender = txctx.BlockContext.AcctHandler.FindAccount(tx.From, txctx.Exec)
-	if txctx.Sender == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("sender address: %v", tx.From)
-	}
-
-	// RG-91: Find the account object with the destination address 0x0.
-	toAddr := txctx.Tx.To
-	if toAddr == nil {
-		// `toAddr` may be `nil` when the tx type is `TRX_CONTRACT`.
-		toAddr = types.ZeroAddress()
-	}
-
-	txctx.Receiver = txctx.BlockContext.AcctHandler.FindOrNewAccount(toAddr, txctx.Exec)
-	if txctx.Receiver == nil {
-		return nil, xerrors.ErrNotFoundAccount.Wrapf("receiver address: %v", toAddr)
-	}
-
-	if payerAddr != nil {
-		txctx.Payer = txctx.BlockContext.AcctHandler.FindAccount(payerAddr, txctx.Exec)
-		if txctx.Payer == nil {
-			return nil, xerrors.ErrNotFoundAccount.Wrapf("payer address: %v", payerAddr)
-		}
-	} else {
-		txctx.Payer = txctx.Sender
-	}
-
 	return txctx, nil
 }
 
+func (ctx *TrxContext) Sender() *Account {
+	acct := ctx.AcctHandler.FindAccount(ctx.Tx.From, ctx.Exec)
+	if acct == nil {
+		panic("trx context sender is nil")
+	}
+	return acct
+}
+
+func (ctx *TrxContext) Receiver() *Account {
+	acct := ctx.AcctHandler.FindOrNewAccount(ctx.receiverAddress(), ctx.Exec)
+	if acct == nil {
+		panic("trx context receiver is nil")
+	}
+	return acct
+}
+
+func (ctx *TrxContext) Payer() *Account {
+	payer := ctx.Tx.Payer
+	if payer == nil {
+		payer = ctx.Tx.From
+	}
+	acct := ctx.AcctHandler.FindAccount(payer, ctx.Exec)
+	if acct == nil {
+		panic("trx context payer is nil")
+	}
+	return acct
+}
+
+func (ctx *TrxContext) receiverAddress() types.Address {
+	if ctx.Tx.To != nil {
+		return ctx.Tx.To
+	}
+	return types.ZeroAddress()
+}
+
 func (ctx *TrxContext) IsHandledByEVM() bool {
-	b := ctx.Tx.GetType() == TRX_CONTRACT || (ctx.Tx.GetType() == TRX_TRANSFER && ctx.Receiver.Code != nil)
+	b := ctx.Tx.GetType() == TRX_CONTRACT || (ctx.Tx.GetType() == TRX_TRANSFER && ctx.Receiver().Code != nil)
 	return b
 }
 

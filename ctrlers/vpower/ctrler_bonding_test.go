@@ -14,7 +14,7 @@ import (
 	beatozcfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types"
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
@@ -46,10 +46,10 @@ func Test_InitLedger(t *testing.T) {
 	}
 
 	totalPower1 := int64(0)
-	xerr = ctrler.vpowerState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowerState.Seek(common.KeyPrefixDelegatee, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		dgt, _ := item.(*Delegatee)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr), key)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgt.addr), dgt.key)
+		require.EqualValues(t, common.LedgerKeyDelegatee(dgt.addr), key)
+		require.EqualValues(t, common.LedgerKeyDelegatee(dgt.addr), dgt.key)
 
 		var valUp *abcitypes.ValidatorUpdate
 		var wallet *web3.Wallet
@@ -78,9 +78,9 @@ func Test_InitLedger(t *testing.T) {
 	}, true)
 
 	totalPower2 := int64(0)
-	xerr = ctrler.vpowerState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowerState.Seek(common.KeyPrefixVPower, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
-		require.EqualValues(t, v1.LedgerKeyVPower(vpow.from, vpow.to), key)
+		require.EqualValues(t, common.LedgerKeyVPower(vpow.from, vpow.to), key)
 		require.EqualValues(t, key, vpow.key)
 
 		var valUp *abcitypes.ValidatorUpdate
@@ -334,21 +334,21 @@ func Test_Unbonding(t *testing.T) {
 	txctx1, xerr := doUndelegate(ctrler, acctMock.RandWallet(), valWal.Address(), lastHeight+1, txhash0)
 	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundStake))
-	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 0, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 	// 2. wrong to
 	txctx1, xerr = doUndelegate(ctrler, fromWal, types.RandAddress(), lastHeight+1, txhash0)
 	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundDelegatee))
-	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 0, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 	// 3. wrong txhash
 	txctx1, xerr = doUndelegate(ctrler, fromWal, valWal.Address(), lastHeight+1, bytes2.RandBytes(32))
 	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrNotFoundStake))
-	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 0, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 	// 4. all ok
 	txctx1, xerr = doUndelegate(ctrler, fromWal, valWal.Address(), lastHeight+1, txhash0)
 	require.NoError(t, xerr)
-	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 1, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 
 	// commit
 	_, lastHeight, xerr = ctrler.Commit()
@@ -359,7 +359,7 @@ func Test_Unbonding(t *testing.T) {
 	require.NoError(t, xerr, dgtee0.key)
 	require.Equal(t, totalPower0, dgtee1.SumPower)
 	require.Equal(t, selfPower0, dgtee1.SelfPower)
-	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 1, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 	refundHeight := lastHeight + govMock.LazyUnbondingBlocks()
 	frozen, xerr := ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.NoError(t, xerr)
@@ -373,7 +373,7 @@ func Test_Unbonding(t *testing.T) {
 	// nothing happens because refundHeight has not been reached.
 	xerr = ctrler._unfreezePowerChunk(refundHeight-1, acctMock)
 	require.NoError(t, xerr)
-	require.Equal(t, 1, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 1, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozen)
@@ -386,7 +386,7 @@ func Test_Unbonding(t *testing.T) {
 	// frozen vpower has been removed because refundHeight has been reached.
 	xerr = ctrler._unfreezePowerChunk(refundHeight, acctMock)
 	require.NoError(t, xerr)
-	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 0, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 	frozen, xerr = ctrler.readFrozenVPower(refundHeight, fromWal.Address(), true)
 	require.Error(t, xerr)
 	require.Nil(t, frozen)
@@ -561,9 +561,9 @@ func Test_Freezing(t *testing.T) {
 		var expectedBalances []*uint256.Int
 		// frozen vpowers to be un-frozen (thawed) at height 'h'
 		xerr = ctrler.vpowerState.Seek(
-			v1.LedgerKeyFrozenVPower(h, nil),
+			common.LedgerKeyFrozenVPower(h, nil),
 			true,
-			func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+			func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 				frozen, _ := item.(*FrozenVPower)
 				sum := int64(0)
 				for _, pc := range frozen.PowerChunks {
@@ -608,9 +608,9 @@ func Test_Freezing(t *testing.T) {
 	}
 
 	ctrler.vpowerState.Seek(
-		v1.KeyPrefixFrozenVPower,
+		common.KeyPrefixFrozenVPower,
 		true,
-		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 			frozen := item.(*FrozenVPower)
 			_h := key[1:9]
 			h := binary.BigEndian.Uint64(_h)
@@ -619,14 +619,14 @@ func Test_Freezing(t *testing.T) {
 		},
 		true,
 	)
-	require.Equal(t, 0, ctrler.countOf(v1.KeyPrefixFrozenVPower, true))
+	require.Equal(t, 0, ctrler.countOf(common.KeyPrefixFrozenVPower, true))
 
 	// at now, all delegated power has been frozen.
 	// only initial vpowers are remained.
 	fmt.Println("return to initial vpowers - last committed height", lastHeight)
 
 	for _, v := range valWallets {
-		item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyDelegatee(v.Address()), true)
+		item, xerr := ctrler.vpowerState.Get(common.LedgerKeyDelegatee(v.Address()), true)
 		require.NoError(t, xerr)
 
 		dgtee, _ := item.(*Delegatee)
@@ -669,9 +669,9 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 
 	// check all vpowers
 	var txhashes1 []bytes2.HexBytes
-	xerr := ctrler.vpowerState.Seek(v1.KeyPrefixVPower, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr := ctrler.vpowerState.Seek(common.KeyPrefixVPower, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
-		require.EqualValues(t, v1.LedgerKeyVPower(vpow.from, vpow.to), key)
+		require.EqualValues(t, common.LedgerKeyVPower(vpow.from, vpow.to), key)
 		require.EqualValues(t, key, vpow.key)
 
 		sum := int64(0)
@@ -715,10 +715,10 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 	}
 
 	// check delegatees
-	xerr = ctrler.vpowerState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = ctrler.vpowerState.Seek(common.KeyPrefixDelegatee, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		dgtee, _ := item.(*Delegatee)
 		require.EqualValues(t, crypto.PubKeyBytes2Addr(dgtee.PubKey), dgtee.addr)
-		require.EqualValues(t, v1.LedgerKeyDelegatee(dgtee.addr), key)
+		require.EqualValues(t, common.LedgerKeyDelegatee(dgtee.addr), key)
 		require.EqualValues(t, key, dgtee.key)
 		require.Equal(t, sumPowerOfDgtee[dgtee.addr.String()], dgtee.SumPower)
 		require.Equal(t, len(fromAddrsOfDgtee[dgtee.addr.String()]), len(dgtee.Delegators))

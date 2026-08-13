@@ -10,12 +10,12 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
+	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -34,9 +34,7 @@ func Test_Punish_By_BlockProcess(t *testing.T) {
 	require.NoError(t, xerr)
 	localGovCtrler.GovParams = *(types.DefaultGovParams())
 
-	supplyHandler := &proposalSupplyHandlerStub{
-		totalSupply: new(uint256.Int),
-	}
+	supplyHandler := supplymock.NewSupplyHandlerMock()
 	bctx := mocks.InitBlockCtxWith(localCfg.ChainIdHex(), 1, localGovCtrler, acctMock, nil, supplyHandler, vpowMock)
 	bctx.SetChainID(localCfg.ChainIdHex())
 

@@ -2,7 +2,7 @@ package vpower
 
 import (
 	"fmt"
-	"github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -11,7 +11,7 @@ import (
 
 type VPower struct {
 	VPowerProto
-	key  v1.LedgerKey
+	key  common.LedgerKey
 	from types.Address
 	to   types.Address
 }
@@ -20,7 +20,7 @@ func NewVPower(from types.Address, to types.Address) *VPower {
 	ret := &VPower{}
 	ret.from = from
 	ret.to = to
-	ret.key = v1.LedgerKeyVPower(ret.from, ret.to)
+	ret.key = common.LedgerKeyVPower(ret.from, ret.to)
 	return ret
 }
 
@@ -38,13 +38,13 @@ func (x *VPower) Decode(k, v []byte) xerrors.XError {
 	}
 	// k is `prefix + from_address + to_address`
 	x.key = k
-	from_to := v1.UnwrapKeyPrefix(k)
+	from_to := common.UnwrapKeyPrefix(k)
 	x.from = from_to[:20]
 	x.to = from_to[20:]
 	return nil
 }
 
-var _ v1.ILedgerItem = (*VPower)(nil)
+var _ common.ILedgerItem = (*VPower)(nil)
 
 func (x *VPower) IsSelfPower() bool {
 	return bytes.Equal(x.from, x.to)

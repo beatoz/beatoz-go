@@ -5,7 +5,8 @@ import (
 	"fmt"
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	ledger "github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -13,7 +14,7 @@ import (
 )
 
 type SupplyCtrler struct {
-	supplyState v1.IStateLedger
+	supplyState *ledger.StateLedgerManager
 
 	lastTotalSupply *Supply
 
@@ -24,10 +25,10 @@ type SupplyCtrler struct {
 	mtx    sync.RWMutex
 }
 
-func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
-	if bytes.HasPrefix(key, v1.KeyPrefixTotalSupply) {
+func defaultNewItem(key common.LedgerKey) common.ILedgerItem {
+	if bytes.HasPrefix(key, common.KeyPrefixTotalSupply) {
 		return &Supply{}
-	} else if bytes.HasPrefix(key, v1.KeyPrefixReward) {
+	} else if bytes.HasPrefix(key, common.KeyPrefixReward) {
 		return &Reward{}
 	}
 	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
@@ -36,13 +37,13 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_SupplyCtrler")
 
-	ledger, xerr := v1.NewStateLedger("supply", config.DBDir(), 21*1000, defaultNewItem, lg)
+	state, xerr := ledger.NewStateLedgerManager("supply", config.DBDir(), 21*1000, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// load supply info from ledger
-	item, xerr := ledger.Get(v1.LedgerKeyTotalSupply(), true)
+	item, xerr := state.Get(common.LedgerKeyTotalSupply(), true)
 	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 		return nil, xerr
 	}
@@ -55,7 +56,7 @@ func NewSupplyCtrler(config *cfg.Config, logger tmlog.Logger) (*SupplyCtrler, xe
 	go computeIssuanceAndRewardRoutine(reqCh, respCh)
 
 	return &SupplyCtrler{
-		supplyState:     ledger,
+		supplyState:     state,
 		lastTotalSupply: total,
 		reqCh:           reqCh,
 		respCh:          respCh,
@@ -94,7 +95,7 @@ func (ctrler *SupplyCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerrors.ErrInvalidTrxPayloadType
 		}
 
-		item, xerr := ctrler.supplyState.Get(v1.LedgerKeyReward(ctx.Tx.From), ctx.Exec)
+		item, xerr := ctrler.supplyState.Get(common.LedgerKeyReward(ctx.Tx.From), ctx.Exec)
 		if xerr != nil {
 			return xerr
 		}
@@ -128,6 +129,18 @@ func (ctrler *SupplyCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XErr
 	}
 }
 
+func (ctrler *SupplyCtrler) CreateCache(exec bool) xerrors.XError {
+	return ctrler.supplyState.CreateCache(exec)
+}
+
+func (ctrler *SupplyCtrler) WriteCache(exec bool) xerrors.XError {
+	return ctrler.supplyState.WriteCache(exec)
+}
+
+func (ctrler *SupplyCtrler) ClearCache(exec bool) xerrors.XError {
+	return ctrler.supplyState.ClearCache(exec)
+}
+
 func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -149,7 +162,12 @@ func (ctrler *SupplyCtrler) Close() xerrors.XError {
 	return nil
 }
 
+func (ctrler *SupplyCtrler) UpgradeLedgerVersion(target common.LedgerVersion) xerrors.XError {
+	return ctrler.supplyState.UpgradeLedgerVersion(target)
+}
+
 var _ ctrlertypes.ISupplyHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*SupplyCtrler)(nil)
 var _ ctrlertypes.ILedgerHandler = (*SupplyCtrler)(nil)
+var _ ctrlertypes.ILedgerVersionHandler = (*SupplyCtrler)(nil)

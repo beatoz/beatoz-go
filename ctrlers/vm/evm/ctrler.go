@@ -199,7 +199,8 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 	// deploy tx	: address == zero, code == nil
 	// normal tx	: address != zero, code != nil
 	// fallback tx	: address != zero, code != nil
-	if !bytes.Equal(ctx.Receiver.Address, types.ZeroAddress()) && ctx.Receiver.Code == nil {
+	receiver := ctx.Receiver()
+	if !bytes.Equal(receiver.Address, types.ZeroAddress()) && receiver.Code == nil {
 		return xerrors.ErrInvalidAccountType
 	}
 
@@ -209,7 +210,7 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		inputData = payload.Data
 	}
 
-	if bytes.Equal(ctx.Receiver.Address, types.ZeroAddress()) && len(inputData) == 0 {
+	if bytes.Equal(receiver.Address, types.ZeroAddress()) && len(inputData) == 0 {
 		return xerrors.ErrInvalidTrxPayloadParams
 	}
 
@@ -236,12 +237,13 @@ func (ctrler *EVMCtrler) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError 
 		// and in the 'CheckTx' phase it is minimally executed.
 
 		// update balance
-		if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
+		sender := ctx.Sender()
+		if xerr := sender.SubBalance(ctx.Tx.Amount); xerr != nil {
 			return xerr
 		}
 
 		// update account ledger
-		if xerr := ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec); xerr != nil {
+		if xerr := ctx.AcctHandler.SetAccount(sender, ctx.Exec); xerr != nil {
 			return xerr
 		}
 		return nil

@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs/fxnum"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -36,7 +36,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 	for _, val := range lastValidators {
 
 		// NOTE: Consider caching the missed block count.
-		item, xerr := ledger.Get(v1.LedgerKeyMissedBlockCount(val.addr))
+		item, xerr := ledger.Get(common.LedgerKeyMissedBlockCount(val.addr))
 		if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 			return nil, xerr
 		}
@@ -50,7 +50,7 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 
 		mapBenefPowChunks := make(map[string]*benefPowChunksW)
 		for _, from := range val.Delegators {
-			item, xerr = ledger.Get(v1.LedgerKeyVPower(from, val.addr))
+			item, xerr = ledger.Get(common.LedgerKeyVPower(from, val.addr))
 			if xerr != nil {
 				return nil, xerr
 			}

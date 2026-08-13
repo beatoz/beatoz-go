@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -18,24 +19,29 @@ import (
 )
 
 func Test_Blockhash(t *testing.T) {
+	rootDir, err := os.MkdirTemp("", "evm-blockhash-")
+	require.NoError(t, err)
+	defer os.RemoveAll(rootDir)
+
 	config := cfg.DefaultConfig()
 	config.SetChainId("0xDEA8D3")
-	config.SetRoot(t.TempDir())
+	config.SetRoot(rootDir)
 
 	acctHandler := newBlockhashTestAcctHandler()
 	ctrler := NewEVMCtrler(config, acctHandler, tmlog.NewNopLogger())
-	t.Cleanup(func() {
+	defer func() {
 		require.NoError(t, ctrler.Close())
-	})
+	}()
 
 	block1Hash := common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111")
+	blockTime := time.Unix(1, 0)
 	block1Ctx := ctrlertypes.NewBlockContext(
 		abcitypes.RequestBeginBlock{
 			Hash: block1Hash.Bytes(),
 			Header: tmproto.Header{
 				ChainID: config.ChainIdHex(),
 				Height:  1,
-				Time:    time.Now(),
+				Time:    blockTime,
 			},
 		},
 		govMock, acctHandler, ctrler, nil, nil,
@@ -52,7 +58,7 @@ func Test_Blockhash(t *testing.T) {
 			Header: tmproto.Header{
 				ChainID: config.ChainIdHex(),
 				Height:  2,
-				Time:    time.Now(),
+				Time:    blockTime,
 			},
 		},
 		govMock, acctHandler, ctrler, nil, nil,
@@ -62,7 +68,10 @@ func Test_Blockhash(t *testing.T) {
 	require.NoError(t, xerr)
 
 	fromAcct := acctHandler.walletsArr[0].GetAccount()
-	contractAcct := ctrlertypes.NewAccount(types.RandAddress())
+	contractAddress := types.Address(bytes2.ZeroBytes(types.AddrSize))
+	contractAddress[0] = 0x10
+	contractAddress[len(contractAddress)-1] = 3
+	contractAcct := ctrlertypes.NewAccount(contractAddress)
 	contractAcct.SetCode([]byte{1})
 	acctHandler.contAccts = append(acctHandler.contAccts, contractAcct)
 
@@ -78,9 +87,11 @@ func Test_Blockhash(t *testing.T) {
 	}
 	ctrler.stateDBWrapper.SetCode(contractAcct.Address.Array20(), blockhashRuntime)
 
+	txHash := bytes2.ZeroBytes(32)
+	txHash[len(txHash)-1] = 4
 	txctx := &ctrlertypes.TrxContext{
 		BlockContext: block2Ctx,
-		TxHash:       bytes2.RandBytes(32),
+		TxHash:       txHash,
 		Tx: web3.NewTrxContract(
 			fromAcct.Address,
 			contractAcct.Address,
@@ -90,10 +101,8 @@ func Test_Blockhash(t *testing.T) {
 			uint256.NewInt(0),
 			nil,
 		),
-		TxIdx:    1,
-		Exec:     true,
-		Sender:   fromAcct,
-		Receiver: contractAcct,
+		TxIdx: 1,
+		Exec:  true,
 	}
 
 	require.NoError(t, ctrler.ValidateTrx(txctx))
@@ -125,7 +134,9 @@ func newBlockhashTestAcctHandler() *acctHandlerMock {
 		walletsMap: make(map[string]*web3.Wallet),
 	}
 	for i := 0; i < 2; i++ {
-		wallet := web3.NewWallet(nil)
+		privateKey := make([]byte, 32)
+		privateKey[len(privateKey)-1] = byte(i + 1)
+		wallet := web3.ImportKey(privateKey, nil)
 		wallet.GetAccount().AddBalance(uint256.MustFromDecimal("1000000000000000000000000000"))
 		handler.walletsMap[wallet.Address().String()] = wallet
 		handler.walletsArr = append(handler.walletsArr, wallet)

@@ -200,6 +200,12 @@ func (mock *VPowerHandlerMock) ExecuteTrx(context *ctrlertypes.TrxContext) xerro
 	panic("implement me")
 }
 
+func (mock *VPowerHandlerMock) CreateCache(bool) xerrors.XError { return nil }
+
+func (mock *VPowerHandlerMock) WriteCache(bool) xerrors.XError { return nil }
+
+func (mock *VPowerHandlerMock) ClearCache(bool) xerrors.XError { return nil }
+
 func (mock *VPowerHandlerMock) BeginBlock(context *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	panic("implement me")
 }

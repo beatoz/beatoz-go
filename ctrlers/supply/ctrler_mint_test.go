@@ -19,7 +19,7 @@ import (
 )
 
 func TestSdSupplyLimit(t *testing.T) {
-	tests := []struct {
+	for _, test := range []struct {
 		name          string
 		currentSupply uint64
 		maxSupply     uint64
@@ -34,19 +34,15 @@ func TestSdSupplyLimit(t *testing.T) {
 			currentSupply: 101,
 			maxSupply:     100,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			addedSupply := Sd(
-				fxnum.FromInt(1),
-				uint256.NewInt(tt.currentSupply),
-				uint256.NewInt(tt.maxSupply),
-				100,
-				fxnum.FromInt(1),
-			)
-			require.True(t, addedSupply.IsZero(), addedSupply)
-		})
+	} {
+		addedSupply := Sd(
+			fxnum.FromInt(1),
+			uint256.NewInt(test.currentSupply),
+			uint256.NewInt(test.maxSupply),
+			100,
+			fxnum.FromInt(1),
+		)
+		require.True(t, addedSupply.IsZero(), "case=%s supply=%s", test.name, addedSupply)
 	}
 }
 

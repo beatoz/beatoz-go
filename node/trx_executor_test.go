@@ -9,6 +9,8 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
+	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
+	vpowermock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -16,6 +18,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
 	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
@@ -38,12 +41,15 @@ func init() {
 func Test_commonValidation(t *testing.T) {
 	w0 := acctMock.RandWallet() // web3.NewWallet(nil)
 	w1 := web3.NewWallet(nil)
+	blockTime := time.Unix(1, 0)
 
 	//
 	// Exceed the block gas limit
 	blockGasLimit := int64(10_000)
 	bctx := ctrlertypes.NewBlockContext(
-		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
+		abcitypes.RequestBeginBlock{
+			Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1, Time: blockTime},
+		},
 		govMock,
 		acctMock,
 		nil, nil, nil)
@@ -71,7 +77,7 @@ func Test_commonValidation(t *testing.T) {
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 1, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(balance))
 	_, _, err := w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
-	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, blockTime, true, govMock, acctMock, nil, nil, nil)
 	require.NoError(t, xerr)
 	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInvalidNonce.Error(), xerr)
 
@@ -80,21 +86,129 @@ func Test_commonValidation(t *testing.T) {
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(balance+1))
 	_, _, err = w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
-	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, blockTime, true, govMock, acctMock, nil, nil, nil)
 	require.NoError(t, xerr)
 	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrInsufficientFund.Error())
+
+	//
+	// Sender not found
+	missingSender := makeTestWallet(100)
+	tx = web3.NewTrxTransfer(
+		missingSender.Address(), w1.Address(), missingSender.GetNonce(),
+		govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1),
+	)
+	_, _, err = missingSender.SignTrxRLP(tx, chainId.Hex())
+	require.NoError(t, err)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(
+		tx, chainId.Hex(), 1, blockTime, true,
+		govMock, acctMock, nil, nil, nil,
+	)
+	require.NoError(t, xerr)
+	xerr = commonValidation(txctx)
+	require.ErrorContains(t, xerr, xerrors.ErrNotFoundAccount.Error())
+	require.ErrorContains(t, xerr, "sender address")
+
+	//
+	// Payer not found
+	missingPayer := makeTestWallet(101)
+	tx = web3.NewTrxTransfer(
+		w0.Address(), w1.Address(), w0.GetNonce(),
+		govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1),
+	)
+	_, _, err = w0.SignTrxRLP(tx, chainId.Hex())
+	require.NoError(t, err)
+	_, _, err = missingPayer.SignPayerTrxRLP(tx, chainId.Hex())
+	require.NoError(t, err)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(
+		tx, chainId.Hex(), 1, blockTime, true,
+		govMock, acctMock, nil, nil, nil,
+	)
+	require.NoError(t, xerr)
+	xerr = commonValidation(txctx)
+	require.ErrorContains(t, xerr, xerrors.ErrNotFoundAccount.Error())
+	require.ErrorContains(t, xerr, "payer address")
+}
+
+func Test_ExecuteSync(t *testing.T) {
+	acctHandler := acct.NewAcctHandlerMock(2)
+	supplyHandler := supplymock.NewSupplyHandlerMock()
+	vpowerHandler := vpowermock.NewVPowerHandlerMock(nil, 0)
+	sender := acctHandler.GetWallet(0)
+	receiver := acctHandler.GetWallet(1)
+	sender.GetAccount().SetBalance(uint256.NewInt(balance))
+
+	bctx := ctrlertypes.NewBlockContext(
+		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
+		govMock,
+		acctHandler,
+		nil, supplyHandler, vpowerHandler)
+
+	txe := NewTrxExecutor(log.NewNopLogger())
+	gas := govMock.MinTrxGas()
+	amount := uint256.NewInt(1)
+	senderBalance := sender.GetBalance()
+	receiverBalance := receiver.GetBalance()
+	nonce := sender.GetNonce()
+
+	//
+	// Validation failure should not change transaction state.
+	tx := web3.NewTrxTransfer(
+		sender.Address(), receiver.Address(), nonce+1,
+		gas, govMock.GasPrice(), amount,
+	)
+	_, _, xerr := sender.SignTrxRLP(tx, chainId.Hex())
+	require.NoError(t, xerr)
+	txctx, xerr := mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+	require.NoError(t, xerr)
+
+	xerr = txe.ExecuteSync(txctx)
+
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidNonce.Error())
+	require.Equal(t, int64(0), txctx.GasUsed)
+	require.Equal(t, int64(0), bctx.GetBlockGasUsed())
+	require.Equal(t, nonce, sender.GetNonce())
+	require.Equal(t, senderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, receiverBalance.Dec(), receiver.GetBalance().Dec())
+
+	//
+	// Successful execution should update transaction state.
+	tx = web3.NewTrxTransfer(
+		sender.Address(), receiver.Address(), nonce,
+		gas, govMock.GasPrice(), amount,
+	)
+	_, _, xerr = sender.SignTrxRLP(tx, chainId.Hex())
+	require.NoError(t, xerr)
+	txctx, xerr = mocks.MakeTrxCtxWithTrxBctx(tx, bctx, true)
+	require.NoError(t, xerr)
+
+	require.NoError(t, txe.ExecuteSync(txctx))
+
+	fee := types.GasToFee(gas, govMock.GasPrice())
+	expectedSenderBalance := senderBalance.Clone()
+	_ = expectedSenderBalance.Sub(expectedSenderBalance, amount)
+	_ = expectedSenderBalance.Sub(expectedSenderBalance, fee)
+	expectedReceiverBalance := receiverBalance.Clone()
+	_ = expectedReceiverBalance.Add(expectedReceiverBalance, amount)
+
+	require.Equal(t, gas, txctx.GasUsed)
+	require.Equal(t, gas, bctx.GetBlockGasUsed())
+	require.Equal(t, nonce+1, sender.GetNonce())
+	require.Equal(t, expectedSenderBalance.Dec(), sender.GetBalance().Dec())
+	require.Equal(t, expectedReceiverBalance.Dec(), receiver.GetBalance().Dec())
 }
 
 func Test_Gas_FailedTx(t *testing.T) {
 	w0 := acctMock.RandWallet() //web3.NewWallet(nil)
 	w1 := web3.NewWallet(nil)
+	supplyHandler := supplymock.NewSupplyHandlerMock()
+	vpowerHandler := vpowermock.NewVPowerHandlerMock(nil, 0)
 
 	blockGasLimit := int64(5_000_000)
 	bctx := ctrlertypes.NewBlockContext(
 		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
 		govMock,
 		acctMock,
-		nil, nil, nil)
+		nil, supplyHandler, vpowerHandler)
 	bctx.SetBlockGasLimit(blockGasLimit)
 	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 	require.Equal(t, int64(0), bctx.GetBlockGasUsed())
@@ -259,6 +373,8 @@ func Test_Gas_FailedTx(t *testing.T) {
 
 func Test_Payer(t *testing.T) {
 	sender := acctMock.RandWallet()
+	supplyHandler := supplymock.NewSupplyHandlerMock()
+	vpowerHandler := vpowermock.NewVPowerHandlerMock(nil, 0)
 	amt := uint256.NewInt(rand.Uint64N(sender.GetBalance().Uint64()/2) + 10)
 	fmt.Println("sender", sender.Address(), "balance", sender.GetBalance(), "transfer", amt, "fee", govMock.MinTrxFee())
 
@@ -283,7 +399,7 @@ func Test_Payer(t *testing.T) {
 	expectedSenderBalance := sender.GetBalance().Clone()
 	_ = expectedSenderBalance.Sub(expectedSenderBalance, amt)
 
-	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, supplyHandler, vpowerHandler)
 	require.NoError(t, xerr)
 	require.NoError(t, validateTrx(txctx))
 	require.NoError(t, runTrx(txctx))
@@ -305,9 +421,9 @@ func Test_Payer(t *testing.T) {
 	tx = web3.NewTrxTransfer(sender.Address(), types.RandAddress(), sender.GetNonce(), govMock.MinTrxGas(), govMock.GasPrice(), amt)
 	_, _, err = sender.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
-	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, nil, nil)
+	txctx, xerr = mocks.MakeTrxCtxWithTrx(tx, chainId.Hex(), 1, time.Now(), true, govMock, acctMock, nil, supplyHandler, vpowerHandler)
 	require.NoError(t, xerr)
-	require.EqualValues(t, txctx.Sender.Address, txctx.Payer.Address)
+	require.EqualValues(t, txctx.Sender().Address, txctx.Payer().Address)
 	require.NoError(t, validateTrx(txctx))
 	require.NoError(t, runTrx(txctx))
 

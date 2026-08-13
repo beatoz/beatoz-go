@@ -46,7 +46,13 @@ func TestTrxEncode(t *testing.T) {
 
 func TestTrxValidateInvalidSignature(t *testing.T) {
 	validSig := bytes.HexBytes(bytes.ZeroBytes(65))
-	tests := []struct {
+	payerAddress := types.Address(bytes.ZeroBytes(types.AddrSize))
+	payerAddress[len(payerAddress)-1] = 1
+	senderAddress := types.Address(bytes.ZeroBytes(types.AddrSize))
+	senderAddress[len(senderAddress)-1] = 2
+	receiverAddress := types.Address(bytes.ZeroBytes(types.AddrSize))
+	receiverAddress[len(receiverAddress)-1] = 3
+	for _, test := range []struct {
 		name     string
 		sig      bytes.HexBytes
 		payer    types.Address
@@ -56,33 +62,29 @@ func TestTrxValidateInvalidSignature(t *testing.T) {
 		{name: "one_byte_sender_sig", sig: bytes.HexBytes{0x01}},
 		{name: "sixty_four_byte_sender_sig", sig: bytes.HexBytes(bytes.ZeroBytes(64))},
 		{name: "sixty_six_byte_sender_sig", sig: bytes.HexBytes(bytes.ZeroBytes(66))},
-		{name: "nil_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: nil},
-		{name: "one_byte_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: bytes.HexBytes{0x01}},
-		{name: "sixty_four_byte_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: bytes.HexBytes(bytes.ZeroBytes(64))},
-		{name: "sixty_six_byte_payer_sig", sig: validSig, payer: types.RandAddress(), payerSig: bytes.HexBytes(bytes.ZeroBytes(66))},
-	}
+		{name: "nil_payer_sig", sig: validSig, payer: payerAddress, payerSig: nil},
+		{name: "one_byte_payer_sig", sig: validSig, payer: payerAddress, payerSig: bytes.HexBytes{0x01}},
+		{name: "sixty_four_byte_payer_sig", sig: validSig, payer: payerAddress, payerSig: bytes.HexBytes(bytes.ZeroBytes(64))},
+		{name: "sixty_six_byte_payer_sig", sig: validSig, payer: payerAddress, payerSig: bytes.HexBytes(bytes.ZeroBytes(66))},
+	} {
+		tx := &types2.Trx{
+			Version:  1,
+			Time:     1,
+			Nonce:    1,
+			From:     senderAddress,
+			To:       receiverAddress,
+			Amount:   uint256.NewInt(0),
+			Gas:      1,
+			GasPrice: uint256.NewInt(1),
+			Type:     types2.TRX_TRANSFER,
+			Sig:      test.sig,
+			Payer:    test.payer,
+			PayerSig: test.payerSig,
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tx := &types2.Trx{
-				Version:  1,
-				Time:     time.Now().UnixNano(),
-				Nonce:    rand.Int63(),
-				From:     types.RandAddress(),
-				To:       types.RandAddress(),
-				Amount:   uint256.NewInt(0),
-				Gas:      rand.Int63(),
-				GasPrice: uint256.NewInt(rand.Uint64()),
-				Type:     types2.TRX_TRANSFER,
-				Sig:      tt.sig,
-				Payer:    tt.payer,
-				PayerSig: tt.payerSig,
-			}
-
-			xerr := tx.Validate()
-			require.Error(t, xerr)
-			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "unexpected error: %v", xerr)
-		})
+		xerr := tx.Validate()
+		require.Error(t, xerr, "case=%s", test.name)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "case=%s unexpected error: %v", test.name, xerr)
 	}
 }
 

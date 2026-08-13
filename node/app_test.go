@@ -20,9 +20,13 @@ import (
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
-func newTestBeatozApp(t *testing.T, wallets []*web3.Wallet) (*BeatozApp, *beatozLocalClient, func()) {
-	t.Helper()
+func makeTestWallet(privateKeyByte byte) *web3.Wallet {
+	privateKey := make([]byte, 32)
+	privateKey[len(privateKey)-1] = privateKeyByte
+	return web3.ImportKey(privateKey, nil)
+}
 
+func newTestBeatozApp(t *testing.T, wallets []*web3.Wallet) (*BeatozApp, *beatozLocalClient, func()) {
 	appState := genesis.GenesisAppState{
 		AssetHolders: make([]*genesis.GenesisAssetHolder, len(wallets)),
 		GovParams:    types.DefaultGovParams(),
@@ -36,8 +40,10 @@ func newTestBeatozApp(t *testing.T, wallets []*web3.Wallet) (*BeatozApp, *beatoz
 	jz, err := jsonx.Marshal(appState)
 	require.NoError(t, err)
 
+	rootDir, err := os.MkdirTemp("", "beatoz-app-")
+	require.NoError(t, err)
 	btxcfg := config.DefaultConfig("1234")
-	btxcfg.SetRoot(filepath.Join(t.TempDir(), "beatoz-test"))
+	btxcfg.SetRoot(filepath.Join(rootDir, "beatoz-test"))
 
 	btzApp := NewBeatozApp(btxcfg, log.NewNopLogger())
 	btzClient := NewBeatozLocalClient(&tmsync.Mutex{}, btzApp)
@@ -69,10 +75,89 @@ func newTestBeatozApp(t *testing.T, wallets []*web3.Wallet) (*BeatozApp, *beatoz
 
 	cleanup := func() {
 		btzApp.Stop()
-		os.RemoveAll(btxcfg.RootDir)
+		os.RemoveAll(rootDir)
 		types.InitSigner(chainId)
 	}
 	return btzApp, btzClient.(*beatozLocalClient), cleanup
+}
+
+func makeTestTransferTx(
+	t *testing.T,
+	app *BeatozApp,
+	from *web3.Wallet,
+	to *web3.Wallet,
+	nonce int64,
+	amount uint64,
+) []byte {
+	tx := web3.NewTrxTransfer(
+		from.Address(), to.Address(),
+		nonce,
+		app.govCtrler.MinTrxGas(), app.govCtrler.GasPrice(),
+		uint256.NewInt(amount),
+	)
+	_, _, err := from.SignTrxRLP(tx, app.lastBlockCtx.ChainID())
+	require.NoError(t, err)
+	txbz, err := tx.Encode()
+	require.NoError(t, err)
+	return txbz
+}
+
+func runTestBlock(
+	t *testing.T,
+	app *BeatozApp,
+	client *beatozLocalClient,
+	txs [][]byte,
+) []byte {
+	var deliverTxResponses []*abcitypes.ResponseDeliverTx
+	client.SetResponseCallback(func(_ *abcitypes.Request, resp *abcitypes.Response) {
+		if r := resp.GetDeliverTx(); r != nil {
+			deliverTxResp := *r
+			deliverTxResponses = append(deliverTxResponses, &deliverTxResp)
+		}
+	})
+
+	height := app.lastBlockCtx.Height() + 1
+	app.BeginBlock(abcitypes.RequestBeginBlock{
+		Header: tmproto.Header{
+			Height:  height,
+			ChainID: app.lastBlockCtx.ChainID(),
+		},
+	})
+	for _, tx := range txs {
+		app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
+	}
+	app.EndBlock(abcitypes.RequestEndBlock{Height: height})
+	require.Len(t, deliverTxResponses, len(txs))
+	for _, resp := range deliverTxResponses {
+		require.Equal(t, abcitypes.CodeTypeOK, resp.Code, resp.Log)
+	}
+
+	commitResp := app.Commit()
+	require.NotEmpty(t, commitResp.Data)
+	require.Equal(t, height, app.lastBlockCtx.Height())
+	return commitResp.Data
+}
+
+type testAccountSnapshot struct {
+	balance string
+	nonce   int64
+}
+
+func testAccountStates(
+	t *testing.T,
+	app *BeatozApp,
+	wallets []*web3.Wallet,
+) []testAccountSnapshot {
+	states := make([]testAccountSnapshot, len(wallets))
+	for i, wallet := range wallets {
+		acct := app.acctCtrler.FindAccount(wallet.Address(), true)
+		require.NotNil(t, acct)
+		states[i] = testAccountSnapshot{
+			balance: acct.GetBalance().Dec(),
+			nonce:   acct.GetNonce(),
+		}
+	}
+	return states
 }
 
 func Test_InitChain(t *testing.T) {
@@ -115,109 +200,111 @@ func Test_InitChain(t *testing.T) {
 	require.Equal(t, "6000000000000000000", genTotalSupply.Dec())
 }
 
-func Test_EndBlock_NoChainHalt(t *testing.T) {
-	testCases := []struct {
-		name  string
-		build func(t *testing.T, app *BeatozApp, chainID string, wallets []*web3.Wallet) []byte
-	}{
-		{
-			name: "wrong_gas_price",
-			build: func(t *testing.T, app *BeatozApp, chainID string, wallets []*web3.Wallet) []byte {
-				gasPrice := new(uint256.Int).Add(app.govCtrler.GasPrice(), uint256.NewInt(1))
-				tx := web3.NewTrxTransfer(
-					wallets[0].Address(), types2.RandAddress(),
-					wallets[0].GetNonce(),
-					app.govCtrler.MinTrxGas(), gasPrice,
-					uint256.NewInt(1),
-				)
-				_, _, err := wallets[0].SignTrxRLP(tx, chainID)
-				require.NoError(t, err)
-				txbz, err := tx.Encode()
-				require.NoError(t, err)
-				return txbz
-			},
-		},
-		{
-			name: "small_gas",
-			build: func(t *testing.T, app *BeatozApp, chainID string, wallets []*web3.Wallet) []byte {
-				tx := web3.NewTrxTransfer(
-					wallets[0].Address(), types2.RandAddress(),
-					wallets[0].GetNonce(),
-					app.govCtrler.MinTrxGas()-1, app.govCtrler.GasPrice(),
-					uint256.NewInt(1),
-				)
-				_, _, err := wallets[0].SignTrxRLP(tx, chainID)
-				require.NoError(t, err)
-				txbz, err := tx.Encode()
-				require.NoError(t, err)
-				return txbz
-			},
-		},
-		{
-			name: "wrong_signature",
-			build: func(t *testing.T, app *BeatozApp, chainID string, wallets []*web3.Wallet) []byte {
-				tx := web3.NewTrxTransfer(
-					wallets[0].Address(), types2.RandAddress(),
-					wallets[0].GetNonce(),
-					app.govCtrler.MinTrxGas(), app.govCtrler.GasPrice(),
-					uint256.NewInt(1),
-				)
-				_, _, err := wallets[1].SignTrxRLP(tx, chainID)
-				require.NoError(t, err)
-				txbz, err := tx.Encode()
-				require.NoError(t, err)
-				return txbz
-			},
-		},
-		{
-			name: "sender_not_found",
-			build: func(t *testing.T, app *BeatozApp, chainID string, wallets []*web3.Wallet) []byte {
-				unknownSender := web3.NewWallet(nil)
-				tx := web3.NewTrxTransfer(
-					unknownSender.Address(), types2.RandAddress(),
-					unknownSender.GetNonce(),
-					app.govCtrler.MinTrxGas(), app.govCtrler.GasPrice(),
-					uint256.NewInt(1),
-				)
-				_, _, err := unknownSender.SignTrxRLP(tx, chainID)
-				require.NoError(t, err)
-				txbz, err := tx.Encode()
-				require.NoError(t, err)
-				return txbz
-			},
-		},
+func Test_AppHash(t *testing.T) {
+	wallets := []*web3.Wallet{
+		makeTestWallet(1),
+		makeTestWallet(2),
+		makeTestWallet(3),
+	}
+	app0, client0, cleanup0 := newTestBeatozApp(t, wallets)
+	defer cleanup0()
+	app1, client1, cleanup1 := newTestBeatozApp(t, wallets)
+	defer cleanup1()
+
+	txs := [][]byte{
+		makeTestTransferTx(t, app0, wallets[0], wallets[1], 0, 1),
+		makeTestTransferTx(t, app0, wallets[1], wallets[2], 0, 2),
+		makeTestTransferTx(t, app0, wallets[0], wallets[2], 1, 3),
+		makeTestTransferTx(t, app0, wallets[2], wallets[2], 0, 4),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			wallets := []*web3.Wallet{web3.NewWallet(nil), web3.NewWallet(nil)}
-			btzApp, btzClient, cleanup := newTestBeatozApp(t, wallets)
-			defer cleanup()
+	hash0 := runTestBlock(t, app0, client0, txs)
+	hash1 := runTestBlock(t, app1, client1, txs)
 
-			var deliverTxResp *abcitypes.ResponseDeliverTx
-			btzClient.SetResponseCallback(func(req *abcitypes.Request, resp *abcitypes.Response) {
-				if r := resp.GetDeliverTx(); r != nil {
-					deliverTxResp = r
-				}
-			})
+	require.Equal(t, hash0, hash1)
+	require.Equal(t, testAccountStates(t, app0, wallets), testAccountStates(t, app1, wallets))
 
-			chainID := btzApp.lastBlockCtx.ChainID()
-			txbz := tc.build(t, btzApp, chainID, wallets)
+	emptyHash0 := runTestBlock(t, app0, client0, nil)
+	emptyHash1 := runTestBlock(t, app1, client1, nil)
 
-			btzApp.BeginBlock(abcitypes.RequestBeginBlock{
-				Header: tmproto.Header{Height: 2, ChainID: chainID},
-			})
-			btzApp.DeliverTx(abcitypes.RequestDeliverTx{Tx: txbz})
-			require.Equal(t, 1, btzApp.currBlockCtx.TxsCnt())
+	require.Equal(t, emptyHash0, emptyHash1)
+	require.EqualValues(t, 3, app0.lastBlockCtx.Height())
+	require.EqualValues(t, 3, app1.lastBlockCtx.Height())
+}
 
-			require.NotPanics(t, func() {
-				btzApp.EndBlock(abcitypes.RequestEndBlock{Height: 2})
-			})
-			require.NotNil(t, deliverTxResp)
-			require.NotEqual(t, abcitypes.CodeTypeOK, deliverTxResp.Code)
+func Test_EndBlock_NoChainHalt(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		gasDelta       int64
+		gasPriceDelta  uint64
+		wrongSigner    bool
+		senderNotFound bool
+	}{
+		{
+			name:          "wrong_gas_price",
+			gasPriceDelta: 1,
+		},
+		{
+			name:     "small_gas",
+			gasDelta: -1,
+		},
+		{
+			name:        "wrong_signature",
+			wrongSigner: true,
+		},
+		{
+			name:           "sender_not_found",
+			senderNotFound: true,
+		},
+	} {
+		wallets := []*web3.Wallet{makeTestWallet(1), makeTestWallet(2)}
+		btzApp, btzClient, cleanup := newTestBeatozApp(t, wallets)
+		defer cleanup()
 
-			btzApp.Commit()
+		var deliverTxResp *abcitypes.ResponseDeliverTx
+		btzClient.SetResponseCallback(func(_ *abcitypes.Request, resp *abcitypes.Response) {
+			if r := resp.GetDeliverTx(); r != nil {
+				deliverTxResp = r
+			}
 		})
+
+		sender := wallets[0]
+		if test.senderNotFound {
+			sender = makeTestWallet(3)
+		}
+		signer := sender
+		if test.wrongSigner {
+			signer = wallets[1]
+		}
+		gasPrice := new(uint256.Int).Add(
+			btzApp.govCtrler.GasPrice(),
+			uint256.NewInt(test.gasPriceDelta),
+		)
+		tx := web3.NewTrxTransfer(
+			sender.Address(), wallets[1].Address(),
+			sender.GetNonce(),
+			btzApp.govCtrler.MinTrxGas()+test.gasDelta, gasPrice,
+			uint256.NewInt(1),
+		)
+		chainID := btzApp.lastBlockCtx.ChainID()
+		_, _, err := signer.SignTrxRLP(tx, chainID)
+		require.NoError(t, err, "case=%s", test.name)
+		txbz, err := tx.Encode()
+		require.NoError(t, err, "case=%s", test.name)
+
+		btzApp.BeginBlock(abcitypes.RequestBeginBlock{
+			Header: tmproto.Header{Height: 2, ChainID: chainID},
+		})
+		btzApp.DeliverTx(abcitypes.RequestDeliverTx{Tx: txbz})
+		require.Equal(t, 1, btzApp.currBlockCtx.TxsCnt(), "case=%s", test.name)
+
+		require.NotPanics(t, func() {
+			btzApp.EndBlock(abcitypes.RequestEndBlock{Height: 2})
+		}, "case=%s", test.name)
+		require.NotNil(t, deliverTxResp, "case=%s", test.name)
+		require.NotEqual(t, abcitypes.CodeTypeOK, deliverTxResp.Code, "case=%s", test.name)
+
+		btzApp.Commit()
 	}
 }
 

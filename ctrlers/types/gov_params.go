@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sync"
 
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -537,7 +537,7 @@ func MergeGovParams(fromPrams, toParams *GovParams) {
 	}
 }
 
-var _ v1.ILedgerItem = (*GovParams)(nil)
+var _ common.ILedgerItem = (*GovParams)(nil)
 var _ IGovParams = (*GovParams)(nil)
 
 // functions for test

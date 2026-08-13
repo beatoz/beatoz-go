@@ -5,7 +5,7 @@ import (
 
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -212,7 +212,7 @@ func TestFreezingProposal(t *testing.T) {
 	// the proposal is frozen.
 	_, xerr = govCtrler.ReadProposal(trxCtxProposal.TxHash, false)
 	require.Equal(t, xerrors.ErrNotFoundProposal, xerr)
-	item, xerr := govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
+	item, xerr := govCtrler.govState.Get(common.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	frozenProp, _ := item.(*proposal.GovProposal)
 	require.NotNil(t, frozenProp.MajorOption())
@@ -258,7 +258,7 @@ func TestApplyingProposal(t *testing.T) {
 	require.NoError(t, xerr)
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr := govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
+	frozenProp, xerr := govCtrler.govState.Get(common.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.NoError(t, xerr)
 	require.NotNil(t, frozenProp)
 
@@ -273,7 +273,7 @@ func TestApplyingProposal(t *testing.T) {
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
-	frozenProp, xerr = govCtrler.govState.Get(v1.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
+	frozenProp, xerr = govCtrler.govState.Get(common.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 	require.Nil(t, frozenProp)
 
@@ -292,13 +292,14 @@ func TestApplyInvalidGovParamsProposalRejected(t *testing.T) {
 	bzOpt, err := jsonx.Marshal(invalidGovParams)
 	require.NoError(t, err)
 
-	txHash := bytes.RandBytes(32)
+	txHash := make([]byte, 32)
+	txHash[0] = 1
 	applyHeight := int64(100)
 	prop := proposal.NewGovProposal(proposal.PROPOSAL_GOVPARAMS, txHash, 1, 1, 1, applyHeight)
 	prop.AddOption(bzOpt)
 	require.NotNil(t, prop.UpdateMajorOption())
 
-	frozenKey := v1.LedgerKeyFrozenProp(txHash)
+	frozenKey := common.LedgerKeyFrozenProp(txHash)
 	require.NoError(t, govCtrler.govState.Set(frozenKey, prop, true))
 
 	bctx := &ctrlertypes.BlockContext{}

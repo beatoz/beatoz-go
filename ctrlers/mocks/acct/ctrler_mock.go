@@ -147,6 +147,12 @@ func (mock *AcctHandlerMock) SetAccount(acct *ctrlertypes.Account, b bool) xerro
 	return nil
 }
 
+func (mock *AcctHandlerMock) CreateCache(bool) xerrors.XError { return nil }
+
+func (mock *AcctHandlerMock) WriteCache(bool) xerrors.XError { return nil }
+
+func (mock *AcctHandlerMock) ClearCache(bool) xerrors.XError { return nil }
+
 func (mock *AcctHandlerMock) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcitypes.Event, xerrors.XError) {
 	//TODO implement me
 	panic("implement me")
@@ -167,10 +173,13 @@ func (mock *AcctHandlerMock) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XE
 }
 
 func (mock *AcctHandlerMock) ExecuteTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
-	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
+	sender := ctx.Sender()
+	receiver := ctx.Receiver()
+
+	if xerr := sender.SubBalance(ctx.Tx.Amount); xerr != nil {
 		return xerr
 	}
-	if xerr := ctx.Receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
+	if xerr := receiver.AddBalance(ctx.Tx.Amount); xerr != nil {
 		return xerr
 	}
 	return nil

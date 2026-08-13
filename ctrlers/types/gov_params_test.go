@@ -44,59 +44,66 @@ func TestGovParamsValidateBasic(t *testing.T) {
 }
 
 func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
-	tests := []struct {
+	negativeMaxValidatorCount := DefaultGovParams()
+	negativeMaxValidatorCount.SetValue(func(v *GovParamsProto) {
+		v.MaxValidatorCnt = -1
+	})
+	zeroInflationCycleBlocks := DefaultGovParams()
+	zeroInflationCycleBlocks.SetValue(func(v *GovParamsProto) {
+		v.InflationCycleBlocks = 0
+	})
+	negativeInflationCycleBlocks := DefaultGovParams()
+	negativeInflationCycleBlocks.SetValue(func(v *GovParamsProto) {
+		v.InflationCycleBlocks = -1
+	})
+	negativeBlockGasLimit := DefaultGovParams()
+	negativeBlockGasLimit.SetValue(func(v *GovParamsProto) {
+		v.BlockGasLimit = -1
+	})
+	invalidTxFeeRewardRate := DefaultGovParams()
+	invalidTxFeeRewardRate.SetValue(func(v *GovParamsProto) {
+		v.TxFeeRewardRate = 200
+	})
+	invalidSlashRate := DefaultGovParams()
+	invalidSlashRate.SetValue(func(v *GovParamsProto) {
+		v.SlashRate = 200
+	})
+
+	for _, test := range []struct {
 		name   string
-		mutate func(*GovParamsProto)
+		params *GovParams
 	}{
 		{
-			name: "negative_max_validator_count",
-			mutate: func(v *GovParamsProto) {
-				v.MaxValidatorCnt = -1
-			},
+			name:   "negative_max_validator_count",
+			params: negativeMaxValidatorCount,
 		},
 		{
-			name: "zero_inflation_cycle_blocks",
-			mutate: func(v *GovParamsProto) {
-				v.InflationCycleBlocks = 0
-			},
+			name:   "zero_inflation_cycle_blocks",
+			params: zeroInflationCycleBlocks,
 		},
 		{
-			name: "negative_inflation_cycle_blocks",
-			mutate: func(v *GovParamsProto) {
-				v.InflationCycleBlocks = -1
-			},
+			name:   "negative_inflation_cycle_blocks",
+			params: negativeInflationCycleBlocks,
 		},
 		{
-			name: "negative_block_gas_limit",
-			mutate: func(v *GovParamsProto) {
-				v.BlockGasLimit = -1
-			},
+			name:   "negative_block_gas_limit",
+			params: negativeBlockGasLimit,
 		},
 		{
-			name: "tx_fee_reward_rate_over_100",
-			mutate: func(v *GovParamsProto) {
-				v.TxFeeRewardRate = 200
-			},
+			name:   "tx_fee_reward_rate_over_100",
+			params: invalidTxFeeRewardRate,
 		},
 		{
-			name: "slash_rate_over_100",
-			mutate: func(v *GovParamsProto) {
-				v.SlashRate = 200
-			},
+			name:   "slash_rate_over_100",
+			params: invalidSlashRate,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			params := DefaultGovParams()
-			params.SetValue(tt.mutate)
-			require.Error(t, params.ValidateBasic())
-		})
+	} {
+		require.Error(t, test.params.ValidateBasic(), "case=%s", test.name)
 	}
 }
 
 func TestValidateCurrentSupply(t *testing.T) {
-	tests := []struct {
+	for _, test := range []struct {
 		name          string
 		maxSupply     uint64
 		currentSupply uint64
@@ -118,28 +125,24 @@ func TestValidateCurrentSupply(t *testing.T) {
 			maxSupply:     101,
 			currentSupply: 100,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			params := DefaultGovParams()
-			params.SetValue(func(v *GovParamsProto) {
-				v.XMaxTotalSupply = uint256.NewInt(tt.maxSupply).Bytes()
-			})
-
-			xerr := params.ValidateCurrentSupply(uint256.NewInt(tt.currentSupply))
-			if tt.wantErr {
-				require.Error(t, xerr)
-				require.Contains(t, xerr.Error(), "maxTotalSupply")
-				return
-			}
-			require.NoError(t, xerr)
+	} {
+		params := DefaultGovParams()
+		params.SetValue(func(v *GovParamsProto) {
+			v.XMaxTotalSupply = uint256.NewInt(test.maxSupply).Bytes()
 		})
+
+		xerr := params.ValidateCurrentSupply(uint256.NewInt(test.currentSupply))
+		if test.wantErr {
+			require.Error(t, xerr, "case=%s", test.name)
+			require.Contains(t, xerr.Error(), "maxTotalSupply", "case=%s", test.name)
+			continue
+		}
+		require.NoError(t, xerr, "case=%s", test.name)
 	}
 }
 
 func TestGovParamsUnmarshalError(t *testing.T) {
-	tests := []struct {
+	for _, test := range []struct {
 		name     string
 		input    string
 		errField string
@@ -184,14 +187,10 @@ func TestGovParamsUnmarshalError(t *testing.T) {
 			input:    `{"rewardPoolAddress": "not-hex"}`,
 			errField: "rewardPoolAddress",
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			params := &GovParams{}
-			err := jsonx.Unmarshal([]byte(tt.input), params)
-			require.Error(t, err)
-			require.ErrorContains(t, err, tt.errField)
-		})
+	} {
+		params := &GovParams{}
+		err := jsonx.Unmarshal([]byte(test.input), params)
+		require.Error(t, err, "case=%s", test.name)
+		require.ErrorContains(t, err, test.errField, "case=%s", test.name)
 	}
 }
