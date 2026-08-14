@@ -91,38 +91,48 @@ func Test_ValidateTrx(t *testing.T) {
 	// normal tx	: address != zero, code != nil
 	// fallback tx	: address != zero, code != nil
 
-	bctx := &ctrlertypes.BlockContext{}
-	fromAcct := ctrlertypes.NewAccount(types.RandAddress())
+	bctx := mocks.InitBlockCtxWith("evm-test-chain-id", 1, govMock, &acctHandler, ctrler, nil, nil)
+	fromAcct := acctHandler.walletsArr[0].GetAccount()
 
 	txctx := &ctrlertypes.TrxContext{
 		BlockContext: bctx,
 		Tx: web3.NewTrxContract(types.ZeroAddress(), types.ZeroAddress(),
 			1, 300000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(32)),
-		Sender: fromAcct,
 	}
 
 	// contract tx: toAcct.Code == nil
-	txctx.Receiver = ctrlertypes.NewAccount(types.RandAddress())
+	toAcct := ctrlertypes.NewAccount(types.RandAddress())
+	acctHandler.contAccts = append(acctHandler.contAccts, toAcct)
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, toAcct.Address,
+		1, 300000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(32))
 	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrInvalidAccountType.Error())
 
 	// contract tx: toAcct.Code != nil
-	txctx.Receiver = ctrlertypes.NewAccount(types.RandAddress())
-	txctx.Receiver.Code = []byte("not nil")
+	toAcct = ctrlertypes.NewAccount(types.RandAddress())
+	toAcct.Code = []byte("not nil")
+	acctHandler.contAccts = append(acctHandler.contAccts, toAcct)
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, toAcct.Address,
+		1, 300000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(32))
 	require.NoError(t, ctrler.ValidateTrx(txctx))
 
 	// contract tx: toAcct.Code != nil, input == nil or 0 len
-	txctx.Receiver = ctrlertypes.NewAccount(types.RandAddress())
-	txctx.Receiver.Code = []byte("not nil")
+	toAcct = ctrlertypes.NewAccount(types.RandAddress())
+	toAcct.Code = []byte("not nil")
+	acctHandler.contAccts = append(acctHandler.contAccts, toAcct)
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, toAcct.Address,
+		1, 300000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(32))
 	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 0)
 	require.NoError(t, ctrler.ValidateTrx(txctx))
 
 	// deploy tx: input == nil or 0 len
-	txctx.Receiver = ctrlertypes.NewAccount(types.ZeroAddress())
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, types.ZeroAddress(),
+		1, 300000, govMock.GasPrice(), uint256.NewInt(1), nil)
 	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 0)
 	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrInvalidTrxPayloadParams.Error())
 
 	// deploy tx: input == nil or 0 len
-	txctx.Receiver = ctrlertypes.NewAccount(types.ZeroAddress())
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, types.ZeroAddress(),
+		1, 300000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(1))
 	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 1)
 	require.NoError(t, ctrler.ValidateTrx(txctx))
 
@@ -139,7 +149,7 @@ func Test_Deploy(t *testing.T) {
 	deployInput = append(erc20BuildInfo.Bytecode, deployInput...)
 
 	contAddr, txctx := testDeployContract(t, deployInput)
-	fromAcct := txctx.Sender
+	fromAcct := txctx.Sender()
 	height := txctx.Height()
 	erc20ContAddr = contAddr
 
@@ -307,8 +317,6 @@ func testDeployContract(t *testing.T, input []byte) (types.Address, *ctrlertypes
 		Tx:           web3.NewTrxContract(fromAcct.Address, to, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), input),
 		TxIdx:        1,
 		Exec:         true,
-		Sender:       fromAcct,
-		Receiver:     nil,
 		GasUsed:      0,
 	}
 
@@ -344,9 +352,6 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPri
 		return nil, xerrors.From(err)
 	}
 
-	fromAcct := acctHandler.FindAccount(from, true)
-	toAcct := acctHandler.FindAccount(to, true)
-
 	bctx := mocks.CurrBlockCtx()
 	txctx := &ctrlertypes.TrxContext{
 		BlockContext: bctx,
@@ -354,8 +359,6 @@ func execMethod(abiObj abi.ABI, from, to types.Address, nonce, gas int64, gasPri
 		TxIdx:        1,
 		TxHash:       bytes2.RandBytes(32),
 		Exec:         true,
-		Sender:       fromAcct,
-		Receiver:     toAcct,
 		GasUsed:      0,
 	}
 
@@ -426,6 +429,12 @@ type acctHandlerMock struct {
 	contAccts  []*ctrlertypes.Account
 	origin     bool
 }
+
+func (handler *acctHandlerMock) CreateCache(bool) xerrors.XError { return nil }
+
+func (handler *acctHandlerMock) WriteCache(bool) xerrors.XError { return nil }
+
+func (handler *acctHandlerMock) ClearCache(bool) xerrors.XError { return nil }
 
 func (handler *acctHandlerMock) FindOrNewAccount(addr types.Address, exec bool) *ctrlertypes.Account {
 	ret := handler.FindAccount(addr, exec)

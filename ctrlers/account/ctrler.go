@@ -6,7 +6,8 @@ import (
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	btztypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/genesis"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	ledger "github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
@@ -15,7 +16,7 @@ import (
 )
 
 type AcctCtrler struct {
-	acctState v1.IStateLedger
+	acctState *ledger.StateLedgerManager
 
 	newbiesCheck   map[btztypes.AcctKey]*btztypes.Account
 	newbiesDeliver map[btztypes.AcctKey]*btztypes.Account
@@ -27,7 +28,7 @@ type AcctCtrler struct {
 func NewAcctCtrler(config *cfg.Config, logger tmlog.Logger) (*AcctCtrler, error) {
 	lg := logger.With("module", "beatoz_AcctCtrler")
 
-	if _state, xerr := v1.NewStateLedger("accounts", config.DBDir(), 10000, func(key v1.LedgerKey) v1.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
+	if _state, xerr := ledger.NewStateLedgerManager("accounts", config.DBDir(), 10000, func(key ledger.LedgerKey) ledger.ILedgerItem { return &btztypes.Account{} }, lg); xerr != nil {
 		return nil, xerr
 	} else {
 		return &AcctCtrler{
@@ -83,21 +84,38 @@ func (ctrler *AcctCtrler) ExecuteTrx(ctx *btztypes.TrxContext) xerrors.XError {
 
 	switch ctx.Tx.GetType() {
 	case btztypes.TRX_TRANSFER:
-		if xerr := ctrler.transfer(ctx.Sender, ctx.Receiver, ctx.Tx.Amount); xerr != nil {
+		return ctrler.transfer(ctx.Tx.From, ctx.Tx.To, ctx.Tx.Amount, ctx.Exec)
+	case btztypes.TRX_SETDOC:
+		sender := ctrler.findAccount(ctx.Tx.From, ctx.Exec)
+		if sender == nil {
+			return xerrors.ErrNotFoundAccount.Wrapf("SetDoc - address: %v", ctx.Tx.From)
+		}
+		payload := ctx.Tx.Payload.(*btztypes.TrxPayloadSetDoc)
+		ctrler.setDoc(sender, payload.Name, payload.URL)
+		if xerr := ctrler.setAccount(sender, ctx.Exec); xerr != nil {
 			return xerr
 		}
-	case btztypes.TRX_SETDOC:
-		ctrler.setDoc(ctx.Sender,
-			ctx.Tx.Payload.(*btztypes.TrxPayloadSetDoc).Name,
-			ctx.Tx.Payload.(*btztypes.TrxPayloadSetDoc).URL)
-	}
 
-	_ = ctrler.setAccount(ctx.Sender, ctx.Exec)
-	if ctx.Receiver != nil {
-		_ = ctrler.setAccount(ctx.Receiver, ctx.Exec)
+		receiver := ctrler.findAccount(ctx.Tx.To, ctx.Exec)
+		if receiver == nil {
+			receiver = btztypes.NewAccountWithName(ctx.Tx.To, "")
+		}
+		return ctrler.setAccount(receiver, ctx.Exec)
 	}
 
 	return nil
+}
+
+func (ctrler *AcctCtrler) CreateCache(exec bool) xerrors.XError {
+	return ctrler.acctState.CreateCache(exec)
+}
+
+func (ctrler *AcctCtrler) WriteCache(exec bool) xerrors.XError {
+	return ctrler.acctState.WriteCache(exec)
+}
+
+func (ctrler *AcctCtrler) ClearCache(exec bool) xerrors.XError {
+	return ctrler.acctState.ClearCache(exec)
 }
 
 func (ctrler *AcctCtrler) Close() xerrors.XError {
@@ -146,7 +164,7 @@ func (ctrler *AcctCtrler) FindAccount(addr types.Address, exec bool) *btztypes.A
 }
 
 func (ctrler *AcctCtrler) findAccount(addr types.Address, exec bool) *btztypes.Account {
-	if acct, xerr := ctrler.acctState.Get(v1.LedgerKeyAccount(addr), exec); xerr != nil {
+	if acct, xerr := ctrler.acctState.Get(common.LedgerKeyAccount(addr), exec); xerr != nil {
 		return nil
 	} else {
 		return acct.(*btztypes.Account)
@@ -157,37 +175,29 @@ func (ctrler *AcctCtrler) Transfer(from, to types.Address, amt *uint256.Int, exe
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
+	return ctrler.transfer(from, to, amt, exec)
+}
+
+func (ctrler *AcctCtrler) transfer(from, to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	acct0 := ctrler.findAccount(from, exec)
 	if acct0 == nil {
 		return xerrors.ErrNotFoundAccount.Wrapf("Transfer - address: %v", from)
 	}
+	if xerr := acct0.SubBalance(amt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.setAccount(acct0, exec); xerr != nil {
+		return xerr
+	}
+
 	acct1 := ctrler.findAccount(to, exec)
 	if acct1 == nil {
 		acct1 = btztypes.NewAccountWithName(to, "")
 	}
-	xerr := ctrler.transfer(acct0, acct1, amt)
-	if xerr != nil {
+	if xerr := acct1.AddBalance(amt); xerr != nil {
 		return xerr
 	}
-
-	if xerr := ctrler.setAccount(acct0, exec); xerr != nil {
-		return xerr
-	}
-	if xerr := ctrler.setAccount(acct1, exec); xerr != nil {
-		return xerr
-	}
-	return nil
-}
-
-func (ctrler *AcctCtrler) transfer(from, to *btztypes.Account, amt *uint256.Int) xerrors.XError {
-	if err := from.SubBalance(amt); err != nil {
-		return err
-	}
-	if err := to.AddBalance(amt); err != nil {
-		_ = from.AddBalance(amt) // refund
-		return err
-	}
-	return nil
+	return ctrler.setAccount(acct1, exec)
 }
 
 func (ctrler *AcctCtrler) SetCode(addr types.Address, code []byte, exec bool) xerrors.XError {
@@ -308,7 +318,7 @@ func (ctrler *AcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.
 }
 
 func (ctrler *AcctCtrler) setAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return ctrler.acctState.Set(v1.LedgerKeyAccount(acct.Address), acct, exec)
+	return ctrler.acctState.Set(common.LedgerKeyAccount(acct.Address), acct, exec)
 }
 
 func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandler, xerrors.XError) {
@@ -324,20 +334,37 @@ func (ctrler *AcctCtrler) SimuAcctCtrlerAt(height int64) (btztypes.IAccountHandl
 	}, nil
 }
 
+func (ctrler *AcctCtrler) UpgradeLedgerVersion(target common.LedgerVersion) xerrors.XError {
+	return ctrler.acctState.UpgradeLedgerVersion(target)
+}
+
 var _ btztypes.ILedgerHandler = (*AcctCtrler)(nil)
 var _ btztypes.ITrxHandler = (*AcctCtrler)(nil)
 var _ btztypes.IBlockHandler = (*AcctCtrler)(nil)
 var _ btztypes.IAccountHandler = (*AcctCtrler)(nil)
+var _ btztypes.ILedgerVersionHandler = (*AcctCtrler)(nil)
 
 type SimuAcctCtrler struct {
-	simuLedger v1.IImitable
+	simuLedger ledger.IImitable
 	newbies    map[btztypes.AcctKey]*btztypes.Account
 	logger     tmlog.Logger
 	mtx        sync.RWMutex
 }
 
 func (memCtrler *SimuAcctCtrler) SetAccount(acct *btztypes.Account, exec bool) xerrors.XError {
-	return memCtrler.simuLedger.Set(v1.LedgerKeyAccount(acct.Address), acct)
+	return memCtrler.simuLedger.Set(common.LedgerKeyAccount(acct.Address), acct)
+}
+
+func (memCtrler *SimuAcctCtrler) CreateCache(bool) xerrors.XError {
+	return xerrors.NewOrdinary("simulated account controller does not support transaction cache")
+}
+
+func (memCtrler *SimuAcctCtrler) WriteCache(bool) xerrors.XError {
+	return xerrors.NewOrdinary("simulated account controller does not support transaction cache")
+}
+
+func (memCtrler *SimuAcctCtrler) ClearCache(bool) xerrors.XError {
+	return xerrors.NewOrdinary("simulated account controller does not support transaction cache")
 }
 
 func (memCtrler *SimuAcctCtrler) FindOrNewAccount(addr types.Address, exec bool) *btztypes.Account {
@@ -365,7 +392,7 @@ func (memCtrler *SimuAcctCtrler) FindAccount(addr types.Address, exec bool) *btz
 }
 
 func (memCtrler *SimuAcctCtrler) findAccount(addr types.Address) *btztypes.Account {
-	if acct, xerr := memCtrler.simuLedger.Get(v1.LedgerKeyAccount(addr)); xerr != nil {
+	if acct, xerr := memCtrler.simuLedger.Get(common.LedgerKeyAccount(addr)); xerr != nil {
 		return nil
 	} else {
 		return acct.(*btztypes.Account)

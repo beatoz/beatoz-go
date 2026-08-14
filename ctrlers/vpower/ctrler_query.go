@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -47,7 +47,7 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	xerr = atledger.Seek(v1.LedgerKeyVPower(addr, nil), true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = atledger.Seek(common.LedgerKeyVPower(addr, nil), true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		for _, pc := range vpow.PowerChunks {
 			ret = append(ret, &respStake{
@@ -101,14 +101,14 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 
-	bc, xerr := atledger.Get(v1.LedgerKeyMissedBlockCount(addr))
+	bc, xerr := atledger.Get(common.LedgerKeyMissedBlockCount(addr))
 	if xerr != nil && !xerr.Contains(xerrors.ErrNotFoundResult) {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
 	_ptr, _ := bc.(*BlockCount)
 	n := _ptr.Int64()
 
-	item, xerr := atledger.Get(v1.LedgerKeyDelegatee(addr))
+	item, xerr := atledger.Get(common.LedgerKeyDelegatee(addr))
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
@@ -119,7 +119,7 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 	for i, _addr := range dgtee.Delegators {
 		dgtors[i] = _addr
 
-		item, xerr = atledger.Get(v1.LedgerKeyVPower(_addr, dgtee.addr))
+		item, xerr = atledger.Get(common.LedgerKeyVPower(_addr, dgtee.addr))
 		if xerr != nil {
 			return nil, xerrors.ErrQuery.Wrap(xerr)
 		}
@@ -160,7 +160,7 @@ func (ctrler *VPowerCtrler) queryTotalPower(height int64) ([]byte, xerrors.XErro
 	}
 
 	ret := int64(0)
-	xerr = atledger.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = atledger.Seek(common.KeyPrefixDelegatee, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		d, _ := item.(*Delegatee)
 		ret += d.SumPower
 		return nil
@@ -182,7 +182,7 @@ func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinV
 	minValPower := getMinValPower().(int64)
 
 	var delegatees OrderByPowerDelegatees
-	xerr = atledger.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr = atledger.Seek(common.KeyPrefixDelegatee, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		d, _ := item.(*Delegatee)
 		if d.SelfPower < minValPower {
 			return nil // continue

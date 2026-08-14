@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -75,7 +75,7 @@ func (prop *GovProposal) Decode(k, v []byte) xerrors.XError {
 	return nil
 }
 
-var _ v1.ILedgerItem = (*GovProposal)(nil)
+var _ common.ILedgerItem = (*GovProposal)(nil)
 
 func (prop *GovProposal) Header() *GovProposalHeaderProto {
 	prop.mtx.RLock()

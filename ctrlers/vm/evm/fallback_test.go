@@ -74,8 +74,6 @@ func Test_Fallback(t *testing.T) {
 		Tx:           web3.NewTrxContract(fromAcct.Address, toAcct.Address, fromAcct.GetNonce(), 3_000_000, uint256.NewInt(10_000_000_000), uint256.NewInt(0), bytes2.HexBytes(buildInfoFallbackContract.Bytecode)),
 		TxIdx:        1,
 		Exec:         true,
-		Sender:       fromAcct,
-		Receiver:     toAcct,
 		GasUsed:      0,
 	}
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))
@@ -115,8 +113,6 @@ func Test_Fallback(t *testing.T) {
 		TxIdx:        1,
 		TxHash:       bytes2.RandBytes(32),
 		Exec:         true,
-		Sender:       fromAcct,
-		Receiver:     contAcct,
 		GasUsed:      0,
 	}
 	require.NoError(t, fallbackEVM.ValidateTrx(txctx))

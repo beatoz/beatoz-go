@@ -4,7 +4,7 @@ import (
 	"fmt"
 	vpowmock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-sdk-go/web3"
@@ -62,7 +62,7 @@ func Test_Withdraw(t *testing.T) {
 				beforeWithdrawn := accumRwd.WithdrawnAmount()
 				beforeCummAmt := accumRwd.CumulatedAmount()
 
-				item, xerr := ctrler.supplyState.Get(v1.LedgerKeyReward(mintRwd.addr), true)
+				item, xerr := ctrler.supplyState.Get(common.LedgerKeyReward(mintRwd.addr), true)
 				require.NoError(t, xerr)
 
 				rwd := item.(*Reward)

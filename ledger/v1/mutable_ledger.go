@@ -14,7 +14,6 @@ import (
 type MutableLedger struct {
 	db         dbm.DB
 	tree       *iavl.MutableTree
-	revisions  *revisionList[[]byte]
 	cachedObjs map[string]ILedgerItem
 
 	newItemFor FuncNewItemFor
@@ -39,7 +38,6 @@ func NewMutableLedger(name, dbDir string, cacheSize int, newItem FuncNewItemFor,
 	return &MutableLedger{
 		db:         db,
 		tree:       tree,
-		revisions:  newSnapshotList[[]byte](),
 		cachedObjs: make(map[string]ILedgerItem),
 		newItemFor: newItem,
 		cacheSize:  cacheSize,
@@ -152,26 +150,14 @@ func (ledger *MutableLedger) Set(key LedgerKey, item ILedgerItem) xerrors.XError
 }
 
 func (ledger *MutableLedger) set(key LedgerKey, item ILedgerItem) xerrors.XError {
-	oldVal, err := ledger.tree.Get(key)
-	if err != nil {
-		return xerrors.From(err)
-	}
 	newVal, xerr := item.Encode()
 	if xerr != nil {
 		return xerr
 	}
 
-	_, err = ledger.tree.Set(key, newVal)
+	_, err := ledger.tree.Set(key, newVal)
 	if err != nil {
 		return xerrors.From(err)
-	}
-
-	//ledger.logger.Debug("set item to tree", "key", key, "oldVal", oldVal, "newVal", newVal)
-
-	if bytes.Compare(oldVal, newVal) != 0 {
-		// if `oldVal` is `nil`, it means that the item is created, and it should be removed in reverting.
-		// if `oldVal` is not equal to `newVal`, it means that the item is updated, and `oldVal` will be restored in reverting.
-		ledger.revisions.set(key, oldVal)
 	}
 	return nil
 }
@@ -186,47 +172,7 @@ func (ledger *MutableLedger) Del(key LedgerKey) xerrors.XError {
 	}
 	ledger.logger.Debug("delete item from tree", "key", key, "value", oldVal, "removed", removed)
 
-	//if oldVal != nil && removed {
-	if removed {
-		// In reverting, `oldVal` will be restored.
-		ledger.revisions.set(key, oldVal)
-	}
-
 	delete(ledger.cachedObjs, unsafe.String(&key[0], len(key)))
-	return nil
-}
-
-func (ledger *MutableLedger) Snapshot() int {
-	ledger.mtx.RLock()
-	defer ledger.mtx.RUnlock()
-
-	return ledger.revisions.snapshot()
-}
-
-func (ledger *MutableLedger) RevertToSnapshot(snap int) xerrors.XError {
-	ledger.mtx.Lock()
-	defer ledger.mtx.Unlock()
-
-	restores := ledger.revisions.revs[snap:]
-	for i := len(restores) - 1; i >= 0; i-- {
-		kv := restores[i]
-		if kv.val != nil {
-			if _, err := ledger.tree.Set(kv.key, kv.val); err != nil {
-				return xerrors.From(err)
-			}
-			restoreItem := ledger.newItemFor(kv.key)
-			if xerr := restoreItem.Decode(kv.key, kv.val); xerr != nil {
-				return xerr
-			}
-			ledger.cachedObjs[unsafe.String(&kv.key[0], len(kv.key))] = restoreItem
-		} else {
-			if _, _, err := ledger.tree.Remove(kv.key); err != nil {
-				return xerrors.From(err)
-			}
-			delete(ledger.cachedObjs, unsafe.String(&kv.key[0], len(kv.key)))
-		}
-	}
-	ledger.revisions.revert(snap)
 	return nil
 }
 
@@ -244,7 +190,6 @@ func (ledger *MutableLedger) Commit() ([]byte, int64, xerrors.XError) {
 
 	ledger.logger.Debug("tree save version", "hash", r1, "version", r2)
 
-	ledger.revisions.reset()
 	ledger.cachedObjs = make(map[string]ILedgerItem)
 	return r1, r2, nil
 }
@@ -284,8 +229,6 @@ func (ledger *MutableLedger) Close() xerrors.XError {
 		}
 	}
 	ledger.db = nil
-
-	ledger.revisions.reset()
 
 	return nil
 }

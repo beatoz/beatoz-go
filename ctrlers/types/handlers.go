@@ -1,11 +1,16 @@
 package types
 
 import (
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
+
+type ILedgerVersionHandler interface {
+	UpgradeLedgerVersion(target common.LedgerVersion) xerrors.XError
+}
 
 type Option func() interface{}
 
@@ -25,6 +30,12 @@ type IBlockHandler interface {
 type ITrxHandler interface {
 	ValidateTrx(*TrxContext) xerrors.XError
 	ExecuteTrx(*TrxContext) xerrors.XError
+}
+
+type ITrxCacheHandler interface {
+	CreateCache(exec bool) xerrors.XError
+	WriteCache(exec bool) xerrors.XError
+	ClearCache(exec bool) xerrors.XError
 }
 
 type IGovParams interface {
@@ -68,11 +79,13 @@ type IGovHandler interface {
 	IGovParams
 	ITrxHandler
 	IBlockHandler
+	ITrxCacheHandler
 }
 
 type IAccountHandler interface {
 	ITrxHandler
 	IBlockHandler
+	ITrxCacheHandler
 	SetAccount(*Account, bool) xerrors.XError
 	FindOrNewAccount(types.Address, bool) *Account
 	FindAccount(types.Address, bool) *Account
@@ -103,6 +116,7 @@ type IEVMHandler interface {
 type IVPowerHandler interface {
 	ITrxHandler
 	IBlockHandler
+	ITrxCacheHandler
 	IStakeHandler
 	ComputeWeight(int64, int64, int64, int32, *uint256.Int) (IWeightResult, xerrors.XError)
 }
@@ -110,6 +124,7 @@ type IVPowerHandler interface {
 type ISupplyHandler interface {
 	ITrxHandler
 	IBlockHandler
+	ITrxCacheHandler
 	TotalSupply() *uint256.Int
 	RequestMint(bctx *BlockContext)
 	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError

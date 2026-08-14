@@ -3,6 +3,7 @@ package types
 type ForkBlocks struct {
 	BTIP27Block int64
 	BTIP35Block int64
+	BTIP45Block int64
 }
 
 var (
@@ -12,6 +13,7 @@ var (
 	testnetForkBlocks = ForkBlocks{
 		BTIP27Block: 194_850,
 		BTIP35Block: 194_850,
+		BTIP45Block: 500_000,
 	}
 
 	mainnetForkBlocks = ForkBlocks{
@@ -40,6 +42,15 @@ func IsBTIP35(chainId string, height int64) bool {
 		h0 = forkBlocks.BTIP35Block
 	}
 	// If there is no forkBlocks then `h0` is 0; BTIP27 is enabled by default.
+	return isBlockForked(h0, height)
+}
+
+func IsBTIP45(chainId string, height int64) bool {
+	h0 := int64(0)
+	if forkBlocks, ok := chainForkBlocks[chainId]; ok {
+		h0 = forkBlocks.BTIP45Block
+	}
+	// If there is no forkBlocks then `h0` is 0; BTIP45 is enabled by default.
 	return isBlockForked(h0, height)
 }
 

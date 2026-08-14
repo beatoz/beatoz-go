@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 
 	types2 "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -12,7 +12,7 @@ import (
 
 func (ctrler *VPowerCtrler) loadDelegatees(exec bool) ([]*Delegatee, xerrors.XError) {
 	var dgtees []*Delegatee
-	xerr := ctrler.vpowerState.Seek(v1.KeyPrefixDelegatee, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	xerr := ctrler.vpowerState.Seek(common.KeyPrefixDelegatee, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		dgtee, _ := item.(*Delegatee)
 		dgtees = append(dgtees, dgtee)
 		return nil
@@ -25,7 +25,7 @@ func (ctrler *VPowerCtrler) loadDelegatees(exec bool) ([]*Delegatee, xerrors.XEr
 
 func (ctrler *VPowerCtrler) readDelegatee(addr types.Address, exec bool) (*Delegatee, xerrors.XError) {
 	var ret *Delegatee
-	item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyDelegatee(addr), exec)
+	item, xerr := ctrler.vpowerState.Get(common.LedgerKeyDelegatee(addr), exec)
 	if xerr == nil {
 		ret, _ = item.(*Delegatee)
 	}
@@ -37,12 +37,12 @@ func (ctrler *VPowerCtrler) writeDelegatee(dgtee *Delegatee, exec bool) xerrors.
 }
 
 func (ctrler *VPowerCtrler) removeDelegatee(addr types.Address, exec bool) xerrors.XError {
-	return ctrler.vpowerState.Del(v1.LedgerKeyDelegatee(addr), exec)
+	return ctrler.vpowerState.Del(common.LedgerKeyDelegatee(addr), exec)
 }
 
 func (ctrler *VPowerCtrler) readVPower(from, to types.Address, exec bool) (*VPower, xerrors.XError) {
 	var ret *VPower
-	item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyVPower(from, to), exec)
+	item, xerr := ctrler.vpowerState.Get(common.LedgerKeyVPower(from, to), exec)
 	if xerr == nil {
 		ret, _ = item.(*VPower)
 	}
@@ -52,12 +52,12 @@ func (ctrler *VPowerCtrler) writeVPower(vpow *VPower, exec bool) xerrors.XError 
 	return ctrler.vpowerState.Set(vpow.key, vpow, exec)
 }
 
-func (ctrler *VPowerCtrler) seekVPowersOf(from types.Address, cb v1.FuncIterate, exec bool) xerrors.XError {
-	return ctrler.vpowerState.Seek(v1.LedgerKeyVPower(from, nil), true, cb, exec)
+func (ctrler *VPowerCtrler) seekVPowersOf(from types.Address, cb common.FuncIterate, exec bool) xerrors.XError {
+	return ctrler.vpowerState.Seek(common.LedgerKeyVPower(from, nil), true, cb, exec)
 }
 
 func (ctrler *VPowerCtrler) removeVPower(from, to types.Address, exec bool) xerrors.XError {
-	return ctrler.vpowerState.Del(v1.LedgerKeyVPower(from, to), exec)
+	return ctrler.vpowerState.Del(common.LedgerKeyVPower(from, to), exec)
 }
 
 func (ctrler *VPowerCtrler) bondPowerChunk(
@@ -111,7 +111,7 @@ func (ctrler *VPowerCtrler) unbondPowerChunk(dgtee *Delegatee, vpow *VPower, txh
 func (ctrler *VPowerCtrler) freezePowerChunk(from types.Address, pc *PowerChunkProto, refundHeight int64, exec bool) xerrors.XError {
 	// the `from` can do freezing multiple power chunks in one block.
 	// if the `from` already has existing frozen power chunks, add `pc` to them.
-	item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+	item, xerr := ctrler.vpowerState.Get(common.LedgerKeyFrozenVPower(refundHeight, from), exec)
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return xerr
 	}
@@ -123,13 +123,13 @@ func (ctrler *VPowerCtrler) freezePowerChunk(from types.Address, pc *PowerChunkP
 	frozen.RefundPower += pc.Power
 	frozen.PowerChunks = append(frozen.PowerChunks, pc)
 
-	return ctrler.vpowerState.Set(v1.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
+	return ctrler.vpowerState.Set(common.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
 }
 
 func (ctrler *VPowerCtrler) freezePowerChunkList(from types.Address, pcs []*PowerChunkProto, refundHeight int64, exec bool) xerrors.XError {
 	// the `from` can do freezing multiple power chunks in one block.
 	// if the `from` already has existing frozen power chunks, add `pcs` to them.
-	item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+	item, xerr := ctrler.vpowerState.Get(common.LedgerKeyFrozenVPower(refundHeight, from), exec)
 	if xerr != nil && xerr != xerrors.ErrNotFoundResult {
 		return xerr
 	}
@@ -143,7 +143,7 @@ func (ctrler *VPowerCtrler) freezePowerChunkList(from types.Address, pcs []*Powe
 	}
 	frozen.PowerChunks = append(frozen.PowerChunks, pcs...)
 
-	return ctrler.vpowerState.Set(v1.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
+	return ctrler.vpowerState.Set(common.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
 }
 
 func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerrors.XError {
@@ -151,7 +151,7 @@ func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerror
 }
 
 func (ctrler *VPowerCtrler) _unfreezePowerChunk(refundHeight int64, acctHandler types2.IAccountHandler) xerrors.XError {
-	var removed []v1.LedgerKey
+	var removed []common.LedgerKey
 	defer func() {
 		for _, k := range removed {
 			_ = ctrler.vpowerState.Del(k, true)
@@ -159,9 +159,9 @@ func (ctrler *VPowerCtrler) _unfreezePowerChunk(refundHeight int64, acctHandler 
 	}()
 
 	return ctrler.vpowerState.Seek(
-		v1.LedgerKeyFrozenVPower(refundHeight, nil),
+		common.LedgerKeyFrozenVPower(refundHeight, nil),
 		true,
-		func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+		func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 			frozen, _ := item.(*FrozenVPower)
 			refundAmt := types.PowerToAmount(frozen.RefundPower)
 
@@ -180,7 +180,7 @@ func (ctrler *VPowerCtrler) _unfreezePowerChunk(refundHeight int64, acctHandler 
 
 func (ctrler *VPowerCtrler) readFrozenVPower(refundHeight int64, from types.Address, exec bool) (*FrozenVPower, xerrors.XError) {
 	var ret *FrozenVPower
-	item, xerr := ctrler.vpowerState.Get(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+	item, xerr := ctrler.vpowerState.Get(common.LedgerKeyFrozenVPower(refundHeight, from), exec)
 	if xerr == nil {
 		ret, _ = item.(*FrozenVPower)
 	}
@@ -188,12 +188,12 @@ func (ctrler *VPowerCtrler) readFrozenVPower(refundHeight int64, from types.Addr
 }
 
 func (ctrler *VPowerCtrler) removeFrozenVPower(refundHeight int64, from types.Address, exec bool) xerrors.XError {
-	return ctrler.vpowerState.Del(v1.LedgerKeyFrozenVPower(refundHeight, from), exec)
+	return ctrler.vpowerState.Del(common.LedgerKeyFrozenVPower(refundHeight, from), exec)
 }
 
 func (ctrler *VPowerCtrler) countOf(keyPrefix []byte, exec bool) int {
 	ret := 0
-	_ = ctrler.vpowerState.Seek(keyPrefix, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	_ = ctrler.vpowerState.Seek(keyPrefix, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		ret++
 		return nil
 	}, exec)
@@ -224,10 +224,10 @@ func (c *BlockCount) Int64() int64 {
 	return int64(*c)
 }
 
-var _ v1.ILedgerItem = (*BlockCount)(nil)
+var _ common.ILedgerItem = (*BlockCount)(nil)
 
 func (ctrler *VPowerCtrler) getMissedBlockCount(valAddr types.Address, exec bool) (BlockCount, xerrors.XError) {
-	key := v1.LedgerKeyMissedBlockCount(valAddr)
+	key := common.LedgerKeyMissedBlockCount(valAddr)
 	d, xerr := ctrler.vpowerState.Get(key, exec)
 	if xerr != nil {
 		return 0, xerr
@@ -237,7 +237,7 @@ func (ctrler *VPowerCtrler) getMissedBlockCount(valAddr types.Address, exec bool
 }
 
 func (ctrler *VPowerCtrler) setMissedBlockCount(valAddr types.Address, c BlockCount, exec bool) xerrors.XError {
-	key := v1.LedgerKeyMissedBlockCount(valAddr)
+	key := common.LedgerKeyMissedBlockCount(valAddr)
 	return ctrler.vpowerState.Set(key, &c, exec)
 }
 
@@ -253,13 +253,13 @@ func (ctrler *VPowerCtrler) addMissedBlockCount(valAddr types.Address, exec bool
 }
 
 func (ctrler *VPowerCtrler) resetAllMissedBlockCount(exec bool) xerrors.XError {
-	var rmKeys []v1.LedgerKey
+	var rmKeys []common.LedgerKey
 	defer func() {
 		for _, rmKey := range rmKeys {
 			_ = ctrler.vpowerState.Del(rmKey, exec)
 		}
 	}()
-	return ctrler.vpowerState.Seek(v1.KeyPrefixMissedBlockCount, true, func(key v1.LedgerKey, value v1.ILedgerItem) xerrors.XError {
+	return ctrler.vpowerState.Seek(common.KeyPrefixMissedBlockCount, true, func(key common.LedgerKey, value common.ILedgerItem) xerrors.XError {
 		rmKeys = append(rmKeys, key)
 		return nil
 	}, exec)

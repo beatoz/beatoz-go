@@ -9,7 +9,8 @@ import (
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	ledger "github.com/beatoz/beatoz-go/ledger"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -19,7 +20,7 @@ import (
 )
 
 type VPowerCtrler struct {
-	vpowerState v1.IStateLedger
+	vpowerState *ledger.StateLedgerManager
 
 	allDelegatees  []*Delegatee
 	lastValidators []*Delegatee
@@ -30,14 +31,14 @@ type VPowerCtrler struct {
 	mtx    sync.RWMutex
 }
 
-func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
-	if bytes2.HasPrefix(key, v1.KeyPrefixVPower) {
+func defaultNewItem(key common.LedgerKey) common.ILedgerItem {
+	if bytes2.HasPrefix(key, common.KeyPrefixVPower) {
 		return &VPower{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixDelegatee) {
+	} else if bytes2.HasPrefix(key, common.KeyPrefixDelegatee) {
 		return &Delegatee{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixFrozenVPower) {
+	} else if bytes2.HasPrefix(key, common.KeyPrefixFrozenVPower) {
 		return &FrozenVPower{}
-	} else if bytes2.HasPrefix(key, v1.KeyPrefixMissedBlockCount) {
+	} else if bytes2.HasPrefix(key, common.KeyPrefixMissedBlockCount) {
 		return new(BlockCount)
 	}
 	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
@@ -46,7 +47,7 @@ func defaultNewItem(key v1.LedgerKey) v1.ILedgerItem {
 func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_VPowerCtrler")
 
-	powersState, xerr := v1.NewStateLedger("vpows", config.DBDir(), 21*1000, defaultNewItem, lg)
+	powersState, xerr := ledger.NewStateLedgerManager("vpows", config.DBDir(), 21*1000, defaultNewItem, lg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -301,10 +302,13 @@ func (ctrler *VPowerCtrler) execBonding(ctx *ctrlertypes.TrxContext) xerrors.XEr
 	}
 
 	// Update sender account balance
-	if xerr := ctx.Sender.SubBalance(ctx.Tx.Amount); xerr != nil {
+	sender := ctx.Sender()
+	if xerr := sender.SubBalance(ctx.Tx.Amount); xerr != nil {
 		return xerr
 	}
-	_ = ctx.AcctHandler.SetAccount(ctx.Sender, ctx.Exec)
+	if xerr := ctx.AcctHandler.SetAccount(sender, ctx.Exec); xerr != nil {
+		return xerr
+	}
 
 	return nil
 }
@@ -360,6 +364,18 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	}
 
 	return nil
+}
+
+func (ctrler *VPowerCtrler) CreateCache(exec bool) xerrors.XError {
+	return ctrler.vpowerState.CreateCache(exec)
+}
+
+func (ctrler *VPowerCtrler) WriteCache(exec bool) xerrors.XError {
+	return ctrler.vpowerState.WriteCache(exec)
+}
+
+func (ctrler *VPowerCtrler) ClearCache(exec bool) xerrors.XError {
+	return ctrler.vpowerState.ClearCache(exec)
 }
 
 func (ctrler *VPowerCtrler) Close() xerrors.XError {
@@ -465,7 +481,7 @@ func (ctrler *VPowerCtrler) PowerOf(from types.Address) int64 {
 	defer ctrler.mtx.RUnlock()
 
 	delegatePower := int64(0)
-	_ = ctrler.seekVPowersOf(from, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	_ = ctrler.seekVPowersOf(from, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		delegatePower += vpow.SumPower
 		return nil
@@ -480,14 +496,19 @@ func (ctrler *VPowerCtrler) DelegatedPowerOf(addr types.Address) int64 {
 }
 
 // DEPRECATED
-func (ctrler *VPowerCtrler) ImitableState(h int64) (v1.IImitable, xerrors.XError) {
+func (ctrler *VPowerCtrler) ImitableState(h int64) (ledger.IImitable, xerrors.XError) {
 	ctrler.mtx.RLock()
 	defer ctrler.mtx.RUnlock()
 
 	return ctrler.vpowerState.ImitableLedgerAt(h)
 }
 
+func (ctrler *VPowerCtrler) UpgradeLedgerVersion(target common.LedgerVersion) xerrors.XError {
+	return ctrler.vpowerState.UpgradeLedgerVersion(target)
+}
+
 var _ ctrlertypes.ILedgerHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.ITrxHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IBlockHandler = (*VPowerCtrler)(nil)
 var _ ctrlertypes.IVPowerHandler = (*VPowerCtrler)(nil)
+var _ ctrlertypes.ILedgerVersionHandler = (*VPowerCtrler)(nil)

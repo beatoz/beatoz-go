@@ -6,7 +6,7 @@ import (
 	"sort"
 	"sync"
 
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	abytes "github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
@@ -29,7 +29,7 @@ type Account struct {
 	mtx     sync.RWMutex
 }
 
-var _ v1.ILedgerItem = (*Account)(nil)
+var _ common.ILedgerItem = (*Account)(nil)
 
 func NewAccount(addr types.Address) *Account {
 	return &Account{

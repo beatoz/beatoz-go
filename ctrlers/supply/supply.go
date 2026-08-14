@@ -1,7 +1,7 @@
 package supply
 
 import (
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/holiman/uint256"
 	"google.golang.org/protobuf/proto"
@@ -92,4 +92,4 @@ func (s *Supply) ResetChanged() {
 	s.changed = false
 }
 
-var _ v1.ILedgerItem = (*Supply)(nil)
+var _ common.ILedgerItem = (*Supply)(nil)

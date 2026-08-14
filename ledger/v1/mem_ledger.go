@@ -14,7 +14,6 @@ import (
 type MemLedger struct {
 	immuTree   *iavl.ImmutableTree
 	memStorage map[string][]byte
-	revisions  *revisionList[[]byte]
 	newItemFor FuncNewItemFor
 	logger     tmlog.Logger
 	mtx        sync.RWMutex
@@ -35,7 +34,6 @@ func NewMemLedgerAt(ver int64, from IMutable, lg tmlog.Logger) (*MemLedger, xerr
 	return &MemLedger{
 		immuTree:   tree,
 		memStorage: make(map[string][]byte),
-		revisions:  newSnapshotList[[]byte](),
 		newItemFor: from.(*MutableLedger).newItemFor,
 		logger:     lg.With("ledger", "MemLedger"),
 	}, nil
@@ -146,40 +144,15 @@ func (ledger *MemLedger) Seek(prefix []byte, ascending bool, cb FuncIterate) xer
 	return nil
 }
 
-// Set:
-//   memStorage 에서 조회
-//     없으면 immuTree 에서 조회
-//       없으면 revisions 에 nil set
-//     	 있으면 revisions 에 immuTree.value 를 set.
-//     있으면 revisions 에 memStorage.value를 set.
-//   memStroage 에 새로운 value set
-
 func (ledger *MemLedger) Set(key LedgerKey, item ILedgerItem) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
-
-	keystr := unsafe.String(&key[0], len(key))
-	oldVal, ok := ledger.memStorage[keystr]
-	if !ok {
-		_old, err := ledger.immuTree.Get(key)
-		if err != nil {
-			return xerrors.From(err)
-		}
-		oldVal = _old // if _old is nil, it means deleted.
-	}
 
 	newVal, xerr := item.Encode()
 	if xerr != nil {
 		return xerr
 	}
-
-	if bytes.Compare(oldVal, newVal) != 0 {
-		// if `oldVal` is `nil`, it means that the item is created, and it should be removed in reverting.
-		// if `oldVal` is not equal to `newVal`, it means that the item is updated, and `oldVal` will be restored in reverting.
-		ledger.revisions.set(key, oldVal)
-	}
-
-	ledger.memStorage[keystr] = newVal
+	ledger.memStorage[unsafe.String(&key[0], len(key))] = newVal
 	return nil
 }
 
@@ -187,33 +160,6 @@ func (ledger *MemLedger) Del(key LedgerKey) xerrors.XError {
 	ledger.mtx.Lock()
 	defer ledger.mtx.Unlock()
 
-	keystr := unsafe.String(&key[0], len(key))
-	if oldVal, ok := ledger.memStorage[keystr]; ok {
-		ledger.revisions.set(key, oldVal)
-	}
-
-	ledger.memStorage[keystr] = nil // delete from memory. don't read from immuTree.
-
-	return nil
-}
-
-func (ledger *MemLedger) Snapshot() int {
-	ledger.mtx.RLock()
-	defer ledger.mtx.RUnlock()
-
-	return ledger.revisions.snapshot()
-}
-
-func (ledger *MemLedger) RevertToSnapshot(snap int) xerrors.XError {
-	ledger.mtx.Lock()
-	defer ledger.mtx.Unlock()
-
-	restores := ledger.revisions.revs[snap:]
-	for i := len(restores) - 1; i >= 0; i-- {
-		kv := restores[i]
-		keystr := unsafe.String(&kv.key[0], len(kv.key))
-		ledger.memStorage[keystr] = kv.val
-	}
-	ledger.revisions.revert(snap)
+	ledger.memStorage[unsafe.String(&key[0], len(key))] = nil
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/vm/evm"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/genesis"
+	"github.com/beatoz/beatoz-go/ledger"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/crypto"
@@ -176,6 +177,16 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		}
 	} else {
 		ctrler.lastBlockCtx.SetChainID(ctrler.rootConfig.ChainIdHex())
+	}
+
+	// Apply the ledger version for the next block according to IsBTIP45.
+	startupLedgerVersion := ledger.LedgerVersionAt(
+		ctrler.lastBlockCtx.ChainID(),
+		ctrler.lastBlockCtx.Height()+1,
+	)
+	if xerr := ctrler.upgradeLedgerVersion(startupLedgerVersion); xerr != nil {
+		ctrler.logger.Error("failed to finalize startup ledger version", "version", startupLedgerVersion, "error", xerr)
+		panic(xerr)
 	}
 
 	// create signers
@@ -482,6 +493,21 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	}
 }
 
+func (ctrler *BeatozApp) upgradeLedgerVersion(target ledger.LedgerVersion) xerrors.XError {
+	handlers := []ctrlertypes.ILedgerVersionHandler{
+		ctrler.acctCtrler,
+		ctrler.govCtrler,
+		ctrler.supplyCtrler,
+		ctrler.vpowCtrler,
+	}
+	for _, h := range handlers {
+		if xerr := h.UpgradeLedgerVersion(target); xerr != nil {
+			return xerr
+		}
+	}
+	return nil
+}
+
 func (ctrler *BeatozApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -775,6 +801,13 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	_ = ctrler.metaDB.PutLastBlockContext(ctrler.currBlockCtx)
 	ctrler.lastBlockCtx = ctrler.currBlockCtx
 	ctrler.currBlockCtx = nil
+
+	// Apply the ledger version for the next block according to IsBTIP45.
+	targetLedgerVersion := ledger.LedgerVersionAt(ctrler.lastBlockCtx.ChainID(), height+1)
+	if xerr := ctrler.upgradeLedgerVersion(targetLedgerVersion); xerr != nil {
+		ctrler.logger.Error("failed to upgrade ledger version", "error", xerr)
+		panic(xerr)
+	}
 
 	if ctrler.rootConfig.RPC.ListenAddress != "" {
 		if ctrler.lastBlockCtx.TxsCnt() > 0 {

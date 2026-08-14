@@ -2,13 +2,16 @@ package v1
 
 import (
 	"bytes"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/cosmos/iavl"
 	"sort"
 )
 
-type FuncNewItemFor func(LedgerKey) ILedgerItem
-type FuncIterate func(LedgerKey, ILedgerItem) xerrors.XError
+type LedgerKey = common.LedgerKey
+type ILedgerItem = common.ILedgerItem
+type FuncNewItemFor = common.FuncNewItemFor
+type FuncIterate = common.FuncIterate
 
 type IGettable interface {
 	Get(LedgerKey) (ILedgerItem, xerrors.XError)
@@ -19,18 +22,13 @@ type IGettable interface {
 type ISettable interface {
 	Set(LedgerKey, ILedgerItem) xerrors.XError
 	Del(LedgerKey) xerrors.XError
-	Snapshot() int
-	RevertToSnapshot(int) xerrors.XError
 }
 
 type ICommittable interface {
 	Commit() ([]byte, int64, xerrors.XError)
 }
 
-type IImitable interface {
-	IGettable
-	ISettable
-}
+type IImitable = common.IImitable
 
 type IMutable interface {
 	IGettable
@@ -47,21 +45,14 @@ type IStateLedger interface {
 	Iterate(FuncIterate, bool) xerrors.XError
 	Seek([]byte, bool, FuncIterate, bool) xerrors.XError
 	Set(LedgerKey, ILedgerItem, bool) xerrors.XError
-	Snapshot(bool) int
-	RevertToSnapshot(int, bool) xerrors.XError
 	Del(LedgerKey, bool) xerrors.XError
+	CreateCache(bool) xerrors.XError
+	WriteCache(bool) xerrors.XError
+	ClearCache(bool) xerrors.XError
 	Commit() ([]byte, int64, xerrors.XError)
 	Close() xerrors.XError
 	ImitableLedgerAt(int64) (IImitable, xerrors.XError)
 }
-
-type ILedgerItem interface {
-	//Key() LedgerKey
-	Encode() ([]byte, xerrors.XError)
-	Decode([]byte, []byte) xerrors.XError
-}
-
-type LedgerKey = []byte
 
 type LedgerKeyList []LedgerKey
 

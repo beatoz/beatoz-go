@@ -2,7 +2,7 @@ package gov
 
 import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
-	v1 "github.com/beatoz/beatoz-go/ledger/v1"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 )
@@ -14,12 +14,12 @@ func (ctrler *GovCtrler) doSlash(targetAddr types.Address) (int64, xerrors.XErro
 	var updatedProp []*proposal.GovProposal
 	defer func() {
 		for _, prop := range updatedProp {
-			_ = ctrler.govState.Set(v1.LedgerKeyProposal(prop.Header().TxHash), prop, true)
+			_ = ctrler.govState.Set(common.LedgerKeyProposal(prop.Header().TxHash), prop, true)
 		}
 	}()
 
 	slashPower := int64(0)
-	_ = ctrler.govState.Seek(v1.KeyPrefixProposal, true, func(key v1.LedgerKey, item v1.ILedgerItem) xerrors.XError {
+	_ = ctrler.govState.Seek(common.KeyPrefixProposal, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		prop, _ := item.(*proposal.GovProposal)
 
 		if prop.FindVoter(targetAddr) != nil {

@@ -21,7 +21,7 @@ func init() {
 }
 
 func TestVerifyTrxRLPInvalidSignature(t *testing.T) {
-	tests := []struct {
+	for _, test := range []struct {
 		name string
 		sig  bytes.HexBytes
 	}{
@@ -29,24 +29,20 @@ func TestVerifyTrxRLPInvalidSignature(t *testing.T) {
 		{name: "one_byte", sig: bytes.HexBytes{0x01}},
 		{name: "sixty_four_bytes", sig: bytes.HexBytes(bytes.ZeroBytes(64))},
 		{name: "invalid_v", sig: bytes.HexBytes(append(bytes.ZeroBytes(64), 99))},
-	}
+	} {
+		tx := &ctrtypes.Trx{Sig: test.sig}
+		var xerr xerrors.XError
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tx := &ctrtypes.Trx{Sig: tt.sig}
-			var xerr xerrors.XError
-
-			require.NotPanics(t, func() {
-				_, _, xerr = ctrtypes.VerifyTrxRLP(tx)
-			})
-			require.Error(t, xerr)
-			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "unexpected error: %v", xerr)
-		})
+		require.NotPanics(t, func() {
+			_, _, xerr = ctrtypes.VerifyTrxRLP(tx)
+		}, "case=%s", test.name)
+		require.Error(t, xerr, "case=%s", test.name)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "case=%s unexpected error: %v", test.name, xerr)
 	}
 }
 
 func TestVerifyPayerTrxRLPInvalidSignature(t *testing.T) {
-	tests := []struct {
+	for _, test := range []struct {
 		name string
 		sig  bytes.HexBytes
 	}{
@@ -54,19 +50,15 @@ func TestVerifyPayerTrxRLPInvalidSignature(t *testing.T) {
 		{name: "one_byte", sig: bytes.HexBytes{0x01}},
 		{name: "sixty_four_bytes", sig: bytes.HexBytes(bytes.ZeroBytes(64))},
 		{name: "invalid_v", sig: bytes.HexBytes(append(bytes.ZeroBytes(64), 99))},
-	}
+	} {
+		tx := &ctrtypes.Trx{PayerSig: test.sig}
+		var xerr xerrors.XError
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tx := &ctrtypes.Trx{PayerSig: tt.sig}
-			var xerr xerrors.XError
-
-			require.NotPanics(t, func() {
-				_, _, xerr = ctrtypes.VerifyPayerTrxRLP(tx)
-			})
-			require.Error(t, xerr)
-			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "unexpected error: %v", xerr)
-		})
+		require.NotPanics(t, func() {
+			_, _, xerr = ctrtypes.VerifyPayerTrxRLP(tx)
+		}, "case=%s", test.name)
+		require.Error(t, xerr, "case=%s", test.name)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidTrxSig), "case=%s unexpected error: %v", test.name, xerr)
 	}
 }
 

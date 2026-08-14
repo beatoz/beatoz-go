@@ -101,24 +101,24 @@ func Test_NewTrxContext(t *testing.T) {
 	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
-	require.NotNil(t, txctx.Sender)
-	require.Equal(t, txctx.Sender.Address, w0.Address())
-	require.NotNil(t, txctx.Receiver)
-	require.Equal(t, txctx.Receiver.Address, types.ZeroAddress())
-	require.NotNil(t, txctx.Payer)
-	require.Equal(t, txctx.Payer.Address, w0.Address())
+	require.NotNil(t, txctx.Sender())
+	require.Equal(t, txctx.Sender().Address, w0.Address())
+	require.NotNil(t, txctx.Receiver())
+	require.Equal(t, txctx.Receiver().Address, types.ZeroAddress())
+	require.NotNil(t, txctx.Payer())
+	require.Equal(t, txctx.Payer().Address, w0.Address())
 	//
 	// To Zero Address
 	tx = web3.NewTrxTransfer(w0.Address(), types.ZeroAddress(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
 	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
-	require.NotNil(t, txctx.Sender)
-	require.Equal(t, txctx.Sender.Address, w0.Address())
-	require.NotNil(t, txctx.Receiver)
-	require.Equal(t, txctx.Receiver.Address, types.ZeroAddress())
-	require.NotNil(t, txctx.Payer)
-	require.Equal(t, txctx.Payer.Address, w0.Address())
+	require.NotNil(t, txctx.Sender())
+	require.Equal(t, txctx.Sender().Address, w0.Address())
+	require.NotNil(t, txctx.Receiver())
+	require.Equal(t, txctx.Receiver().Address, types.ZeroAddress())
+	require.NotNil(t, txctx.Payer())
+	require.Equal(t, txctx.Payer().Address, w0.Address())
 
 	//
 	// Success
@@ -126,36 +126,25 @@ func Test_NewTrxContext(t *testing.T) {
 	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
-	require.NotNil(t, txctx.Sender)
-	require.Equal(t, txctx.Sender.Address, w0.Address())
-	require.NotNil(t, txctx.Receiver)
-	require.Equal(t, txctx.Receiver.Address, w1.Address())
-	require.NotNil(t, txctx.Payer)
-	require.EqualValues(t, txctx.Sender.Address, txctx.Payer.Address)
+	require.NotNil(t, txctx.Sender())
+	require.Equal(t, txctx.Sender().Address, w0.Address())
+	require.NotNil(t, txctx.Receiver())
+	require.Equal(t, txctx.Receiver().Address, w1.Address())
+	require.NotNil(t, txctx.Payer())
+	require.EqualValues(t, txctx.Sender().Address, txctx.Payer().Address)
 
 	//
-	// Payer: not found payer account
-	payer := web3.NewWallet(nil)
+	// Payer: not Sender
+	payer := acctMock.RandWallet()
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
 	_, _, err := w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	txctx, xerr = newTrxCtx(tx, 1)
-	require.ErrorContains(t, xerr, xerrors.ErrNotFoundAccount.Error())
-
-	//
-	// Payer: not Sender
-	payer = acctMock.RandWallet()
-	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
-	_, _, err = w0.SignTrxRLP(tx, chainId.Hex())
-	require.NoError(t, err)
-	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
-	require.NoError(t, err)
-	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
-	require.NotNil(t, txctx.Payer)
-	require.Equal(t, payer.Address(), txctx.Payer.Address)
+	require.NotNil(t, txctx.Payer())
+	require.Equal(t, payer.Address(), txctx.Payer().Address)
 }
 
 func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {

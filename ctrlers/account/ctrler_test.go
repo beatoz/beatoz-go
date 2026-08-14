@@ -170,6 +170,50 @@ func TestAcctCtrler_Commit(t *testing.T) {
 	}
 }
 
+func TestAcctCtrler_SelfTransfer(t *testing.T) {
+	for _, exec := range []bool{false, true} {
+		for _, test := range []struct {
+			name      string
+			amount    *uint256.Int
+			wantError bool
+		}{
+			{name: "partial balance", amount: uint256.NewInt(100)},
+			{name: "full balance", amount: uint256.NewInt(1_000)},
+			{name: "insufficient balance", amount: uint256.NewInt(1_001), wantError: true},
+		} {
+			rootDir, err := os.MkdirTemp("", "account-self-transfer-")
+			require.NoError(t, err, "exec=%t case=%s", exec, test.name)
+			defer os.RemoveAll(rootDir)
+
+			config := cfg.DefaultConfig()
+			config.SetRoot(rootDir)
+			ctrler, err := NewAcctCtrler(config, tmlog.NewNopLogger())
+			require.NoError(t, err, "exec=%t case=%s", exec, test.name)
+			defer ctrler.Close()
+
+			addr := types.Address(bytes.ZeroBytes(types.AddrSize))
+			addr[len(addr)-1] = 1
+			initialBalance := uint256.NewInt(1_000)
+			acct := account2.NewAccount(addr)
+			acct.SetBalance(initialBalance)
+			require.NoError(t, ctrler.SetAccount(acct, true), "exec=%t case=%s", exec, test.name)
+			_, _, xerr := ctrler.Commit()
+			require.NoError(t, xerr, "exec=%t case=%s", exec, test.name)
+
+			xerr = ctrler.Transfer(addr, addr, test.amount, exec)
+			if test.wantError {
+				require.ErrorContains(t, xerr, xerrors.ErrInsufficientFund.Error(), "exec=%t case=%s", exec, test.name)
+			} else {
+				require.NoError(t, xerr, "exec=%t case=%s", exec, test.name)
+			}
+
+			actual := ctrler.FindAccount(addr, exec)
+			require.NotNil(t, actual, "exec=%t case=%s", exec, test.name)
+			require.Equal(t, initialBalance.Dec(), actual.GetBalance().Dec(), "exec=%t case=%s", exec, test.name)
+		}
+	}
+}
+
 func Test_Issue32(t *testing.T) {
 	config := cfg.DefaultConfig()
 	config.DBPath = filepath.Join(os.TempDir(), "test-concurrnent-findornewaccount")

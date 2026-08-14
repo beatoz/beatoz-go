@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
+	"github.com/beatoz/beatoz-go/ctrlers/supply"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
@@ -12,6 +13,7 @@ import (
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+	tmlog "github.com/tendermint/tendermint/libs/log"
 )
 
 type Case struct {
@@ -136,54 +138,53 @@ func TestProposalDuplicate(t *testing.T) {
 }
 
 func TestInvalidGovParamsProposalValidation(t *testing.T) {
-	tests := []struct {
-		name    string
-		mutate  func(*ctrlertypes.GovParamsProto)
-		wantMsg string
+	negativeMaxValidatorCount := &ctrlertypes.GovParams{}
+	negativeMaxValidatorCount.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxValidatorCnt = -1
+	})
+	invalidTxFeeRewardRate := &ctrlertypes.GovParams{}
+	invalidTxFeeRewardRate.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.TxFeeRewardRate = 200
+	})
+
+	for i, test := range []struct {
+		name      string
+		govParams *ctrlertypes.GovParams
+		wantMsg   string
 	}{
 		{
-			name: "negative_max_validator_count",
-			mutate: func(v *ctrlertypes.GovParamsProto) {
-				v.MaxValidatorCnt = -1
-			},
-			wantMsg: "maxValidatorCnt",
+			name:      "negative_max_validator_count",
+			govParams: negativeMaxValidatorCount,
+			wantMsg:   "maxValidatorCnt",
 		},
 		{
-			name: "tx_fee_reward_rate_over_100",
-			mutate: func(v *ctrlertypes.GovParamsProto) {
-				v.TxFeeRewardRate = 200
-			},
-			wantMsg: "txFeeRewardRate",
+			name:      "tx_fee_reward_rate_over_100",
+			govParams: invalidTxFeeRewardRate,
+			wantMsg:   "txFeeRewardRate",
 		},
-	}
+	} {
+		bzOpt, err := jsonx.Marshal(test.govParams)
+		require.NoError(t, err, "case=%s", test.name)
 
-	for i, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			newGovParams := &ctrlertypes.GovParams{}
-			newGovParams.SetValue(tt.mutate)
-			bzOpt, err := jsonx.Marshal(newGovParams)
-			require.NoError(t, err)
+		tx := web3.NewTrxProposal(
+			vpowMock.PickAddress(vpowMock.ValCnt-1),
+			types.ZeroAddress(),
+			int64(100+i),
+			defMinGas,
+			defGasPrice,
+			"invalid govparams proposal",
+			10,
+			govCtrler.MinVotingPeriodBlocks(),
+			10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+			proposal.PROPOSAL_GOVPARAMS,
+			bzOpt,
+		)
+		require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()), "case=%s", test.name)
 
-			tx := web3.NewTrxProposal(
-				vpowMock.PickAddress(vpowMock.ValCnt-1),
-				types.ZeroAddress(),
-				int64(100+i),
-				defMinGas,
-				defGasPrice,
-				"invalid govparams proposal",
-				10,
-				govCtrler.MinVotingPeriodBlocks(),
-				10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
-				proposal.PROPOSAL_GOVPARAMS,
-				bzOpt,
-			)
-			require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
-
-			xerr := runTrx(makeTrxCtx(tx, 1, true))
-			require.Error(t, xerr)
-			require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), xerr)
-			require.Contains(t, xerr.Error(), tt.wantMsg)
-		})
+		xerr := runTrx(makeTrxCtx(tx, 1, true))
+		require.Error(t, xerr, "case=%s", test.name)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), "case=%s error=%v", test.name, xerr)
+		require.Contains(t, xerr.Error(), test.wantMsg, "case=%s", test.name)
 	}
 }
 
@@ -210,12 +211,15 @@ func TestInvalidMaxSupply(t *testing.T) {
 	)
 	require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
 
-	txctx := makeTrxCtx(tx, 1, true)
-	txctx.SupplyHandler = &proposalSupplyHandlerStub{
-		totalSupply: uint256.NewInt(100),
-	}
+	supplyCtrler, xerr := supply.NewSupplyCtrler(config, tmlog.NewNopLogger())
+	require.NoError(t, xerr)
+	defer supplyCtrler.Close()
+	require.NoError(t, supplyCtrler.InitLedger(uint256.NewInt(100)))
 
-	xerr := govCtrler.ValidateTrx(txctx)
+	txctx := makeTrxCtx(tx, 1, true)
+	txctx.SupplyHandler = supplyCtrler
+
+	xerr = govCtrler.ValidateTrx(txctx)
 	require.Error(t, xerr)
 	require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), xerr)
 	require.Contains(t, xerr.Error(), "maxTotalSupply")
