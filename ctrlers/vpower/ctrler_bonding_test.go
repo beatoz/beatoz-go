@@ -149,6 +149,12 @@ func Test_LoadLedger(t *testing.T) {
 func Test_Bonding(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
+	originalMaxDelegators := govMock.GetValues().MaxDelegatorsOfValidator
+	t.Cleanup(func() {
+		govMock.GetValues().MaxDelegatorsOfValidator = originalMaxDelegators
+	})
+	govMock.GetValues().MaxDelegatorsOfValidator = 20_000
+
 	ctrler, lastValUps, valWallets, xerr := initLedger(config)
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps), len(valWallets))
@@ -226,6 +232,49 @@ func Test_Bonding(t *testing.T) {
 			return fmt.Sprintf("validator:%v\ntotal:%v, self:%v, total-self:%v\ndelegators\n%s", dgtee.addr, dgtee.SumPower, dgtee.SelfPower, dgtee.SumPower-dgtee.SelfPower, ret)
 		}())
 	}
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func Test_Bonding_MaxDelegatorsOfValidator(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	originalMaxDelegators := govMock.GetValues().MaxDelegatorsOfValidator
+	t.Cleanup(func() {
+		govMock.GetValues().MaxDelegatorsOfValidator = originalMaxDelegators
+	})
+	govMock.GetValues().MaxDelegatorsOfValidator = 2 // self delegation + one external delegator
+
+	ctrler, _, valWallets, xerr := initLedger(config)
+	require.NoError(t, xerr)
+
+	_, lastHeight, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+
+	valWal := valWallets[0]
+	delegator0 := acctMock.GetWallet(0)
+	delegator1 := acctMock.GetWallet(1)
+	power := govMock.MinDelegatorPower()
+
+	_, xerr = doDelegate(ctrler, delegator0, valWal.Address(), power, lastHeight+1)
+	require.NoError(t, xerr)
+
+	dgtee, xerr := ctrler.readDelegatee(valWal.Address(), true)
+	require.NoError(t, xerr)
+	require.Len(t, dgtee.Delegators, int(govMock.MaxDelegatorsOfValidator()))
+	require.True(t, dgtee.hasDelegator(delegator0.Address()))
+
+	newDelegationCtx, xerr := makeBondingTrxCtx(delegator1, valWal.Address(), power, lastHeight+1)
+	require.NoError(t, xerr)
+	xerr = ctrler.ValidateTrx(newDelegationCtx)
+	require.Error(t, xerr)
+	require.True(t, xerr.Contains(xerrors.ErrInvalidTrx))
+	require.Contains(t, xerr.Error(), "maximum number of delegators")
+
+	existingDelegationCtx, xerr := makeBondingTrxCtx(delegator0, valWal.Address(), power, lastHeight+1)
+	require.NoError(t, xerr)
+	require.NoError(t, ctrler.ValidateTrx(existingDelegationCtx))
 
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
