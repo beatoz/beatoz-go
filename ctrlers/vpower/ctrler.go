@@ -168,6 +168,15 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 			}
 
+			maxDelegators := int(ctx.GovHandler.MaxDelegatorsOfValidator())
+			if !dgtee.hasDelegator(ctx.Tx.From) && len(dgtee.Delegators) >= maxDelegators {
+				return xerrors.ErrInvalidTrx.Wrapf(
+					"validator(%v) reached the maximum number of delegators: %v",
+					dgtee.addr,
+					maxDelegators,
+				)
+			}
+
 			// check minDelegatorPower
 			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {

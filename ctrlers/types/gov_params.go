@@ -42,7 +42,7 @@ func NewGovParams(interval int) *GovParams {
 			MinValidatorPower:         100_000, // 100,000 BEATOZ
 			MinDelegatorPower:         100,
 			MaxValidatorsOfDelegator:  1,
-			MaxDelegatorsOfValidator:  1000,
+			MaxDelegatorsOfValidator:  256,
 			MinSelfPowerRate:          50,                                // 50%
 			MaxUpdatablePowerRate:     33,                                // 33%
 			MaxIndividualPowerRate:    33,                                // 33%
