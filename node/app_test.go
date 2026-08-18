@@ -11,6 +11,7 @@ import (
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -306,6 +307,49 @@ func Test_EndBlock_NoChainHalt(t *testing.T) {
 
 		btzApp.Commit()
 	}
+}
+
+func Test_AsyncExecTrxContextBTIP35_AddFee(t *testing.T) {
+	wallets := []*web3.Wallet{makeTestWallet(1), makeTestWallet(2)}
+	app, _, cleanup := newTestBeatozApp(t, wallets)
+	defer cleanup()
+
+	chainID := app.lastBlockCtx.ChainID()
+	height := app.lastBlockCtx.Height() + 1
+	require.True(t, types2.IsBTIP35(chainID, height))
+	require.True(t, types2.IsBTIP45(chainID, height))
+
+	app.BeginBlock(abcitypes.RequestBeginBlock{
+		Header: tmproto.Header{Height: height, ChainID: chainID},
+	})
+
+	sender := app.acctCtrler.FindAccount(wallets[0].Address(), true)
+	require.NotNil(t, sender)
+	txbz := makeTestTransferTx(t, app, wallets[0], wallets[1], sender.GetNonce(), 1)
+	txctx, xerr := types.NewTrxContext(txbz, app.currBlockCtx, true)
+	require.NoError(t, xerr)
+
+	failureHandler := &accountTransferFailureHandler{
+		accountSetFailureHandler: &accountSetFailureHandler{
+			IAccountHandler: app.acctCtrler,
+			failureAddress:  wallets[1].Address(),
+			setAccountErr:   xerrors.NewOrdinary("receiver account set failure"),
+		},
+	}
+	app.currBlockCtx.AcctHandler = failureHandler
+
+	feeBefore := app.currBlockCtx.SumFee()
+	resp := app.asyncExecTrxContextBTIP35(txctx)
+	feeAfter := app.currBlockCtx.SumFee()
+	app.currBlockCtx.AcctHandler = app.acctCtrler
+
+	require.NotEqual(t, abcitypes.CodeTypeOK, resp.Code)
+	require.True(t, failureHandler.failed)
+	require.Equal(t, txctx.Tx.Gas, txctx.GasUsed)
+
+	addedFee := new(uint256.Int).Sub(feeAfter, feeBefore)
+	expectedFee := types2.GasToFee(txctx.GasUsed, app.govCtrler.GasPrice())
+	require.Equal(t, expectedFee.Dec(), addedFee.Dec())
 }
 
 func Benchmark_TxLifeCycle(b *testing.B) {
