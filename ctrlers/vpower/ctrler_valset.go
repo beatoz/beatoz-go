@@ -3,6 +3,7 @@ package vpower
 import (
 	"github.com/beatoz/beatoz-go/libs"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/beatoz/beatoz-go/types/xerrors"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"sort"
 )
@@ -10,11 +11,44 @@ import (
 // UpdateValidators is called after executing staking/unstaking txs and before committing the result of the executing.
 // `ctrler.allDelegatees` has delegatees committed at previous block.
 // It means that UpdateValidators consider the stakes updated at the previous block, not the current block.
-func (ctrler *VPowerCtrler) updateValidators(allDelegatees, lastValidators []*Delegatee, maxVals int) ([]abcitypes.ValidatorUpdate, []*Delegatee) {
-	newValidators := selectValidators(allDelegatees, maxVals)
+func (ctrler *VPowerCtrler) updateValidators(allDelegatees, lastValidators []*Delegatee, maxVals int, minValidatorPower int64, minSelfPowerRate int32) ([]abcitypes.ValidatorUpdate, []*Delegatee, xerrors.XError) {
+	newValidators, xerr := selectEligibleValidators(allDelegatees, maxVals, minValidatorPower, minSelfPowerRate)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
 	upVals := validatorUpdates(lastValidators, newValidators)
 
-	return upVals, newValidators
+	return upVals, newValidators, nil
+}
+
+func selectEligibleValidators(delegatees []*Delegatee, maxVals int, minValidatorPower int64, minSelfPowerRate int32) ([]*Delegatee, xerrors.XError) {
+	eligible := make([]*Delegatee, 0, len(delegatees))
+	for _, dgtee := range delegatees {
+		if !isEligibleValidator(dgtee, minValidatorPower, minSelfPowerRate) {
+			continue
+		}
+		eligible = append(eligible, dgtee)
+	}
+
+	if len(eligible) == 0 {
+		return nil, xerrors.ErrCommon.Wrapf(
+			"no delegatee satisfies validator eligibility(MinValidatorPower=%v, MinSelfPowerRate=%v)",
+			minValidatorPower, minSelfPowerRate)
+	}
+	return selectValidators(eligible, maxVals), nil
+}
+
+func isEligibleValidator(dgtee *Delegatee, minValidatorPower int64, minSelfPowerRate int32) bool {
+	return dgtee.SelfPower >= minValidatorPower &&
+		hasEnoughSelfPower(dgtee.SelfPower, dgtee.SumPower, minSelfPowerRate)
+}
+
+func hasEnoughSelfPower(selfPower, sumPower int64, minSelfPowerRate int32) bool {
+	if minSelfPowerRate <= 0 {
+		return true
+	}
+	return selfPower*100/sumPower >= int64(minSelfPowerRate)
 }
 
 // selectValidators returns the top maxVals delegatees, sorted in descending order of power.

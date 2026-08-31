@@ -22,8 +22,20 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	if len(byzantines) > 0 {
 		ctrler.logger.Info("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
+			tombstoned, xerr := ctrler.isTombstoned(evi.Validator.Address, true)
+			if xerr != nil {
+				return nil, xerr
+			}
+			if tombstoned {
+				ctrler.logger.Debug("Byzantine validator is already tombstoned",
+					"byzantine", types.Address(evi.Validator.Address),
+					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
+				continue
+			}
+
 			// slash the byzantine validator's voting power.
-			slashed, xerr := ctrler.doSlash(evi.Validator.Address, bctx.GovHandler.SlashRate())
+			refundHeight := bctx.Height() + bctx.GovHandler.LazyUnbondingBlocks()
+			slashed, xerr := ctrler.doSlash(evi.Validator.Address, bctx.GovHandler.SlashRate(), refundHeight)
 			if xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
@@ -80,21 +92,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				if xerr != nil {
 					return nil, xerr
 				}
-				// un-bonding all vpowers delegated to `dgtee`
-				for _, _from := range dgtee.Delegators {
-					_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, true)
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					if xerr := ctrler.freezePowerChunkList(_vpow.from, _vpow.PowerChunks, refundHeight, true); xerr != nil {
-						return nil, xerr
-					}
-					if xerr := ctrler.removeVPower(_vpow.from, _vpow.to, true); xerr != nil {
-						return nil, xerr
-					}
-				}
-				if xerr := ctrler.removeDelegatee(dgtee.addr, true); xerr != nil {
+				if xerr := ctrler.forceUnbondDelegatee(dgtee, refundHeight, true, 0); xerr != nil {
 					return nil, xerr
 				}
 			}
@@ -139,11 +137,16 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	}
 	ctrler.allDelegatees = dgtees
 
-	newValUps, newValidators := ctrler.updateValidators(
+	newValUps, newValidators, xerr := ctrler.updateValidators(
 		ctrler.allDelegatees,
 		ctrler.lastValidators,
 		int(bctx.GovHandler.MaxValidatorCnt()),
+		bctx.GovHandler.MinValidatorPower(),
+		bctx.GovHandler.MinSelfPowerRate(),
 	)
+	if xerr != nil {
+		return nil, xerr
+	}
 	bctx.SetValUpdates(newValUps)
 	ctrler.lastValidators = newValidators
 

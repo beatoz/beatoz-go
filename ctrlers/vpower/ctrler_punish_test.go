@@ -24,9 +24,14 @@ func Test_Slash_Byzantine(t *testing.T) {
 	require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
 	targetAddr := valWallets0[rand.Intn(len(valWallets0))].Address()
+	delegatorWal := acctMock.RandWallet()
+	_, xerr = doDelegate(ctrler, delegatorWal, targetAddr, govMock.MinDelegatorPower(), mocks.CurrBlockHeight())
+	require.NoError(t, xerr)
+
 	dgtee, xerr := ctrler.readDelegatee(targetAddr, true)
 	require.NoError(t, xerr)
 	require.True(t, ctrler.IsValidator(dgtee.Address()))
+	require.Len(t, dgtee.Delegators, 2)
 
 	//
 	// compute expected result
@@ -38,47 +43,47 @@ func Test_Slash_Byzantine(t *testing.T) {
 		require.NoError(t, xerr)
 		expected := vpow.Clone()
 
-		for _, pc := range expected.PowerChunks {
-			slashed := pc.Power * int64(govMock.SlashRate()) / int64(100)
-			pc.Power -= slashed
-			expected.SumPower -= slashed
-			expectedByzantine.SumPower -= slashed
-			if bytes.Equal(expected.from, expected.from) {
-				expectedByzantine.SelfPower -= slashed
+		if expected.IsSelfPower() {
+			for _, pc := range expected.PowerChunks {
+				slashed := pc.Power * int64(govMock.SlashRate()) / int64(100)
+				pc.Power -= slashed
+				expected.SumPower -= slashed
+				expectedSlahsed += slashed
 			}
-
-			expectedSlahsed += slashed
 		}
 		expectedVPowers[i] = expected
 	}
 
 	//
 	// doSlash
-	slashed, xerr := ctrler.doSlash(expectedByzantine.Address(), govMock.SlashRate())
+	refundHeight := mocks.CurrBlockHeight() + govMock.LazyUnbondingBlocks()
+	slashed, xerr := ctrler.doSlash(expectedByzantine.Address(), govMock.SlashRate(), refundHeight)
 	require.NoError(t, xerr)
 	require.Equal(t, expectedSlahsed, slashed)
 
 	//
-	// updated dgtee
-	dgtee, xerr = ctrler.readDelegatee(targetAddr, true)
+	// removed dgtee
+	_, xerr = ctrler.readDelegatee(targetAddr, true)
+	require.Error(t, xerr)
+	tombstoned, xerr := ctrler.isTombstoned(targetAddr, true)
 	require.NoError(t, xerr)
+	require.True(t, tombstoned)
 
 	{
 		//
 		// check result
-		require.Equal(t, expectedByzantine.SumPower, dgtee.SumPower)
-		require.Equal(t, expectedByzantine.SelfPower, dgtee.SelfPower)
-		require.Equal(t, len(expectedVPowers), len(dgtee.Delegators))
+		for _, expected := range expectedVPowers {
+			_, xerr := ctrler.readVPower(expected.from, expected.to, true)
+			require.Error(t, xerr)
 
-		for i, addr := range dgtee.Delegators {
-			vpow, xerr := ctrler.readVPower(addr, dgtee.Address(), true)
+			frozen, xerr := ctrler.readFrozenVPower(refundHeight, expected.from, true)
 			require.NoError(t, xerr)
-			require.Equal(t, expectedVPowers[i].SumPower, vpow.SumPower)
-			require.Equal(t, len(expectedVPowers[i].PowerChunks), len(vpow.PowerChunks))
-			for j, pc := range vpow.PowerChunks {
-				require.Equal(t, expectedVPowers[i].PowerChunks[j].Power, pc.Power)
-				require.Equal(t, expectedVPowers[i].PowerChunks[j].Height, pc.Height)
-				require.EqualValues(t, expectedVPowers[i].PowerChunks[j].TxHash, pc.TxHash)
+			require.Equal(t, expected.SumPower, frozen.RefundPower)
+			require.Equal(t, len(expected.PowerChunks), len(frozen.PowerChunks))
+			for j, pc := range frozen.PowerChunks {
+				require.Equal(t, expected.PowerChunks[j].Power, pc.Power)
+				require.Equal(t, expected.PowerChunks[j].Height, pc.Height)
+				require.EqualValues(t, expected.PowerChunks[j].TxHash, pc.TxHash)
 			}
 		}
 	}
