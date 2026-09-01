@@ -239,7 +239,6 @@ func (ctrler *AcctCtrler) setDoc(acct *btztypes.Account, name, url string) {
 	acct.SetDocURL(url)
 }
 
-// DEPRECATED: Add `AddBlance` and replace it.
 func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -258,6 +257,26 @@ func (ctrler *AcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) 
 
 	return nil
 }
+
+func (ctrler *AcctCtrler) Refund(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	acct := ctrler.findAccount(to, exec)
+	if acct == nil {
+		return xerrors.ErrNotFoundAccount.Wrapf("Refund - address: %v", to)
+	}
+
+	if xerr := acct.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	if xerr := ctrler.setAccount(acct, exec); xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
 func (ctrler *AcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
@@ -404,6 +423,9 @@ func (memCtrler *SimuAcctCtrler) Transfer(from types.Address, to types.Address, 
 }
 
 func (memCtrler *SimuAcctCtrler) Reward(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	panic("SimuAcctCtrler can not have this method")
+}
+func (memCtrler *SimuAcctCtrler) Refund(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	panic("SimuAcctCtrler can not have this method")
 }
 func (memCtrler *SimuAcctCtrler) AddBalance(addr types.Address, amt *uint256.Int, b bool) xerrors.XError {
