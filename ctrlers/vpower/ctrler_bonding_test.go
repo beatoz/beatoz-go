@@ -130,7 +130,7 @@ func Test_LoadLedger(t *testing.T) {
 	require.NoError(t, xerr)
 	require.Equal(t, int64(1), lastHeight)
 
-	require.NoError(t, ctrler.LoadDelegatees(int(govMock.MaxValidatorCnt())))
+	require.NoError(t, ctrler.LoadDelegatees(int(govMock.MaxValidatorCnt()), govMock.MinValidatorPower(), govMock.MinSelfPowerRate()))
 
 	require.Len(t, ctrler.allDelegatees, len(lastValUps))
 	require.LessOrEqual(t, len(ctrler.lastValidators), int(govMock.MaxValidatorCnt()))
@@ -163,7 +163,7 @@ func Test_Bonding(t *testing.T) {
 
 	// close and re-open
 	require.NoError(t, ctrler.Close())
-	ctrler, xerr = NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
+	ctrler, xerr = NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), govMock.MinValidatorPower(), govMock.MinSelfPowerRate(), log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	//
@@ -291,6 +291,49 @@ func Test_Bonding_ToNotValidator(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
+func Test_Delegating_SelfPowerRatioBoundary(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	ctrler, _, valWallets, xerr := initLedger(config)
+	require.NoError(t, xerr)
+
+	_, lastHeight, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+
+	target := valWallets[0]
+	dgteeBefore, xerr := ctrler.readDelegatee(target.Address(), true)
+	require.NoError(t, xerr)
+	require.Equal(t, int32(50), govMock.MinSelfPowerRate())
+	require.Equal(t, dgteeBefore.SelfPower, dgteeBefore.SumPower)
+
+	// The external delegation that leaves exactly 50% self-power is allowed.
+	_, xerr = doDelegate(ctrler, acctMock.RandWallet(), target.Address(), dgteeBefore.SelfPower, lastHeight+1)
+	require.NoError(t, xerr)
+
+	dgteeAtBoundary, xerr := ctrler.readDelegatee(target.Address(), true)
+	require.NoError(t, xerr)
+	require.True(t, hasEnoughSelfPower(
+		dgteeAtBoundary.SelfPower,
+		dgteeAtBoundary.SumPower,
+		govMock.MinSelfPowerRate(),
+	))
+	selfPowerAtBoundary := dgteeAtBoundary.SelfPower
+	sumPowerAtBoundary := dgteeAtBoundary.SumPower
+
+	// Any further external delegation would lower the self-power ratio below 50%.
+	_, xerr = doDelegate(ctrler, acctMock.RandWallet(), target.Address(), govMock.MinDelegatorPower(), lastHeight+1)
+	require.Error(t, xerr)
+	require.Contains(t, xerr.Error(), "not enough self power")
+
+	dgteeAfterRejected, xerr := ctrler.readDelegatee(target.Address(), true)
+	require.NoError(t, xerr)
+	require.Equal(t, sumPowerAtBoundary, dgteeAfterRejected.SumPower)
+	require.Equal(t, selfPowerAtBoundary, dgteeAfterRejected.SelfPower)
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
 func Test_Unbonding(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
@@ -407,7 +450,7 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 	_, lastHeight, xerr := ctrler.Commit()
 	require.NoError(t, xerr)
 
-	froms, vals, _, _ := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
+	_, vals, _, _ := testRandDelegate(t, 1000, ctrler, valWallets, lastHeight+1)
 
 	_, lastHeight, xerr = ctrler.Commit()
 	require.NoError(t, xerr)
@@ -420,6 +463,32 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 			// and the test for the case is meaningless.
 			break
 		}
+
+		dgteeBefore, xerr := ctrler.readDelegatee(valWal.Address(), true)
+		require.NoError(t, xerr)
+		type refundExpectation struct {
+			from  []byte
+			power int64
+		}
+		var expectedRefunds []refundExpectation
+		refundHeight := lastHeight + 1 + govMock.LazyUnbondingBlocks()
+		for _, from := range dgteeBefore.Delegators {
+			vpow, xerr := ctrler.readVPower(from, dgteeBefore.addr, true)
+			require.NoError(t, xerr)
+
+			previousRefund := int64(0)
+			frozen, xerr := ctrler.readFrozenVPower(refundHeight, from, true)
+			if xerr == nil {
+				previousRefund = frozen.RefundPower
+			} else {
+				require.True(t, xerr.Contains(xerrors.ErrNotFoundResult))
+			}
+			expectedRefunds = append(expectedRefunds, refundExpectation{
+				from:  append([]byte(nil), from...),
+				power: previousRefund + vpow.SumPower,
+			})
+		}
+
 		// unbonding self power deposited at genesis with zero txhash
 		zeroHash := bytes2.ZeroBytes(32) // points to self voting power
 		_, xerr = doUndelegate(ctrler, valWal, valWal.Address(), lastHeight+1, zeroHash)
@@ -429,18 +498,124 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 		require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 		require.Nil(t, dgtee)
 
-		// expected that all vpowers delegated to dgtee are removed
-		for _, fromWal := range froms {
-			vpow, xerr := ctrler.readVPower(fromWal.Address(), valWal.Address(), true)
+		// expected that all vpowers delegated to dgtee are removed and frozen exactly once
+		for _, expected := range expectedRefunds {
+			vpow, xerr := ctrler.readVPower(expected.from, valWal.Address(), true)
 			require.Equal(t, xerrors.ErrNotFoundResult, xerr)
 			require.Nil(t, vpow)
+
+			frozen, xerr := ctrler.readFrozenVPower(refundHeight, expected.from, true)
+			require.NoError(t, xerr)
+			require.Equal(t, expected.power, frozen.RefundPower)
+			frozenPower := int64(0)
+			for _, pc := range frozen.PowerChunks {
+				frozenPower += pc.Power
+			}
+			require.Equal(t, frozen.RefundPower, frozenPower)
 		}
+		tombstoned, xerr := ctrler.isTombstoned(valWal.Address(), true)
+		require.NoError(t, xerr)
+		require.False(t, tombstoned)
 	}
 
 	// -----------------------------------------------------------------------------------------------------------------
 	//
 
 	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func Test_Unbonding_PartialSelfPower_Eligibility(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	ctrler, _, valWallets, xerr := initLedger(config)
+	require.NoError(t, xerr)
+
+	_, lastHeight, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+
+	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), lastHeight+1, govMock, acctMock, nil, nil, ctrler)
+	require.NoError(t, mocks.DoBeginBlock(ctrler))
+	h := mocks.CurrBlockHeight()
+
+	target := valWallets[0]
+	acctMock.AddWallet(target)
+	target.GetAccount().SetBalance(types.ToGrans(1_000_000_000))
+
+	addSelfTxCtx, xerr := doDelegate(ctrler, target, target.Address(), 10_000_000, h)
+	require.NoError(t, xerr)
+	addSelfTxHash := addSelfTxCtx.TxHash
+
+	delegator := acctMock.RandWallet()
+	_, xerr = doDelegate(ctrler, delegator, target.Address(), 20_000_000, h)
+	require.NoError(t, xerr)
+
+	dgteeBefore, xerr := ctrler.readDelegatee(target.Address(), true)
+	require.NoError(t, xerr)
+	require.Equal(t, int64(20_000_000), dgteeBefore.SelfPower)
+	require.Equal(t, int64(40_000_000), dgteeBefore.SumPower)
+
+	promoted := acctMock.RandWallet()
+	_, xerr = doDelegate(ctrler, promoted, promoted.Address(), 9_000_000, h)
+	require.NoError(t, xerr)
+
+	_, xerr = doUndelegate(ctrler, target, target.Address(), h, addSelfTxHash)
+	require.NoError(t, xerr)
+
+	dgteeAfter, xerr := ctrler.readDelegatee(target.Address(), true)
+	require.NoError(t, xerr)
+	require.Equal(t, int64(10_000_000), dgteeAfter.SelfPower)
+	require.Equal(t, int64(30_000_000), dgteeAfter.SumPower)
+
+	vpow, xerr := ctrler.readVPower(delegator.Address(), target.Address(), true)
+	require.NoError(t, xerr)
+	require.NotNil(t, vpow)
+
+	require.NoError(t, mocks.DoEndBlock(ctrler))
+	bctx := mocks.CurrBlockCtx()
+
+	targetUp, cnt := findValUp(target.GetPubKey(), bctx.ValUpdates)
+	require.Equal(t, 1, cnt)
+	require.EqualValues(t, 0, targetUp.Power)
+
+	promotedUp, cnt := findValUp(promoted.GetPubKey(), bctx.ValUpdates)
+	require.Equal(t, 1, cnt)
+	require.EqualValues(t, 9_000_000, promotedUp.Power)
+
+	require.False(t, ctrler.IsValidator(target.Address()))
+	require.True(t, ctrler.IsValidator(promoted.Address()))
+
+	require.NoError(t, mocks.DoCommit(ctrler))
+
+	_, expectedVotingPower := ctrler.Validators()
+	queriedVotingPower, xerr := ctrler.queryVotingPower(
+		mocks.LastBlockHeight(),
+		func() interface{} { return govMock.MaxValidatorCnt() },
+		func() interface{} { return govMock.MinValidatorPower() },
+		func() interface{} { return govMock.MinSelfPowerRate() },
+	)
+	require.NoError(t, xerr)
+	require.Equal(t, fmt.Sprintf("\"%d\"", expectedVotingPower), string(queriedVotingPower))
+
+	require.NoError(t, ctrler.Close())
+	ctrler2, xerr := NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), govMock.MinValidatorPower(), govMock.MinSelfPowerRate(), log.NewNopLogger())
+	require.NoError(t, xerr)
+	require.False(t, ctrler2.IsValidator(target.Address()))
+	require.True(t, ctrler2.IsValidator(promoted.Address()))
+
+	_, totalPower2 := ctrler2.Validators()
+	ctrler2.vpowLimiter.Reset(totalPower2, 100)
+
+	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), h+1, govMock, acctMock, nil, nil, ctrler2)
+	require.NoError(t, mocks.DoBeginBlock(ctrler2))
+	_, xerr = doDelegate(ctrler2, target, target.Address(), 10_000_000, mocks.CurrBlockHeight())
+	require.NoError(t, xerr)
+
+	require.NoError(t, mocks.DoEndBlock(ctrler2))
+	require.True(t, ctrler2.IsValidator(target.Address()))
+
+	require.NoError(t, mocks.DoCommit(ctrler2))
+	require.NoError(t, ctrler2.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
@@ -738,7 +913,7 @@ func testRandDelegate(t *testing.T, count int, ctrler *VPowerCtrler, valWallets 
 }
 
 func initLedger(cfg *beatozcfg.Config) (*VPowerCtrler, []abcitypes.ValidatorUpdate, []*web3.Wallet, xerrors.XError) {
-	ctrler, xerr := NewVPowerCtrler(cfg, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
+	ctrler, xerr := NewVPowerCtrler(cfg, int(govMock.MaxValidatorCnt()), govMock.MinValidatorPower(), govMock.MinSelfPowerRate(), log.NewNopLogger())
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}

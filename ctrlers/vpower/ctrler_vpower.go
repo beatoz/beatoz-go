@@ -48,6 +48,7 @@ func (ctrler *VPowerCtrler) readVPower(from, to types.Address, exec bool) (*VPow
 	}
 	return ret, xerr
 }
+
 func (ctrler *VPowerCtrler) writeVPower(vpow *VPower, exec bool) xerrors.XError {
 	return ctrler.vpowerState.Set(vpow.key, vpow, exec)
 }
@@ -146,6 +147,39 @@ func (ctrler *VPowerCtrler) freezePowerChunkList(from types.Address, pcs []*Powe
 	return ctrler.vpowerState.Set(common.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
 }
 
+// forceUnbondDelegatee freezes and removes all power delegated to `dgtee`, then removes `dgtee`.
+// If `slashRate` is positive, the validator's self-delegated power is slashed before freezing.
+func (ctrler *VPowerCtrler) forceUnbondDelegatee(
+	dgtee *Delegatee,
+	refundHeight int64,
+	exec bool,
+	slashRate int32,
+) xerrors.XError {
+	for _, from := range dgtee.Delegators {
+		vpow, xerr := ctrler.readVPower(from, dgtee.addr, exec)
+		if xerr != nil {
+			return xerr
+		}
+		if slashRate > 0 && vpow.IsSelfPower() {
+			for i := len(vpow.PowerChunks) - 1; i >= 0; i-- {
+				pc := vpow.PowerChunks[i]
+				slashed := (pc.Power * int64(slashRate)) / 100
+				pc.Power -= slashed
+				vpow.SumPower -= slashed
+				dgtee.SumPower -= slashed
+				dgtee.SelfPower -= slashed
+			}
+		}
+		if xerr := ctrler.freezePowerChunkList(vpow.from, vpow.PowerChunks, refundHeight, exec); xerr != nil {
+			return xerr
+		}
+		if xerr := ctrler.removeVPower(vpow.from, vpow.to, exec); xerr != nil {
+			return xerr
+		}
+	}
+	return ctrler.removeDelegatee(dgtee.addr, exec)
+}
+
 func (ctrler *VPowerCtrler) unfreezePowerChunk(bctx *types2.BlockContext) xerrors.XError {
 	return ctrler._unfreezePowerChunk(bctx.Height(), bctx.AcctHandler)
 }
@@ -199,6 +233,47 @@ func (ctrler *VPowerCtrler) countOf(keyPrefix []byte, exec bool) int {
 	}, exec)
 	return ret
 }
+
+func (ctrler *VPowerCtrler) setTombstone(addr types.Address, exec bool) xerrors.XError {
+	key := common.LedgerKeyTombstone(addr)
+	tombstone := Tombstone(true)
+	return ctrler.vpowerState.Set(key, &tombstone, exec)
+}
+
+func (ctrler *VPowerCtrler) isTombstoned(addr types.Address, exec bool) (bool, xerrors.XError) {
+	key := common.LedgerKeyTombstone(addr)
+	item, xerr := ctrler.vpowerState.Get(key, exec)
+	if xerr != nil {
+		if xerr.Contains(xerrors.ErrNotFoundResult) {
+			return false, nil
+		}
+		return false, xerr
+	}
+	tombstone, ok := item.(*Tombstone)
+	if !ok {
+		return false, xerrors.NewOrdinary("invalid tombstone type")
+	}
+	return bool(*tombstone), nil
+}
+
+type Tombstone bool
+
+func (t *Tombstone) Encode() ([]byte, xerrors.XError) {
+	if *t {
+		return []byte{1}, nil
+	}
+	return []byte{0}, nil
+}
+
+func (t *Tombstone) Decode(_, value []byte) xerrors.XError {
+	if len(value) != 1 || (value[0] != 0 && value[0] != 1) {
+		return xerrors.NewOrdinary("invalid tombstone value")
+	}
+	*t = Tombstone(value[0] == 1)
+	return nil
+}
+
+var _ common.ILedgerItem = (*Tombstone)(nil)
 
 type BlockCount int64
 
