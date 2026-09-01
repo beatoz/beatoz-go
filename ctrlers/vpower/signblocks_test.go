@@ -26,7 +26,7 @@ func Test_BlockCount(t *testing.T) {
 func Test_SignBlock(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, xerr := NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
+	ctrler, xerr := NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), govMock.MinValidatorPower(), govMock.MinSelfPowerRate(), log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	signerAddr := types.RandAddress()
@@ -48,7 +48,7 @@ func Test_SignBlock(t *testing.T) {
 func Test_SignBlock_Reset(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	ctrler, xerr := NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), log.NewNopLogger())
+	ctrler, xerr := NewVPowerCtrler(config, int(govMock.MaxValidatorCnt()), govMock.MinValidatorPower(), govMock.MinSelfPowerRate(), log.NewNopLogger())
 	require.NoError(t, xerr)
 
 	signerAddr := types.RandAddress()

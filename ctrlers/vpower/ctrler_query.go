@@ -27,7 +27,7 @@ func (ctrler *VPowerCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertype
 	case "stakes/total_power":
 		return ctrler.queryTotalPower(req.Height)
 	case "stakes/voting_power":
-		return ctrler.queryVotingPower(req.Height, opts[0], opts[1])
+		return ctrler.queryVotingPower(req.Height, opts[0], opts[1], opts[2])
 	default:
 		return nil, xerrors.ErrQuery.Wrapf("unknown query path")
 	}
@@ -194,7 +194,7 @@ func (ctrler *VPowerCtrler) queryTotalPower(height int64) ([]byte, xerrors.XErro
 }
 
 // queryVotingPower returns the sum of voting power of validators.
-func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinValPower ctrlertypes.Option) ([]byte, xerrors.XError) {
+func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinValPower, getMinSelfPowerRate ctrlertypes.Option) ([]byte, xerrors.XError) {
 	atledger, xerr := ctrler.vpowerState.ImitableLedgerAt(height)
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
@@ -202,11 +202,12 @@ func (ctrler *VPowerCtrler) queryVotingPower(height int64, getMaxValCnt, getMinV
 
 	maxValCnt := getMaxValCnt().(int32)
 	minValPower := getMinValPower().(int64)
+	minSelfPowerRate := getMinSelfPowerRate().(int32)
 
 	var delegatees OrderByPowerDelegatees
 	xerr = atledger.Seek(common.KeyPrefixDelegatee, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		d, _ := item.(*Delegatee)
-		if d.SelfPower < minValPower {
+		if !isEligibleValidator(d, minValPower, minSelfPowerRate) {
 			return nil // continue
 		}
 		delegatees = append(delegatees, d)

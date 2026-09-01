@@ -14,6 +14,7 @@ var (
 	KeyPrefixVPower           = []byte{0x21}
 	KeyPrefixFrozenVPower     = []byte{0x22}
 	KeyPrefixMissedBlockCount = []byte{0x23}
+	KeyPrefixTombstone        = []byte{0x24}
 	KeyPrefixTotalSupply      = []byte{0x30}
 	KeyPrefixReward           = []byte{0x32}
 )
@@ -68,6 +69,13 @@ func LedgerKeyMissedBlockCount(signer types.Address) LedgerKey {
 	k := make([]byte, len(KeyPrefixMissedBlockCount)+len(signer))
 	copy(k, KeyPrefixMissedBlockCount)
 	copy(k[len(KeyPrefixMissedBlockCount):], signer)
+	return k
+}
+
+func LedgerKeyTombstone(addr types.Address) LedgerKey {
+	k := make([]byte, len(KeyPrefixTombstone)+len(addr))
+	copy(k, KeyPrefixTombstone)
+	copy(k[len(KeyPrefixTombstone):], addr)
 	return k
 }
 
