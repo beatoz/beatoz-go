@@ -32,7 +32,7 @@ func IsZeroAddress(addr Address) bool {
 	return true
 }
 
-func DeadAddress() Address {
+func TxFeePoolAddress() Address {
 	r, _ := hex.DecodeString("000000000000000000000000000000000000DEAD")
 	return r
 }

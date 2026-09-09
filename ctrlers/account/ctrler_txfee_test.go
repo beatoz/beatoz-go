@@ -32,7 +32,7 @@ func Test_TxFeeProcessing(t *testing.T) {
 	for currHeight := int64(2); currHeight < 500; currHeight++ {
 		//fmt.Println("---- block", currHeight)
 
-		deadAddr := govMock.DeadAddress()
+		deadAddr := govMock.TxFeePoolAddress()
 		proposer := btztypes.RandAddress()
 		mocks.CurrBlockCtx().SetProposerAddress(proposer)
 

@@ -29,7 +29,7 @@ func ForTest1GovParams() *ctrlertypes.GovParams {
 		v.MinBondingBlocks = 1
 		v.BondingBlocksWeightPermil = 2
 		v.XRewardPoolAddress = types.ZeroAddress()
-		v.XDeadAddress = types.ZeroAddress()
+		v.XTxFeePoolAddress = types.ZeroAddress()
 	})
 	return params
 }
@@ -58,7 +58,7 @@ func ForTest3GovParams() *ctrlertypes.GovParams {
 		v.MinBondingBlocks = 1
 		v.BondingBlocksWeightPermil = 2
 		v.XRewardPoolAddress = types.ZeroAddress()
-		v.XDeadAddress = types.ZeroAddress()
+		v.XTxFeePoolAddress = types.ZeroAddress()
 	})
 	return params
 }

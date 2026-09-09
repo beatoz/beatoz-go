@@ -23,7 +23,7 @@ message GovParamsProto {
   int32   bonding_blocks_weight_permil   = 17;
   int64   ripening_blocks                = 18;
   bytes   _reward_pool_address           = 19;
-  bytes   _dead_address                  = 20;
+  bytes   _tx_fee_pool_address           = 20;
   int32   validator_reward_rate          = 21;
   int32   tx_fee_reward_rate             = 22;
   int32   slash_rate                     = 23;
