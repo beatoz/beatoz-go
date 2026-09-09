@@ -1,6 +1,7 @@
 package vpower
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -33,6 +34,9 @@ func (ctrler *VPowerCtrler) Query(req abcitypes.RequestQuery, opts ...ctrlertype
 }
 
 func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byte, xerrors.XError) {
+	ctx, cancel := context.WithTimeout(context.Background(), ctrler.queryTimeout)
+	defer cancel()
+
 	type respStake struct {
 		From        types.Address     `json:"owner"`
 		To          types.Address     `json:"to"`
@@ -50,6 +54,9 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 	xerr = atledger.Seek(common.LedgerKeyVPower(addr, nil), true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		vpow, _ := item.(*VPower)
 		for _, pc := range vpow.PowerChunks {
+			if err := ctx.Err(); err != nil {
+				return xerrors.ErrQuery.Wrap(err)
+			}
 			ret = append(ret, &respStake{
 				From:        vpow.from,
 				To:          vpow.to,
@@ -60,6 +67,9 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 		}
 		return nil
 	})
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.ErrQuery.Wrap(err)
+	}
 	if xerr != nil {
 		return nil, xerrors.ErrQuery.Wrap(xerr)
 	}
@@ -72,6 +82,9 @@ func (ctrler *VPowerCtrler) queryStakes(height int64, addr types.Address) ([]byt
 }
 
 func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]byte, xerrors.XError) {
+	ctx, cancel := context.WithTimeout(context.Background(), ctrler.queryTimeout)
+	defer cancel()
+
 	type respStake struct {
 		From        types.Address     `json:"owner"`
 		To          types.Address     `json:"to"`
@@ -117,6 +130,9 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 	dgtors := make([]types.Address, len(dgtee.Delegators))
 	var stakes []*respStake
 	for i, _addr := range dgtee.Delegators {
+		if err := ctx.Err(); err != nil {
+			return nil, xerrors.ErrQuery.Wrap(err)
+		}
 		dgtors[i] = _addr
 
 		item, xerr = atledger.Get(common.LedgerKeyVPower(_addr, dgtee.addr))
@@ -125,6 +141,9 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 		}
 		vpow, _ := item.(*VPower)
 		for _, pc := range vpow.PowerChunks {
+			if err := ctx.Err(); err != nil {
+				return nil, xerrors.ErrQuery.Wrap(err)
+			}
 			stakes = append(stakes, &respStake{
 				From:        vpow.from,
 				To:          vpow.to,
@@ -133,6 +152,9 @@ func (ctrler *VPowerCtrler) queryDelegatee(height int64, addr types.Address) ([]
 				Power:       pc.Power,
 			})
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.ErrQuery.Wrap(err)
 	}
 	ret = &respDelegatee{
 		Addr:                dgtee.addr,

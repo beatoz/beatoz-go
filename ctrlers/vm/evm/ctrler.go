@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -86,8 +87,9 @@ type EVMCtrler struct {
 	lastBlockHash   common.Hash
 	lastBlockHeight int64
 
-	logger tmlog.Logger
-	mtx    sync.RWMutex
+	queryTimeout time.Duration
+	logger       tmlog.Logger
+	mtx          sync.RWMutex
 }
 
 func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, logger tmlog.Logger) *EVMCtrler {
@@ -128,6 +130,7 @@ func NewEVMCtrler(config *cfg.Config, acctHandler ctrlertypes.IAccountHandler, l
 		acctHandler:     acctHandler,
 		lastRootHash:    hash,
 		lastBlockHeight: bn,
+		queryTimeout:    config.App.QueryTimeout,
 		logger:          lg,
 	}
 }

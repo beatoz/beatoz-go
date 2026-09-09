@@ -1,15 +1,23 @@
 package config
 
 import (
+	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/holiman/uint256"
 	tmcfg "github.com/tendermint/tendermint/config"
 )
 
 type Config struct {
-	*tmcfg.Config
-	chainId *uint256.Int
+	*tmcfg.Config `mapstructure:",squash"`
+	App           appConfig `mapstructure:"app"`
+	chainId       *uint256.Int
+}
+
+type appConfig struct {
+	QueryTimeout time.Duration `mapstructure:"query_timeout"`
 }
 
 func DefaultConfig(chainId ...string) *Config {
@@ -23,7 +31,10 @@ func DefaultConfig(chainId ...string) *Config {
 	}
 
 	return &Config{
-		Config:  tmcfg.DefaultConfig(),
+		Config: tmcfg.DefaultConfig(),
+		App: appConfig{
+			QueryTimeout: time.Second,
+		},
 		chainId: cid,
 	}
 }
@@ -32,6 +43,17 @@ func DefaultConfigWith(cfg *tmcfg.Config, chainId ...string) *Config {
 	conf := DefaultConfig(chainId...)
 	conf.Config = cfg
 	return conf
+}
+
+func WriteConfigFile(path string, config *Config) error {
+	tmcfg.WriteConfigFile(path, config.Config)
+
+	bz, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	suffix := []byte(fmt.Sprintf("\n# Beatoz application options\n[app]\nquery_timeout = %q\n", config.App.QueryTimeout))
+	return os.WriteFile(path, append(bz, suffix...), 0644)
 }
 
 func (c *Config) SetChainId(chainId string) {

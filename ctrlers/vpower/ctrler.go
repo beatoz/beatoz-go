@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -27,8 +28,9 @@ type VPowerCtrler struct {
 
 	vpowLimiter *VPowerLimiter
 
-	logger tmlog.Logger
-	mtx    sync.RWMutex
+	queryTimeout time.Duration
+	logger       tmlog.Logger
+	mtx          sync.RWMutex
 }
 
 func defaultNewItem(key common.LedgerKey) common.ILedgerItem {
@@ -53,9 +55,10 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 	}
 
 	ret := &VPowerCtrler{
-		vpowerState: powersState,
-		vpowLimiter: NewVPowerLimiter(),
-		logger:      lg,
+		vpowerState:  powersState,
+		vpowLimiter:  NewVPowerLimiter(),
+		queryTimeout: config.App.QueryTimeout,
+		logger:       lg,
 	}
 	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
 		return nil, xerr
