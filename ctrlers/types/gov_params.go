@@ -55,7 +55,7 @@ func NewGovParams(interval int) *GovParams {
 			BondingBlocksWeightPermil: 500,                                                            // 0.500
 			RipeningBlocks:            YearSeconds / int64(interval),                                  // one year blocks
 			XRewardPoolAddress:        types.ZeroAddress(),                                            // zero address
-			XDeadAddress:              types.DeadAddress(),                                            // zero address
+			XTxFeePoolAddress:         types.TxFeePoolAddress(),                                       // zero address
 			ValidatorRewardRate:       30,                                                             // 30%
 			TxFeeRewardRate:           90,                                                             // 90%
 			SlashRate:                 50,                                                             // 50%
@@ -153,8 +153,8 @@ func (govParams *GovParams) ValidateBasic() xerrors.XError {
 	if len(v.XRewardPoolAddress) != types.AddrSize {
 		return xerrors.NewOrdinary("invalid governance params").Wrapf("rewardPoolAddress must be %d bytes", types.AddrSize)
 	}
-	if len(v.XDeadAddress) != types.AddrSize {
-		return xerrors.NewOrdinary("invalid governance params").Wrapf("deadAddress must be %d bytes", types.AddrSize)
+	if len(v.XTxFeePoolAddress) != types.AddrSize {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("txFeePoolAddress must be %d bytes", types.AddrSize)
 	}
 	if xerr := validatePercentRate("validatorRewardRate", v.ValidatorRewardRate); xerr != nil {
 		return xerr
@@ -224,7 +224,7 @@ func (govParams *GovParams) MarshalJSON() ([]byte, error) {
 				return nil, err
 			}
 			tmp[k] = new(uint256.Int).SetBytes(_v).String() // decimal string
-		} else if k == "deadAddress" || k == "rewardPoolAddress" {
+		} else if k == "txFeePoolAddress" || k == "rewardPoolAddress" {
 			// v is base64 string
 			_v, err := base64.StdEncoding.DecodeString(v.(string))
 			if err != nil {
@@ -246,9 +246,15 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 		return err
 	}
 
+	// deadAddress is deprecated, but remains supported for testnet backward compatibility.
+	_, hasLegacyDeadAddress := tmp["deadAddress"]
+	if hasLegacyDeadAddress {
+		delete(tmp, "txFeePoolAddress")
+	}
+
 	for k, v := range tmp {
 		switch k {
-		case "maxTotalSupply", "gasPrice", "deadAddress", "rewardPoolAddress":
+		case "maxTotalSupply", "gasPrice", "deadAddress", "txFeePoolAddress", "rewardPoolAddress":
 			strValue, ok := v.(string)
 			if !ok {
 				return fmt.Errorf("invalid %s: expected string", k)
@@ -269,6 +275,10 @@ func (govParams *GovParams) UnmarshalJSON(d []byte) error {
 			}
 			tmp[k] = base64.StdEncoding.EncodeToString(_v)
 		}
+	}
+	if hasLegacyDeadAddress {
+		tmp["txFeePoolAddress"] = tmp["deadAddress"]
+		delete(tmp, "deadAddress")
 	}
 	jz, err := jsonx.Marshal(tmp)
 	if err != nil {
@@ -408,11 +418,11 @@ func (govParams *GovParams) RewardPoolAddress() types.Address {
 
 	return types.Address(govParams._v.XRewardPoolAddress).Copy()
 }
-func (govParams *GovParams) DeadAddress() types.Address {
+func (govParams *GovParams) TxFeePoolAddress() types.Address {
 	govParams.mtx.RLock()
 	defer govParams.mtx.RUnlock()
 
-	return types.Address(govParams._v.XDeadAddress).Copy()
+	return types.Address(govParams._v.XTxFeePoolAddress).Copy()
 }
 func (govParams *GovParams) ValidatorRewardRate() int32 {
 	govParams.mtx.RLock()

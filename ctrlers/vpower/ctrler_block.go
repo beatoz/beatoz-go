@@ -31,7 +31,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 			} else {
 				// do permanent lock
 				deadAmt := types.PowerToAmount(slashed)
-				if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
+				if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.TxFeePoolAddress(), deadAmt, true); xerr != nil {
 					return nil, xerr
 				}
 

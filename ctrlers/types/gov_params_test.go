@@ -1,12 +1,14 @@
 package types
 
 import (
+	"bytes"
+	"reflect"
+	"testing"
+
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
-	"reflect"
-	"testing"
 )
 
 func Test_ProtoCodec(t *testing.T) {
@@ -37,6 +39,63 @@ func Test_JsonCodec(t *testing.T) {
 	jz2, err := jsonx.MarshalIndent(govParams2, "", "  ")
 	require.NoError(t, err)
 	require.Equal(t, jz, jz2)
+}
+
+func TestGovParamsRename(t *testing.T) {
+	canonicalParams := DefaultGovParams()
+	canonicalJSON, err := jsonx.Marshal(canonicalParams)
+	require.NoError(t, err)
+	require.Contains(t, string(canonicalJSON), `"txFeePoolAddress"`)
+	require.NotContains(t, string(canonicalJSON), `"deadAddress"`)
+
+	canonicalProto, xerr := canonicalParams.Encode()
+	require.NoError(t, xerr)
+	legacyAddr := canonicalParams.TxFeePoolAddress()
+	legacyWire := append([]byte{0xa2, 0x01, byte(len(legacyAddr))}, legacyAddr...)
+
+	testCases := []struct {
+		name      string
+		input     []byte
+		decode    func([]byte, *GovParams) error
+		wantProto []byte
+	}{
+		{
+			name:  "legacy json",
+			input: bytes.Replace(canonicalJSON, []byte(`"txFeePoolAddress"`), []byte(`"deadAddress"`), 1),
+			decode: func(input []byte, params *GovParams) error {
+				return jsonx.Unmarshal(input, params)
+			},
+			wantProto: canonicalProto,
+		},
+		{
+			name:  "proto field 20",
+			input: legacyWire,
+			decode: func(input []byte, params *GovParams) error {
+				return params.Decode(nil, input)
+			},
+			wantProto: legacyWire,
+		},
+		{
+			name:  "legacy precedence",
+			input: []byte(`{"deadAddress":"` + legacyAddr.String() + `","txFeePoolAddress":"0000000000000000000000000000000000000001"}`),
+			decode: func(input []byte, params *GovParams) error {
+				return jsonx.Unmarshal(input, params)
+			},
+			wantProto: legacyWire,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			params := &GovParams{}
+			require.NoError(t, testCase.decode(testCase.input, params))
+			require.Equal(t, legacyAddr, params.TxFeePoolAddress())
+
+			gotProto, xerr := params.Encode()
+			require.NoError(t, xerr)
+			require.Equal(t, testCase.wantProto, gotProto)
+		})
+	}
 }
 
 func TestGovParamsValidateBasic(t *testing.T) {

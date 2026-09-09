@@ -59,7 +59,7 @@ type IGovParams interface {
 	BondingBlocksWeightPermil() int32
 	RipeningBlocks() int64
 	RewardPoolAddress() types.Address
-	DeadAddress() types.Address
+	TxFeePoolAddress() types.Address
 	ValidatorRewardRate() int32
 	TxFeeRewardRate() int32
 	SlashRate() int32
