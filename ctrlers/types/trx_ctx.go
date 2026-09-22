@@ -122,6 +122,9 @@ func (ctx *TrxContext) IsHandledByEVM() bool {
 }
 
 func (ctx *TrxContext) EventRoot() (*merkle.MerkleTree, []byte) {
+	if types.IsBTIP48(ctx.ChainID(), ctx.Height()) {
+		return ctx.eventRootBTIP48()
+	}
 	if types.IsBTIP27(ctx.ChainID(), ctx.Height()) {
 		return ctx.eventRootBTIP27()
 	}
@@ -182,6 +185,29 @@ func (ctx *TrxContext) eventRootBTIP27() (*merkle.MerkleTree, []byte) {
 
 	// 2. Roots -> merkle tree -> final root (roots are already hashed)
 	tree := merkle.NewMerkleTree(merkle.WithHashedLeaves(roots))
+	return tree, tree.Root()
+}
+
+// eventRootBTIP48 preserves the two-level event structure introduced by
+// BTIP-27 while applying BTIP-48 hashing at both tree boundaries.
+func (ctx *TrxContext) eventRootBTIP48() (*merkle.MerkleTree, []byte) {
+	if len(ctx.Events) == 0 {
+		return nil, nil
+	}
+
+	roots := make([][]byte, len(ctx.Events))
+	for i, evt := range ctx.Events {
+		leaves := make([][]byte, len(evt.Attributes))
+		for j, attr := range evt.Attributes {
+			leaves[j] = attr.Value
+		}
+		tree := merkle.NewMerkleTree(merkle.WithRawLeaves(leaves), true)
+		roots[i] = tree.Root()
+	}
+
+	// Event roots are raw leaves at this boundary, so the leaf prefix is
+	// applied again even when there is only one event.
+	tree := merkle.NewMerkleTree(merkle.WithRawLeaves(roots), true)
 	return tree, tree.Root()
 }
 

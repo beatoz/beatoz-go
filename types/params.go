@@ -54,6 +54,11 @@ func IsBTIP45(chainId string, height int64) bool {
 	return isBlockForked(h0, height)
 }
 
+// IsBTIP48 shares its activation height with BTIP45.
+func IsBTIP48(chainId string, height int64) bool {
+	return IsBTIP45(chainId, height)
+}
+
 func isBlockForked(h0, head int64) bool {
 	// If `h0` is `0`, any `head` is forked.
 	return h0 <= head
