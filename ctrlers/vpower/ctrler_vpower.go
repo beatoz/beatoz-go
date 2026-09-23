@@ -147,6 +147,17 @@ func (ctrler *VPowerCtrler) freezePowerChunkList(from types.Address, pcs []*Powe
 	return ctrler.vpowerState.Set(common.LedgerKeyFrozenVPower(refundHeight, from), frozen, exec)
 }
 
+func slashPowerChunks(powerChunks []*PowerChunkProto, slashRate int32) int64 {
+	totalSlashed := int64(0)
+	for i := len(powerChunks) - 1; i >= 0; i-- {
+		pc := powerChunks[i]
+		slashed := (pc.Power * int64(slashRate)) / 100
+		pc.Power -= slashed
+		totalSlashed += slashed
+	}
+	return totalSlashed
+}
+
 // forceUnbondDelegatee freezes and removes all power delegated to `dgtee`, then removes `dgtee`.
 // If `slashRate` is positive, the validator's self-delegated power is slashed before freezing.
 func (ctrler *VPowerCtrler) forceUnbondDelegatee(
@@ -161,14 +172,10 @@ func (ctrler *VPowerCtrler) forceUnbondDelegatee(
 			return xerr
 		}
 		if slashRate > 0 && vpow.IsSelfPower() {
-			for i := len(vpow.PowerChunks) - 1; i >= 0; i-- {
-				pc := vpow.PowerChunks[i]
-				slashed := (pc.Power * int64(slashRate)) / 100
-				pc.Power -= slashed
-				vpow.SumPower -= slashed
-				dgtee.SumPower -= slashed
-				dgtee.SelfPower -= slashed
-			}
+			slashed := slashPowerChunks(vpow.PowerChunks, slashRate)
+			vpow.SumPower -= slashed
+			dgtee.SumPower -= slashed
+			dgtee.SelfPower -= slashed
 		}
 		if xerr := ctrler.freezePowerChunkList(vpow.from, vpow.PowerChunks, refundHeight, exec); xerr != nil {
 			return xerr

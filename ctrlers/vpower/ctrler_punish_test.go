@@ -3,11 +3,14 @@ package vpower
 import (
 	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
+	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
+	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
@@ -57,7 +60,12 @@ func Test_Slash_Byzantine(t *testing.T) {
 	//
 	// doSlash
 	refundHeight := mocks.CurrBlockHeight() + govMock.LazyUnbondingBlocks()
-	slashed, xerr := ctrler.doSlash(expectedByzantine.Address(), govMock.SlashRate(), refundHeight)
+	tombstoned, xerr := ctrler.isTombstoned(expectedByzantine.Address(), true)
+	require.NoError(t, xerr)
+	require.False(t, tombstoned)
+	slashed, xerr := ctrler.doSlash(
+		expectedByzantine.Address(), govMock.SlashRate(), refundHeight,
+	)
 	require.NoError(t, xerr)
 	require.Equal(t, expectedSlashed, slashed)
 
@@ -65,7 +73,7 @@ func Test_Slash_Byzantine(t *testing.T) {
 	// removed dgtee
 	_, xerr = ctrler.readDelegatee(targetAddr, true)
 	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
-	tombstoned, xerr := ctrler.isTombstoned(targetAddr, true)
+	tombstoned, xerr = ctrler.isTombstoned(targetAddr, true)
 	require.NoError(t, xerr)
 	require.True(t, tombstoned)
 	_, xerr = doDelegate(ctrler, acctMock.RandWallet(), targetAddr, govMock.MinDelegatorPower(), mocks.CurrBlockHeight())
@@ -86,6 +94,143 @@ func Test_Slash_Byzantine(t *testing.T) {
 	}
 	require.NoError(t, ctrler.Close())
 	require.NoError(t, os.RemoveAll(config.DBDir()))
+}
+
+func Test_FrozenPowerSlashing(t *testing.T) {
+	t.Run("slash twice for two evidences in the same block", func(t *testing.T) {
+		ctrler, degtee := setupFrozenSlashTest(t)
+		degteeAddr := degtee.Address()
+		selfPowerBefore := requireSelfPower(t, ctrler, degteeAddr)
+
+		const blockHeight int64 = 3
+		_ = mocks.InitBlockCtxWith(
+			config.ChainIdHex(), blockHeight, govMock, acctMock, nil,
+			supplymock.NewSupplyHandlerMock(), ctrler,
+		)
+		tombstoned, xerr := ctrler.isTombstoned(degteeAddr, true)
+		require.NoError(t, xerr)
+		require.False(t, tombstoned)
+
+		events := beginBlockWithDuplicateVoteEvidence(
+			t, ctrler, degteeAddr, blockHeight-2, blockHeight-1,
+		)
+
+		firstSlashed := selfPowerBefore * int64(govMock.SlashRate()) / 100
+		afterFirst := selfPowerBefore - firstSlashed
+		secondSlashed := afterFirst * int64(govMock.SlashRate()) / 100
+		afterSecond := afterFirst - secondSlashed
+
+		requireSlashingEvent(t, events[0], firstSlashed)
+		requireSlashingEvent(t, events[1], secondSlashed)
+		require.Equal(t, selfPowerBefore-afterSecond, firstSlashed+secondSlashed)
+
+		refundHeight := blockHeight + govMock.LazyUnbondingBlocks()
+		requireFrozenPower(t, ctrler, refundHeight, degteeAddr, afterSecond)
+		requireTombstoned(t, ctrler, degteeAddr)
+	})
+
+	t.Run("slash frozen power after self power rate drops below minimum", func(t *testing.T) {
+		ctrler, degtee := setupFrozenSlashTest(t)
+		degteeAddr := degtee.Address()
+		_, lastHeight, xerr := ctrler.Commit()
+		require.NoError(t, xerr)
+		bctx := mocks.InitBlockCtxWith(
+			config.ChainIdHex(), lastHeight+1, govMock, acctMock, nil,
+			supplymock.NewSupplyHandlerMock(), ctrler,
+		)
+		require.NoError(t, mocks.DoBeginBlock(ctrler))
+		activeSelfPower := requireSelfPower(t, ctrler, degteeAddr)
+		unstakingPower := activeSelfPower
+		delegator := acctMock.GetWallet(0)
+		decreaseSelfPowerRate(t, ctrler, degtee, delegator, bctx.Height())
+
+		dgteeBelowRate, xerr := ctrler.readDelegatee(degteeAddr, true)
+		require.NoError(t, xerr)
+		require.Equal(t, activeSelfPower, dgteeBelowRate.SelfPower)
+		require.False(t, hasEnoughSelfPower(
+			dgteeBelowRate.SelfPower,
+			dgteeBelowRate.SumPower,
+			govMock.MinSelfPowerRate(),
+		))
+
+		unstakingRefundHeight := bctx.Height() + govMock.LazyUnbondingBlocks()
+		requireFrozenPower(t, ctrler, unstakingRefundHeight, degteeAddr, unstakingPower)
+
+		require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
+		require.False(t, ctrler.IsValidator(degteeAddr))
+
+		bctx = mocks.CurrBlockCtx()
+		slashingRefundHeight := bctx.Height() + govMock.LazyUnbondingBlocks()
+		tombstoned, xerr := ctrler.isTombstoned(degteeAddr, true)
+		require.NoError(t, xerr)
+		require.False(t, tombstoned)
+
+		events := beginBlockWithDuplicateVoteEvidence(
+			t, ctrler, degteeAddr, bctx.Height()-1,
+		)
+
+		frozenSlashed := unstakingPower * int64(govMock.SlashRate()) / 100
+		activeSlashed := activeSelfPower * int64(govMock.SlashRate()) / 100
+		requireSlashingEvent(t, events[0], frozenSlashed+activeSlashed)
+		requireFrozenPower(
+			t, ctrler, unstakingRefundHeight, degteeAddr, unstakingPower-frozenSlashed,
+		)
+		requireFrozenPower(
+			t, ctrler, slashingRefundHeight, degteeAddr, activeSelfPower-activeSlashed,
+		)
+
+		requireTombstoned(t, ctrler, degteeAddr)
+	})
+
+	t.Run("slash frozen power after forced unbonding for missed blocks", func(t *testing.T) {
+		ctrler, degtee := setupFrozenSlashTest(t)
+		degteeAddr := degtee.Address()
+		selfPowerBefore := requireSelfPower(t, ctrler, degteeAddr)
+
+		forcedUnbondHeight := missBlocksUntilUnbonded(t, ctrler, degteeAddr)
+
+		missingRefundHeight := forcedUnbondHeight + govMock.LazyUnbondingBlocks()
+		requireFrozenPower(t, ctrler, missingRefundHeight, degteeAddr, selfPowerBefore)
+		require.False(t, ctrler.IsValidator(degteeAddr))
+
+		tombstoned, xerr := ctrler.isTombstoned(degteeAddr, true)
+		require.NoError(t, xerr)
+		require.False(t, tombstoned)
+
+		events := beginBlockWithDuplicateVoteEvidence(
+			t, ctrler, degteeAddr, forcedUnbondHeight-1,
+		)
+
+		expectedSlashed := selfPowerBefore * int64(govMock.SlashRate()) / 100
+		requireSlashingEvent(t, events[0], expectedSlashed)
+		requireFrozenPower(t, ctrler, missingRefundHeight, degteeAddr, selfPowerBefore-expectedSlashed)
+		requireTombstoned(t, ctrler, degteeAddr)
+	})
+
+	t.Run("skip tombstoned validator with no frozen power", func(t *testing.T) {
+		ctrler, _ := setupFrozenSlashTest(t)
+		degteeAddr := web3.NewWallet(nil).Address()
+		require.NoError(t, ctrler.setTombstone(degteeAddr, true))
+
+		const blockHeight int64 = 3
+		bctx := mocks.InitBlockCtxWith(
+			config.ChainIdHex(), blockHeight, govMock, acctMock, nil,
+			supplymock.NewSupplyHandlerMock(), ctrler,
+		)
+		bctx.SetByzantine([]abcitypes.Evidence{
+			{
+				Type: abcitypes.EvidenceType_DUPLICATE_VOTE,
+				Validator: abcitypes.Validator{
+					Address: degteeAddr,
+				},
+				Height: blockHeight - 1,
+			},
+		})
+
+		events, xerr := ctrler.BeginBlock(bctx)
+		require.NoError(t, xerr)
+		require.Empty(t, events)
+	})
 }
 
 func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
@@ -166,37 +311,48 @@ func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {
 func Test_Punish_MissingBlock(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 
-	allowedDownCnt := govMock.InflationCycleBlocks() - govMock.MinSignedBlocks()
-	require.True(t, allowedDownCnt > 0)
-
 	ctrler, lastValUps0, valWallets0, xerr := initLedger(config)
 	require.NoError(t, xerr)
 	require.Equal(t, len(lastValUps0), len(valWallets0))
+	t.Cleanup(func() {
+		require.NoError(t, ctrler.Close())
+	})
+
+	targetValWal := valWallets0[rand.Intn(len(valWallets0))]
+	missBlocksUntilUnbonded(t, ctrler, targetValWal.Address())
+}
+
+// missBlocksUntilUnbonded commits the forced unbonding and returns its block height.
+// The current block context is then ready for evidence in the following block.
+func missBlocksUntilUnbonded(t *testing.T, ctrler *VPowerCtrler, targetAddr types.Address) int64 {
+	t.Helper()
+
+	allowedDownCnt := govMock.InflationCycleBlocks() - govMock.MinSignedBlocks()
+	require.Positive(t, allowedDownCnt)
 
 	_ = mocks.InitBlockCtxWith(config.ChainIdHex(), 1, govMock, acctMock, nil, supplymock.NewSupplyHandlerMock(), ctrler)
 	require.NoError(t, mocks.DoAllProcess(ctrler))
 
-	targetValWal := valWallets0[rand.Intn(len(valWallets0))]
-	require.True(t, ctrler.IsValidator(targetValWal.Address()))
-	dgtee0, xerr := ctrler.readDelegatee(targetValWal.Address(), true)
+	require.True(t, ctrler.IsValidator(targetAddr))
+	dgtee0, xerr := ctrler.readDelegatee(targetAddr, true)
 	require.NoError(t, xerr)
 	require.NotNil(t, dgtee0)
 
-	// It will return an error because the targetValWal has not missed any block.
+	// It will return an error because the target has not missed any block.
 	// And missedCnt is set to 0.
-	missedCnt, xerr := ctrler.getMissedBlockCount(targetValWal.Address(), true)
+	missedCnt, xerr := ctrler.getMissedBlockCount(targetAddr, true)
 	require.Error(t, xerr)
 
 	for {
 		bctx := mocks.CurrBlockCtx()
 		require.NotNil(t, bctx)
 
-		// make targetVal not sign block
+		// make target not sign block
 		bi := mocks.CurrBlockCtx().BlockInfo()
 		require.NotNil(t, bi)
 		bi.LastCommitInfo.Votes = append([]abcitypes.VoteInfo(nil), abcitypes.VoteInfo{
 			Validator: abcitypes.Validator{
-				Address: targetValWal.Address(),
+				Address: targetAddr,
 			},
 			SignedLastBlock: false,
 		})
@@ -206,14 +362,14 @@ func Test_Punish_MissingBlock(t *testing.T) {
 		// missedBlock is increased.
 		require.NoError(t, mocks.DoBeginBlock(ctrler))
 
-		_missedCnt, xerr := ctrler.getMissedBlockCount(targetValWal.Address(), true)
+		_missedCnt, xerr := ctrler.getMissedBlockCount(targetAddr, true)
 		require.NoError(t, xerr)
 		require.Equal(t, missedCnt+1, _missedCnt)
 		missedCnt = _missedCnt
 
 		if int64(missedCnt) >= allowedDownCnt {
-			// all voting power of targetValWal should be unstaked.
-			_, xerr := ctrler.readDelegatee(targetValWal.Address(), true)
+			// all voting power of target should be unstaked.
+			_, xerr := ctrler.readDelegatee(targetAddr, true)
 			require.Error(t, xerr)
 
 			for _, addr := range dgtee0.Delegators {
@@ -225,13 +381,13 @@ func Test_Punish_MissingBlock(t *testing.T) {
 			// update validators
 			require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
 
-			require.False(t, ctrler.IsValidator(targetValWal.Address()))
-			break
+			require.False(t, ctrler.IsValidator(targetAddr))
+			return bctx.Height()
 		}
 
 		// EndBlock and Commit
 		require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
-		require.True(t, ctrler.IsValidator(targetValWal.Address()))
+		require.True(t, ctrler.IsValidator(targetAddr))
 	}
 }
 
@@ -244,6 +400,110 @@ func requirePowerChunksEqual(t *testing.T, expected, actual []*PowerChunkProto) 
 		require.Equal(t, expected[i].Height, actualChunk.Height)
 		require.EqualValues(t, expected[i].TxHash, actualChunk.TxHash)
 	}
+}
+
+func setupFrozenSlashTest(t *testing.T) (*VPowerCtrler, *web3.Wallet) {
+	t.Helper()
+
+	require.NoError(t, os.RemoveAll(config.RootDir))
+	ctrler, _, valWallets, xerr := initLedger(config)
+	require.NoError(t, xerr)
+	require.NotEmpty(t, valWallets)
+
+	t.Cleanup(func() {
+		require.NoError(t, ctrler.Close())
+		require.NoError(t, os.RemoveAll(config.DBDir()))
+	})
+	return ctrler, valWallets[0]
+}
+
+func beginBlockWithDuplicateVoteEvidence(
+	t *testing.T,
+	ctrler *VPowerCtrler,
+	targetAddr types.Address,
+	offenseHeights ...int64,
+) []abcitypes.Event {
+	t.Helper()
+
+	evidences := make([]abcitypes.Evidence, len(offenseHeights))
+	for i, offenseHeight := range offenseHeights {
+		evidences[i] = abcitypes.Evidence{
+			Type: abcitypes.EvidenceType_DUPLICATE_VOTE,
+			Validator: abcitypes.Validator{
+				Address: targetAddr,
+			},
+			Height: offenseHeight,
+		}
+	}
+
+	bctx := mocks.CurrBlockCtx()
+	require.NotNil(t, bctx)
+	bctx.SetByzantine(evidences)
+	events, xerr := ctrler.BeginBlock(bctx)
+	require.NoError(t, xerr)
+	require.Len(t, events, len(evidences))
+	return events
+}
+
+func requireTombstoned(t *testing.T, ctrler *VPowerCtrler, targetAddr types.Address) {
+	t.Helper()
+
+	requireDelegateeRemoved(t, ctrler, targetAddr)
+
+	tombstoned, xerr := ctrler.isTombstoned(targetAddr, true)
+	require.NoError(t, xerr)
+	require.True(t, tombstoned)
+}
+
+func requireDelegateeRemoved(t *testing.T, ctrler *VPowerCtrler, targetAddr types.Address) {
+	t.Helper()
+
+	dgtee, xerr := ctrler.readDelegatee(targetAddr, true)
+	require.Nil(t, dgtee)
+	require.Error(t, xerr)
+	require.True(t, xerr.Contains(xerrors.ErrNotFoundResult))
+}
+
+func requireSelfPower(t *testing.T, ctrler *VPowerCtrler, targetAddr types.Address) int64 {
+	t.Helper()
+
+	dgtee, xerr := ctrler.readDelegatee(targetAddr, true)
+	require.NoError(t, xerr)
+	require.NotNil(t, dgtee)
+	return dgtee.SelfPower
+}
+
+func requireFrozenPower(
+	t *testing.T,
+	ctrler *VPowerCtrler,
+	refundHeight int64,
+	from types.Address,
+	expectedPower int64,
+) {
+	t.Helper()
+
+	frozen, xerr := ctrler.readFrozenVPower(refundHeight, from, true)
+	require.NoError(t, xerr)
+	require.Equal(t, expectedPower, frozen.RefundPower)
+
+	sumPower := int64(0)
+	for _, pc := range frozen.PowerChunks {
+		sumPower += pc.Power
+	}
+	require.Equal(t, frozen.RefundPower, sumPower)
+}
+
+func requireSlashingEvent(t *testing.T, event abcitypes.Event, expectedSlashed int64) {
+	t.Helper()
+
+	require.Equal(t, "vpower.slashing", event.Type)
+	for _, attr := range event.Attributes {
+		if string(attr.Key) == "slashed" {
+			require.Equal(t, strconv.FormatInt(expectedSlashed, 10), string(attr.Value))
+			return
+		}
+	}
+	require.Fail(t, "slashed event attribute not found")
 }
 
 func requireFrozenVPowerEqual(t *testing.T, ctrler *VPowerCtrler, refundHeight int64, expected *VPower) {
