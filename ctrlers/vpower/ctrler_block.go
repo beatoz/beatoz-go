@@ -22,20 +22,11 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 	if len(byzantines) > 0 {
 		ctrler.logger.Info("Byzantine validators is found", "count", len(byzantines))
 		for _, evi := range byzantines {
-			tombstoned, xerr := ctrler.isTombstoned(evi.Validator.Address, true)
-			if xerr != nil {
-				return nil, xerr
-			}
-			if tombstoned {
-				ctrler.logger.Debug("Byzantine validator is already tombstoned",
-					"byzantine", types.Address(evi.Validator.Address),
-					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
-				continue
-			}
-
 			// slash the byzantine validator's voting power.
 			refundHeight := bctx.Height() + bctx.GovHandler.LazyUnbondingBlocks()
-			slashed, xerr := ctrler.doSlash(evi.Validator.Address, bctx.GovHandler.SlashRate(), refundHeight)
+			slashed, xerr := ctrler.doSlash(
+				evi.Validator.Address, bctx.GovHandler.SlashRate(), refundHeight,
+			)
 			if xerr != nil {
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
