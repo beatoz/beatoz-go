@@ -97,6 +97,67 @@ func Test_Slash_Byzantine(t *testing.T) {
 }
 
 func Test_FrozenPowerSlashing(t *testing.T) {
+	t.Run("slash frozen delegation to another validator", func(t *testing.T) {
+		ctrler, validator := setupFrozenSlashTest(t)
+		targetAddr := validator.Address()
+		var otherAddr types.Address
+		for _, other := range ctrler.CopyLastValidators() {
+			if other.Address().Compare(targetAddr) != 0 {
+				otherAddr = other.Address()
+				break
+			}
+		}
+		require.NotEmpty(t, otherAddr)
+
+		acctMock.AddWallet(validator)
+		validator.GetAccount().SetBalance(types.ToGrans(1_000_000_000))
+		const unstakingHeight int64 = 1
+		_ = mocks.InitBlockCtxWith(
+			config.ChainIdHex(), unstakingHeight, govMock, acctMock, nil,
+			supplymock.NewSupplyHandlerMock(), ctrler,
+		)
+		require.NoError(t, mocks.DoBeginBlock(ctrler))
+		frozenPower := govMock.MinDelegatorPower()
+		activePower := frozenPower * 2
+		frozenTx, xerr := doDelegate(ctrler, validator, otherAddr, frozenPower, unstakingHeight)
+		require.NoError(t, xerr)
+		_, xerr = doDelegate(ctrler, validator, otherAddr, activePower, unstakingHeight)
+		require.NoError(t, xerr)
+		_, xerr = doUndelegate(ctrler, validator, otherAddr, unstakingHeight, frozenTx.TxHash)
+		require.NoError(t, xerr)
+		frozenHeight := unstakingHeight + govMock.LazyUnbondingBlocks()
+		requireFrozenPower(t, ctrler, frozenHeight, targetAddr, frozenPower)
+		require.NoError(t, mocks.DoEndBlockAndCommit(ctrler))
+
+		delegated, xerr := ctrler.readVPower(targetAddr, otherAddr, true)
+		require.NoError(t, xerr)
+		require.Equal(t, activePower, delegated.SumPower)
+		require.Len(t, delegated.PowerChunks, 1)
+		expectedDelegated := delegated.Clone()
+		other, xerr := ctrler.readDelegatee(otherAddr, true)
+		require.NoError(t, xerr)
+		expectedOther := other.Clone()
+		selfPower := requireSelfPower(t, ctrler, targetAddr)
+
+		events := beginBlockWithDuplicateVoteEvidence(t, ctrler, targetAddr, unstakingHeight)
+		frozenSlashed := frozenPower * int64(govMock.SlashRate()) / 100
+		selfSlashed := selfPower * int64(govMock.SlashRate()) / 100
+		requireSlashingEvent(t, events[0], frozenSlashed+selfSlashed)
+		requireFrozenPower(t, ctrler, frozenHeight, targetAddr, frozenPower-frozenSlashed)
+		requireFrozenPower(t, ctrler,
+			mocks.CurrBlockHeight()+govMock.LazyUnbondingBlocks(), targetAddr, selfPower-selfSlashed)
+		requireTombstoned(t, ctrler, targetAddr)
+
+		delegated, xerr = ctrler.readVPower(targetAddr, otherAddr, true)
+		require.NoError(t, xerr)
+		require.Equal(t, expectedDelegated.SumPower, delegated.SumPower)
+		requirePowerChunksEqual(t, expectedDelegated.PowerChunks, delegated.PowerChunks)
+		other, xerr = ctrler.readDelegatee(otherAddr, true)
+		require.NoError(t, xerr)
+		require.Equal(t, expectedOther.SelfPower, other.SelfPower)
+		require.Equal(t, expectedOther.SumPower, other.SumPower)
+	})
+
 	t.Run("slash twice for two evidences in the same block", func(t *testing.T) {
 		ctrler, degtee := setupFrozenSlashTest(t)
 		degteeAddr := degtee.Address()
@@ -232,6 +293,26 @@ func Test_FrozenPowerSlashing(t *testing.T) {
 		require.Len(t, events, 1)
 		requireSlashingEvent(t, events[0], 0)
 	})
+}
+
+func Test_BeginBlock_FailureDoSlash(t *testing.T) {
+	ctrler, validator := setupFrozenSlashTest(t)
+	bctx := mocks.InitBlockCtxWith(
+		config.ChainIdHex(), 3, govMock, acctMock, nil,
+		supplymock.NewSupplyHandlerMock(), ctrler,
+	)
+	bctx.SetByzantine([]abcitypes.Evidence{{
+		Type:      abcitypes.EvidenceType_DUPLICATE_VOTE,
+		Validator: abcitypes.Validator{Address: validator.Address()},
+		Height:    2,
+	}})
+
+	// Keep the manager attached so doSlash returns a ledger error, not a nil-pointer panic.
+	require.NoError(t, ctrler.vpowerState.Close())
+
+	events, xerr := ctrler.BeginBlock(bctx)
+	require.EqualError(t, xerr, "state ledger manager is closed")
+	require.Nil(t, events)
 }
 
 func Test_Punish_Byzantine_By_BlockProcess(t *testing.T) {

@@ -31,6 +31,7 @@ func (ctrler *VPowerCtrler) BeginBlock(bctx *ctrlertypes.BlockContext) ([]abcity
 				ctrler.logger.Error("Error when punishing",
 					"byzantine", types.Address(evi.Validator.Address),
 					"evidenceType", abcitypes.EvidenceType_name[int32(evi.Type)])
+				return nil, xerr
 			} else {
 				// do permanent lock
 				deadAmt := types.PowerToAmount(slashed)
