@@ -75,6 +75,7 @@ func Test_Query(t *testing.T) {
 		abcitypes.RequestQuery{Path: "stakes/voting_power", Height: height},
 		func() interface{} { return int32(len(validators)) },
 		func() interface{} { return int64(0) },
+		func() interface{} { return int32(0) },
 	)
 	require.NoError(t, xerr)
 	var votingPower string
