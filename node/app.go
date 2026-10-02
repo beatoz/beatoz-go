@@ -72,7 +72,7 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 		panic(err)
 	}
 
-	vpowCtrler, err := vpower.NewVPowerCtrler(config, int(govCtrler.MaxValidatorCnt()), logger)
+	vpowCtrler, err := vpower.NewVPowerCtrler(config, int(govCtrler.MaxValidatorCnt()), govCtrler.MinValidatorPower(), govCtrler.MinSelfPowerRate(), logger)
 	if err != nil {
 		panic(err)
 	}
@@ -563,6 +563,10 @@ func (ctrler *BeatozApp) asyncExecTrxContextBTIP35(txctx *ctrlertypes.TrxContext
 	})
 
 	xerr := ctrler.txExecutor.ExecuteSync(txctx)
+	if xerr == nil || types.IsBTIP45(txctx.ChainID(), txctx.Height()) {
+		ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
+	}
+
 	if xerr != nil {
 		xerr = xerrors.ErrDeliverTx.Wrap(xerr)
 		ctrler.logger.Error("asyncExecTrxContextBTIP35", "error", xerr)
@@ -574,8 +578,6 @@ func (ctrler *BeatozApp) asyncExecTrxContextBTIP35(txctx *ctrlertypes.TrxContext
 			GasUsed:   txctx.GasUsed,
 		}
 	}
-
-	ctrler.currBlockCtx.AddFee(types.GasToFee(txctx.GasUsed, ctrler.govCtrler.GasPrice()))
 
 	_, evtRoot := txctx.EventRoot()
 	return &abcitypes.ResponseDeliverTx{

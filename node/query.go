@@ -82,6 +82,9 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 			func() interface{} {
 				return ctrler.govCtrler.MinValidatorPower()
 			},
+			func() interface{} {
+				return ctrler.govCtrler.MinSelfPowerRate()
+			},
 		)
 	case "reward", "total_supply":
 		response.Value, xerr = ctrler.supplyCtrler.Query(req)

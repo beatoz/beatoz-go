@@ -14,6 +14,7 @@ var (
 	KeyPrefixVPower           = common.KeyPrefixVPower
 	KeyPrefixFrozenVPower     = common.KeyPrefixFrozenVPower
 	KeyPrefixMissedBlockCount = common.KeyPrefixMissedBlockCount
+	KeyPrefixTombstone        = common.KeyPrefixTombstone
 	KeyPrefixTotalSupply      = common.KeyPrefixTotalSupply
 	KeyPrefixReward           = common.KeyPrefixReward
 )
@@ -48,6 +49,10 @@ func LedgerKeyFrozenVPower(height int64, from types.Address) LedgerKey {
 
 func LedgerKeyMissedBlockCount(signer types.Address) LedgerKey {
 	return common.LedgerKeyMissedBlockCount(signer)
+}
+
+func LedgerKeyTombstone(addr types.Address) LedgerKey {
+	return common.LedgerKeyTombstone(addr)
 }
 
 func LedgerKeyTotalSupply() LedgerKey {

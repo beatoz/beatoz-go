@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 
@@ -121,7 +122,8 @@ func TestRootConfig(t *testing.T) {
 	// write non-default config
 	nonDefaultLogLvl := "abc:debug"
 	cvals := map[string]string{
-		"log_level": nonDefaultLogLvl,
+		"log_level":         nonDefaultLogLvl,
+		"app.query_timeout": "2s",
 	}
 
 	cases := []struct {
@@ -157,6 +159,7 @@ func TestRootConfig(t *testing.T) {
 		require.Nil(t, err, idxString)
 
 		assert.Equal(t, tc.logLvl, rootConfig.LogLevel, idxString)
+		assert.Equal(t, 2*time.Second, rootConfig.App.QueryTimeout, idxString)
 	}
 }
 

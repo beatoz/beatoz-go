@@ -63,6 +63,74 @@ func TestNewMerkleTree_RawAndPreHashed(t *testing.T) {
 	require.Equal(t, rawTree.Root(), hashedTree.Root(), fmt.Sprintf("root should be identical:\n  raw:    %x\n  hashed: %x", rawTree.Root(), hashedTree.Root()))
 }
 
+func TestNewMerkleTree_BTIP48_EmptyAndNull(t *testing.T) {
+	emptyTree := NewMerkleTree(WithRawLeaves(nil), true)
+	nilLeafTree := NewMerkleTree(WithRawLeaves([][]byte{nil}), true)
+	emptyLeafTree := NewMerkleTree(WithRawLeaves([][]byte{{}}), true)
+
+	require.Equal(t,
+		"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		fmt.Sprintf("%x", emptyTree.Root()),
+	)
+	require.Equal(t,
+		"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+		fmt.Sprintf("%x", nilLeafTree.Root()),
+	)
+	require.Equal(t, nilLeafTree.Root(), emptyLeafTree.Root())
+}
+
+func TestNewMerkleTree_BTIP48_OfficialTreeVector(t *testing.T) {
+	tree := NewMerkleTree(WithRawLeaves([][]byte{{0x61}, {0x62}, nil}), true)
+
+	require.Equal(t,
+		"ed59f0e9e53a90b1fa76c23816424acaab94c5fd6073e597517daf43f6b38154",
+		fmt.Sprintf("%x", tree.Root()),
+	)
+}
+
+func TestNewMerkleTree_BTIP48_OfficialProofVector(t *testing.T) {
+	tree := NewMerkleTree(WithRawLeaves([][]byte{{0x61}, {0x62}, nil}), true)
+	storedLeaf, siblings, err := tree.Proof(1)
+	require.NoError(t, err)
+
+	require.Equal(t,
+		"57eb35615d47f34ec714cacdf5fd74608a5e8e102724e80b24b287c0c27b6a31",
+		fmt.Sprintf("%x", storedLeaf),
+	)
+
+	actualSiblings := make([]string, len(siblings))
+	for i, sibling := range siblings {
+		actualSiblings[i] = fmt.Sprintf("%x", sibling)
+	}
+	require.Equal(t, []string{
+		"022a6979e6dab7aa5ae4c3e5e45f7e977112a7e63593820dbec1ec738a24f93c",
+		"8c35feba66fbe78ac0ead640353127fa1bfe1c20c64b4ab6ce2ee56418828f0e",
+	}, actualSiblings)
+}
+
+func TestNewMerkleTree_BTIP48_Rehashes32ByteLeaf(t *testing.T) {
+	leaf := make([]byte, sha256.Size)
+	tree := NewMerkleTree(WithRawLeaves([][]byte{leaf}), true)
+	expected := sha256.Sum256(append([]byte{0x00}, leaf...))
+
+	require.Equal(t, expected[:], tree.Root())
+	// BTIP48 must not allow pre-hashed inputs to bypass leaf domain separation.
+	require.Equal(t, expected[:], NewMerkleTree(WithHashedLeaves([][]byte{leaf}), true).Root())
+	// An explicit false retains both legacy input modes.
+	legacyHash := sha256.Sum256(leaf)
+	require.Equal(t, legacyHash[:], NewMerkleTree(WithRawLeaves([][]byte{leaf}), false).Root())
+	require.Equal(t, leaf, NewMerkleTree(WithHashedLeaves([][]byte{leaf}), false).Root())
+}
+
+func TestNewMerkleTree_BTIP48_DomainSeparation(t *testing.T) {
+	tree := NewMerkleTree(WithRawLeaves([][]byte{[]byte("A"), []byte("B")}), true)
+	concatenatedLeaves := append([]byte(nil), tree.nodes[2]...)
+	concatenatedLeaves = append(concatenatedLeaves, tree.nodes[3]...)
+	forgedTree := NewMerkleTree(WithRawLeaves([][]byte{concatenatedLeaves}), true)
+
+	require.NotEqual(t, tree.Root(), forgedTree.Root())
+}
+
 // TestNewMerkleTree_PaddingToPowerOf2 tests that non-power-of-2 leaves are padded.
 func TestNewMerkleTree_PaddingToPowerOf2(t *testing.T) {
 	hashedLeaves := [][]byte{

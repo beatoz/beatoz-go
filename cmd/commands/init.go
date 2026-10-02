@@ -16,7 +16,6 @@ import (
 	acrypto "github.com/beatoz/beatoz-go/types/crypto"
 	"github.com/holiman/uint256"
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/config"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
@@ -118,7 +117,9 @@ func initFiles(cmd *cobra.Command, args []string) error {
 	// write the empty block parameters to config.toml
 	rootConfig.Consensus.CreateEmptyBlocks = initParams.CreateEmptyBlocks
 	rootConfig.Consensus.CreateEmptyBlocksInterval, _ = time.ParseDuration(initParams.CreateEmptyBlocksInterval)
-	config.WriteConfigFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"), rootConfig.Config)
+	if err := cfg.WriteConfigFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"), rootConfig); err != nil {
+		return err
+	}
 
 	var s0, s1 []byte
 

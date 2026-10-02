@@ -1,7 +1,7 @@
 package evm
 
 import (
-	"fmt"
+	"context"
 	"math"
 	"math/big"
 	"time"
@@ -58,6 +58,8 @@ func (ctrler *EVMCtrler) GetCode(addr types.Address, height int64) ([]byte, xerr
 	return state.GetCode(addr.Array20()), nil
 }
 func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blockTime int64) (*core.ExecutionResult, xerrors.XError) {
+	ctx, cancel := context.WithTimeout(context.Background(), ctrler.queryTimeout)
+	defer cancel()
 
 	// Get the stateDB at block<height> and the `stateDBWrapper` that has account ledger(acctCtrler)
 	state, xerr := ctrler.MemStateAt(height)
@@ -96,17 +98,21 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 	vmevm := vm.NewEVM(blockContext, txContext, state, ctrler.ethChainConfig, vm.Config{NoBaseFee: true})
 
 	gp := new(core.GasPool).AddGas(blockContext.GasLimit)
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.ErrQuery.Wrap(err)
+	}
+
+	clearTimeoutCallback := context.AfterFunc(ctx, vmevm.Cancel)
 	result, err := NewVMStateTransition(vmevm, vmmsg, gp).TransitionDb()
+	timeoutCallbackCleared := clearTimeoutCallback()
 	if err != nil {
 		return nil, xerrors.From(err)
 	}
-
-	// If the timer caused an abort, return an appropriate error message
-	if vmevm.Cancelled() {
-		return nil, xerrors.From(fmt.Errorf("execution aborted (timeout ???)"))
+	if result != nil && result.Err != nil {
+		return result, nil
 	}
-	if err != nil {
-		return nil, xerrors.From(fmt.Errorf("err: %w (supplied gasLimit %d)", err, vmmsg.GasLimit))
+	if !timeoutCallbackCleared {
+		return nil, xerrors.ErrQuery.Wrap(ctx.Err())
 	}
 
 	// todo: Improve handling result

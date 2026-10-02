@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
@@ -27,8 +28,9 @@ type VPowerCtrler struct {
 
 	vpowLimiter *VPowerLimiter
 
-	logger tmlog.Logger
-	mtx    sync.RWMutex
+	queryTimeout time.Duration
+	logger       tmlog.Logger
+	mtx          sync.RWMutex
 }
 
 func defaultNewItem(key common.LedgerKey) common.ILedgerItem {
@@ -40,11 +42,13 @@ func defaultNewItem(key common.LedgerKey) common.ILedgerItem {
 		return &FrozenVPower{}
 	} else if bytes2.HasPrefix(key, common.KeyPrefixMissedBlockCount) {
 		return new(BlockCount)
+	} else if bytes2.HasPrefix(key, common.KeyPrefixTombstone) {
+		return new(Tombstone)
 	}
 	panic(fmt.Errorf("invalid key prefix:0x%x", key[0]))
 }
 
-func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
+func NewVPowerCtrler(config *cfg.Config, maxValCnt int, minValidatorPower int64, minSelfPowerRate int32, logger tmlog.Logger) (*VPowerCtrler, xerrors.XError) {
 	lg := logger.With("module", "beatoz_VPowerCtrler")
 
 	powersState, xerr := ledger.NewStateLedgerManager("vpows", config.DBDir(), 21*1000, defaultNewItem, lg)
@@ -53,11 +57,12 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, logger tmlog.Logger) (*V
 	}
 
 	ret := &VPowerCtrler{
-		vpowerState: powersState,
-		vpowLimiter: NewVPowerLimiter(),
-		logger:      lg,
+		vpowerState:  powersState,
+		vpowLimiter:  NewVPowerLimiter(),
+		queryTimeout: config.App.QueryTimeout,
+		logger:       lg,
 	}
-	if xerr := ret.LoadDelegatees(maxValCnt); xerr != nil {
+	if xerr := ret.LoadDelegatees(maxValCnt, minValidatorPower, minSelfPowerRate); xerr != nil {
 		return nil, xerr
 	}
 	return ret, nil
@@ -95,7 +100,7 @@ func (ctrler *VPowerCtrler) InitLedger(req interface{}) xerrors.XError {
 	return nil
 }
 
-func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int) xerrors.XError {
+func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int, minValidatorPower int64, minSelfPowerRate int32) xerrors.XError {
 	ctrler.mtx.Lock()
 	defer ctrler.mtx.Unlock()
 
@@ -106,7 +111,10 @@ func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int) xerrors.XError {
 
 	var lastVals []*Delegatee
 	if dgtees != nil {
-		lastVals = selectValidators(dgtees, maxValCnt)
+		lastVals, xerr = selectEligibleValidators(dgtees, maxValCnt, minValidatorPower, minSelfPowerRate)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	ctrler.allDelegatees = dgtees
@@ -152,6 +160,14 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 			return xerr
 		}
 
+		tombstoned, xerr := ctrler.isTombstoned(ctx.Tx.To, ctx.Exec)
+		if xerr != nil {
+			return xerr
+		}
+		if tombstoned {
+			return xerrors.ErrInvalidTrx.Wrapf("staking to tombstoned validator is not allowed: %v", ctx.Tx.To)
+		}
+
 		if bytes.Equal(ctx.Tx.From, ctx.Tx.To) {
 			// self bonding
 			selfPower = txPower
@@ -168,15 +184,27 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 				return xerrors.ErrNotFoundDelegatee.Wrapf("address(%v)", ctx.Tx.To)
 			}
 
+			maxDelegators := int(ctx.GovHandler.MaxDelegatorsOfValidator())
+			if !dgtee.hasDelegator(ctx.Tx.From) && len(dgtee.Delegators) >= maxDelegators {
+				return xerrors.ErrInvalidTrx.Wrapf(
+					"validator(%v) reached the maximum number of delegators: %v",
+					dgtee.addr,
+					maxDelegators,
+				)
+			}
+
 			// check minDelegatorPower
 			minDelegatorPower := ctx.GovHandler.MinDelegatorPower()
 			if minDelegatorPower > txPower {
 				return xerrors.ErrInvalidTrx.Wrapf("invalid delegation: must be >= %v power", minDelegatorPower)
 			}
 
-			// it's delegating. check minSelfStakeRatio
-			selfrate := dgtee.SelfPower * int64(100) / (dgtee.SumPower + txPower)
-			if selfrate < int64(ctx.GovHandler.MinSelfPowerRate()) {
+			// Delegation must not lower the validator's self-power ratio below the minimum.
+			if !hasEnoughSelfPower(
+				dgtee.SelfPower,
+				dgtee.SumPower+txPower,
+				ctx.GovHandler.MinSelfPowerRate(),
+			) {
 				return xerrors.From(fmt.Errorf("not enough self power of %v: self: %v, total: %v, new power: %v", dgtee.addr, dgtee.SelfPower, dgtee.SumPower, txPower))
 			}
 
@@ -344,23 +372,8 @@ func (ctrler *VPowerCtrler) exeUnbonding(ctx *ctrlertypes.TrxContext) xerrors.XE
 	}
 
 	if dgtee.SelfPower == 0 {
-		// un-bonding all vpowers delegated to `dgtee`
-		for _, _from := range dgtee.Delegators {
-			_vpow, xerr := ctrler.readVPower(_from, dgtee.addr, ctx.Exec)
-			if xerr != nil {
-				return xerr
-			}
-			if xerr := ctrler.freezePowerChunkList(_vpow.from, _vpow.PowerChunks, refundHeight, ctx.Exec); xerr != nil {
-				return xerr
-			}
-			if xerr := ctrler.removeVPower(_vpow.from, _vpow.to, ctx.Exec); xerr != nil {
-				return xerr
-			}
-
-		}
-		if xerr := ctrler.removeDelegatee(dgtee.addr, ctx.Exec); xerr != nil {
-			return xerr
-		}
+		// Force-unbond all remaining power delegated to `dgtee`.
+		return ctrler.forceUnbondDelegatee(dgtee, refundHeight, ctx.Exec, 0)
 	}
 
 	return nil
