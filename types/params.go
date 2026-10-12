@@ -4,6 +4,7 @@ type ForkBlocks struct {
 	BTIP27Block int64
 	BTIP35Block int64
 	BTIP45Block int64
+	BTIP48Block int64
 }
 
 var (
@@ -14,6 +15,7 @@ var (
 		BTIP27Block: 194_850,
 		BTIP35Block: 194_850,
 		BTIP45Block: 500_000,
+		BTIP48Block: 500_000,
 	}
 
 	mainnetForkBlocks = ForkBlocks{
@@ -54,9 +56,13 @@ func IsBTIP45(chainId string, height int64) bool {
 	return isBlockForked(h0, height)
 }
 
-// IsBTIP48 shares its activation height with BTIP45.
 func IsBTIP48(chainId string, height int64) bool {
-	return IsBTIP45(chainId, height)
+	h0 := int64(0)
+	if forkBlocks, ok := chainForkBlocks[chainId]; ok {
+		h0 = forkBlocks.BTIP48Block
+	}
+	// If there is no forkBlocks then `h0` is 0; BTIP48 is enabled by default.
+	return isBlockForked(h0, height)
 }
 
 func isBlockForked(h0, head int64) bool {
