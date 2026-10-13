@@ -116,6 +116,15 @@ func (mock *AcctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec boo
 	return nil
 }
 
+func (mock *AcctHandlerMock) Refund(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
+	if receiver := mock.FindAccount(to, exec); receiver == nil {
+		return xerrors.ErrNotFoundAccount
+	} else if xerr := receiver.AddBalance(amt); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
 func (mock *AcctHandlerMock) AddBalance(addr types.Address, amt *uint256.Int, exec bool) xerrors.XError {
 	if receiver := mock.FindOrNewAccount(addr, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount

@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"testing"
 	"time"
@@ -287,6 +288,112 @@ func Test_TrxContext_EventRootEx(t *testing.T) {
 	require.NoError(t, err)
 	err = merkle.VerifyProof(targetIdx, targetData, evt1Siblings, evt1Root)
 	require.NoError(t, err)
+}
+
+// Fixed roots preserve historical event hashing when replay crosses fork boundaries.
+func Test_TrxContext_EventRoot_ForkBoundaries(t *testing.T) {
+	const (
+		legacyRoot = "93e2141e5046991b2f6267030cf1b1ec5ddc59abd0205f3a9e5ceaca936ee689"
+		btip27Root = "424a8b97a36c130712bb6ffd75bb6b6d4abe2ff186ee25e1970a49daa8c6defb"
+		btip48Root = "3bee3fbdc0a89cb01275036a78662045f38d0ecd45780321054320d8cbb98907"
+	)
+	tests := []struct {
+		height int64
+		root   string
+	}{
+		{194_849, legacyRoot},
+		{194_850, btip27Root},
+		{194_851, btip27Root},
+		{499_999, btip27Root},
+		{500_000, btip48Root},
+		{500_001, btip48Root},
+		// Revisit older heights to catch any sticky, process-wide fork selection.
+		{499_999, btip27Root},
+		{194_849, legacyRoot},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("height_%d", tt.height), func(t *testing.T) {
+			txctx := &ctrlertypes.TrxContext{
+				BlockContext: ctrlertypes.TempBlockContext("0xbea701", tt.height, time.Now(), govMock, acctMock, nil, nil, nil),
+				Events: []abcitypes.Event{
+					{Type: "tx", Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("from"), Value: []byte("A")},
+						{Key: []byte("to"), Value: make([]byte, 32)},
+						{Key: []byte("empty"), Value: nil},
+					}},
+					{Type: "empty"},
+					{Type: "log", Attributes: []abcitypes.EventAttribute{
+						{Key: []byte("value"), Value: []byte("B")},
+					}},
+				},
+			}
+			_, root := txctx.EventRoot()
+			require.Equal(t, tt.root, fmt.Sprintf("%x", root))
+		})
+	}
+}
+
+// Fixed roots were calculated independently with SHA-256, not production helpers.
+func Test_TrxContext_EventRootBTIP48(t *testing.T) {
+	a, b, c := []byte("A"), []byte("B"), []byte("C")
+	d, e, f := []byte("D"), []byte("E"), []byte("F")
+	g, h, i := []byte("G"), []byte("H"), []byte("I")
+	// One event, one nil Value: Attributes: []EventAttribute{{Value: nil}}
+	// has root H(0x00 || H(0x00)). One event, zero attributes: Attributes: nil
+	// has root H(0x00 || H(nil)). No events returns a nil tree and root.
+	tests := []struct {
+		name   string
+		values [][][]byte // events -> attributes -> value bytes
+		root   string
+	}{
+		{"multiple_events_multiple_attributes/no_padding", [][][]byte{{a, b}, {d, e}}, "a3454c32f187389c5efdf710621f5bb27169f3dac94eddcfd0197b11d34b6da6"},
+		{"multiple_events_multiple_attributes/attribute_padding_only", [][][]byte{{a, b, c}, {d, e, f}}, "190c01291807f47a0893ff23f118a74fff7c2c758d5f7edcfab836c9488e780a"},
+		{"multiple_events_multiple_attributes/event_padding_only", [][][]byte{{a, b}, {d, e}, {g, h}}, "7fe2cafc270e369804ad77047de4a80b3bab431f7f304fbbfece78af4a9417ae"},
+		{"multiple_events_multiple_attributes/event_and_attribute_padding", [][][]byte{{a, b, c}, {d, e, f}, {g, h, i}}, "5c9fc044af2df0f5ed60a0c478ebaf3d592252746b9589cfd2332f6af02bb55e"},
+		{"multiple_events_single_attribute/no_padding", [][][]byte{{a}, {b}}, "eadec9dee35e7c04322fbd985533fca8b238f0791387ace8909f35b1ecc6bb7b"},
+		{"multiple_events_single_attribute/event_padding", [][][]byte{{a}, {b}, {c}}, "d01ca942f32f34749e8111ccb7460b07a3d62c6c0ed9f06b8480b98115fb6a20"},
+		{"single_event_multiple_attributes/no_padding", [][][]byte{{a, b}}, "11a4e9096291a34828282aa31f2f0ef379cdd70ee570a35a41fe3f6a325173c2"},
+		{"single_event_multiple_attributes/attribute_padding", [][][]byte{{a, b, c}}, "3cd09d9b9a88bbe7190d6b007c887ac7bb2d482b6e69f26a4135346b061bc319"},
+		{"single_event_single_attribute/normal_value", [][][]byte{{a}}, "c0603962fb8fc20a20da41d0e63d7402aecacba29a2157ac4e3a27d188c25dc7"},
+		{"single_event_single_attribute/nil_value", [][][]byte{{nil}}, "d9de27625445003d8a9739a851e3ff8d41c0683630b4d63a88327a6aaa37c409"},
+		{"single_event_single_attribute/empty_value", [][][]byte{{{}}}, "d9de27625445003d8a9739a851e3ff8d41c0683630b4d63a88327a6aaa37c409"},
+		{"empty_attributes/nil_attributes", [][][]byte{nil}, "4e59bf27372b1304bc0b137d1be9d566ad58b154b6a6b5778af7f414b1d4b84c"},
+		{"empty_attributes/empty_attributes", [][][]byte{{}}, "4e59bf27372b1304bc0b137d1be9d566ad58b154b6a6b5778af7f414b1d4b84c"},
+		{"empty_events/nil_events", nil, ""},
+		{"empty_events/empty_events", [][][]byte{}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var events []abcitypes.Event
+			if tt.values != nil {
+				events = make([]abcitypes.Event, len(tt.values))
+			}
+			for i, attributes := range tt.values {
+				events[i].Type = fmt.Sprintf("event_%d", i)
+				if attributes != nil {
+					events[i].Attributes = make([]abcitypes.EventAttribute, len(attributes))
+				}
+				for j, value := range attributes {
+					events[i].Attributes[j] = abcitypes.EventAttribute{
+						Key: []byte(fmt.Sprintf("key_%d", j)), Value: value,
+					}
+				}
+			}
+			txctx := &ctrlertypes.TrxContext{
+				BlockContext: ctrlertypes.TempBlockContext("0xbea701", 500_000, time.Now(), govMock, acctMock, nil, nil, nil),
+				Events:       events,
+			}
+			tree, root := txctx.EventRoot()
+			if len(tt.values) == 0 {
+				require.Nil(t, tree)
+				require.Nil(t, root)
+				return
+			}
+			require.NotNil(t, tree)
+			require.Len(t, root, sha256.Size)
+			require.Equal(t, tt.root, fmt.Sprintf("%x", root))
+		})
+	}
 }
 
 func newBenchTrxContext(eventCount, attrCount int) *ctrlertypes.TrxContext {

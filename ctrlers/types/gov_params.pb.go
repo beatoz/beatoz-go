@@ -42,7 +42,7 @@ type GovParamsProto struct {
 	BondingBlocksWeightPermil int32                  `protobuf:"varint,17,opt,name=bonding_blocks_weight_permil,json=bondingBlocksWeightPermil,proto3" json:"bonding_blocks_weight_permil,omitempty"`
 	RipeningBlocks            int64                  `protobuf:"varint,18,opt,name=ripening_blocks,json=ripeningBlocks,proto3" json:"ripening_blocks,omitempty"`
 	XRewardPoolAddress        []byte                 `protobuf:"bytes,19,opt,name=_reward_pool_address,json=RewardPoolAddress,proto3" json:"_reward_pool_address,omitempty"`
-	XDeadAddress              []byte                 `protobuf:"bytes,20,opt,name=_dead_address,json=DeadAddress,proto3" json:"_dead_address,omitempty"`
+	XTxFeePoolAddress         []byte                 `protobuf:"bytes,20,opt,name=_tx_fee_pool_address,json=TxFeePoolAddress,proto3" json:"_tx_fee_pool_address,omitempty"`
 	ValidatorRewardRate       int32                  `protobuf:"varint,21,opt,name=validator_reward_rate,json=validatorRewardRate,proto3" json:"validator_reward_rate,omitempty"`
 	TxFeeRewardRate           int32                  `protobuf:"varint,22,opt,name=tx_fee_reward_rate,json=txFeeRewardRate,proto3" json:"tx_fee_reward_rate,omitempty"`
 	SlashRate                 int32                  `protobuf:"varint,23,opt,name=slash_rate,json=slashRate,proto3" json:"slash_rate,omitempty"`
@@ -220,9 +220,9 @@ func (x *GovParamsProto) GetXRewardPoolAddress() []byte {
 	return nil
 }
 
-func (x *GovParamsProto) GetXDeadAddress() []byte {
+func (x *GovParamsProto) GetXTxFeePoolAddress() []byte {
 	if x != nil {
-		return x.XDeadAddress
+		return x.XTxFeePoolAddress
 	}
 	return nil
 }
@@ -301,7 +301,7 @@ var File_gov_params_proto protoreflect.FileDescriptor
 
 const file_gov_params_proto_rawDesc = "" +
 	"\n" +
-	"\x10gov_params.proto\x12\x05types\"\xac\v\n" +
+	"\x10gov_params.proto\x12\x05types\"\xb8\v\n" +
 	"\x0eGovParamsProto\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x129\n" +
 	"\x19empty_block_interval_secs\x18\x02 \x01(\x05R\x16emptyBlockIntervalSecs\x12*\n" +
@@ -322,8 +322,8 @@ const file_gov_params_proto_rawDesc = "" +
 	"\x16inflation_cycle_blocks\x18\x10 \x01(\x03R\x14inflationCycleBlocks\x12?\n" +
 	"\x1cbonding_blocks_weight_permil\x18\x11 \x01(\x05R\x19bondingBlocksWeightPermil\x12'\n" +
 	"\x0fripening_blocks\x18\x12 \x01(\x03R\x0eripeningBlocks\x12/\n" +
-	"\x14_reward_pool_address\x18\x13 \x01(\fR\x11RewardPoolAddress\x12\"\n" +
-	"\r_dead_address\x18\x14 \x01(\fR\vDeadAddress\x122\n" +
+	"\x14_reward_pool_address\x18\x13 \x01(\fR\x11RewardPoolAddress\x12.\n" +
+	"\x14_tx_fee_pool_address\x18\x14 \x01(\fR\x10TxFeePoolAddress\x122\n" +
 	"\x15validator_reward_rate\x18\x15 \x01(\x05R\x13validatorRewardRate\x12+\n" +
 	"\x12tx_fee_reward_rate\x18\x16 \x01(\x05R\x0ftxFeeRewardRate\x12\x1d\n" +
 	"\n" +

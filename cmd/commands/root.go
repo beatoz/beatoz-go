@@ -32,7 +32,7 @@ func registerFlagsRootCmd(cmd *cobra.Command) {
 // ParseConfig retrieves the default environment configuration,
 // sets up the Tendermint root and ensures that the root exists
 func ParseConfig() (*cfg.Config, error) {
-	conf := tmcfg.DefaultConfig()
+	conf := cfg.DefaultConfigWith(tmcfg.DefaultConfig(), "0")
 	err := viper.Unmarshal(conf)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,10 @@ func ParseConfig() (*cfg.Config, error) {
 	if err := conf.ValidateBasic(); err != nil {
 		return nil, fmt.Errorf("error in rootConfig file: %v", err)
 	}
-	return cfg.DefaultConfigWith(conf, "0"), nil
+	if conf.App.QueryTimeout <= 0 {
+		return nil, fmt.Errorf("error in rootConfig file: query_timeout must be greater than 0")
+	}
+	return conf, nil
 }
 
 // RootCmd is the root command for Tendermint core.

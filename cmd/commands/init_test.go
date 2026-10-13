@@ -5,17 +5,65 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/genesis"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	types2 "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	tmcfg "github.com/tendermint/tendermint/config"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
+
+func Test_InitConfig(t *testing.T) {
+	originalRootConfig := rootConfig
+	originalInitParams := initParams
+	originalLogger := logger
+	t.Cleanup(func() {
+		rootConfig = originalRootConfig
+		initParams = originalInitParams
+		logger = originalLogger
+	})
+
+	rootConfig = cfg.DefaultConfig()
+	rootConfig.SetRoot(filepath.Join(t.TempDir(), "node"))
+	rootConfig.App.QueryTimeout = 2 * time.Second
+	tmcfg.EnsureRoot(rootConfig.RootDir)
+	initParams = DefaultInitParams()
+	initParams.ChainID = "1"
+	initParams.HolderCnt = 1
+	logger = tmlog.NewNopLogger()
+	t.Setenv("BEATOZ_VALIDATOR_SECRET", "validator-secret")
+	t.Setenv("BEATOZ_HOLDER_SECRET", "holder-secret")
+
+	require.NoError(t, initFiles(nil, nil))
+
+	tmConfigPath := filepath.Join(t.TempDir(), "config.toml")
+	tmcfg.WriteConfigFile(tmConfigPath, rootConfig.Config)
+	tmConfig, err := os.ReadFile(tmConfigPath)
+	require.NoError(t, err)
+
+	config, err := os.ReadFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"))
+	require.NoError(t, err)
+	appConfigSection := []byte("\n# Beatoz application options\n[app]\nquery_timeout = \"2s\"\n")
+	require.Equal(t, append(tmConfig, appConfigSection...), config)
+
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("home", rootConfig.RootDir)
+	viper.SetConfigFile(filepath.Join(rootConfig.RootDir, "config", "config.toml"))
+	require.NoError(t, viper.ReadInConfig())
+	require.False(t, viper.IsSet("instrumentation.query_timeout"))
+	require.Equal(t, 2*time.Second, viper.GetDuration("app.query_timeout"))
+	parsedConfig, err := ParseConfig()
+	require.NoError(t, err)
+	require.Equal(t, 2*time.Second, parsedConfig.App.QueryTimeout)
+}
 
 func Test_ChainId(t *testing.T) {
 	cases := []struct {

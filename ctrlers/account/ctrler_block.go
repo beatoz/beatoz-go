@@ -33,7 +33,7 @@ func (ctrler *AcctCtrler) EndBlock(bctx *btztypes.BlockContext) ([]abcitypes.Eve
 		// Fee Draining: transfer the remaining fee to DEAD Address
 		// this is not burning. it is just to transfer to the zero address.
 		deadAmt := new(uint256.Int).Sub(sumFee, rwdAmt)
-		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.DeadAddress(), deadAmt, true); xerr != nil {
+		if xerr := bctx.AcctHandler.AddBalance(bctx.GovHandler.TxFeePoolAddress(), deadAmt, true); xerr != nil {
 			return nil, xerr
 		}
 		evts = append(evts, abcitypes.Event{

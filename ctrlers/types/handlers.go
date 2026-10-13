@@ -59,7 +59,7 @@ type IGovParams interface {
 	BondingBlocksWeightPermil() int32
 	RipeningBlocks() int64
 	RewardPoolAddress() types.Address
-	DeadAddress() types.Address
+	TxFeePoolAddress() types.Address
 	ValidatorRewardRate() int32
 	TxFeeRewardRate() int32
 	SlashRate() int32
@@ -90,8 +90,8 @@ type IAccountHandler interface {
 	FindOrNewAccount(types.Address, bool) *Account
 	FindAccount(types.Address, bool) *Account
 	Transfer(types.Address, types.Address, *uint256.Int, bool) xerrors.XError
-	// DEPRECATED: Add `AddBlance` and replace it.
 	Reward(types.Address, *uint256.Int, bool) xerrors.XError
+	Refund(types.Address, *uint256.Int, bool) xerrors.XError
 	AddBalance(types.Address, *uint256.Int, bool) xerrors.XError
 	SubBalance(types.Address, *uint256.Int, bool) xerrors.XError
 	SetBalance(types.Address, *uint256.Int, bool) xerrors.XError
