@@ -101,7 +101,12 @@ func validateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			return xerr
 		}
 	case ctrlertypes.TRX_TRANSFER, ctrlertypes.TRX_SETDOC:
-		if xerr := ctx.AcctHandler.ValidateTrx(ctx); xerr != nil {
+		// BTIP49: a transfer to a contract is executed by EVM, so it is validated by EVM.
+		if types.IsBTIP49(ctx.ChainID(), ctx.Height()) && ctx.IsHandledByEVM() {
+			if xerr := ctx.EVMHandler.ValidateTrx(ctx); xerr != nil {
+				return xerr
+			}
+		} else if xerr := ctx.AcctHandler.ValidateTrx(ctx); xerr != nil {
 			return xerr
 		}
 	case ctrlertypes.TRX_WITHDRAW:

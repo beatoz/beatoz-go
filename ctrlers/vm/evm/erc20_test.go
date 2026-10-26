@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -136,6 +137,47 @@ func Test_ValidateTrx(t *testing.T) {
 	txctx.Tx.Payload.(*ctrlertypes.TrxPayloadContract).Data = make([]byte, 1)
 	require.NoError(t, ctrler.ValidateTrx(txctx))
 
+	// deploy tx: initcode size == MaxInitCodeSize
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, types.ZeroAddress(),
+		1, 1_000_000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(params.MaxInitCodeSize))
+	require.NoError(t, ctrler.ValidateTrx(txctx))
+
+	// deploy tx: initcode size > MaxInitCodeSize
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, types.ZeroAddress(),
+		1, 1_000_000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(params.MaxInitCodeSize+1))
+	require.ErrorContains(t, ctrler.ValidateTrx(txctx), "max initcode size exceeded")
+
+	// contract tx: gas * gasPrice overflow
+	overTx := web3.NewTrxContract(fromAcct.Address, toAcct.Address,
+		1, 300000, new(uint256.Int).SetAllOne(), uint256.NewInt(0), bytes2.RandBytes(32))
+	txctx.Tx = overTx
+	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrOverFlow.Error())
+
+	// contract tx: fee + amount overflow
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, toAcct.Address,
+		1, 300000, govMock.GasPrice(), new(uint256.Int).SetAllOne(), bytes2.RandBytes(32))
+	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrOverFlow.Error())
+
+	// transfer tx to contract: gas < intrinsic gas
+	txctx.Tx = web3.NewTrxTransfer(fromAcct.Address, toAcct.Address,
+		1, 5_000, govMock.GasPrice(), uint256.NewInt(0))
+	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrInvalidGas.Error())
+
+	// transfer tx to contract: intrinsic gas is set as GasUsed in CheckTx
+	txctx.Tx = web3.NewTrxTransfer(fromAcct.Address, toAcct.Address,
+		1, 100_000, govMock.GasPrice(), uint256.NewInt(0))
+	txctx.Exec = false
+	require.NoError(t, ctrler.ValidateTrx(txctx))
+	require.Equal(t, int64(params.TxGas), txctx.GasUsed)
+	txctx.Exec, txctx.GasUsed = true, 0
+
+	// before BTIP49 (testnet)
+	txctx.BlockContext = mocks.InitBlockCtxWith("0xbea701", 1, govMock, &acctHandler, ctrler, nil, nil)
+	txctx.Tx = web3.NewTrxContract(fromAcct.Address, types.ZeroAddress(),
+		1, 1_000_000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(params.MaxInitCodeSize+1))
+	require.NoError(t, ctrler.ValidateTrx(txctx))
+	txctx.Tx = overTx
+	require.NoError(t, ctrler.ValidateTrx(txctx))
 }
 
 func Test_Deploy(t *testing.T) {
