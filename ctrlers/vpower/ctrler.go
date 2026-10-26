@@ -26,7 +26,8 @@ type VPowerCtrler struct {
 	allDelegatees  []*Delegatee
 	lastValidators []*Delegatee
 
-	vpowLimiter *VPowerLimiter
+	vpowLimiter      *VPowerLimiter // used only in DeliverTx (exec=true)
+	checkVPowLimiter *VPowerLimiter // used only in CheckTx (exec=false)
 
 	queryTimeout time.Duration
 	logger       tmlog.Logger
@@ -57,10 +58,11 @@ func NewVPowerCtrler(config *cfg.Config, maxValCnt int, minValidatorPower int64,
 	}
 
 	ret := &VPowerCtrler{
-		vpowerState:  powersState,
-		vpowLimiter:  NewVPowerLimiter(),
-		queryTimeout: config.App.QueryTimeout,
-		logger:       lg,
+		vpowerState:      powersState,
+		vpowLimiter:      NewVPowerLimiter(),
+		checkVPowLimiter: NewVPowerLimiter(),
+		queryTimeout:     config.App.QueryTimeout,
+		logger:           lg,
 	}
 	if xerr := ret.LoadDelegatees(maxValCnt, minValidatorPower, minSelfPowerRate); xerr != nil {
 		return nil, xerr
@@ -120,6 +122,15 @@ func (ctrler *VPowerCtrler) LoadDelegatees(maxValCnt int, minValidatorPower int6
 	ctrler.allDelegatees = dgtees
 	ctrler.lastValidators = lastVals
 	return nil
+}
+
+// limiter returns the limiter for the execution mode.
+// CheckTx must not consume the budget of the limiter used in block execution.
+func (ctrler *VPowerCtrler) limiter(exec bool) *VPowerLimiter {
+	if exec {
+		return ctrler.vpowLimiter
+	}
+	return ctrler.checkVPowLimiter
 }
 
 type bondingTrxOpt struct {
@@ -222,7 +233,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by txPower
-		if xerr := ctrler.vpowLimiter.CheckLimit(txPower, ADD_POWER); xerr != nil {
+		if xerr := ctrler.limiter(ctx.Exec).CheckLimit(txPower, ADD_POWER); xerr != nil {
 			return xerr
 		}
 
@@ -263,7 +274,7 @@ func (ctrler *VPowerCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XEr
 
 		//
 		// check the rate of total power change caused by vpow.SumPower
-		if xerr := ctrler.vpowLimiter.CheckLimit(pc.Power, SUB_POWER); xerr != nil {
+		if xerr := ctrler.limiter(ctx.Exec).CheckLimit(pc.Power, SUB_POWER); xerr != nil {
 			return xerr
 		}
 
