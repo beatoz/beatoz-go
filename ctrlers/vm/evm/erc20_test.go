@@ -479,7 +479,7 @@ func (handler *acctHandlerMock) Reward(to types.Address, amt *uint256.Int, exec 
 }
 
 func (handler *acctHandlerMock) Refund(to types.Address, amt *uint256.Int, exec bool) xerrors.XError {
-	if receiver := handler.FindAccount(to, exec); receiver == nil {
+	if receiver := handler.FindOrNewAccount(to, exec); receiver == nil {
 		return xerrors.ErrNotFoundAccount
 	} else if xerr := receiver.AddBalance(amt); xerr != nil {
 		return xerr

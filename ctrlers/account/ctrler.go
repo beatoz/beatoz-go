@@ -264,7 +264,7 @@ func (ctrler *AcctCtrler) Refund(to types.Address, amt *uint256.Int, exec bool) 
 
 	acct := ctrler.findAccount(to, exec)
 	if acct == nil {
-		return xerrors.ErrNotFoundAccount.Wrapf("Refund - address: %v", to)
+		acct = btztypes.NewAccount(to)
 	}
 
 	if xerr := acct.AddBalance(amt); xerr != nil {
