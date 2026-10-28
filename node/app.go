@@ -72,7 +72,12 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 		panic(err)
 	}
 
-	vpowCtrler, err := vpower.NewVPowerCtrler(config, int(govCtrler.MaxValidatorCnt()), govCtrler.MinValidatorPower(), govCtrler.MinSelfPowerRate(), logger)
+	lastBlockGovParams, xerr := govCtrler.LastBlockGovParams()
+	if xerr != nil {
+		panic(xerr)
+	}
+
+	vpowCtrler, err := vpower.NewVPowerCtrler(config, int(lastBlockGovParams.MaxValidatorCnt()), lastBlockGovParams.MinValidatorPower(), lastBlockGovParams.MinSelfPowerRate(), logger)
 	if err != nil {
 		panic(err)
 	}

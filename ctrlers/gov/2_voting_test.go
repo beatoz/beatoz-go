@@ -256,6 +256,8 @@ func TestApplyingProposal(t *testing.T) {
 	bctx.SetHeight(runHeight)
 	_, xerr := govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
+	// `govCtrler.GovParams` is set only in memory by the test setup, so store it to the ledger.
+	require.NoError(t, govCtrler.govState.Set(common.LedgerKeyGovParams(), &oriParams, true))
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
 	frozenProp, xerr := govCtrler.govState.Get(common.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
@@ -279,6 +281,11 @@ func TestApplyingProposal(t *testing.T) {
 
 	require.NotEqual(t, oriParams, govCtrler.GovParams)
 	require.True(t, govParams1.Equal(&govCtrler.GovParams))
+
+	// the last block was executed with the parameters before the new gov rule was applied.
+	lastBlockGovParams, xerr := govCtrler.LastBlockGovParams()
+	require.NoError(t, xerr)
+	require.True(t, oriParams.Equal(lastBlockGovParams))
 }
 
 func TestApplyInvalidGovParamsProposalRejected(t *testing.T) {

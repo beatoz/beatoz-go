@@ -427,6 +427,30 @@ func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes, exec bool) (*propo
 	return prop, nil
 }
 
+func (ctrler *GovCtrler) LastBlockGovParams() (*ctrlertypes.GovParams, xerrors.XError) {
+	ctrler.mtx.RLock()
+	defer ctrler.mtx.RUnlock()
+
+	lastHeight := ctrler.govState.Version()
+	if lastHeight <= 1 {
+		return &ctrler.GovParams, nil
+	}
+
+	memLedger, xerr := ctrler.govState.ImitableLedgerAt(lastHeight - 1)
+	if xerr != nil {
+		return nil, xerr
+	}
+	item, xerr := memLedger.Get(common.LedgerKeyGovParams())
+	if xerr != nil {
+		if xerr.Contains(xerrors.ErrNotFoundResult) {
+			return &ctrler.GovParams, nil
+		}
+		return nil, xerr
+	}
+	params, _ := item.(*ctrlertypes.GovParams)
+	return params, nil
+}
+
 func (ctrler *GovCtrler) UpgradeLedgerVersion(target common.LedgerVersion) xerrors.XError {
 	return ctrler.govState.UpgradeLedgerVersion(target)
 }
