@@ -140,6 +140,50 @@ func Test_Mint(t *testing.T) {
 	require.NoError(t, os.RemoveAll(config.RootDir))
 }
 
+// Test_Mint_ZeroSignRate tests that the reward of the beneficiary whose sign rate is zero is zero.
+func Test_Mint_ZeroSignRate(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	initSupply := btztypes.PowerToAmount(350_000_000)
+	ctrler, xerr := initLedger(initSupply)
+	require.NoError(t, xerr)
+
+	valsCnt := min(acctMock.WalletLen(), 10)
+	valWals := make([]*web3.Wallet, valsCnt)
+	for i := 0; i < valsCnt; i++ {
+		valWals[i] = acctMock.GetWallet(i)
+	}
+	zeroSignRateAddr := valWals[0].Address()
+	vpowMock := vpowmock.NewVPowerHandlerMock(valWals, len(valWals))
+	vpowMock.SetZeroSignRate(zeroSignRateAddr)
+
+	currHeight := govMock.InflationCycleBlocks()
+	bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock)
+	ctrler.requestMint(bctx)
+	result, xerr := ctrler.waitMint(bctx)
+	require.NoError(t, xerr)
+	require.Equal(t, len(valWals), len(result.rewards))
+
+	found := false
+	for _, mintRwd := range result.rewards {
+		accumRwd, xerr := ctrler.readReward(mintRwd.addr)
+		require.NoError(t, xerr)
+
+		if bytes.Equal(mintRwd.addr, zeroSignRateAddr) {
+			found = true
+			require.True(t, mintRwd.amt.IsZero(), mintRwd.amt.Dec())
+			require.True(t, accumRwd.issued.IsZero(), accumRwd.issued.Dec())
+		} else {
+			require.False(t, mintRwd.amt.IsZero())
+			require.Equal(t, mintRwd.amt.Dec(), accumRwd.issued.Dec())
+		}
+	}
+	require.True(t, found)
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.RootDir))
+}
+
 //// the following results are calculated by google spreadsheets
 //var expectedSupplys = []struct {
 //	height int64

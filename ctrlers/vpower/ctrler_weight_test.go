@@ -9,6 +9,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/fxnum"
+	btztypes "github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/stretchr/testify/require"
 )
@@ -169,6 +170,56 @@ func Test_VPowerCtrler_ComputeWeight_ValidatorMark(t *testing.T) {
 	require.True(t, chkD)
 
 	//printWeightResult(weightComputed)
+}
+
+// Test_VPowerCtrler_ComputeWeight_SignRate tests that the sign rate is not negative
+// when the missed block count of a validator exceeds the inflation cycle.
+// (e.g. the inflation cycle is shortened by governance after the missed block count is accumulated.)
+// The sign rate of the validator and its delegators should be zero.
+func Test_VPowerCtrler_ComputeWeight_SignRate(t *testing.T) {
+	require.NoError(t, os.RemoveAll(config.RootDir))
+
+	ctrler, _, _, xerr := initLedger(config)
+	require.NoError(t, xerr)
+
+	_, h, xerr := ctrler.Commit()
+	require.NoError(t, xerr)
+
+	missedVal := ctrler.lastValidators[0]
+	delegator := btztypes.RandAddress()
+
+	vpow := NewVPower(delegator, missedVal.addr)
+	xerr = ctrler.bondPowerChunk(missedVal, vpow, 1234, h+1, bytes.ZeroBytes(32), true)
+	require.NoError(t, xerr)
+
+	// sign rate = 1 - (inflationCycle * 2) / inflationCycle = -1
+	xerr = ctrler.setMissedBlockCount(missedVal.addr, BlockCount(govMock.InflationCycleBlocks()*2), true)
+	require.NoError(t, xerr)
+
+	_, h, xerr = ctrler.Commit()
+	require.NoError(t, xerr)
+
+	weightComputed, xerr := ctrler.ComputeWeight(
+		h+1,
+		govMock.InflationCycleBlocks(),
+		govMock.RipeningBlocks(),
+		govMock.BondingBlocksWeightPermil(),
+		totalSupply)
+	require.NoError(t, xerr)
+
+	// lastValidators + delegator(1)
+	require.Equal(t, len(ctrler.lastValidators)+1, len(weightComputed.Beneficiaries()))
+
+	for _, b := range weightComputed.Beneficiaries() {
+		if bytes.Equal(b.Address(), missedVal.addr) || bytes.Equal(b.Address(), delegator) {
+			require.True(t, fxnum.ZERO.Equal(b.SignRate()), b.SignRate())
+		} else {
+			require.True(t, fxnum.ONE.Equal(b.SignRate()), b.SignRate())
+		}
+	}
+
+	require.NoError(t, ctrler.Close())
+	require.NoError(t, os.RemoveAll(config.DBDir()))
 }
 
 func printValidators(vals []*Delegatee) {

@@ -21,6 +21,8 @@ type VPowerHandlerMock struct {
 	validators []*vpower.Delegatee
 	mapVPowers map[string]*vpower.VPower
 	totalPower int64 // key is from_address + to_address
+
+	zeroSignRates map[string]bool // key is address
 }
 
 func NewVPowerHandlerMock(dgteeWals []*web3.Wallet, valCnt int) *VPowerHandlerMock {
@@ -144,6 +146,14 @@ func (mock *VPowerHandlerMock) PickAddress(i int) types.Address {
 	return mock.Delegatees[i].Address()
 }
 
+// SetZeroSignRate makes the sign rate of `addr` zero in ComputeWeight. (default: 1)
+func (mock *VPowerHandlerMock) SetZeroSignRate(addr types.Address) {
+	if mock.zeroSignRates == nil {
+		mock.zeroSignRates = make(map[string]bool)
+	}
+	mock.zeroSignRates[addr.String()] = true
+}
+
 func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlocks int64, tau int32, totalSupply *uint256.Int) (ctrlertypes.IWeightResult, xerrors.XError) {
 	mapWeightObjs := make(map[string]*struct {
 		isval bool
@@ -184,7 +194,11 @@ func (mock *VPowerHandlerMock) ComputeWeight(height, inflationCycle, ripeningBlo
 	weightInfo := vpower.NewWeight()
 	for k, wo := range mapWeightObjs {
 		addr, _ := hex.DecodeString(k)
-		weightInfo.Add(addr, wo.w, fxnum.FromInt(1), wo.isval)
+		signRate := fxnum.FromInt(1)
+		if mock.zeroSignRates[k] {
+			signRate = fxnum.FromInt(0)
+		}
+		weightInfo.Add(addr, wo.w, signRate, wo.isval)
 	}
 
 	return weightInfo, nil
