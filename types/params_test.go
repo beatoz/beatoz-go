@@ -28,4 +28,11 @@ func Test_ForkBlocks(t *testing.T) {
 	require.True(t, IsBTIP48("0xbea700", 0))
 	require.True(t, IsBTIP48("0xbea702", 0))
 	require.True(t, IsBTIP48("0xabc", 0))
+
+	require.False(t, IsBTIP61(chainId.Hex(), 499_999))
+	require.True(t, IsBTIP61(chainId.Hex(), 500_000))
+	require.True(t, IsBTIP61(chainId.Hex(), 500_001))
+	require.True(t, IsBTIP61("0xbea700", 0))
+	require.True(t, IsBTIP61("0xbea702", 0))
+	require.True(t, IsBTIP61("0xabc", 0))
 }

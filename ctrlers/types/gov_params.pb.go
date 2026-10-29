@@ -53,6 +53,7 @@ type GovParamsProto struct {
 	MinVotingPeriodBlocks     int64                  `protobuf:"varint,28,opt,name=min_voting_period_blocks,json=minVotingPeriodBlocks,proto3" json:"min_voting_period_blocks,omitempty"`
 	MaxVotingPeriodBlocks     int64                  `protobuf:"varint,29,opt,name=max_voting_period_blocks,json=maxVotingPeriodBlocks,proto3" json:"max_voting_period_blocks,omitempty"`
 	LazyApplyingBlocks        int64                  `protobuf:"varint,30,opt,name=lazy_applying_blocks,json=lazyApplyingBlocks,proto3" json:"lazy_applying_blocks,omitempty"`
+	MaxVotingStartDelayBlocks int64                  `protobuf:"varint,31,opt,name=max_voting_start_delay_blocks,json=maxVotingStartDelayBlocks,proto3" json:"max_voting_start_delay_blocks,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -297,11 +298,18 @@ func (x *GovParamsProto) GetLazyApplyingBlocks() int64 {
 	return 0
 }
 
+func (x *GovParamsProto) GetMaxVotingStartDelayBlocks() int64 {
+	if x != nil {
+		return x.MaxVotingStartDelayBlocks
+	}
+	return 0
+}
+
 var File_gov_params_proto protoreflect.FileDescriptor
 
 const file_gov_params_proto_rawDesc = "" +
 	"\n" +
-	"\x10gov_params.proto\x12\x05types\"\xb8\v\n" +
+	"\x10gov_params.proto\x12\x05types\"\xfa\v\n" +
 	"\x0eGovParamsProto\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x129\n" +
 	"\x19empty_block_interval_secs\x18\x02 \x01(\x05R\x16emptyBlockIntervalSecs\x12*\n" +
@@ -335,7 +343,8 @@ const file_gov_params_proto_rawDesc = "" +
 	"\x0fblock_gas_limit\x18\x1b \x01(\x03R\rblockGasLimit\x127\n" +
 	"\x18min_voting_period_blocks\x18\x1c \x01(\x03R\x15minVotingPeriodBlocks\x127\n" +
 	"\x18max_voting_period_blocks\x18\x1d \x01(\x03R\x15maxVotingPeriodBlocks\x120\n" +
-	"\x14lazy_applying_blocks\x18\x1e \x01(\x03R\x12lazyApplyingBlocksB+Z)github.com/beatoz/beatoz-go/ctrlers/typesb\x06proto3"
+	"\x14lazy_applying_blocks\x18\x1e \x01(\x03R\x12lazyApplyingBlocks\x12@\n" +
+	"\x1dmax_voting_start_delay_blocks\x18\x1f \x01(\x03R\x19maxVotingStartDelayBlocksB+Z)github.com/beatoz/beatoz-go/ctrlers/typesb\x06proto3"
 
 var (
 	file_gov_params_proto_rawDescOnce sync.Once

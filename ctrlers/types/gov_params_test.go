@@ -100,6 +100,12 @@ func TestGovParamsRename(t *testing.T) {
 
 func TestGovParamsValidateBasic(t *testing.T) {
 	require.NoError(t, DefaultGovParams().ValidateBasic())
+
+	zeroMaxVotingStartDelayBlocks := DefaultGovParams()
+	zeroMaxVotingStartDelayBlocks.SetValue(func(v *GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = 0
+	})
+	require.NoError(t, zeroMaxVotingStartDelayBlocks.ValidateBasic())
 }
 
 func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
@@ -126,6 +132,10 @@ func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
 	invalidSlashRate := DefaultGovParams()
 	invalidSlashRate.SetValue(func(v *GovParamsProto) {
 		v.SlashRate = 200
+	})
+	negativeMaxVotingStartDelayBlocks := DefaultGovParams()
+	negativeMaxVotingStartDelayBlocks.SetValue(func(v *GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = -1
 	})
 
 	for _, test := range []struct {
@@ -155,6 +165,10 @@ func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
 		{
 			name:   "slash_rate_over_100",
 			params: invalidSlashRate,
+		},
+		{
+			name:   "negative_max_voting_start_delay_blocks",
+			params: negativeMaxVotingStartDelayBlocks,
 		},
 	} {
 		require.Error(t, test.params.ValidateBasic(), "case=%s", test.name)

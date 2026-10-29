@@ -73,6 +73,7 @@ type IGovParams interface {
 	MaxVotingPeriodBlocks() int64
 	MinVotingPeriodBlocks() int64
 	LazyApplyingBlocks() int64
+	MaxVotingStartDelayBlocks() int64
 }
 
 type IGovHandler interface {

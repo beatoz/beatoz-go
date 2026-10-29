@@ -66,6 +66,7 @@ func NewGovParams(interval int) *GovParams {
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
 			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
 			LazyApplyingBlocks:        DaySeconds / int64(interval),     // 1days blocks
+			MaxVotingStartDelayBlocks: 7 * DaySeconds / int64(interval), // 7 day blocks
 		},
 		mtx: sync.RWMutex{},
 	}
@@ -185,6 +186,9 @@ func (govParams *GovParams) ValidateBasic() xerrors.XError {
 	}
 	if v.LazyApplyingBlocks < 0 {
 		return xerrors.NewOrdinary("invalid governance params").Wrapf("lazyApplyingBlocks must be non-negative")
+	}
+	if v.MaxVotingStartDelayBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxVotingStartDelayBlocks must be non-negative")
 	}
 	return nil
 }
@@ -491,6 +495,12 @@ func (govParams *GovParams) LazyApplyingBlocks() int64 {
 	defer govParams.mtx.RUnlock()
 
 	return govParams._v.LazyApplyingBlocks
+}
+func (govParams *GovParams) MaxVotingStartDelayBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxVotingStartDelayBlocks
 }
 
 func (govParams *GovParams) GetValues() *GovParamsProto {
