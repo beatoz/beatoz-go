@@ -25,7 +25,7 @@ func ForTest1GovParams() *ctrlertypes.GovParams {
 		v.MaxVotingPeriodBlocks = 10
 		v.MinSignedBlocks = 3
 		v.InflationWeightPermil = 290
-		v.InflationCycleBlocks = 1
+		v.InflationCycleBlocks = 10
 		v.MinBondingBlocks = 1
 		v.BondingBlocksWeightPermil = 2
 		v.XRewardPoolAddress = types.ZeroAddress()
@@ -54,7 +54,7 @@ func ForTest3GovParams() *ctrlertypes.GovParams {
 		v.MinSelfPowerRate = 50
 		v.MinSignedBlocks = 500
 		v.InflationWeightPermil = 290
-		v.InflationCycleBlocks = 1
+		v.InflationCycleBlocks = 1000
 		v.MinBondingBlocks = 1
 		v.BondingBlocksWeightPermil = 2
 		v.XRewardPoolAddress = types.ZeroAddress()

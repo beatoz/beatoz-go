@@ -146,6 +146,10 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v",
 				txpayload.StartVotingHeight, endVotingHeight)
 		}
+		if endVotingHeight > minApplyingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: endVotingHeight:%v, minApplyingHeight:%v",
+				endVotingHeight, minApplyingHeight)
+		}
 		// check applying blocks
 		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf(
@@ -304,7 +308,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]common.LedgerKey, []co
 }
 
 // applyProposals is called from EndBlock
-func (ctrler *GovCtrler) applyProposals(height int64) ([]common.LedgerKey, []common.LedgerKey, xerrors.XError) {
+func (ctrler *GovCtrler) applyProposals(bctx *ctrlertypes.BlockContext) ([]common.LedgerKey, []common.LedgerKey, xerrors.XError) {
 	var applied []common.LedgerKey
 	var rejected []common.LedgerKey
 
@@ -325,7 +329,7 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]common.LedgerKey, []com
 
 	xerr := ctrler.govState.Seek(common.KeyPrefixFrozenProp, true, func(key common.LedgerKey, item common.ILedgerItem) xerrors.XError {
 		prop, _ := item.(*proposal.GovProposal)
-		if prop.Header().ApplyHeight <= height {
+		if prop.Header().ApplyHeight <= bctx.Height() {
 
 			// DO NOT REMOVE `prop` from `frozenState` in Seek.
 
@@ -350,6 +354,22 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]common.LedgerKey, []com
 				ctrlertypes.MergeGovParams(&ctrler.GovParams, newGovParams)
 				if xerr := newGovParams.ValidateBasic(); xerr != nil {
 					ctrler.logger.Error("Apply proposal", "error", xerr, "option", string(prop.MajorOption().Option))
+					rejected = append(rejected, key)
+					return nil
+				}
+				eligible := false
+				vals, _ := bctx.VPowerHandler.Validators()
+				for _, val := range vals {
+					selfPower := bctx.VPowerHandler.SelfPowerOf(val.Address)
+					totalPower := bctx.VPowerHandler.TotalPowerOf(val.Address)
+					if totalPower > 0 && selfPower >= newGovParams.MinValidatorPower() &&
+						(newGovParams.MinSelfPowerRate() <= 0 || selfPower*100/totalPower >= int64(newGovParams.MinSelfPowerRate())) {
+						eligible = true
+						break
+					}
+				}
+				if !eligible {
+					ctrler.logger.Error("Apply proposal", "error", "no validator satisfies validator eligibility", "option", string(prop.MajorOption().Option))
 					rejected = append(rejected, key)
 					return nil
 				}

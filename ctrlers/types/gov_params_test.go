@@ -8,6 +8,7 @@ import (
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -127,6 +128,26 @@ func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
 	invalidSlashRate.SetValue(func(v *GovParamsProto) {
 		v.SlashRate = 200
 	})
+	minTrxGasOverBlockGasLimit := DefaultGovParams()
+	minTrxGasOverBlockGasLimit.SetValue(func(v *GovParamsProto) {
+		v.MinTrxGas = v.BlockGasLimit + 1
+	})
+	blockSizeLimitUnderEvidenceMaxBytes := DefaultGovParams()
+	blockSizeLimitUnderEvidenceMaxBytes.SetValue(func(v *GovParamsProto) {
+		v.BlockSizeLimit = tmtypes.DefaultEvidenceParams().MaxBytes - 1
+	})
+	blockSizeLimitOverMaxBlockSize := DefaultGovParams()
+	blockSizeLimitOverMaxBlockSize.SetValue(func(v *GovParamsProto) {
+		v.BlockSizeLimit = tmtypes.MaxBlockSizeBytes + 1
+	})
+	gasPriceOverflow := DefaultGovParams()
+	gasPriceOverflow.SetValue(func(v *GovParamsProto) {
+		v.XGasPrice = new(uint256.Int).Lsh(uint256.NewInt(1), 255).Bytes()
+	})
+	minSignedBlocksNotLessThanInflationCycleBlocks := DefaultGovParams()
+	minSignedBlocksNotLessThanInflationCycleBlocks.SetValue(func(v *GovParamsProto) {
+		v.MinSignedBlocks = v.InflationCycleBlocks
+	})
 
 	for _, test := range []struct {
 		name   string
@@ -155,6 +176,26 @@ func TestGovParamsValidateBasic_InvalidValues(t *testing.T) {
 		{
 			name:   "slash_rate_over_100",
 			params: invalidSlashRate,
+		},
+		{
+			name:   "min_trx_gas_over_block_gas_limit",
+			params: minTrxGasOverBlockGasLimit,
+		},
+		{
+			name:   "block_size_limit_under_evidence_max_bytes",
+			params: blockSizeLimitUnderEvidenceMaxBytes,
+		},
+		{
+			name:   "block_size_limit_over_max_block_size",
+			params: blockSizeLimitOverMaxBlockSize,
+		},
+		{
+			name:   "gas_price_mul_block_gas_limit_overflow",
+			params: gasPriceOverflow,
+		},
+		{
+			name:   "min_signed_blocks_not_less_than_inflation_cycle_blocks",
+			params: minSignedBlocksNotLessThanInflationCycleBlocks,
 		},
 	} {
 		require.Error(t, test.params.ValidateBasic(), "case=%s", test.name)
