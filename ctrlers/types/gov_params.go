@@ -1,8 +1,10 @@
 package types
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sync"
@@ -545,6 +547,54 @@ func MergeGovParams(fromPrams, toParams *GovParams) {
 			//fmt.Printf("%-10s | %-20s | %#v -> %#v\n", fieldName, fieldType, newInf, newVal.Interface())
 		}
 	}
+}
+
+var govParamsJSONKeys = func() map[string]struct{} {
+	keys := make(map[string]struct{})
+	refT := reflect.TypeOf(GovParamsProto{})
+	for i := 0; i < refT.NumField(); i++ {
+		field := refT.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		if name, ok := jsonx.JSONName(field.Name, field.Tag.Get("json")); ok {
+			keys[name] = struct{}{}
+		}
+	}
+	return keys
+}()
+
+func ValidateGovParamsJSON(d []byte) xerrors.XError {
+	dec := json.NewDecoder(bytes.NewReader(d))
+	tok, err := dec.Token()
+	if err != nil {
+		return xerrors.From(err)
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("must be a JSON object")
+	}
+
+	seen := make(map[string]struct{})
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return xerrors.From(err)
+		}
+		key, _ := tok.(string)
+		if _, ok := govParamsJSONKeys[key]; !ok {
+			return xerrors.NewOrdinary("invalid governance params").Wrapf("unknown key: %q", key)
+		}
+		if _, ok := seen[key]; ok {
+			return xerrors.NewOrdinary("invalid governance params").Wrapf("duplicate key: %q", key)
+		}
+		seen[key] = struct{}{}
+
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return xerrors.From(err)
+		}
+	}
+	return nil
 }
 
 var _ common.ILedgerItem = (*GovParams)(nil)

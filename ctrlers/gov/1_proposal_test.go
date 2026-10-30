@@ -188,6 +188,56 @@ func TestInvalidGovParamsProposalValidation(t *testing.T) {
 	}
 }
 
+// The option has non-canonical, unknown or duplicate keys.
+func TestInvalidGovParamsProposalKeyValidation(t *testing.T) {
+	for i, test := range []struct {
+		name    string
+		option  string
+		wantMsg string
+	}{
+		{
+			name:    "case_variant_key",
+			option:  `{"maxTotalSupply":"700000000000000000000000000","maxTotalsupply":"AQ=="}`,
+			wantMsg: "unknown key",
+		},
+		{
+			name:    "snake_case_key",
+			option:  `{"maxValidatorCnt":21,"max_validator_cnt":1}`,
+			wantMsg: "unknown key",
+		},
+		{
+			name:    "duplicate_key",
+			option:  `{"slashRate":10,"slashRate":20}`,
+			wantMsg: "duplicate key",
+		},
+		{
+			name:    "unknown_key",
+			option:  `{"unknownKey":1}`,
+			wantMsg: "unknown key",
+		},
+	} {
+		tx := web3.NewTrxProposal(
+			vpowMock.PickAddress(vpowMock.ValCnt-1),
+			types.ZeroAddress(),
+			int64(200+i),
+			defMinGas,
+			defGasPrice,
+			"invalid govparams proposal",
+			10,
+			govCtrler.MinVotingPeriodBlocks(),
+			10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+			proposal.PROPOSAL_GOVPARAMS,
+			[]byte(test.option),
+		)
+		require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()), "case=%s", test.name)
+
+		xerr := runTrx(makeTrxCtx(tx, 1, true))
+		require.Error(t, xerr, "case=%s", test.name)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), "case=%s error=%v", test.name, xerr)
+		require.Contains(t, xerr.Error(), test.wantMsg, "case=%s", test.name)
+	}
+}
+
 func TestInvalidMaxSupply(t *testing.T) {
 	newGovParams := &ctrlertypes.GovParams{}
 	newGovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {

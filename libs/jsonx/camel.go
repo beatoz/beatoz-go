@@ -16,26 +16,42 @@ func (e *camelCaseExtension) UpdateStructDescriptor(desc *jsoniter.StructDescrip
 		binding := desc.Fields[i]
 
 		// name from json tag
-		jsonTag := binding.Field.Tag().Get("json")
-		if jsonTag == "-" {
+		tagName, ok := jsonTagName(binding.Field.Name(), binding.Field.Tag().Get("json"))
+		if !ok {
 			continue
 		}
 
-		tagName := binding.Field.Name()
-		if jsonTag != "" {
-			parts := strings.Split(jsonTag, ",")
-			if parts[0] != "" {
-				tagName = parts[0]
-			}
-		}
-
 		// snake_case를 camelCase로 변환
-		if strings.Contains(tagName, "_") || isFirstCharUpper(tagName) {
-			camelName := toLowerFirstCamel(tagName)
+		if camelName := camelName(tagName); camelName != tagName {
 			binding.ToNames = []string{camelName}
 			binding.FromNames = []string{camelName, tagName} // 둘 다 지원
 		}
 	}
+}
+
+func JSONName(fieldName, jsonTag string) (string, bool) {
+	tagName, ok := jsonTagName(fieldName, jsonTag)
+	if !ok {
+		return "", false
+	}
+	return camelName(tagName), true
+}
+
+func jsonTagName(fieldName, jsonTag string) (string, bool) {
+	if jsonTag == "-" {
+		return "", false
+	}
+	if parts := strings.Split(jsonTag, ","); parts[0] != "" {
+		return parts[0], true
+	}
+	return fieldName, true
+}
+
+func camelName(tagName string) string {
+	if strings.Contains(tagName, "_") || isFirstCharUpper(tagName) {
+		return toLowerFirstCamel(tagName)
+	}
+	return tagName
 }
 
 func toLowerFirstCamel(s string) string {
