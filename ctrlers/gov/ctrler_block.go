@@ -54,6 +54,11 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		return nil, xerr
 	}
 
+	if ctrler.newGovParams != nil {
+		ctx.SetNxBlockSizeLimit(ctrler.newGovParams.BlockSizeLimit())
+		ctx.SetNxBlockGasLimit(ctrler.newGovParams.BlockGasLimit())
+	}
+
 	for _, k := range frozen {
 		evts = append(evts, types2.Event{
 			Type: "proposal",

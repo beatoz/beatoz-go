@@ -1,6 +1,8 @@
 package test
 
 import (
+	"context"
+
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
 	"github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
@@ -9,6 +11,7 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/rand"
+	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	"testing"
 )
 
@@ -184,4 +187,73 @@ func TestProposalAndVoting(t *testing.T) {
 	require.Equal(t, dgtee.TotalPower, prop.Proposal.Option(0).Votes)
 	// MajorOption is set in EndBlock of startHeight + votingPeriod
 	require.Nil(t, prop.Proposal.MajorOption())
+}
+
+func TestGovParamsProposalUpdatesConsensusParams(t *testing.T) {
+	bzweb3 := randBeatozWeb3()
+	validatorWallet := validatorWallets[0]
+	require.NoError(t, validatorWallet.SyncAccount(bzweb3))
+	require.NoError(t, validatorWallet.Unlock(defaultRpcNode.Pass))
+
+	tmClient, err := rpchttp.New(defaultRpcNode.RPCURL, "/websocket")
+	require.NoError(t, err)
+
+	currGovParams, xerr := bzweb3.GetGovParams()
+	require.NoError(t, xerr)
+	require.NotNil(t, currGovParams)
+
+	lastBlockHeight, err := waitBlock(10)
+	require.NoError(t, err)
+
+	currConsensusParams, err := tmClient.ConsensusParams(context.Background(), &lastBlockHeight)
+	require.NoError(t, err)
+	require.Equal(t, currGovParams.BlockSizeLimit(), currConsensusParams.ConsensusParams.Block.MaxBytes)
+	require.Equal(t, currGovParams.BlockGasLimit(), currConsensusParams.ConsensusParams.Block.MaxGas)
+
+	newBlockSizeLimit := currGovParams.BlockSizeLimit() * 2
+	newBlockGasLimit := currGovParams.BlockGasLimit() + 50_000_000
+	newGovParams := &types.GovParams{}
+	newGovParams.SetValue(func(v *types.GovParamsProto) {
+		v.BlockSizeLimit = newBlockSizeLimit
+		v.BlockGasLimit = newBlockGasLimit
+	})
+	bzOpt, err := jsonx.Marshal(newGovParams)
+	require.NoError(t, err)
+
+	startHeight := lastBlockHeight + 5
+	votePeriod := currGovParams.MinVotingPeriodBlocks()
+	applyHeight := startHeight + votePeriod + currGovParams.LazyApplyingBlocks()
+
+	proposalResult, err := validatorWallet.ProposalCommit(defGas, defGasPrice, "block limits proposal", startHeight, votePeriod, applyHeight, proposal.PROPOSAL_GOVPARAMS, bzOpt, bzweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.CheckTx.Code)
+	require.Equal(t, xerrors.ErrCodeSuccess, proposalResult.DeliverTx.Code)
+
+	_, err = waitBlock(startHeight)
+	require.NoError(t, err)
+
+	require.NoError(t, validatorWallet.SyncAccount(bzweb3))
+	votingResult, err := validatorWallet.VotingCommit(defGas, defGasPrice, bytes.HexBytes(proposalResult.Hash), 0, bzweb3)
+	require.NoError(t, err)
+	require.Equal(t, xerrors.ErrCodeSuccess, votingResult.CheckTx.Code)
+	require.Equal(t, xerrors.ErrCodeSuccess, votingResult.DeliverTx.Code)
+
+	_, err = waitBlock(applyHeight + 2)
+	require.NoError(t, err)
+
+	appliedGovParams, xerr := bzweb3.GetGovParams()
+	require.NoError(t, xerr)
+	require.Equal(t, newBlockSizeLimit, appliedGovParams.BlockSizeLimit())
+	require.Equal(t, newBlockGasLimit, appliedGovParams.BlockGasLimit())
+
+	applyConsensusParams, err := tmClient.ConsensusParams(context.Background(), &applyHeight)
+	require.NoError(t, err)
+	require.Equal(t, currGovParams.BlockSizeLimit(), applyConsensusParams.ConsensusParams.Block.MaxBytes)
+	require.Equal(t, currGovParams.BlockGasLimit(), applyConsensusParams.ConsensusParams.Block.MaxGas)
+
+	nextHeight := applyHeight + 1
+	nextConsensusParams, err := tmClient.ConsensusParams(context.Background(), &nextHeight)
+	require.NoError(t, err)
+	require.Equal(t, newBlockSizeLimit, nextConsensusParams.ConsensusParams.Block.MaxBytes)
+	require.Equal(t, newBlockGasLimit, nextConsensusParams.ConsensusParams.Block.MaxGas)
 }

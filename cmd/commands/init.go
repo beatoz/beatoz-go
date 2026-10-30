@@ -78,7 +78,7 @@ func AddInitFlags(cmd *cobra.Command) {
 		"block_gas_limit",
 		initParams.BlockGasLimit,
 		"the maximum gas that can be used in one block.\n"+
-			"this value is deterministically adjusted based on the gas usage in the blockchain network.",
+			"this value is set as both the consensus parameter and the governance parameter.",
 	)
 	cmd.Flags().Int64Var(
 		&initParams.MaxTotalSupply,
@@ -284,6 +284,8 @@ func InitFilesWith(
 		// Create Governance Parameters
 		govParams := types.NewGovParams(int(config.Consensus.CreateEmptyBlocksInterval.Seconds()))
 		govParams.GetValues().XMaxTotalSupply = btztypes.ToGrans(params.MaxTotalSupply).Bytes()
+		govParams.GetValues().BlockSizeLimit = params.BlockSizeLimit
+		govParams.GetValues().BlockGasLimit = params.BlockGasLimit
 
 		appState := &genesis.GenesisAppState{
 			AssetHolders: holders,

@@ -734,8 +734,8 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	beginBlockEvents = append(beginBlockEvents, evts...)
 
 	var consensusParams *abcitypes.ConsensusParams
-	nxBlockSizeLimit := ctrler.govCtrler.BlockSizeLimit()
-	nxBlockGasLimit := ctrler.govCtrler.BlockGasLimit()
+	nxBlockSizeLimit := ctrler.currBlockCtx.GetNxBlockSizeLimit()
+	nxBlockGasLimit := ctrler.currBlockCtx.GetNxBlockGasLimit()
 
 	if nxBlockSizeLimit != ctrler.currBlockCtx.GetBlockSizeLimit() ||
 		nxBlockGasLimit != ctrler.currBlockCtx.GetBlockGasLimit() {
@@ -751,8 +751,8 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 			"height", req.Height,
 			"block size limit(origin)", ctrler.currBlockCtx.GetBlockSizeLimit(),
 			"block size limit(new)   ", nxBlockSizeLimit,
-			"block size limit(origin)", ctrler.currBlockCtx.GetBlockGasLimit(),
-			"block size limit(origin)", nxBlockGasLimit,
+			"block gas limit(origin) ", ctrler.currBlockCtx.GetBlockGasLimit(),
+			"block gas limit(new)    ", nxBlockGasLimit,
 		)
 	}
 

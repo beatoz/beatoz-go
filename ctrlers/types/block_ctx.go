@@ -16,13 +16,15 @@ import (
 )
 
 type BlockContext struct {
-	blockInfo      abcitypes.RequestBeginBlock
-	blockSizeLimit int64
-	blockGasLimit  int64
-	blockGasPool   *ethcore.GasPool
-	feeSum         *uint256.Int
-	txsCnt         int
-	appHash        bytes.HexBytes
+	blockInfo        abcitypes.RequestBeginBlock
+	blockSizeLimit   int64
+	blockGasLimit    int64
+	nxBlockSizeLimit int64
+	nxBlockGasLimit  int64
+	blockGasPool     *ethcore.GasPool
+	feeSum           *uint256.Int
+	txsCnt           int
+	appHash          bytes.HexBytes
 
 	GovHandler    IGovHandler
 	AcctHandler   IAccountHandler
@@ -225,6 +227,22 @@ func (bctx *BlockContext) SetBlockSizeLimit(limit int64) {
 	bctx.blockSizeLimit = limit
 }
 
+func (bctx *BlockContext) GetNxBlockSizeLimit() int64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	if bctx.nxBlockSizeLimit == 0 {
+		return bctx.blockSizeLimit
+	}
+	return bctx.nxBlockSizeLimit
+}
+
+func (bctx *BlockContext) SetNxBlockSizeLimit(limit int64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+	bctx.nxBlockSizeLimit = limit
+}
+
 func (bctx *BlockContext) GetBlockGasLimit() int64 {
 	bctx.mtx.RLock()
 	defer bctx.mtx.RUnlock()
@@ -242,6 +260,23 @@ func (bctx *BlockContext) SetBlockGasLimit(gasLimit int64) {
 func (bctx *BlockContext) setBlockGasLimit(gasLimit int64) {
 	bctx.blockGasLimit = gasLimit
 	bctx.blockGasPool = new(ethcore.GasPool).AddGas(uint64(gasLimit))
+}
+
+func (bctx *BlockContext) GetNxBlockGasLimit() int64 {
+	bctx.mtx.RLock()
+	defer bctx.mtx.RUnlock()
+
+	if bctx.nxBlockGasLimit == 0 {
+		return bctx.blockGasLimit
+	}
+	return bctx.nxBlockGasLimit
+}
+
+func (bctx *BlockContext) SetNxBlockGasLimit(gasLimit int64) {
+	bctx.mtx.Lock()
+	defer bctx.mtx.Unlock()
+
+	bctx.nxBlockGasLimit = gasLimit
 }
 
 func (bctx *BlockContext) GetBlockGasUsed() int64 {
