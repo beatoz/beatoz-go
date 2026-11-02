@@ -1,11 +1,13 @@
 package rpc
 
 import (
-	"encoding/binary"
+	"encoding/json"
 	"math/big"
 	"regexp"
+	"runtime"
 	"strconv"
 
+	"github.com/beatoz/beatoz-go/cmd/version"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -15,7 +17,7 @@ func EthChainId(ctx *tmrpctypes.Context) (string, error) {
 	if resp, err := tmrpccore.ABCIQuery(ctx, "chain_id", nil, 0, false); err != nil {
 		return "", err
 	} else {
-		return "0x" + new(big.Int).SetBytes(resp.Response.Value).Text(16), nil
+		return ethQuantityBig(new(big.Int).SetBytes(resp.Response.Value))
 	}
 }
 
@@ -23,7 +25,27 @@ func EthGetBlockNumber(ctx *tmrpctypes.Context) (string, error) {
 	if resp, err := tmrpccore.ABCIQuery(ctx, "block_height", nil, 0, false); err != nil {
 		return "", err
 	} else {
-		return strconv.FormatInt(int64(binary.BigEndian.Uint64(resp.Response.Value)), 10), nil
+		return formatEthBlockNumber(resp.Response.Value)
+	}
+}
+
+func NetVersion(ctx *tmrpctypes.Context) (string, error) {
+	if resp, err := tmrpccore.ABCIQuery(ctx, "chain_id", nil, 0, false); err != nil {
+		return "", err
+	} else {
+		return formatNetVersion(resp.Response.Value), nil
+	}
+}
+
+func Web3ClientVersion(ctx *tmrpctypes.Context) (string, error) {
+	return "beatoz/" + version.String() + "/" + runtime.GOOS + "-" + runtime.GOARCH + "/" + runtime.Version(), nil
+}
+
+func EthSyncing(ctx *tmrpctypes.Context) (json.RawMessage, error) {
+	if resp, err := tmrpccore.Status(ctx); err != nil {
+		return nil, err
+	} else {
+		return formatEthSyncing(resp.SyncInfo)
 	}
 }
 
