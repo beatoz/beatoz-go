@@ -107,6 +107,7 @@ func (peer *PeerMock) Init(valCnt int) error {
 		appState := &genesis.GenesisAppState{}
 		_ = jsonx.Unmarshal(genDoc.AppState, appState)
 		appState.GovParams.GetValues().InflationCycleBlocks = 10
+		appState.GovParams.GetValues().MinSignedBlocks = 5
 		genDoc.AppState, _ = jsonx.Marshal(appState)
 	})
 }

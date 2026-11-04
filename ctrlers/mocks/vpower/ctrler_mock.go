@@ -133,7 +133,12 @@ func (mock *VPowerHandlerMock) TotalPowerOf(addr types.Address) int64 {
 }
 
 func (mock *VPowerHandlerMock) SelfPowerOf(addr types.Address) int64 {
-	panic("implement me")
+	for _, v := range mock.Delegatees {
+		if bytes.Compare(addr, v.Address()) == 0 {
+			return v.SelfPower
+		}
+	}
+	return int64(0)
 }
 
 func (mock *VPowerHandlerMock) DelegatedPowerOf(addr types.Address) int64 {

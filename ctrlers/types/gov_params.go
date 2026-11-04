@@ -186,6 +186,24 @@ func (govParams *GovParams) ValidateBasic() xerrors.XError {
 	if v.LazyApplyingBlocks < 0 {
 		return xerrors.NewOrdinary("invalid governance params").Wrapf("lazyApplyingBlocks must be non-negative")
 	}
+	if v.MinTrxGas > v.BlockGasLimit {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minTrxGas must be less than or equal to blockGasLimit")
+	}
+	if v.BlockSizeLimit < tmtypes.DefaultEvidenceParams().MaxBytes {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("blockSizeLimit must be greater than or equal to %d", tmtypes.DefaultEvidenceParams().MaxBytes)
+	}
+	if v.BlockSizeLimit > tmtypes.MaxBlockSizeBytes {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("blockSizeLimit must be less than or equal to %d", tmtypes.MaxBlockSizeBytes)
+	}
+	if _, overflow := new(uint256.Int).MulOverflow(
+		new(uint256.Int).SetBytes(v.XGasPrice),
+		uint256.NewInt(uint64(v.BlockGasLimit)),
+	); overflow {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("gasPrice * blockGasLimit must not overflow")
+	}
+	if v.MinSignedBlocks >= v.InflationCycleBlocks {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("minSignedBlocks must be less than inflationCycleBlocks")
+	}
 	return nil
 }
 

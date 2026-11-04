@@ -146,6 +146,11 @@ func TestInvalidGovParamsProposalValidation(t *testing.T) {
 	invalidTxFeeRewardRate.SetValue(func(v *ctrlertypes.GovParamsProto) {
 		v.TxFeeRewardRate = 200
 	})
+	invalidMinSignedBlocks := &ctrlertypes.GovParams{}
+	invalidMinSignedBlocks.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MinSignedBlocks = 3
+		v.InflationCycleBlocks = 1
+	})
 
 	for i, test := range []struct {
 		name      string
@@ -161,6 +166,11 @@ func TestInvalidGovParamsProposalValidation(t *testing.T) {
 			name:      "tx_fee_reward_rate_over_100",
 			govParams: invalidTxFeeRewardRate,
 			wantMsg:   "txFeeRewardRate",
+		},
+		{
+			name:      "min_signed_blocks_not_less_than_inflation_cycle_blocks",
+			govParams: invalidMinSignedBlocks,
+			wantMsg:   "minSignedBlocks",
 		},
 	} {
 		bzOpt, err := jsonx.Marshal(test.govParams)
@@ -229,6 +239,7 @@ func TestOverflowBlockHeight(t *testing.T) {
 	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)
 
+	// case 1: `StartVotingHeight + VotingPeriodBlocks` (endVotingHeight) overflows. (issue #51)
 	tx := web3.NewTrxProposal(
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", math.MaxInt64, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
@@ -236,6 +247,23 @@ func TestOverflowBlockHeight(t *testing.T) {
 	xerr := runTrx(makeTrxCtx(tx, 1, true))
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "overflow occurs")
+
+	// case 2: `endVotingHeight + LazyApplyingBlocks` (minApplyingHeight) overflows.
+	oriLazyApplyingBlocks := govCtrler.LazyApplyingBlocks()
+	govCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.LazyApplyingBlocks = math.MaxInt64
+	})
+	defer govCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.LazyApplyingBlocks = oriLazyApplyingBlocks
+	})
+
+	tx = web3.NewTrxProposal(
+		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
+		"test govparams proposal", 10, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
+	require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()))
+	xerr = runTrx(makeTrxCtx(tx, 1, true))
+	require.Error(t, xerr)
+	require.Contains(t, xerr.Error(), "overflow occurs: endVotingHeight")
 }
 
 func TestApplyingHeight(t *testing.T) {

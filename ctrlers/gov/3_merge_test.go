@@ -95,7 +95,7 @@ func TestApplyMergeProposal(t *testing.T) {
 	require.True(t, ok)
 
 	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
-	blockContext = &ctrlertypes.BlockContext{}
+	blockContext = &ctrlertypes.BlockContext{VPowerHandler: vpowMock}
 	blockContext.SetHeight(runHeight)
 	_, xerr := govCtrler.EndBlock(blockContext)
 	require.NoError(t, xerr)
