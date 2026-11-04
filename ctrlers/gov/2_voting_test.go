@@ -265,7 +265,7 @@ func TestApplyingProposal(t *testing.T) {
 	//
 	// apply new gov rule
 	runHeight = txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
-	bctx = &ctrlertypes.BlockContext{}
+	bctx = &ctrlertypes.BlockContext{VPowerHandler: vpowMock}
 	bctx.SetHeight(runHeight)
 	_, xerr = govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
@@ -303,6 +303,48 @@ func TestApplyInvalidGovParamsProposalRejected(t *testing.T) {
 	require.NoError(t, govCtrler.govState.Set(frozenKey, prop, true))
 
 	bctx := &ctrlertypes.BlockContext{}
+	bctx.SetHeight(applyHeight)
+	evts, xerr := govCtrler.EndBlock(bctx)
+	require.NoError(t, xerr)
+	require.Nil(t, govCtrler.newGovParams)
+	require.True(t, oriParams.Equal(&govCtrler.GovParams))
+
+	require.Len(t, evts, 1)
+	require.Equal(t, "proposal", evts[0].Type)
+	require.Len(t, evts[0].Attributes, 1)
+	require.Equal(t, "rejected", string(evts[0].Attributes[0].Key))
+
+	_, _, xerr = govCtrler.Commit()
+	require.NoError(t, xerr)
+
+	frozenProp, xerr := govCtrler.govState.Get(frozenKey, false)
+	require.Equal(t, xerrors.ErrNotFoundResult, xerr)
+	require.Nil(t, frozenProp)
+}
+
+// The proposal is rejected when no validator satisfies the validator eligibility with the new params.
+func TestApplyNoEligibleValidatorProposalRejected(t *testing.T) {
+	oriParams := govCtrler.GovParams
+	govCtrler.newGovParams = nil
+
+	noEligibleValidator := &ctrlertypes.GovParams{}
+	noEligibleValidator.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MinValidatorPower = 1_000_000_000_000
+	})
+	bzOpt, err := jsonx.Marshal(noEligibleValidator)
+	require.NoError(t, err)
+
+	txHash := make([]byte, 32)
+	txHash[0] = 2
+	applyHeight := int64(100)
+	prop := proposal.NewGovProposal(proposal.PROPOSAL_GOVPARAMS, txHash, 1, 1, 1, applyHeight)
+	prop.AddOption(bzOpt)
+	require.NotNil(t, prop.UpdateMajorOption())
+
+	frozenKey := common.LedgerKeyFrozenProp(txHash)
+	require.NoError(t, govCtrler.govState.Set(frozenKey, prop, true))
+
+	bctx := &ctrlertypes.BlockContext{VPowerHandler: vpowMock}
 	bctx.SetHeight(applyHeight)
 	evts, xerr := govCtrler.EndBlock(bctx)
 	require.NoError(t, xerr)
