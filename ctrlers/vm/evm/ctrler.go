@@ -229,16 +229,6 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 
 	// BTIP60: reject the txs that TransitionDb would reject before execution.
 	if types.IsBTIP60(ctx.ChainID(), ctx.Height()) {
-		if _, overflow := uint256.FromBig(ctx.Tx.Amount.ToBig()); overflow {
-			return xerrors.ErrOverFlow.Wrapf("amount(%v)", ctx.Tx.Amount)
-		}
-		fee, overflow := new(uint256.Int).MulOverflow(ctx.Tx.GasPrice, uint256.NewInt(uint64(ctx.Tx.Gas)))
-		if overflow {
-			return xerrors.ErrOverFlow.Wrapf("gas(%v) * gasPrice(%v)", ctx.Tx.Gas, ctx.Tx.GasPrice)
-		}
-		if _, overflow := new(uint256.Int).AddOverflow(fee, ctx.Tx.Amount); overflow {
-			return xerrors.ErrOverFlow.Wrapf("fee(%v) + amount(%v)", fee, ctx.Tx.Amount)
-		}
 		if types.IsZeroAddress(ctx.Tx.To) && len(inputData) > params.MaxInitCodeSize {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("max initcode size exceeded: size(%v) limit(%v)", len(inputData), params.MaxInitCodeSize)
 		}

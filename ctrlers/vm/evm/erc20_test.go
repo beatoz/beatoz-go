@@ -147,17 +147,6 @@ func Test_ValidateTrx(t *testing.T) {
 		1, 1_000_000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(params.MaxInitCodeSize+1))
 	require.ErrorContains(t, ctrler.ValidateTrx(txctx), "max initcode size exceeded")
 
-	// contract tx: gas * gasPrice overflow
-	overTx := web3.NewTrxContract(fromAcct.Address, toAcct.Address,
-		1, 300000, new(uint256.Int).SetAllOne(), uint256.NewInt(0), bytes2.RandBytes(32))
-	txctx.Tx = overTx
-	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrOverFlow.Error())
-
-	// contract tx: fee + amount overflow
-	txctx.Tx = web3.NewTrxContract(fromAcct.Address, toAcct.Address,
-		1, 300000, govMock.GasPrice(), new(uint256.Int).SetAllOne(), bytes2.RandBytes(32))
-	require.ErrorContains(t, ctrler.ValidateTrx(txctx), xerrors.ErrOverFlow.Error())
-
 	// transfer tx to contract: gas < intrinsic gas
 	txctx.Tx = web3.NewTrxTransfer(fromAcct.Address, toAcct.Address,
 		1, 5_000, govMock.GasPrice(), uint256.NewInt(0))
@@ -175,8 +164,6 @@ func Test_ValidateTrx(t *testing.T) {
 	txctx.BlockContext = mocks.InitBlockCtxWith("0xbea701", 1, govMock, &acctHandler, ctrler, nil, nil)
 	txctx.Tx = web3.NewTrxContract(fromAcct.Address, types.ZeroAddress(),
 		1, 1_000_000, govMock.GasPrice(), uint256.NewInt(1), bytes2.RandBytes(params.MaxInitCodeSize+1))
-	require.NoError(t, ctrler.ValidateTrx(txctx))
-	txctx.Tx = overTx
 	require.NoError(t, ctrler.ValidateTrx(txctx))
 }
 

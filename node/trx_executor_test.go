@@ -128,6 +128,31 @@ func Test_commonValidation(t *testing.T) {
 	xerr = commonValidation(txctx)
 	require.ErrorContains(t, xerr, xerrors.ErrNotFoundAccount.Error())
 	require.ErrorContains(t, xerr, "payer address")
+
+	//
+	// Overflow
+	newOverflowTxCtx := func(chainID string, gasPrice, amt *uint256.Int) *ctrlertypes.TrxContext {
+		bctx := ctrlertypes.NewBlockContext(
+			abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainID, Height: 1, Time: blockTime}},
+			govMock, acctMock, nil, nil, nil)
+		bctx.SetBlockGasLimit(blockGasLimit)
+		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), w0.GetNonce(), govMock.MinTrxGas(), gasPrice, amt)
+		return &ctrlertypes.TrxContext{BlockContext: bctx, Tx: tx, Exec: true}
+	}
+	wrappedAmt := new(uint256.Int).Sub(new(uint256.Int).SetAllOne(), govMock.MinTrxFee())
+	wrappedAmt.AddUint64(wrappedAmt, 2)
+
+	// gas * gasPrice overflow
+	txctx = newOverflowTxCtx(chainId.Hex(), new(uint256.Int).SetAllOne(), uint256.NewInt(0))
+	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrOverFlow.Error())
+
+	// fee + amount overflow
+	txctx = newOverflowTxCtx(chainId.Hex(), govMock.GasPrice(), wrappedAmt)
+	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrOverFlow.Error())
+
+	// before BTIP60 (testnet): the wrapped amount passes the balance check
+	txctx = newOverflowTxCtx("0xbea701", govMock.GasPrice(), wrappedAmt)
+	require.NoError(t, commonValidation(txctx))
 }
 
 func Test_ExecuteSync(t *testing.T) {

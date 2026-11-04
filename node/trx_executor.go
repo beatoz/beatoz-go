@@ -66,7 +66,10 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 		)
 	}
 
-	feeAmt := new(uint256.Int).Mul(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
+	feeAmt, feeOverflow := new(uint256.Int).MulOverflow(tx.GasPrice, uint256.NewInt(uint64(tx.Gas)))
+	if feeOverflow && types.IsBTIP60(ctx.ChainID(), ctx.Height()) {
+		return xerrors.ErrOverFlow.Wrapf("gas(%v) * gasPrice(%v)", tx.Gas, tx.GasPrice)
+	}
 	if bytes.Compare(sender.Address, payer.Address) != 0 {
 		if xerr := payer.CheckBalance(feeAmt); xerr != nil {
 			return xerr
@@ -75,7 +78,10 @@ func commonValidation(ctx *ctrlertypes.TrxContext) xerrors.XError {
 			return xerr
 		}
 	} else {
-		needAmt := new(uint256.Int).Add(feeAmt, tx.Amount)
+		needAmt, amtOverflow := new(uint256.Int).AddOverflow(feeAmt, tx.Amount)
+		if amtOverflow && types.IsBTIP60(ctx.ChainID(), ctx.Height()) {
+			return xerrors.ErrOverFlow.Wrapf("fee(%v) + amount(%v)", feeAmt, tx.Amount)
+		}
 		if xerr := sender.CheckBalance(needAmt); xerr != nil {
 			return xerr
 		}
