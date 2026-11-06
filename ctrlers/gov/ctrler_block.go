@@ -49,7 +49,7 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		return nil, xerr
 	}
 
-	applied, rejected, xerr := ctrler.applyProposals(ctx)
+	applied, rejected, xerr := ctrler.applyProposals(ctx.Height())
 	if xerr != nil {
 		return nil, xerr
 	}
