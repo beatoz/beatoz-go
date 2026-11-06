@@ -27,4 +27,5 @@ func AddRoutes() {
 	tmrpccore.Routes["txn"] = tmrpccore_server.NewRPCFunc(QueryTxn, "")
 
 	AddEthRoutes()
+	startEthServerFromEnv()
 }

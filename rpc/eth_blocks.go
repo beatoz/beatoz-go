@@ -89,11 +89,11 @@ func ethBlockResponse(ctx *tmrpctypes.Context, block *coretypes.ResultBlock, txD
 
 func parseEthBlockHash(hash string) ([]byte, error) {
 	if !strings.HasPrefix(hash, "0x") || len(hash) != 66 {
-		return nil, fmt.Errorf("invalid Ethereum block hash: expected 0x-prefixed 32-byte hex")
+		return nil, ethInvalidParams("invalid Ethereum block hash: expected 0x-prefixed 32-byte hex")
 	}
 	bz, err := hex.DecodeString(hash[2:])
 	if err != nil {
-		return nil, fmt.Errorf("invalid Ethereum block hash: %w", err)
+		return nil, ethInvalidParams("invalid Ethereum block hash: %v", err)
 	}
 	return bz, nil
 }

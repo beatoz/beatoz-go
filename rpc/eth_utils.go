@@ -38,11 +38,11 @@ func parseEthBlockTag(tag string) (height *int64, earliest bool, err error) {
 		return nil, true, nil
 	}
 	if !strings.HasPrefix(tag, "0x") || len(tag) < 3 || (len(tag) > 3 && tag[2] == '0') {
-		return nil, false, fmt.Errorf("invalid Ethereum block tag %q: expected a tag or hex quantity", tag)
+		return nil, false, ethInvalidParams("invalid Ethereum block tag %q: expected a tag or hex quantity", tag)
 	}
 	n, err := strconv.ParseUint(tag[2:], 16, 63)
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid Ethereum block tag %q: %w", tag, err)
+		return nil, false, ethInvalidParams("invalid Ethereum block tag %q: %v", tag, err)
 	}
 	h := int64(n)
 	return &h, false, nil

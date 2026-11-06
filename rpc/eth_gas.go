@@ -116,30 +116,30 @@ func parseEthBlockCount(raw json.RawMessage) (uint64, error) {
 	base := 10
 	if len(raw) > 0 && raw[0] == '"' {
 		if err := json.Unmarshal(raw, &number); err != nil {
-			return 0, fmt.Errorf("invalid blockCount: %w", err)
+			return 0, ethInvalidParams("invalid blockCount: %v", err)
 		}
 		if !strings.HasPrefix(number, "0x") || len(number) < 3 || (len(number) > 3 && number[2] == '0') {
-			return 0, fmt.Errorf("blockCount must be a hex quantity or JSON integer")
+			return 0, ethInvalidParams("blockCount must be a hex quantity or JSON integer")
 		}
 		number, base = number[2:], 16
 	} else {
 		if !json.Valid(raw) {
-			return 0, fmt.Errorf("invalid blockCount JSON")
+			return 0, ethInvalidParams("invalid blockCount JSON")
 		}
 		number = string(raw)
 	}
 	if number == "" {
-		return 0, fmt.Errorf("missing blockCount")
+		return 0, ethInvalidParams("missing blockCount")
 	}
 	for _, r := range number {
 		if (r >= '0' && r <= '9') || (base == 16 && ((r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F'))) {
 			continue
 		}
-		return 0, fmt.Errorf("blockCount must be a non-negative integer")
+		return 0, ethInvalidParams("blockCount must be a non-negative integer")
 	}
 	n, ok := new(big.Int).SetString(number, base)
 	if !ok {
-		return 0, fmt.Errorf("invalid blockCount")
+		return 0, ethInvalidParams("invalid blockCount")
 	}
 	if n.Cmp(big.NewInt(ethMaxFeeHistoryBlocks)) > 0 {
 		return ethMaxFeeHistoryBlocks, nil
@@ -153,7 +153,7 @@ func parseEthRewardPercentiles(raw json.RawMessage) ([]float64, error) {
 	}
 	var values []*float64
 	if err := json.Unmarshal(raw, &values); err != nil {
-		return nil, fmt.Errorf("invalid rewardPercentiles: %w", err)
+		return nil, ethInvalidParams("invalid rewardPercentiles: %v", err)
 	}
 	if values == nil {
 		return nil, nil
@@ -161,7 +161,7 @@ func parseEthRewardPercentiles(raw json.RawMessage) ([]float64, error) {
 	percentiles := make([]float64, len(values))
 	for i, value := range values {
 		if value == nil {
-			return nil, fmt.Errorf("rewardPercentiles cannot contain null")
+			return nil, ethInvalidParams("rewardPercentiles cannot contain null")
 		}
 		percentiles[i] = *value
 	}
@@ -171,7 +171,7 @@ func parseEthRewardPercentiles(raw json.RawMessage) ([]float64, error) {
 func validateEthRewardPercentiles(percentiles []float64) error {
 	for i, p := range percentiles {
 		if math.IsNaN(p) || math.IsInf(p, 0) || p < 0 || p > 100 || (i > 0 && p < percentiles[i-1]) {
-			return fmt.Errorf("rewardPercentiles must be sorted numbers between 0 and 100")
+			return ethInvalidParams("rewardPercentiles must be sorted numbers between 0 and 100")
 		}
 	}
 	return nil
