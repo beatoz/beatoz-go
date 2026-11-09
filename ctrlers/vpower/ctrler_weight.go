@@ -47,6 +47,12 @@ func (ctrler *VPowerCtrler) ComputeWeight(
 		}
 		signRate, _ := fxnum.FromInt(int64(c)).QuoRem(fxnum.FromInt(inflationCycle), fxnum.GetDivisionPrecision())
 		signRate = fxnum.FromInt(1).Sub(signRate) // = 1 - missedBlock/inflationCycle
+		if signRate.LessThan(fxnum.FromInt(0)) {
+			ctrler.logger.Info("Missed block count exceeds inflation cycle",
+				"address", val.addr,
+				"missed_blocks", c, "inflationCycle", inflationCycle)
+			signRate = fxnum.FromInt(0)
+		}
 
 		mapBenefPowChunks := make(map[string]*benefPowChunksW)
 		for _, from := range val.Delegators {
