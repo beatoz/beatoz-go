@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -83,11 +84,11 @@ func (c *beatoz_x509Verify) RequiredGas(input []byte) uint64 {
 	return X509VerifyBaseGas + uint64(n)*X509VerifyPerCertGas
 }
 
-// Run verifies an X.509 certificate chain and returns the last certificate's
-// serial number, OU, and public key.
+// Run verifies an X.509 certificate chain and returns the subject (first)
+// certificate's public key, serial number, and OUs.
 //
 // Input encoding: [4-byte big-endian length][DER cert][4-byte big-endian length][DER cert]...
-// Output encoding (ABI): abi.encode(bytes serialNumber, bytes ou, bytes publicKey)
+// Output encoding: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
 func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
 	// 1. Decode input into [][]byte (length-prefixed DER certificates)
 	derCerts, err := decodeDERCertArray(input)
@@ -117,7 +118,7 @@ func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
 		}
 	}
 
-	// 4. Extract public key (x, y), serial number, and OU from the subject certificate
+	// 4. Extract public key (x, y), serial number, and OUs from the subject certificate
 	subjectCert := certs[0]
 
 	ecdsaKey, ok := subjectCert.PublicKey.(*ecdsa.PublicKey)
@@ -125,13 +126,23 @@ func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
 		return nil, fmt.Errorf("x509: unsupported public key type %T", subjectCert.PublicKey)
 	}
 
-	// Return format: [32B pubkey.x][32B pubkey.y][32B serialNumber][OU string bytes]
+	ous := subjectCert.Subject.OrganizationalUnit
+	if len(ous) > math.MaxUint8 {
+		return nil, fmt.Errorf("x509: too many OUs: %d", len(ous))
+	}
+
+	// Return format: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
 	var result []byte
 	result = append(result, common.LeftPadBytes(ecdsaKey.X.Bytes(), 32)...)
 	result = append(result, common.LeftPadBytes(ecdsaKey.Y.Bytes(), 32)...)
 	result = append(result, common.LeftPadBytes(subjectCert.SerialNumber.Bytes(), 32)...)
-	if len(subjectCert.Subject.OrganizationalUnit) > 0 {
-		result = append(result, []byte(subjectCert.Subject.OrganizationalUnit[0])...)
+	result = append(result, byte(len(ous)))
+	for i, ou := range ous {
+		if len(ou) > math.MaxUint8 {
+			return nil, fmt.Errorf("x509: OU[%d] too long: %d bytes", i, len(ou))
+		}
+		result = append(result, byte(len(ou)))
+		result = append(result, ou...)
 	}
 
 	return result, nil

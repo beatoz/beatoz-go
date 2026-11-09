@@ -186,12 +186,15 @@ func TestX509Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, ret)
 
-	// Parse return: [32B pubkey.x][32B pubkey.y][32B serialNumber][OU string]
-	require.GreaterOrEqual(t, len(ret), 96)
+	// Parse return: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
+	require.GreaterOrEqual(t, len(ret), 98)
 	retX := new(big.Int).SetBytes(ret[0:32])
 	retY := new(big.Int).SetBytes(ret[32:64])
 	retSerial := new(big.Int).SetBytes(ret[64:96])
-	retOU := string(ret[96:])
+	retOUCnt := int(ret[96])
+	retOULen := int(ret[97])
+	require.Len(t, ret, 98+retOULen)
+	retOU := string(ret[98 : 98+retOULen])
 
 	fmt.Println("=== beatoz_x509Verify Result ===")
 	fmt.Printf("  PubKey.X:     %x\n", retX)
@@ -203,5 +206,111 @@ func TestX509Verify(t *testing.T) {
 	require.Equal(t, subjectPubKey.X, retX)
 	require.Equal(t, subjectPubKey.Y, retY)
 	require.Equal(t, subjectCert.SerialNumber, retSerial)
+	require.Equal(t, 1, retOUCnt)
 	require.Equal(t, "peer", retOU)
+}
+
+var (
+	issuerMultiOU = []byte(`-----BEGIN CERTIFICATE-----
+MIICATCCAaigAwIBAgIQYLlHnQ9K1CYMp7//tDvKvDAKBggqhkjOPQQDAjBhMQsw
+CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+YW5jaXNjbzEQMA4GA1UEChMHb3JnMS5iYzETMBEGA1UEAxMKY2Eub3JnMS5iYzAe
+Fw0yNjExMDIwMDAwMDBaFw0zNjExMDIwMDAwMDBaMGExCzAJBgNVBAYTAlVTMRMw
+EQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNpc2NvMRAwDgYD
+VQQKEwdvcmcxLmJjMRMwEQYDVQQDEwpjYS5vcmcxLmJjMFkwEwYHKoZIzj0CAQYI
+KoZIzj0DAQcDQgAEqR0v+zG7nScKNPEBKL8KMysS7vG8zBA461SWPVzrrgNBYiE3
+YUcBC6iK0+97eij/0m1RXrZ+j3eaBqdy/UtvSqNCMEAwDgYDVR0PAQH/BAQDAgKE
+MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFKSKD+SEtc9/nyasiDnxjOi855rG
+MAoGCCqGSM49BAMCA0cAMEQCID6fg326Q1Dl6qbiIDVjmnkRncUuKKH+qZvjU4L1
+ULMLAiBvLgMgLq2fC03stq3DnRVgeONKpR5ZtXVLPhqCiPwjgQ==
+-----END CERTIFICATE-----`)
+	subjectMultiOU = []byte(`-----BEGIN CERTIFICATE-----
+MIICIzCCAcmgAwIBAgIQAxOMQoF3uQYPqI5ms4phITAKBggqhkjOPQQDAjBhMQsw
+CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+YW5jaXNjbzEQMA4GA1UEChMHb3JnMS5iYzETMBEGA1UEAxMKY2Eub3JnMS5iYzAe
+Fw0yNjExMDIwMDAwMDBaFw0zNjExMDIwMDAwMDBaMIGCMQswCQYDVQQGEwJVUzET
+MBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzEuMAsG
+A1UECxMEb3JnMTALBgNVBAsTBHBlZXIwEgYDVQQLEwtkZXBhcnRtZW50MTEWMBQG
+A1UEAxMNcGVlcjAub3JnMS5iYzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABPsM
+fxrjssK2qWBaXaXlEWqPnDWZp4TApw2QFkR+RLFzHRj0upqrsw0r2iGpTlzaWgHm
+FUZGvslEvqw8rkAQxuijQTA/MA4GA1UdDwEB/wQEAwIHgDAMBgNVHRMBAf8EAjAA
+MB8GA1UdIwQYMBaAFKSKD+SEtc9/nyasiDnxjOi855rGMAoGCCqGSM49BAMCA0gA
+MEUCIQD6RCFfp9h1/lhYJtgfhV2jVtBDN8eX7DCE7/ufVCdCegIgQwv1gFQOLWkI
+NBEdaij+s2Sq/nBlX/OrnUEx+Umo7Sw=
+-----END CERTIFICATE-----`)
+)
+
+func TestX509VerifyMultipleOUs(t *testing.T) {
+	// 1. Parse issuer certificate and print info
+	issuerBlock, _ := pem.Decode(issuerMultiOU)
+	require.NotNil(t, issuerBlock, "failed to decode issuer PEM")
+	issuerCert, err := x509.ParseCertificate(issuerBlock.Bytes)
+	require.NoError(t, err)
+
+	fmt.Println("=== Issuer Certificate ===")
+	fmt.Printf("  Subject:      %s\n", issuerCert.Subject)
+	fmt.Printf("  Issuer:       %s\n", issuerCert.Issuer)
+
+	// 2. Parse subject certificate and print info
+	subjectBlock, _ := pem.Decode(subjectMultiOU)
+	require.NotNil(t, subjectBlock, "failed to decode subject PEM")
+	subjectCert, err := x509.ParseCertificate(subjectBlock.Bytes)
+	require.NoError(t, err)
+
+	fmt.Println("=== Subject Certificate ===")
+	fmt.Printf("  Subject:      %s\n", subjectCert.Subject)
+	fmt.Printf("  Issuer:       %s\n", subjectCert.Issuer)
+
+	subjectPubKey, ok := subjectCert.PublicKey.(*ecdsa.PublicKey)
+	require.True(t, ok, "subject public key is not ECDSA")
+	fmt.Printf("  PubKey.X:     %x\n", subjectPubKey.X)
+	fmt.Printf("  PubKey.Y:     %x\n", subjectPubKey.Y)
+
+	// 3. Verify certificate chain using beatoz_x509Verify
+	//    Input: [4B len][subject DER][4B len][issuer DER]
+	var contractInput []byte
+	subjectLen := make([]byte, 4)
+	binary.BigEndian.PutUint32(subjectLen, uint32(len(subjectBlock.Bytes)))
+	contractInput = append(contractInput, subjectLen...)
+	contractInput = append(contractInput, subjectBlock.Bytes...)
+	issuerLen := make([]byte, 4)
+	binary.BigEndian.PutUint32(issuerLen, uint32(len(issuerBlock.Bytes)))
+	contractInput = append(contractInput, issuerLen...)
+	contractInput = append(contractInput, issuerBlock.Bytes...)
+
+	verifier := &beatoz_x509Verify{}
+	ret, err := verifier.Run(contractInput)
+	require.NoError(t, err)
+	require.NotNil(t, ret)
+
+	// Parse return: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
+	require.GreaterOrEqual(t, len(ret), 97)
+	retX := new(big.Int).SetBytes(ret[0:32])
+	retY := new(big.Int).SetBytes(ret[32:64])
+	retSerial := new(big.Int).SetBytes(ret[64:96])
+	retOUCnt := int(ret[96])
+	offset := 97
+	var retOUs []string
+	for i := 0; i < retOUCnt; i++ {
+		require.Less(t, offset, len(ret))
+		retOULen := int(ret[offset])
+		offset++
+		require.LessOrEqual(t, offset+retOULen, len(ret))
+		retOUs = append(retOUs, string(ret[offset:offset+retOULen]))
+		offset += retOULen
+	}
+	require.Len(t, ret, offset)
+
+	fmt.Println("=== beatoz_x509Verify Result ===")
+	fmt.Printf("  PubKey.X:     %x\n", retX)
+	fmt.Printf("  PubKey.Y:     %x\n", retY)
+	fmt.Printf("  SerialNumber: %s\n", retSerial)
+	fmt.Printf("  OU:           %v\n", retOUs)
+
+	// Verify returned values match the subject certificate
+	require.Equal(t, subjectPubKey.X, retX)
+	require.Equal(t, subjectPubKey.Y, retY)
+	require.Equal(t, subjectCert.SerialNumber, retSerial)
+	require.Equal(t, 3, retOUCnt)
+	require.Equal(t, []string{"org1", "peer", "department1"}, retOUs)
 }
