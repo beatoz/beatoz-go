@@ -8,6 +8,7 @@ import (
 
 	"github.com/beatoz/beatoz-go/ctrlers/mocks"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/acct"
+	evmock "github.com/beatoz/beatoz-go/ctrlers/mocks/evm"
 	"github.com/beatoz/beatoz-go/ctrlers/mocks/gov"
 	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
 	vpowermock "github.com/beatoz/beatoz-go/ctrlers/mocks/vpower"
@@ -127,6 +128,31 @@ func Test_commonValidation(t *testing.T) {
 	xerr = commonValidation(txctx)
 	require.ErrorContains(t, xerr, xerrors.ErrNotFoundAccount.Error())
 	require.ErrorContains(t, xerr, "payer address")
+
+	//
+	// Overflow
+	newOverflowTxCtx := func(chainID string, gasPrice, amt *uint256.Int) *ctrlertypes.TrxContext {
+		bctx := ctrlertypes.NewBlockContext(
+			abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainID, Height: 1, Time: blockTime}},
+			govMock, acctMock, nil, nil, nil)
+		bctx.SetBlockGasLimit(blockGasLimit)
+		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), w0.GetNonce(), govMock.MinTrxGas(), gasPrice, amt)
+		return &ctrlertypes.TrxContext{BlockContext: bctx, Tx: tx, Exec: true}
+	}
+	wrappedAmt := new(uint256.Int).Sub(new(uint256.Int).SetAllOne(), govMock.MinTrxFee())
+	wrappedAmt.AddUint64(wrappedAmt, 2)
+
+	// gas * gasPrice overflow
+	txctx = newOverflowTxCtx(chainId.Hex(), new(uint256.Int).SetAllOne(), uint256.NewInt(0))
+	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrOverFlow.Error())
+
+	// fee + amount overflow
+	txctx = newOverflowTxCtx(chainId.Hex(), govMock.GasPrice(), wrappedAmt)
+	require.ErrorContains(t, commonValidation(txctx), xerrors.ErrOverFlow.Error())
+
+	// before BTIP60 (testnet): the wrapped amount passes the balance check
+	txctx = newOverflowTxCtx("0xbea701", govMock.GasPrice(), wrappedAmt)
+	require.NoError(t, commonValidation(txctx))
 }
 
 func Test_ExecuteSync(t *testing.T) {
@@ -429,4 +455,40 @@ func Test_Payer(t *testing.T) {
 
 	actualSender = acctMock.FindAccount(sender.Address(), true)
 	require.Equal(t, expectedSenderBalance.Dec(), actualSender.GetBalance().Dec())
+}
+
+func Test_TransferToContract(t *testing.T) {
+	acctHandler := acct.NewAcctHandlerMock(2)
+	sender := acctHandler.GetWallet(0)
+	sender.GetAccount().SetBalance(uint256.NewInt(balance))
+	contract := acctHandler.GetWallet(1).GetAccount()
+	contract.Code = []byte{0x00}
+	eoa := types.RandAddress()
+
+	newTxCtx := func(chainID string, to types.Address) *ctrlertypes.TrxContext {
+		evmMock := evmock.NewEVMHandlerMock()
+		bctx := ctrlertypes.NewBlockContext(
+			abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainID, Height: 1}},
+			govMock, acctHandler, evmMock, nil, nil)
+		bctx.SetBlockGasLimit(govMock.MinTrxGas() * 10)
+		tx := web3.NewTrxTransfer(sender.Address(), to, sender.GetNonce(), govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1))
+		return &ctrlertypes.TrxContext{BlockContext: bctx, Tx: tx, Exec: true}
+	}
+
+	// after BTIP60: EVM rejects a transfer with insufficient intrinsic gas.
+	txctx := newTxCtx(chainId.Hex(), contract.Address)
+	require.NoError(t, commonValidation(txctx))
+	require.ErrorContains(t, validateTrx(txctx), xerrors.ErrInvalidGas.Error())
+
+	// A transfer with sufficient intrinsic gas passes EVM validation.
+	txctx.Tx.Gas = 21_000
+	require.NoError(t, validateTrx(txctx))
+
+	// after BTIP60: transfer to EOA is validated by AcctHandler
+	txctx = newTxCtx(chainId.Hex(), eoa)
+	require.NoError(t, validateTrx(txctx))
+
+	// before BTIP60 (testnet): transfer to contract is validated by AcctHandler
+	txctx = newTxCtx("0xbea701", contract.Address)
+	require.NoError(t, validateTrx(txctx))
 }

@@ -227,6 +227,13 @@ func (ctrler *EVMCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		return xerrors.ErrInvalidGas.Wrapf("invalid gas: expected(%v+) got(%v)", gas, ctx.Tx.Gas)
 	}
 
+	// BTIP60: reject the txs that TransitionDb would reject before execution.
+	if types.IsBTIP60(ctx.ChainID(), ctx.Height()) {
+		if types.IsZeroAddress(ctx.Tx.To) && len(inputData) > params.MaxInitCodeSize {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("max initcode size exceeded: size(%v) limit(%v)", len(inputData), params.MaxInitCodeSize)
+		}
+	}
+
 	if ctx.Exec == false {
 		ctx.GasUsed = int64(gas)
 	}
