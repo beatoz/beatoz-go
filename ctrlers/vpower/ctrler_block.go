@@ -142,6 +142,10 @@ func (ctrler *VPowerCtrler) EndBlock(bctx *ctrlertypes.BlockContext) ([]abcitype
 	bctx.SetValUpdates(newValUps)
 	ctrler.lastValidators = newValidators
 
+	// Reset checkVPowLimiter with the validator set updated in this block,
+	// so that CheckTx after Commit is limited based on the same total power as the next block.
+	ctrler.checkVPowLimiter.Reset(ctrler.sumPowerOfValidators(), bctx.GovHandler.MaxUpdatablePowerRate())
+
 	if len(newValUps) > 0 {
 		for _, val := range newValUps {
 			if puk, err := encoding.PubKeyFromProto(val.PubKey); err == nil {
