@@ -36,4 +36,5 @@ message GovParamsProto {
   int64   min_voting_period_blocks       = 28;
   int64   max_voting_period_blocks       = 29;
   int64   lazy_applying_blocks           = 30;
+  int64   max_voting_start_delay_blocks  = 31;
 }

@@ -3,12 +3,17 @@ package gov
 import (
 	"math"
 	"testing"
+	"time"
 
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
+	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
 	"github.com/beatoz/beatoz-go/ctrlers/supply"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
@@ -229,6 +234,14 @@ func TestOverflowBlockHeight(t *testing.T) {
 	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)
 
+	oriMaxVotingStartDelayBlocks := govCtrler.MaxVotingStartDelayBlocks()
+	govCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = math.MaxInt64 - 1
+	})
+	defer govCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = oriMaxVotingStartDelayBlocks
+	})
+
 	tx := web3.NewTrxProposal(
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
 		"test govparams proposal", math.MaxInt64, 259200, 518400+10, proposal.PROPOSAL_GOVPARAMS, bzOpt)
@@ -280,4 +293,77 @@ func TestApplyingHeight(t *testing.T) {
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "wrong applyingHeight")
 
+}
+
+func TestStartVotingHeightUpperBound(t *testing.T) {
+	maxDelay := govCtrler.MaxVotingStartDelayBlocks()
+	require.Positive(t, maxDelay)
+
+	proposer := vpowMock.PickAddress(vpowMock.ValCnt - 1)
+	period := govCtrler.MinVotingPeriodBlocks()
+
+	for _, test := range []struct {
+		name      string
+		height    int64
+		delay     int64
+		wantError bool
+	}{
+		{name: "before_btip61", height: 499_999, delay: maxDelay + 1},
+		{name: "btip61_max_delay", height: 500_000, delay: maxDelay},
+		{name: "btip61_over_max_delay", height: 500_000, delay: maxDelay + 1, wantError: true},
+	} {
+		start := test.height + test.delay
+		tx := web3.NewTrxProposal(
+			proposer, types.ZeroAddress(), 1, defMinGas, defGasPrice,
+			"test start voting height", start, period, start+period+govCtrler.LazyApplyingBlocks(),
+			proposal.PROPOSAL_COMMON, []byte("option"))
+
+		txctx := &ctrlertypes.TrxContext{
+			BlockContext: ctrlertypes.TempBlockContext(
+				"0xbea701", test.height, time.Now(),
+				govCtrler, acctMock, nil, supplymock.NewSupplyHandlerMock(), vpowMock),
+			Tx:     tx,
+			TxHash: bytes.RandBytes(32),
+			Exec:   true,
+		}
+
+		xerr := govCtrler.ValidateTrx(txctx)
+		if test.wantError {
+			require.ErrorContains(t, xerr, "wrong startVotingHeight", "case=%s", test.name)
+		} else {
+			require.NoError(t, xerr, "case=%s", test.name)
+		}
+	}
+}
+
+func TestInitNewGovParam(t *testing.T) {
+	localCfg := cfg.DefaultConfig("0x1234")
+	localCfg.SetRoot(t.TempDir())
+
+	localGovCtrler, err := NewGovCtrler(localCfg, tmlog.NewNopLogger())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, localGovCtrler.Close())
+	})
+	localGovCtrler.GovParams = *ctrlertypes.DefaultGovParams()
+
+	defaultValue := ctrlertypes.DefaultGovParams().MaxVotingStartDelayBlocks()
+	localGovCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = 0
+		v.MaxVotingPeriodBlocks = defaultValue + 1
+	})
+	require.NoError(t, localGovCtrler.InitMaxVotingStartDelayBlocks())
+	require.Equal(t, defaultValue, localGovCtrler.MaxVotingStartDelayBlocks())
+
+	_, _, xerr := localGovCtrler.Commit()
+	require.NoError(t, xerr)
+	item, xerr := localGovCtrler.govState.Get(common.LedgerKeyGovParams(), true)
+	require.NoError(t, xerr)
+	require.Equal(t, defaultValue, item.(*ctrlertypes.GovParams).MaxVotingStartDelayBlocks())
+
+	localGovCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = 100
+	})
+	require.NoError(t, localGovCtrler.InitMaxVotingStartDelayBlocks())
+	require.EqualValues(t, 100, localGovCtrler.MaxVotingStartDelayBlocks())
 }

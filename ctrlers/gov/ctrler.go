@@ -117,6 +117,14 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		if txpayload.StartVotingHeight <= ctx.Height() {
 			return xerrors.ErrInvalidTrxPayloadParams
 		}
+		if types.IsBTIP61(ctx.ChainID(), ctx.Height()) &&
+			txpayload.StartVotingHeight-ctx.Height() > ctrler.MaxVotingStartDelayBlocks() {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf(
+				"wrong startVotingHeight: must be less than or equal to height + maxVotingStartDelayBlocks. startVotingHeight:%v, height:%v, maxVotingStartDelayBlocks:%v",
+				txpayload.StartVotingHeight,
+				ctx.Height(),
+				ctrler.MaxVotingStartDelayBlocks())
+		}
 		// check voting period
 		if txpayload.VotingPeriodBlocks > ctrler.MaxVotingPeriodBlocks() ||
 			txpayload.VotingPeriodBlocks < ctrler.MinVotingPeriodBlocks() {
@@ -429,6 +437,23 @@ func (ctrler *GovCtrler) ReadProposal(txhash abytes.HexBytes, exec bool) (*propo
 
 func (ctrler *GovCtrler) UpgradeLedgerVersion(target common.LedgerVersion) xerrors.XError {
 	return ctrler.govState.UpgradeLedgerVersion(target)
+}
+
+func (ctrler *GovCtrler) InitMaxVotingStartDelayBlocks() xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	if ctrler.MaxVotingStartDelayBlocks() > 0 {
+		return nil
+	}
+
+	defaultParams := ctrlertypes.NewGovParams(int(ctrler.EmptyBlockIntervalSecs()))
+	ctrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = defaultParams.MaxVotingStartDelayBlocks()
+	})
+	ctrler.logger.Info("MaxVotingStartDelayBlocks is initialized", "value", ctrler.MaxVotingStartDelayBlocks())
+
+	return ctrler.govState.Set(common.LedgerKeyGovParams(), &ctrler.GovParams, true)
 }
 
 var _ ctrlertypes.ILedgerHandler = (*GovCtrler)(nil)
