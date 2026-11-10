@@ -181,6 +181,9 @@ func TestX509Verify(t *testing.T) {
 	contractInput = append(contractInput, issuerBlock.Bytes...)
 	// append subject DER (length-prefixed)
 
+	x509BTIP62.Store(true)
+	defer x509BTIP62.Store(false)
+
 	verifier := &beatoz_x509Verify{}
 	ret, err := verifier.Run(contractInput)
 	require.NoError(t, err)
@@ -278,6 +281,9 @@ func TestX509VerifyMultipleOUs(t *testing.T) {
 	contractInput = append(contractInput, issuerLen...)
 	contractInput = append(contractInput, issuerBlock.Bytes...)
 
+	x509BTIP62.Store(true)
+	defer x509BTIP62.Store(false)
+
 	verifier := &beatoz_x509Verify{}
 	ret, err := verifier.Run(contractInput)
 	require.NoError(t, err)
@@ -313,4 +319,31 @@ func TestX509VerifyMultipleOUs(t *testing.T) {
 	require.Equal(t, subjectCert.SerialNumber, retSerial)
 	require.Equal(t, 3, retOUCnt)
 	require.Equal(t, []string{"org1", "peer", "department1"}, retOUs)
+}
+
+func TestX509VerifyPreBTIP62(t *testing.T) {
+	subjectBlock, _ := pem.Decode(subjectMultiOU)
+	require.NotNil(t, subjectBlock)
+	issuerBlock, _ := pem.Decode(issuerMultiOU)
+	require.NotNil(t, issuerBlock)
+	subjectCert, err := x509.ParseCertificate(subjectBlock.Bytes)
+	require.NoError(t, err)
+	subjectPubKey, ok := subjectCert.PublicKey.(*ecdsa.PublicKey)
+	require.True(t, ok)
+
+	var contractInput []byte
+	for _, der := range [][]byte{subjectBlock.Bytes, issuerBlock.Bytes} {
+		contractInput = binary.BigEndian.AppendUint32(contractInput, uint32(len(der)))
+		contractInput = append(contractInput, der...)
+	}
+
+	var expected []byte
+	expected = append(expected, common.LeftPadBytes(subjectPubKey.X.Bytes(), 32)...)
+	expected = append(expected, common.LeftPadBytes(subjectPubKey.Y.Bytes(), 32)...)
+	expected = append(expected, common.LeftPadBytes(subjectCert.SerialNumber.Bytes(), 32)...)
+	expected = append(expected, []byte("org1")...)
+
+	ret, err := (&beatoz_x509Verify{}).Run(contractInput)
+	require.NoError(t, err)
+	require.Equal(t, expected, ret)
 }

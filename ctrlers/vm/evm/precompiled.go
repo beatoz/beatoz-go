@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -29,6 +30,8 @@ func init() {
 	vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{0xff, 0x00})] = &beatoz_x509Verify{}
 	vm.PrecompiledContractsCancun[common.BytesToAddress([]byte{0xff, 0x00})] = &beatoz_x509Verify{}
 }
+
+var x509BTIP62 atomic.Bool
 
 const (
 	P256VerifyGas         = 6900
@@ -89,6 +92,7 @@ func (c *beatoz_x509Verify) RequiredGas(input []byte) uint64 {
 //
 // Input encoding: [4-byte big-endian length][DER cert][4-byte big-endian length][DER cert]...
 // Output encoding: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
+// Before BTIP62: [32B pubkey.x][32B pubkey.y][32B serialNumber][first OU bytes]
 func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
 	// 1. Decode input into [][]byte (length-prefixed DER certificates)
 	derCerts, err := decodeDERCertArray(input)
@@ -126,25 +130,33 @@ func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
 		return nil, fmt.Errorf("x509: unsupported public key type %T", subjectCert.PublicKey)
 	}
 
-	ous := subjectCert.Subject.OrganizationalUnit
-	if len(ous) > math.MaxUint8 {
-		return nil, fmt.Errorf("x509: too many OUs: %d", len(ous))
-	}
-
-	// Return format: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
 	var result []byte
 	result = append(result, common.LeftPadBytes(ecdsaKey.X.Bytes(), 32)...)
 	result = append(result, common.LeftPadBytes(ecdsaKey.Y.Bytes(), 32)...)
 	result = append(result, common.LeftPadBytes(subjectCert.SerialNumber.Bytes(), 32)...)
-	result = append(result, byte(len(ous)))
-	for i, ou := range ous {
-		if len(ou) > math.MaxUint8 {
-			return nil, fmt.Errorf("x509: OU[%d] too long: %d bytes", i, len(ou))
+
+	ous := subjectCert.Subject.OrganizationalUnit
+	if x509BTIP62.Load() {
+		if len(ous) > math.MaxUint8 {
+			return nil, fmt.Errorf("x509: too many OUs: %d", len(ous))
 		}
-		result = append(result, byte(len(ou)))
-		result = append(result, ou...)
+
+		// Return format: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
+		result = append(result, byte(len(ous)))
+		for i, ou := range ous {
+			if len(ou) > math.MaxUint8 {
+				return nil, fmt.Errorf("x509: OU[%d] too long: %d bytes", i, len(ou))
+			}
+			result = append(result, byte(len(ou)))
+			result = append(result, ou...)
+		}
+		return result, nil
 	}
 
+	// Return format before BTIP62: [32B pubkey.x][32B pubkey.y][32B serialNumber][first OU bytes]
+	if len(ous) > 0 {
+		result = append(result, []byte(ous[0])...)
+	}
 	return result, nil
 }
 
