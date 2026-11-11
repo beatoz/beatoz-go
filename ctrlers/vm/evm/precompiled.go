@@ -28,6 +28,13 @@ func init() {
 	vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{0xff, 0x00})] = &beatoz_x509Verify{}
 	vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{0xff, 0x00})] = &beatoz_x509Verify{}
 	vm.PrecompiledContractsCancun[common.BytesToAddress([]byte{0xff, 0x00})] = &beatoz_x509Verify{}
+
+	// x509 certificate verification returning all OUs
+	vm.PrecompiledContractsHomestead[common.BytesToAddress([]byte{0x2, 0x00})] = &beatoz_x509VerifyV2{}
+	vm.PrecompiledContractsByzantium[common.BytesToAddress([]byte{0x2, 0x00})] = &beatoz_x509VerifyV2{}
+	vm.PrecompiledContractsIstanbul[common.BytesToAddress([]byte{0x2, 0x00})] = &beatoz_x509VerifyV2{}
+	vm.PrecompiledContractsBerlin[common.BytesToAddress([]byte{0x2, 0x00})] = &beatoz_x509VerifyV2{}
+	vm.PrecompiledContractsCancun[common.BytesToAddress([]byte{0x2, 0x00})] = &beatoz_x509VerifyV2{}
 }
 
 const (
@@ -84,12 +91,72 @@ func (c *beatoz_x509Verify) RequiredGas(input []byte) uint64 {
 	return X509VerifyBaseGas + uint64(n)*X509VerifyPerCertGas
 }
 
+// Run verifies an X.509 certificate chain and returns the last certificate's
+// serial number, OU, and public key.
+//
+// Input encoding: [4-byte big-endian length][DER cert][4-byte big-endian length][DER cert]...
+// Output encoding (ABI): abi.encode(bytes serialNumber, bytes ou, bytes publicKey)
+//
+// Deprecated: Returns only the first OU. Use beatoz_x509VerifyV2 (0x0200) instead.
+func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
+	// 1. Decode input into [][]byte (length-prefixed DER certificates)
+	derCerts, err := decodeDERCertArray(input)
+	if err != nil {
+		return nil, err
+	}
+	if len(derCerts) == 0 {
+		return nil, errors.New("x509: no certificates provided")
+	}
+
+	// 2. Parse all DER certificates
+	certs := make([]*x509.Certificate, len(derCerts))
+	for i, der := range derCerts {
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			return nil, fmt.Errorf("x509: failed to parse certificate %d: %v", i, err)
+		}
+		certs[i] = cert
+	}
+
+	// 3. Verify chain: certs[i] (subject) verifies certs[i+1] (issuer)
+	for i := 0; i < len(certs)-1; i++ {
+		subject := certs[i]
+		issuer := certs[i+1]
+		if err := subject.CheckSignatureFrom(issuer); err != nil {
+			return nil, fmt.Errorf("x509: cert[%d] failed verification by cert[%d]: %v", i+1, i, err)
+		}
+	}
+
+	// 4. Extract public key (x, y), serial number, and OU from the subject certificate
+	subjectCert := certs[0]
+
+	ecdsaKey, ok := subjectCert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("x509: unsupported public key type %T", subjectCert.PublicKey)
+	}
+
+	// Return format: [32B pubkey.x][32B pubkey.y][32B serialNumber][OU string bytes]
+	var result []byte
+	result = append(result, common.LeftPadBytes(ecdsaKey.X.Bytes(), 32)...)
+	result = append(result, common.LeftPadBytes(ecdsaKey.Y.Bytes(), 32)...)
+	result = append(result, common.LeftPadBytes(subjectCert.SerialNumber.Bytes(), 32)...)
+	if len(subjectCert.Subject.OrganizationalUnit) > 0 {
+		result = append(result, []byte(subjectCert.Subject.OrganizationalUnit[0])...)
+	}
+
+	return result, nil
+}
+
+type beatoz_x509VerifyV2 struct {
+	beatoz_x509Verify
+}
+
 // Run verifies an X.509 certificate chain and returns the subject (first)
 // certificate's public key, serial number, and OUs.
 //
 // Input encoding: [4-byte big-endian length][DER cert][4-byte big-endian length][DER cert]...
 // Output encoding: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
-func (c *beatoz_x509Verify) Run(input []byte) ([]byte, error) {
+func (c *beatoz_x509VerifyV2) Run(input []byte) ([]byte, error) {
 	// 1. Decode input into [][]byte (length-prefixed DER certificates)
 	derCerts, err := decodeDERCertArray(input)
 	if err != nil {
