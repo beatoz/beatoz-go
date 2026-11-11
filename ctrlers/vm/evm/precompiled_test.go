@@ -181,23 +181,17 @@ func TestX509Verify(t *testing.T) {
 	contractInput = append(contractInput, issuerBlock.Bytes...)
 	// append subject DER (length-prefixed)
 
-	x509BTIP62.Store(true)
-	defer x509BTIP62.Store(false)
-
 	verifier := &beatoz_x509Verify{}
 	ret, err := verifier.Run(contractInput)
 	require.NoError(t, err)
 	require.NotNil(t, ret)
 
-	// Parse return: [32B pubkey.x][32B pubkey.y][32B serialNumber][1B OU count]([1B OU length][OU bytes])...
-	require.GreaterOrEqual(t, len(ret), 98)
+	// Parse return: [32B pubkey.x][32B pubkey.y][32B serialNumber][OU string]
+	require.GreaterOrEqual(t, len(ret), 96)
 	retX := new(big.Int).SetBytes(ret[0:32])
 	retY := new(big.Int).SetBytes(ret[32:64])
 	retSerial := new(big.Int).SetBytes(ret[64:96])
-	retOUCnt := int(ret[96])
-	retOULen := int(ret[97])
-	require.Len(t, ret, 98+retOULen)
-	retOU := string(ret[98 : 98+retOULen])
+	retOU := string(ret[96:])
 
 	fmt.Println("=== beatoz_x509Verify Result ===")
 	fmt.Printf("  PubKey.X:     %x\n", retX)
@@ -209,7 +203,6 @@ func TestX509Verify(t *testing.T) {
 	require.Equal(t, subjectPubKey.X, retX)
 	require.Equal(t, subjectPubKey.Y, retY)
 	require.Equal(t, subjectCert.SerialNumber, retSerial)
-	require.Equal(t, 1, retOUCnt)
 	require.Equal(t, "peer", retOU)
 }
 
@@ -281,10 +274,7 @@ func TestX509VerifyMultipleOUs(t *testing.T) {
 	contractInput = append(contractInput, issuerLen...)
 	contractInput = append(contractInput, issuerBlock.Bytes...)
 
-	x509BTIP62.Store(true)
-	defer x509BTIP62.Store(false)
-
-	verifier := &beatoz_x509Verify{}
+	verifier := &beatoz_x509VerifyV2{}
 	ret, err := verifier.Run(contractInput)
 	require.NoError(t, err)
 	require.NotNil(t, ret)
@@ -307,7 +297,7 @@ func TestX509VerifyMultipleOUs(t *testing.T) {
 	}
 	require.Len(t, ret, offset)
 
-	fmt.Println("=== beatoz_x509Verify Result ===")
+	fmt.Println("=== beatoz_x509VerifyV2 Result ===")
 	fmt.Printf("  PubKey.X:     %x\n", retX)
 	fmt.Printf("  PubKey.Y:     %x\n", retY)
 	fmt.Printf("  SerialNumber: %s\n", retSerial)
@@ -321,7 +311,7 @@ func TestX509VerifyMultipleOUs(t *testing.T) {
 	require.Equal(t, []string{"org1", "peer", "department1"}, retOUs)
 }
 
-func TestX509VerifyPreBTIP62(t *testing.T) {
+func TestX509VerifyMultipleOUsFirstOU(t *testing.T) {
 	subjectBlock, _ := pem.Decode(subjectMultiOU)
 	require.NotNil(t, subjectBlock)
 	issuerBlock, _ := pem.Decode(issuerMultiOU)
@@ -346,4 +336,17 @@ func TestX509VerifyPreBTIP62(t *testing.T) {
 	ret, err := (&beatoz_x509Verify{}).Run(contractInput)
 	require.NoError(t, err)
 	require.Equal(t, expected, ret)
+}
+
+func TestX509PrecompileAddresses(t *testing.T) {
+	for _, precompiles := range []map[common.Address]vm.PrecompiledContract{
+		vm.PrecompiledContractsHomestead,
+		vm.PrecompiledContractsByzantium,
+		vm.PrecompiledContractsIstanbul,
+		vm.PrecompiledContractsBerlin,
+		vm.PrecompiledContractsCancun,
+	} {
+		require.IsType(t, &beatoz_x509Verify{}, precompiles[common.BytesToAddress([]byte{0xff, 0x00})])
+		require.IsType(t, &beatoz_x509VerifyV2{}, precompiles[common.BytesToAddress([]byte{0x2, 0x00})])
+	}
 }

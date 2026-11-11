@@ -17,7 +17,6 @@ import (
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -369,7 +368,6 @@ func (ctrler *EVMCtrler) execVM(from, to types.Address, nonce, gas int64, gasPri
 	txContext := ethcore.NewEVMTxContext(vmmsg)
 	ctrler.vmevm.Reset(txContext, ctrler.stateDBWrapper)
 
-	x509BTIP62.Store(types.IsBTIP62(hexutil.EncodeBig(ctrler.ethChainConfig.ChainID), ctrler.vmevm.Context.BlockNumber.Int64()))
 	result, err := NewVMStateTransition(ctrler.vmevm, vmmsg, ctrler.blockGasPool).TransitionDb()
 	if err != nil {
 		return nil, xerrors.From(err)

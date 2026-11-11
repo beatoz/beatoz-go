@@ -11,7 +11,6 @@ import (
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/vm"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -103,7 +102,6 @@ func (ctrler *EVMCtrler) callVM(from, to types.Address, data []byte, height, blo
 		return nil, xerrors.ErrQuery.Wrap(err)
 	}
 
-	x509BTIP62.Store(types.IsBTIP62(hexutil.EncodeBig(ctrler.ethChainConfig.ChainID), height))
 	clearTimeoutCallback := context.AfterFunc(ctx, vmevm.Cancel)
 	result, err := NewVMStateTransition(vmevm, vmmsg, gp).TransitionDb()
 	timeoutCallbackCleared := clearTimeoutCallback()
