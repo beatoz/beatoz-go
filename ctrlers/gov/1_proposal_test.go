@@ -3,12 +3,17 @@ package gov
 import (
 	"math"
 	"testing"
+	"time"
 
+	cfg "github.com/beatoz/beatoz-go/cmd/config"
 	"github.com/beatoz/beatoz-go/ctrlers/gov/proposal"
+	supplymock "github.com/beatoz/beatoz-go/ctrlers/mocks/supply"
 	"github.com/beatoz/beatoz-go/ctrlers/supply"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/ledger/common"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/beatoz/beatoz-go/types/bytes"
 	"github.com/beatoz/beatoz-go/types/xerrors"
 	"github.com/beatoz/beatoz-sdk-go/web3"
 	"github.com/holiman/uint256"
@@ -188,6 +193,56 @@ func TestInvalidGovParamsProposalValidation(t *testing.T) {
 	}
 }
 
+// The option has non-canonical, unknown or duplicate keys.
+func TestInvalidGovParamsProposalKeyValidation(t *testing.T) {
+	for i, test := range []struct {
+		name    string
+		option  string
+		wantMsg string
+	}{
+		{
+			name:    "case_variant_key",
+			option:  `{"maxTotalSupply":"700000000000000000000000000","maxTotalsupply":"AQ=="}`,
+			wantMsg: "unknown key",
+		},
+		{
+			name:    "snake_case_key",
+			option:  `{"maxValidatorCnt":21,"max_validator_cnt":1}`,
+			wantMsg: "unknown key",
+		},
+		{
+			name:    "duplicate_key",
+			option:  `{"slashRate":10,"slashRate":20}`,
+			wantMsg: "duplicate key",
+		},
+		{
+			name:    "unknown_key",
+			option:  `{"unknownKey":1}`,
+			wantMsg: "unknown key",
+		},
+	} {
+		tx := web3.NewTrxProposal(
+			vpowMock.PickAddress(vpowMock.ValCnt-1),
+			types.ZeroAddress(),
+			int64(200+i),
+			defMinGas,
+			defGasPrice,
+			"invalid govparams proposal",
+			10,
+			govCtrler.MinVotingPeriodBlocks(),
+			10+govCtrler.MinVotingPeriodBlocks()+govCtrler.LazyApplyingBlocks(),
+			proposal.PROPOSAL_GOVPARAMS,
+			[]byte(test.option),
+		)
+		require.NoError(t, signTrx(tx, vpowMock.PickAddress(vpowMock.ValCnt-1), config.ChainIdHex()), "case=%s", test.name)
+
+		xerr := runTrx(makeTrxCtx(tx, 1, true))
+		require.Error(t, xerr, "case=%s", test.name)
+		require.True(t, xerr.Contains(xerrors.ErrInvalidTrxPayloadParams), "case=%s error=%v", test.name, xerr)
+		require.Contains(t, xerr.Error(), test.wantMsg, "case=%s", test.name)
+	}
+}
+
 func TestInvalidMaxSupply(t *testing.T) {
 	newGovParams := &ctrlertypes.GovParams{}
 	newGovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
@@ -228,6 +283,14 @@ func TestInvalidMaxSupply(t *testing.T) {
 func TestOverflowBlockHeight(t *testing.T) {
 	bzOpt, err := jsonx.Marshal(govParams0)
 	require.NoError(t, err)
+
+	oriMaxVotingStartDelayBlocks := govCtrler.MaxVotingStartDelayBlocks()
+	govCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = math.MaxInt64 - 1
+	})
+	defer govCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = oriMaxVotingStartDelayBlocks
+	})
 
 	tx := web3.NewTrxProposal(
 		vpowMock.PickAddress(vpowMock.ValCnt-1), types.ZeroAddress(), 1, defMinGas, defGasPrice,
@@ -280,4 +343,77 @@ func TestApplyingHeight(t *testing.T) {
 	require.Error(t, xerr)
 	require.Contains(t, xerr.Error(), "wrong applyingHeight")
 
+}
+
+func TestStartVotingHeightUpperBound(t *testing.T) {
+	maxDelay := govCtrler.MaxVotingStartDelayBlocks()
+	require.Positive(t, maxDelay)
+
+	proposer := vpowMock.PickAddress(vpowMock.ValCnt - 1)
+	period := govCtrler.MinVotingPeriodBlocks()
+
+	for _, test := range []struct {
+		name      string
+		height    int64
+		delay     int64
+		wantError bool
+	}{
+		{name: "before_btip61", height: 499_999, delay: maxDelay + 1},
+		{name: "btip61_max_delay", height: 500_000, delay: maxDelay},
+		{name: "btip61_over_max_delay", height: 500_000, delay: maxDelay + 1, wantError: true},
+	} {
+		start := test.height + test.delay
+		tx := web3.NewTrxProposal(
+			proposer, types.ZeroAddress(), 1, defMinGas, defGasPrice,
+			"test start voting height", start, period, start+period+govCtrler.LazyApplyingBlocks(),
+			proposal.PROPOSAL_COMMON, []byte("option"))
+
+		txctx := &ctrlertypes.TrxContext{
+			BlockContext: ctrlertypes.TempBlockContext(
+				"0xbea701", test.height, time.Now(),
+				govCtrler, acctMock, nil, supplymock.NewSupplyHandlerMock(), vpowMock),
+			Tx:     tx,
+			TxHash: bytes.RandBytes(32),
+			Exec:   true,
+		}
+
+		xerr := govCtrler.ValidateTrx(txctx)
+		if test.wantError {
+			require.ErrorContains(t, xerr, "wrong startVotingHeight", "case=%s", test.name)
+		} else {
+			require.NoError(t, xerr, "case=%s", test.name)
+		}
+	}
+}
+
+func TestInitNewGovParam(t *testing.T) {
+	localCfg := cfg.DefaultConfig("0x1234")
+	localCfg.SetRoot(t.TempDir())
+
+	localGovCtrler, err := NewGovCtrler(localCfg, tmlog.NewNopLogger())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, localGovCtrler.Close())
+	})
+	localGovCtrler.GovParams = *ctrlertypes.DefaultGovParams()
+
+	defaultValue := ctrlertypes.DefaultGovParams().MaxVotingStartDelayBlocks()
+	localGovCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = 0
+		v.MaxVotingPeriodBlocks = defaultValue + 1
+	})
+	require.NoError(t, localGovCtrler.InitMaxVotingStartDelayBlocks())
+	require.Equal(t, defaultValue, localGovCtrler.MaxVotingStartDelayBlocks())
+
+	_, _, xerr := localGovCtrler.Commit()
+	require.NoError(t, xerr)
+	item, xerr := localGovCtrler.govState.Get(common.LedgerKeyGovParams(), true)
+	require.NoError(t, xerr)
+	require.Equal(t, defaultValue, item.(*ctrlertypes.GovParams).MaxVotingStartDelayBlocks())
+
+	localGovCtrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MaxVotingStartDelayBlocks = 100
+	})
+	require.NoError(t, localGovCtrler.InitMaxVotingStartDelayBlocks())
+	require.EqualValues(t, 100, localGovCtrler.MaxVotingStartDelayBlocks())
 }

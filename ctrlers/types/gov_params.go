@@ -1,8 +1,10 @@
 package types
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sync"
@@ -66,6 +68,7 @@ func NewGovParams(interval int) *GovParams {
 			MinVotingPeriodBlocks:     DaySeconds / int64(interval),     // 1 days blocks
 			MaxVotingPeriodBlocks:     7 * DaySeconds / int64(interval), // 7 day blocks
 			LazyApplyingBlocks:        DaySeconds / int64(interval),     // 1days blocks
+			MaxVotingStartDelayBlocks: 7 * DaySeconds / int64(interval), // 7 day blocks
 		},
 		mtx: sync.RWMutex{},
 	}
@@ -185,6 +188,9 @@ func (govParams *GovParams) ValidateBasic() xerrors.XError {
 	}
 	if v.LazyApplyingBlocks < 0 {
 		return xerrors.NewOrdinary("invalid governance params").Wrapf("lazyApplyingBlocks must be non-negative")
+	}
+	if v.MaxVotingStartDelayBlocks < 0 {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("maxVotingStartDelayBlocks must be non-negative")
 	}
 	return nil
 }
@@ -492,6 +498,12 @@ func (govParams *GovParams) LazyApplyingBlocks() int64 {
 
 	return govParams._v.LazyApplyingBlocks
 }
+func (govParams *GovParams) MaxVotingStartDelayBlocks() int64 {
+	govParams.mtx.RLock()
+	defer govParams.mtx.RUnlock()
+
+	return govParams._v.MaxVotingStartDelayBlocks
+}
 
 func (govParams *GovParams) GetValues() *GovParamsProto {
 	govParams.mtx.RLock()
@@ -545,6 +557,54 @@ func MergeGovParams(fromPrams, toParams *GovParams) {
 			//fmt.Printf("%-10s | %-20s | %#v -> %#v\n", fieldName, fieldType, newInf, newVal.Interface())
 		}
 	}
+}
+
+var govParamsJSONKeys = func() map[string]struct{} {
+	keys := make(map[string]struct{})
+	refT := reflect.TypeOf(GovParamsProto{})
+	for i := 0; i < refT.NumField(); i++ {
+		field := refT.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		if name, ok := jsonx.JSONName(field.Name, field.Tag.Get("json")); ok {
+			keys[name] = struct{}{}
+		}
+	}
+	return keys
+}()
+
+func ValidateGovParamsJSON(d []byte) xerrors.XError {
+	dec := json.NewDecoder(bytes.NewReader(d))
+	tok, err := dec.Token()
+	if err != nil {
+		return xerrors.From(err)
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
+		return xerrors.NewOrdinary("invalid governance params").Wrapf("must be a JSON object")
+	}
+
+	seen := make(map[string]struct{})
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return xerrors.From(err)
+		}
+		key, _ := tok.(string)
+		if _, ok := govParamsJSONKeys[key]; !ok {
+			return xerrors.NewOrdinary("invalid governance params").Wrapf("unknown key: %q", key)
+		}
+		if _, ok := seen[key]; ok {
+			return xerrors.NewOrdinary("invalid governance params").Wrapf("duplicate key: %q", key)
+		}
+		seen[key] = struct{}{}
+
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return xerrors.From(err)
+		}
+	}
+	return nil
 }
 
 var _ common.ILedgerItem = (*GovParams)(nil)

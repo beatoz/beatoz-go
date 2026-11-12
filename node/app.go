@@ -189,6 +189,14 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		panic(xerr)
 	}
 
+	if ctrler.lastBlockCtx.Height() > 0 &&
+		types.IsBTIP61(ctrler.lastBlockCtx.ChainID(), ctrler.lastBlockCtx.Height()+1) {
+		if xerr := ctrler.govCtrler.InitMaxVotingStartDelayBlocks(); xerr != nil {
+			ctrler.logger.Error("failed to apply BTIP61 governance parameters", "error", xerr)
+			panic(xerr)
+		}
+	}
+
 	// create signers
 	ctrlertypes.InitSigner(ctrler.rootConfig.ChainId())
 
@@ -809,6 +817,13 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	if xerr := ctrler.upgradeLedgerVersion(targetLedgerVersion); xerr != nil {
 		ctrler.logger.Error("failed to upgrade ledger version", "error", xerr)
 		panic(xerr)
+	}
+
+	if types.IsBTIP61(ctrler.lastBlockCtx.ChainID(), height+1) {
+		if xerr := ctrler.govCtrler.InitMaxVotingStartDelayBlocks(); xerr != nil {
+			ctrler.logger.Error("failed to apply BTIP61 governance parameters", "error", xerr)
+			panic(xerr)
+		}
 	}
 
 	if ctrler.rootConfig.RPC.ListenAddress != "" {

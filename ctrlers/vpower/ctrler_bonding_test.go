@@ -565,6 +565,11 @@ func Test_Unbonding_AllSelfPower(t *testing.T) {
 		tombstoned, xerr := ctrler.isTombstoned(valWal.Address(), true)
 		require.NoError(t, xerr)
 		require.False(t, tombstoned)
+
+		// the genesis validator has no account, so refunding its self power creates a new account.
+		require.Nil(t, acctMock.FindAccount(valWal.Address(), true))
+		require.NoError(t, ctrler._unfreezePowerChunk(refundHeight, acctMock))
+		require.NotNil(t, acctMock.FindAccount(valWal.Address(), true))
 	}
 
 	// -----------------------------------------------------------------------------------------------------------------
