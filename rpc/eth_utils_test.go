@@ -54,47 +54,6 @@ func TestEthQuantities(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestParseEthBlockTag(t *testing.T) {
-	for _, tag := range []string{"latest", "pending", "safe", "finalized", "earliest"} {
-		t.Run(tag, func(t *testing.T) {
-			height, earliest, err := parseEthBlockTag(tag)
-			require.NoError(t, err)
-			require.Nil(t, height)
-			require.Equal(t, tag == "earliest", earliest)
-		})
-	}
-	for _, tt := range []struct {
-		tag  string
-		want int64
-	}{
-		{"0x0", 0},
-		{"0x1", 1},
-		{"0x1234", 4660},
-		{"0xaB", 171},
-		{"0x7fffffffffffffff", math.MaxInt64},
-	} {
-		t.Run(tt.tag, func(t *testing.T) {
-			height, earliest, err := parseEthBlockTag(tt.tag)
-			require.NoError(t, err)
-			require.NotNil(t, height)
-			require.Equal(t, tt.want, *height)
-			require.False(t, earliest)
-		})
-	}
-	for _, tag := range []string{
-		"", "0", "123", "LATEST", "unknown", "0x", "0X1", "0x01", "0x00",
-		"0xg", "0x1g", "0x-1", "0x+1", "-0x1", "0x1_0", " 0x1", "0x1 ",
-		"0x8000000000000000", "0xffffffffffffffff", "0x10000000000000000",
-	} {
-		t.Run("invalid/"+tag, func(t *testing.T) {
-			height, earliest, err := parseEthBlockTag(tag)
-			require.ErrorContains(t, err, "invalid Ethereum block tag")
-			require.Nil(t, height)
-			require.False(t, earliest)
-		})
-	}
-}
-
 func TestFormatEthBlockNumber(t *testing.T) {
 	for _, tt := range []struct {
 		height uint64
@@ -135,7 +94,7 @@ func TestFormatNetVersion(t *testing.T) {
 }
 
 func TestWeb3ClientVersion(t *testing.T) {
-	got, err := Web3ClientVersion(nil)
+	got, err := ethClientVersion(nil)
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(got, "beatoz/"+version.String()+"/"))
 	require.Contains(t, got, runtime.GOOS+"-"+runtime.GOARCH)

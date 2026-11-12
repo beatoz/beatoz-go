@@ -1,14 +1,15 @@
 package rpc
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
 	"strconv"
 	"strings"
 
+	gethmath "github.com/ethereum/go-ethereum/common/math"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -56,7 +57,7 @@ func parseEthGasParams(value []byte) (*ethGasParams, error) {
 	return &ethGasParams{blockGasLimit: limit, gasPrice: price}, nil
 }
 
-func EthGasPrice(ctx *tmrpctypes.Context) (string, error) {
+func ethGasPrice(ctx *tmrpctypes.Context) (string, error) {
 	params, err := ethGovParams(ctx, 0)
 	if err != nil {
 		return "", err
@@ -64,32 +65,33 @@ func EthGasPrice(ctx *tmrpctypes.Context) (string, error) {
 	return ethQuantityBig(params.gasPrice)
 }
 
-func EthMaxPriorityFeePerGas(ctx *tmrpctypes.Context) (string, error) {
+func ethMaxPriorityFeePerGas(ctx *tmrpctypes.Context) (string, error) {
 	return "0x0", nil
 }
 
-// RawMessage accepts hex strings and JSON numbers, and preserves an explicit []
-// for rewardPercentiles (tmjson decodes an empty float slice as nil). This fork
-// requires all three positional parameters (use null or [] for no rewards), but
-// allows rewardPercentiles to be omitted from named parameters.
-func EthFeeHistory(ctx *tmrpctypes.Context, blockCount json.RawMessage, newestBlock string, rewardPercentiles json.RawMessage) (*EthFeeHistoryResult, error) {
-	count, err := parseEthBlockCount(blockCount)
-	if err != nil {
+func ethFeeHistory(ctx *tmrpctypes.Context, blockCount gethmath.HexOrDecimal64, newestBlock ethBlockNumberParam, percentiles []float64) (*ethFeeHistoryResult, error) {
+	if err := validateEthRewardPercentiles(percentiles); err != nil {
 		return nil, err
 	}
-	height, earliest, err := parseEthBlockTag(newestBlock)
-	if err != nil {
-		return nil, err
-	}
-	percentiles, err := parseEthRewardPercentiles(rewardPercentiles)
-	if err != nil {
-		return nil, err
+	if newestBlock.BlockNumber == 0 && !newestBlock.earliest {
+		return nil, errors.New("header not found")
 	}
 	status, err := tmrpccore.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
-	oldest, count := ethFeeHistoryRange(count, height, earliest, status.SyncInfo)
+	info := status.SyncInfo
+	info.LatestBlockHeight, err = ethLatestHeight(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if newestBlock.Int64() > info.LatestBlockHeight {
+		return nil, fmt.Errorf("request beyond head block: requested %d, head %d", newestBlock.Int64(), info.LatestBlockHeight)
+	}
+	if newestBlock.BlockNumber > 0 && newestBlock.Int64() < info.EarliestBlockHeight {
+		return nil, errors.New("header not found")
+	}
+	oldest, count := ethFeeHistoryRange(uint64(blockCount), newestBlock, info)
 	blocks := make([]ethFeeHistoryBlock, 0, count)
 	for i := uint64(0); i < count; i++ {
 		h := oldest + int64(i)
@@ -110,64 +112,6 @@ func EthFeeHistory(ctx *tmrpctypes.Context, blockCount json.RawMessage, newestBl
 	return formatEthFeeHistory(oldest, blocks, percentiles)
 }
 
-func parseEthBlockCount(raw json.RawMessage) (uint64, error) {
-	raw = bytes.TrimSpace(raw)
-	var number string
-	base := 10
-	if len(raw) > 0 && raw[0] == '"' {
-		if err := json.Unmarshal(raw, &number); err != nil {
-			return 0, ethInvalidParams("invalid blockCount: %v", err)
-		}
-		if !strings.HasPrefix(number, "0x") || len(number) < 3 || (len(number) > 3 && number[2] == '0') {
-			return 0, ethInvalidParams("blockCount must be a hex quantity or JSON integer")
-		}
-		number, base = number[2:], 16
-	} else {
-		if !json.Valid(raw) {
-			return 0, ethInvalidParams("invalid blockCount JSON")
-		}
-		number = string(raw)
-	}
-	if number == "" {
-		return 0, ethInvalidParams("missing blockCount")
-	}
-	for _, r := range number {
-		if (r >= '0' && r <= '9') || (base == 16 && ((r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F'))) {
-			continue
-		}
-		return 0, ethInvalidParams("blockCount must be a non-negative integer")
-	}
-	n, ok := new(big.Int).SetString(number, base)
-	if !ok {
-		return 0, ethInvalidParams("invalid blockCount")
-	}
-	if n.Cmp(big.NewInt(ethMaxFeeHistoryBlocks)) > 0 {
-		return ethMaxFeeHistoryBlocks, nil
-	}
-	return n.Uint64(), nil
-}
-
-func parseEthRewardPercentiles(raw json.RawMessage) ([]float64, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	var values []*float64
-	if err := json.Unmarshal(raw, &values); err != nil {
-		return nil, ethInvalidParams("invalid rewardPercentiles: %v", err)
-	}
-	if values == nil {
-		return nil, nil
-	}
-	percentiles := make([]float64, len(values))
-	for i, value := range values {
-		if value == nil {
-			return nil, ethInvalidParams("rewardPercentiles cannot contain null")
-		}
-		percentiles[i] = *value
-	}
-	return percentiles, validateEthRewardPercentiles(percentiles)
-}
-
 func validateEthRewardPercentiles(percentiles []float64) error {
 	for i, p := range percentiles {
 		if math.IsNaN(p) || math.IsInf(p, 0) || p < 0 || p > 100 || (i > 0 && p < percentiles[i-1]) {
@@ -177,7 +121,8 @@ func validateEthRewardPercentiles(percentiles []float64) error {
 	return nil
 }
 
-func ethFeeHistoryRange(count uint64, height *int64, earliest bool, info coretypes.SyncInfo) (int64, uint64) {
+// ethFeeHistoryRange requires an end block validated against the stored range and app height.
+func ethFeeHistoryRange(count uint64, blockNumber ethBlockNumberParam, info coretypes.SyncInfo) (int64, uint64) {
 	if count > ethMaxFeeHistoryBlocks {
 		count = ethMaxFeeHistoryBlocks
 	}
@@ -185,14 +130,10 @@ func ethFeeHistoryRange(count uint64, height *int64, earliest bool, info coretyp
 		return 0, 0
 	}
 	newest := info.LatestBlockHeight
-	if earliest {
+	if blockNumber.earliest {
 		newest = info.EarliestBlockHeight
-	} else if height != nil && *height < newest {
-		newest = *height
-	}
-	// Future heights start at latest; an entirely pruned range is empty.
-	if newest < info.EarliestBlockHeight {
-		return 0, 0
+	} else if blockNumber.BlockNumber >= 0 {
+		newest = blockNumber.Int64()
 	}
 	available := uint64(newest-info.EarliestBlockHeight) + 1
 	if count > available {
@@ -206,23 +147,19 @@ type ethFeeHistoryBlock struct {
 	gasLimit uint64
 }
 
-func formatEthFeeHistory(oldest int64, blocks []ethFeeHistoryBlock, percentiles []float64) (*EthFeeHistoryResult, error) {
+func formatEthFeeHistory(oldest int64, blocks []ethFeeHistoryBlock, percentiles []float64) (*ethFeeHistoryResult, error) {
 	oldestBlock, err := ethQuantityInt64(oldest)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateEthRewardPercentiles(percentiles); err != nil {
-		return nil, err
-	}
-	result := &EthFeeHistoryResult{
+	result := &ethFeeHistoryResult{
 		OldestBlock: oldestBlock, BaseFeePerGas: make([]string, len(blocks)+1), GasUsedRatio: make([]float64, len(blocks)),
 	}
 	for i := range result.BaseFeePerGas {
 		result.BaseFeePerGas[i] = "0x0"
 	}
-	if percentiles != nil {
-		reward := make([][]string, len(blocks))
-		result.Reward = &reward
+	if len(percentiles) > 0 {
+		result.Reward = make([][]string, len(blocks))
 	}
 	for i, block := range blocks {
 		if block.gasLimit == 0 {
@@ -234,7 +171,7 @@ func formatEthFeeHistory(oldest int64, blocks []ethFeeHistoryBlock, percentiles 
 			for j := range row {
 				row[j] = "0x0"
 			}
-			(*result.Reward)[i] = row
+			result.Reward[i] = row
 		}
 	}
 	return result, nil

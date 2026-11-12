@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/types"
+	"github.com/ethereum/go-ethereum/common"
 	tmrpccore "github.com/tendermint/tendermint/rpc/core"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -18,50 +18,98 @@ import (
 
 const ethEmptyUncleHash = "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"
 
-func EthGetBlockByNumber(ctx *tmrpctypes.Context, blockNumber string, txDetails bool) (json.RawMessage, error) {
-	height, earliest, err := parseEthBlockTag(blockNumber)
+func ethGetBlockByNumber(ctx *tmrpctypes.Context, blockNumber ethBlockNumberParam, txDetails bool) (json.RawMessage, error) {
+	block, err := ethBlockByNumber(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
+	return ethBlockResponse(ctx, block, txDetails)
+}
+
+func ethBlockByNumber(ctx *tmrpctypes.Context, blockNumber ethBlockNumberParam) (*coretypes.ResultBlock, error) {
 	status, err := tmrpccore.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
-	h := status.SyncInfo.LatestBlockHeight
-	if earliest {
-		h = status.SyncInfo.EarliestBlockHeight
-	} else if height != nil {
-		h = *height
+	latest, err := ethLatestHeight(ctx)
+	if err != nil {
+		return nil, err
 	}
-	if h <= 0 || h < status.SyncInfo.EarliestBlockHeight || h > status.SyncInfo.LatestBlockHeight {
-		return json.RawMessage("null"), nil
+	h := latest
+	if blockNumber.earliest {
+		h = status.SyncInfo.EarliestBlockHeight
+	} else if blockNumber.BlockNumber >= 0 {
+		h = blockNumber.Int64()
+	}
+	if h <= 0 || h < status.SyncInfo.EarliestBlockHeight || h > latest {
+		return nil, nil
 	}
 	block, err := tmrpccore.Block(ctx, &h)
 	if err != nil {
 		// Pruning can advance the base between Status and Block.
 		if current, statusErr := tmrpccore.Status(ctx); statusErr == nil && h < current.SyncInfo.EarliestBlockHeight {
-			return json.RawMessage("null"), nil
+			return nil, nil
 		}
+		return nil, err
+	}
+	return block, nil
+}
+
+func ethGetBlockByHash(ctx *tmrpctypes.Context, blockHash common.Hash, txDetails bool) (json.RawMessage, error) {
+	block, err := ethBlockByHash(ctx, blockHash)
+	if err != nil {
 		return nil, err
 	}
 	return ethBlockResponse(ctx, block, txDetails)
 }
 
-func EthGetBlockByHash(ctx *tmrpctypes.Context, blockHash string, txDetails bool) (json.RawMessage, error) {
-	hash, err := parseEthBlockHash(blockHash)
+func ethBlockByHash(ctx *tmrpctypes.Context, blockHash common.Hash) (*coretypes.ResultBlock, error) {
+	block, err := tmrpccore.BlockByHash(ctx, blockHash[:])
 	if err != nil {
 		return nil, err
 	}
-	block, err := tmrpccore.BlockByHash(ctx, hash)
+	if block != nil && block.Block != nil {
+		latest, err := ethLatestHeight(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if block.Block.Height > latest {
+			return nil, nil
+		}
+	}
+	return block, nil
+}
+
+func ethBlockTransactionCount(block *coretypes.ResultBlock) *string {
+	if block == nil || block.Block == nil {
+		return nil
+	}
+	count := ethQuantityUint64(uint64(len(block.Block.Txs)))
+	return &count
+}
+
+func ethBlockTransactionByIndex(ctx *tmrpctypes.Context, block *coretypes.ResultBlock, index uint64) (*ethTransaction, error) {
+	if block == nil || block.Block == nil || index >= uint64(len(block.Block.Txs)) {
+		return nil, nil
+	}
+	number, err := ethQuantityInt64(block.Block.Height)
 	if err != nil {
 		return nil, err
 	}
-	return ethBlockResponse(ctx, block, txDetails)
+	timestamp, err := ethQuantityInt64(block.Block.Time.Unix())
+	if err != nil {
+		return nil, err
+	}
+	chainID, err := ethChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return formatEthBlockTransaction(block, index, number, timestamp, chainID), nil
 }
 
 func ethBlockResponse(ctx *tmrpctypes.Context, block *coretypes.ResultBlock, txDetails bool) (json.RawMessage, error) {
 	if block == nil || block.Block == nil {
-		// A RawMessage keeps null intact through Tendermint's interface encoder.
+		// A RawMessage preserves a JSON null result.
 		return json.RawMessage("null"), nil
 	}
 	height := block.Block.Height
@@ -75,7 +123,7 @@ func ethBlockResponse(ctx *tmrpctypes.Context, block *coretypes.ResultBlock, txD
 	}
 	var chainID string
 	if txDetails && len(block.Block.Txs) > 0 {
-		chainID, err = EthChainId(ctx)
+		chainID, err = ethChainID(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -85,17 +133,6 @@ func ethBlockResponse(ctx *tmrpctypes.Context, block *coretypes.ResultBlock, txD
 		return nil, err
 	}
 	return json.Marshal(result)
-}
-
-func parseEthBlockHash(hash string) ([]byte, error) {
-	if !strings.HasPrefix(hash, "0x") || len(hash) != 66 {
-		return nil, ethInvalidParams("invalid Ethereum block hash: expected 0x-prefixed 32-byte hex")
-	}
-	bz, err := hex.DecodeString(hash[2:])
-	if err != nil {
-		return nil, ethInvalidParams("invalid Ethereum block hash: %v", err)
-	}
-	return bz, nil
 }
 
 func ethData(bz []byte) string {
@@ -129,7 +166,7 @@ func ethBlockGasUsed(results *coretypes.ResultBlockResults) (uint64, error) {
 	return total, nil
 }
 
-func formatEthBlock(block *coretypes.ResultBlock, results *coretypes.ResultBlockResults, gasLimit uint64, chainID string, txDetails bool) (*EthBlockResult, error) {
+func formatEthBlock(block *coretypes.ResultBlock, results *coretypes.ResultBlockResults, gasLimit uint64, chainID string, txDetails bool) (*ethBlock, error) {
 	if block == nil || block.Block == nil {
 		return nil, fmt.Errorf("missing block")
 	}
@@ -153,7 +190,7 @@ func formatEthBlock(block *coretypes.ResultBlock, results *coretypes.ResultBlock
 	if err != nil {
 		return nil, err
 	}
-	result := &EthBlockResult{
+	result := &ethBlock{
 		Number: number, Hash: ethFixedData(block.BlockID.Hash, 32),
 		ParentHash: ethFixedData(b.LastBlockID.Hash, 32),
 		Nonce:      "0x0000000000000000", Sha3Uncles: ethEmptyUncleHash,
@@ -170,13 +207,9 @@ func formatEthBlock(block *coretypes.ResultBlock, results *coretypes.ResultBlock
 		Uncles: []string{}, MixHash: ethFixedData(nil, 32),
 	}
 	if txDetails {
-		txs := make([]*EthTransactionResult, 0, len(b.Txs))
-		for i, bz := range b.Txs {
-			tx, err := formatEthTransaction(bz, block.BlockID.Hash, b.Height, uint64(i), chainID)
-			if err != nil {
-				return nil, fmt.Errorf("transaction %d: %w", i, err)
-			}
-			txs = append(txs, tx)
+		txs := make([]*ethTransaction, 0, len(b.Txs))
+		for i := range b.Txs {
+			txs = append(txs, formatEthBlockTransaction(block, uint64(i), number, timestamp, chainID))
 		}
 		result.Transactions = txs
 	} else {
@@ -190,8 +223,23 @@ func formatEthBlock(block *coretypes.ResultBlock, results *coretypes.ResultBlock
 	return result, nil
 }
 
+func formatEthBlockTransaction(block *coretypes.ResultBlock, index uint64, number, timestamp, chainID string) *ethTransaction {
+	bz := block.Block.Txs[index]
+	tx, err := formatEthTransaction(bz, block.BlockID.Hash, block.Block.Height, index, timestamp, chainID)
+	if err != nil {
+		// Tendermint can include undecodable transactions; preserve their position and raw bytes.
+		tx = &ethTransaction{
+			Hash: ethData(bz.Hash()), BlockHash: ethFixedData(block.BlockID.Hash, 32), BlockNumber: number, BlockTimestamp: timestamp,
+			TransactionIndex: ethQuantityUint64(index), From: ethFixedData(nil, types.AddrSize),
+			To: nil, Value: "0x0", Gas: "0x0", GasPrice: "0x0", Nonce: "0x0",
+			Input: ethData(bz), Type: "0x0", ChainID: chainID, V: "0x0", R: "0x0", S: "0x0",
+		}
+	}
+	return tx
+}
+
 // formatEthTransaction converts an included BEATOZ transaction; chainID is an Ethereum quantity.
-func formatEthTransaction(bz []byte, blockHash []byte, height int64, index uint64, chainID string) (*EthTransactionResult, error) {
+func formatEthTransaction(bz []byte, blockHash []byte, height int64, index uint64, timestamp, chainID string) (*ethTransaction, error) {
 	tx := &ctrlertypes.Trx{}
 	if err := tx.Decode(bz); err != nil {
 		return nil, fmt.Errorf("decode BEATOZ transaction: %w", err)
@@ -223,9 +271,9 @@ func formatEthTransaction(bz []byte, blockHash []byte, height int64, index uint6
 		return nil, err
 	}
 	to := ethData(tx.To)
-	result := &EthTransactionResult{
+	result := &ethTransaction{
 		Hash: ethData(tmtypes.Tx(bz).Hash()), Nonce: nonce,
-		BlockHash: ethFixedData(blockHash, 32), BlockNumber: blockNumber, TransactionIndex: ethQuantityUint64(index),
+		BlockHash: ethFixedData(blockHash, 32), BlockNumber: blockNumber, BlockTimestamp: timestamp, TransactionIndex: ethQuantityUint64(index),
 		From: ethData(tx.From), To: &to, Value: value, Gas: gas, GasPrice: gasPrice,
 		Input: "0x", Type: "0x0", ChainID: chainID,
 	}

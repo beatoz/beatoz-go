@@ -106,14 +106,15 @@ func TestFormatEthBlockTransactions(t *testing.T) {
 
 	result, err = formatEthBlock(block, results, 120000000, "0xbea701", true)
 	require.NoError(t, err)
-	txs := result.Transactions.([]*EthTransactionResult)
+	txs := result.Transactions.([]*ethTransaction)
 	require.Len(t, txs, 2)
 	to := "0x" + strings.Repeat("cd", 20)
-	require.Equal(t, &EthTransactionResult{
-		Hash: hashes[0], Nonce: "0xf", BlockHash: "0x" + strings.Repeat("aa", 32), BlockNumber: "0x2a", TransactionIndex: "0x0",
+	require.Equal(t, &ethTransaction{
+		Hash: hashes[0], Nonce: "0xf", BlockHash: "0x" + strings.Repeat("aa", 32), BlockNumber: "0x2a", BlockTimestamp: result.Timestamp, TransactionIndex: "0x0",
 		From: "0x" + strings.Repeat("ab", 20), To: &to, Value: "0x100", Gas: "0x1388", GasPrice: "0xb2d05e000",
 		Input: "0x", Type: "0x0", ChainID: "0xbea701", V: "0x1b", R: "0x1", S: "0x2",
 	}, txs[0])
+	require.Equal(t, result.Timestamp, txs[1].BlockTimestamp)
 	require.Equal(t, hashes[1], txs[1].Hash)
 	require.Equal(t, "0x1", txs[1].TransactionIndex)
 	require.Equal(t, "0x10", txs[1].Nonce)
@@ -122,6 +123,7 @@ func TestFormatEthBlockTransactions(t *testing.T) {
 	encoded, err := json.Marshal(result)
 	require.NoError(t, err)
 	require.Contains(t, string(encoded), `"transactions":[{"hash":`)
+	require.Contains(t, string(encoded), `"blockNumber":"0x2a","blockTimestamp":"0x10"`)
 	require.NotContains(t, string(encoded), "baseFeePerGas")
 }
 
@@ -130,7 +132,7 @@ func TestFormatEthTransactionCreationAndSignature(t *testing.T) {
 		for _, v := range []byte{0, 1, 27, 28} {
 			tx := ethTestTrx()
 			tx.To, tx.Type, tx.Payload, tx.Sig[64] = to, ctrlertypes.TRX_CONTRACT, &ctrlertypes.TrxPayloadContract{}, v
-			result, err := formatEthTransaction(ethEncodeTrx(t, tx), nil, 1, 0, "0x1")
+			result, err := formatEthTransaction(ethEncodeTrx(t, tx), nil, 1, 0, "0x10", "0x1")
 			require.NoError(t, err)
 			require.Nil(t, result.To)
 			require.Equal(t, ethQuantityUint64(uint64(v)), result.V)
@@ -144,7 +146,7 @@ func TestFormatEthTransactionCreationAndSignature(t *testing.T) {
 	tx := ethTestTrx()
 	tx.To = make([]byte, 20)
 	tx.Amount = new(uint256.Int).SetAllOne()
-	result, err := formatEthTransaction(ethEncodeTrx(t, tx), nil, 1, 0, "0x1")
+	result, err := formatEthTransaction(ethEncodeTrx(t, tx), nil, 1, 0, "0x10", "0x1")
 	require.NoError(t, err)
 	require.Equal(t, "0x"+strings.Repeat("00", 20), *result.To)
 	require.Equal(t, "0x"+strings.Repeat("ff", 32), result.Value)
@@ -152,10 +154,25 @@ func TestFormatEthTransactionCreationAndSignature(t *testing.T) {
 
 func TestEthConversionErrors(t *testing.T) {
 	block := ethTestBlock(1)
-	block.Block.Txs = tmtypes.Txs{{0xff}}
-	results := &coretypes.ResultBlockResults{Height: 1, TxsResults: []*abci.ResponseDeliverTx{{GasUsed: 1}}}
-	_, err := formatEthBlock(block, results, 100, "0x1", true)
-	require.ErrorContains(t, err, "transaction 0: decode")
+	block.Block.Txs = tmtypes.Txs{ethEncodeTrx(t, ethTestTrx()), {0xff}, ethEncodeTrx(t, ethTestTrx())}
+	results := &coretypes.ResultBlockResults{Height: 1, TxsResults: []*abci.ResponseDeliverTx{{GasUsed: 1}, {GasUsed: 1}, {GasUsed: 1}}}
+	result, err := formatEthBlock(block, results, 100, "0x1", true)
+	require.NoError(t, err)
+	txs := result.Transactions.([]*ethTransaction)
+	require.Len(t, txs, 3)
+	require.Equal(t, &ethTransaction{
+		Hash: ethData(block.Block.Txs[1].Hash()), BlockHash: ethFixedData(block.BlockID.Hash, 32),
+		BlockNumber: "0x1", BlockTimestamp: result.Timestamp, TransactionIndex: "0x1", From: ethFixedData(nil, 20), To: nil,
+		Value: "0x0", Gas: "0x0", GasPrice: "0x0", Nonce: "0x0", Input: "0xff",
+		Type: "0x0", ChainID: "0x1", V: "0x0", R: "0x0", S: "0x0",
+	}, txs[1])
+	for _, i := range []int{0, 2} {
+		want, err := formatEthTransaction(block.Block.Txs[i], block.BlockID.Hash, 1, uint64(i), result.Timestamp, "0x1")
+		require.NoError(t, err)
+		require.Equal(t, want, txs[i])
+	}
+	_, err = formatEthTransaction(block.Block.Txs[1], block.BlockID.Hash, 1, 1, result.Timestamp, "0x1")
+	require.ErrorContains(t, err, "decode BEATOZ transaction")
 	for _, change := range []func(*ctrlertypes.Trx){
 		func(tx *ctrlertypes.Trx) { tx.Sig = nil },
 		func(tx *ctrlertypes.Trx) { tx.From = nil },
@@ -164,7 +181,7 @@ func TestEthConversionErrors(t *testing.T) {
 	} {
 		tx := ethTestTrx()
 		change(tx)
-		_, err := formatEthTransaction(ethEncodeTrx(t, tx), nil, 1, 0, "0x1")
+		_, err := formatEthTransaction(ethEncodeTrx(t, tx), nil, 1, 0, "0x10", "0x1")
 		require.Error(t, err)
 	}
 	for _, results := range []*coretypes.ResultBlockResults{
@@ -176,25 +193,6 @@ func TestEthConversionErrors(t *testing.T) {
 	}
 	_, err = formatEthBlock(block, &coretypes.ResultBlockResults{Height: 1}, 100, "0x1", false)
 	require.ErrorContains(t, err, "do not match")
-}
-
-func TestParseEthBlockHash(t *testing.T) {
-	for _, hash := range []string{"0x" + strings.Repeat("ab", 32), "0x" + strings.Repeat("AB", 32)} {
-		got, err := parseEthBlockHash(hash)
-		require.NoError(t, err)
-		require.Equal(t, bytes.Repeat([]byte{0xab}, 32), got)
-	}
-	for _, hash := range []string{"", "0x", "0xab", strings.Repeat("ab", 32), "0X" + strings.Repeat("ab", 32),
-		"0x" + strings.Repeat("ab", 31), "0x" + strings.Repeat("ab", 33), "0x" + strings.Repeat("zz", 32)} {
-		_, err := parseEthBlockHash(hash)
-		require.Error(t, err)
-		_, err = EthGetBlockByHash(nil, hash, false)
-		require.Error(t, err)
-	}
-	for _, tag := range []string{"bad", "0x01", "0x-1", "0x8000000000000000"} {
-		_, err := EthGetBlockByNumber(nil, tag, false)
-		require.Error(t, err)
-	}
 }
 
 func TestEthNullEncoding(t *testing.T) {

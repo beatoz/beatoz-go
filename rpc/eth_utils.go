@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
-	"strings"
 
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
@@ -29,30 +28,19 @@ func ethQuantityBig(n *big.Int) (string, error) {
 	return "0x" + n.Text(16), nil
 }
 
-// Latest tags return a nil height; earliest must be resolved against the block store.
-func parseEthBlockTag(tag string) (height *int64, earliest bool, err error) {
-	switch tag {
-	case "latest", "pending", "safe", "finalized":
-		return nil, false, nil
-	case "earliest":
-		return nil, true, nil
-	}
-	if !strings.HasPrefix(tag, "0x") || len(tag) < 3 || (len(tag) > 3 && tag[2] == '0') {
-		return nil, false, ethInvalidParams("invalid Ethereum block tag %q: expected a tag or hex quantity", tag)
-	}
-	n, err := strconv.ParseUint(tag[2:], 16, 63)
+func formatEthBlockNumber(value []byte) (string, error) {
+	height, err := decodeEthBlockHeight(value)
 	if err != nil {
-		return nil, false, ethInvalidParams("invalid Ethereum block tag %q: %v", tag, err)
+		return "", err
 	}
-	h := int64(n)
-	return &h, false, nil
+	return ethQuantityUint64(height), nil
 }
 
-func formatEthBlockNumber(value []byte) (string, error) {
+func decodeEthBlockHeight(value []byte) (uint64, error) {
 	if len(value) != 8 {
-		return "", fmt.Errorf("invalid block_height length: got %d, want 8", len(value))
+		return 0, fmt.Errorf("invalid block_height length: got %d, want 8", len(value))
 	}
-	return ethQuantityUint64(binary.BigEndian.Uint64(value)), nil
+	return binary.BigEndian.Uint64(value), nil
 }
 
 func formatNetVersion(chainID []byte) string {

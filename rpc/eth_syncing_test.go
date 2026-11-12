@@ -3,17 +3,11 @@ package rpc
 import (
 	"encoding/json"
 	"math"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/libs/log"
+	"github.com/tendermint/tendermint/consensus"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmrpcserver "github.com/tendermint/tendermint/rpc/jsonrpc/server"
-	tmrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
 func TestEthSyncingEncoding(t *testing.T) {
@@ -31,23 +25,23 @@ func TestEthSyncingEncoding(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := formatEthSyncing(tt.info)
 			require.NoError(t, err)
-			encoded, err := tmjson.Marshal(&result)
+			encoded, err := json.Marshal(&result)
 			require.NoError(t, err)
 			require.JSONEq(t, tt.want, string(encoded))
 
-			handler := EthSyncing
-			handler = func(ctx *tmrpctypes.Context) (json.RawMessage, error) {
-				return formatEthSyncing(tt.info)
+			handler, fixture := ethTestRPCHandler(t)
+			fixture.baseHeight = tt.info.EarliestBlockHeight
+			fixture.blockHeight = tt.info.LatestBlockHeight
+			fixture.blocks = make(map[int64]*coretypes.ResultBlock)
+			for _, height := range []int64{fixture.baseHeight, fixture.blockHeight} {
+				if height > 0 {
+					fixture.blocks[height] = ethTestBlock(height)
+				}
 			}
-			mux := http.NewServeMux()
-			tmrpcserver.RegisterRPCFuncs(mux, map[string]*tmrpcserver.RPCFunc{
-				"eth_syncing": tmrpcserver.NewRPCFunc(handler, ""),
-			}, log.NewNopLogger())
-			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"eth_syncing","params":[]}`))
-			recorder := httptest.NewRecorder()
-			mux.ServeHTTP(recorder, req)
-			require.Equal(t, http.StatusOK, recorder.Code)
-			require.JSONEq(t, `{"jsonrpc":"2.0","id":1,"result":`+tt.want+`}`, recorder.Body.String())
+			fixture.env.ConsensusReactor = consensus.NewReactor(&consensus.State{}, tt.info.CatchingUp)
+			response := ethServerRequest(t, handler, "eth_syncing", `[]`)
+			require.Nil(t, response.Error)
+			require.JSONEq(t, tt.want, string(response.Result))
 		})
 	}
 }

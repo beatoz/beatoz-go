@@ -20,8 +20,9 @@ type ethServerTestResponse struct {
 	ID      json.RawMessage `json:"id"`
 	Result  json.RawMessage `json:"result"`
 	Error   *struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		Code    int             `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
 	} `json:"error"`
 }
 
@@ -49,34 +50,50 @@ func TestEthServerMethods(t *testing.T) {
 	ethTestRPCHandler(t)
 	handler, err := newEthRPCHandler(nil)
 	require.NoError(t, err)
-	clientVersion, err := Web3ClientVersion(ethTMContext())
+	clientVersion, err := ethClientVersion(ethTMContext())
 	require.NoError(t, err)
 	versionJSON, err := json.Marshal(clientVersion)
 	require.NoError(t, err)
+	fullBlock := ethServerRequest(t, handler, "eth_getBlockByNumber", `["latest",true]`)
+	require.Nil(t, fullBlock.Error)
+	var block struct {
+		Transactions []json.RawMessage `json:"transactions"`
+	}
+	require.NoError(t, json.Unmarshal(fullBlock.Result, &block))
+	require.Len(t, block.Transactions, 1)
+	address := `"0x` + strings.Repeat("ab", 20) + `"`
 	for _, tt := range []struct {
 		method, params, want string
 	}{
 		{"eth_chainId", `[]`, `"0xbea701"`},
-		{"eth_blockNumber", `[]`, ""},
+		{"eth_blockNumber", `[]`, `"0xc"`},
 		{"eth_syncing", `[]`, `false`},
-		{"eth_getBlockByNumber", `["0xc",false]`, ""},
-		{"eth_getBlockByHash", `["0x` + strings.Repeat("0c", 32) + `",false]`, ""},
+		{"eth_accounts", `[]`, `[]`},
+		{"eth_getBlockByNumber", `["0xc"]`, ""},
+		{"eth_getBlockByHash", `["0x` + strings.Repeat("0c", 32) + `"]`, ""},
+		{"eth_getBlockTransactionCountByNumber", `["latest"]`, `"0x1"`},
+		{"eth_getBlockTransactionCountByHash", `["0x` + strings.Repeat("0c", 32) + `"]`, `"0x1"`},
+		{"eth_getTransactionByBlockNumberAndIndex", `["latest","0x0"]`, string(block.Transactions[0])},
+		{"eth_getTransactionByBlockHashAndIndex", `["0x` + strings.Repeat("0c", 32) + `","0x0"]`, string(block.Transactions[0])},
 		{"eth_gasPrice", `[]`, `"0xb2d05e000"`},
 		{"eth_maxPriorityFeePerGas", `[]`, `"0x0"`},
-		{"eth_feeHistory", `["0x2","latest",[50]]`, `{"oldestBlock":"0xb","baseFeePerGas":["0x0","0x0","0x0"],"gasUsedRatio":[0.5,0.75],"reward":[["0x0"],["0x0"]]}`},
+		{"eth_feeHistory", `["0x2","latest"]`, `{"oldestBlock":"0xb","baseFeePerGas":["0x0","0x0","0x0"],"gasUsedRatio":[0.5,0.75]}`},
+		{"eth_getBalance", `[` + address + `]`, `"0x0"`},
+		{"eth_getTransactionCount", `[` + address + `]`, `"0x0"`},
+		{"eth_getCode", `[` + address + `]`, `"0x"`},
+		{"eth_getStorageAt", `[` + address + `,"0x0"]`, `"0x` + strings.Repeat("00", 32) + `"`},
+		{"eth_call", `[{}]`, `"0x"`},
+		{"eth_estimateGas", `[{}]`, `"0x0"`},
 		{"net_version", `[]`, `"12494593"`},
+		{"net_listening", `[]`, `false`},
+		{"net_peerCount", `[]`, `"0x0"`},
 		{"web3_clientVersion", `[]`, string(versionJSON)},
+		{"web3_sha3", `["0x"]`, `"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"`},
 	} {
 		t.Run(tt.method, func(t *testing.T) {
 			response := ethServerRequest(t, handler, tt.method, tt.params)
 			if response.Error != nil {
 				require.NotEqual(t, -32601, response.Error.Code)
-			}
-			if tt.method == "eth_blockNumber" {
-				// The fixture deliberately cannot answer block_height queries.
-				require.NotNil(t, response.Error)
-				require.Contains(t, response.Error.Message, "unexpected query block_height")
-				return
 			}
 			require.Nil(t, response.Error)
 			if tt.want != "" {
@@ -114,7 +131,7 @@ func TestEthServerOptionalParams(t *testing.T) {
 				require.Len(t, block.Transactions, 1)
 				wantHash := ethData(fixture.blocks[12].Block.Txs[0].Hash())
 				if suffix == ",true" {
-					var tx EthTransactionResult
+					var tx ethTransaction
 					require.NoError(t, json.Unmarshal(block.Transactions[0], &tx))
 					require.Equal(t, wantHash, tx.Hash)
 					require.Equal(t, "0xbea701", tx.ChainID)
@@ -133,7 +150,10 @@ func TestEthServerOptionalParams(t *testing.T) {
 	}
 	response := ethServerRequest(t, handler, "eth_feeHistory", `["0x2","latest",[]]`)
 	require.Nil(t, response.Error)
-	require.JSONEq(t, `{"oldestBlock":"0xb","baseFeePerGas":["0x0","0x0","0x0"],"gasUsedRatio":[0.5,0.75],"reward":[[],[]]}`, string(response.Result))
+	require.JSONEq(t, `{"oldestBlock":"0xb","baseFeePerGas":["0x0","0x0","0x0"],"gasUsedRatio":[0.5,0.75]}`, string(response.Result))
+	response = ethServerRequest(t, handler, "eth_feeHistory", `["0x2","latest",[50]]`)
+	require.Nil(t, response.Error)
+	require.JSONEq(t, `{"oldestBlock":"0xb","baseFeePerGas":["0x0","0x0","0x0"],"gasUsedRatio":[0.5,0.75],"reward":[["0x0"],["0x0"]]}`, string(response.Result))
 }
 
 func TestEthServerInvalidParams(t *testing.T) {
@@ -143,15 +163,18 @@ func TestEthServerInvalidParams(t *testing.T) {
 	for _, tt := range []struct {
 		name, method, params, message string
 	}{
-		{"block tag format", "eth_getBlockByNumber", `["bad"]`, `invalid Ethereum block tag "bad": expected a tag or hex quantity`},
-		{"block tag hex", "eth_getBlockByNumber", `["0xzz"]`, `invalid Ethereum block tag "0xzz": strconv.ParseUint: parsing "zz": invalid syntax`},
-		{"block hash length", "eth_getBlockByHash", `["0x1234"]`, "invalid Ethereum block hash: expected 0x-prefixed 32-byte hex"},
-		{"block hash hex", "eth_getBlockByHash", `["0x` + strings.Repeat("zz", 32) + `"]`, "invalid Ethereum block hash: encoding/hex: invalid byte: U+007A 'z'"},
-		{"block count format", "eth_feeHistory", `["2","latest"]`, "blockCount must be a hex quantity or JSON integer"},
-		{"block count sign", "eth_feeHistory", `[-1,"latest"]`, "blockCount must be a non-negative integer"},
-		{"newest block", "eth_feeHistory", `[2,"bad"]`, `invalid Ethereum block tag "bad": expected a tag or hex quantity`},
-		{"percentiles type", "eth_feeHistory", `[2,"latest","bad"]`, "invalid rewardPercentiles: json: cannot unmarshal string into Go value of type []*float64"},
-		{"percentiles null", "eth_feeHistory", `[2,"latest",[null]]`, "rewardPercentiles cannot contain null"},
+		{"block tag format", "eth_getBlockByNumber", `["bad"]`, `hex string without 0x prefix`},
+		{"block tag hex", "eth_getBlockByNumber", `["0xzz"]`, `invalid hex string`},
+		{"block number object", "eth_getBlockByNumber", `[{"blockNumber":"0x0"}]`, `hex string without 0x prefix`},
+		{"block tag object", "eth_getBlockByNumber", `[{"blockNumber":"earliest"}]`, `hex string without 0x prefix`},
+		{"newest number object", "eth_feeHistory", `[2,{"blockNumber":"0x0"}]`, `hex string without 0x prefix`},
+		{"newest tag object", "eth_feeHistory", `[2,{"blockNumber":"earliest"}]`, `hex string without 0x prefix`},
+		{"block hash length", "eth_getBlockByHash", `["0x1234"]`, "want 64 for common.Hash"},
+		{"block hash hex", "eth_getBlockByHash", `["0x` + strings.Repeat("zz", 32) + `"]`, "invalid hex string"},
+		{"block count format", "eth_feeHistory", `["2.5","latest"]`, "invalid hex or decimal integer"},
+		{"block count sign", "eth_feeHistory", `[-1,"latest"]`, "invalid hex or decimal integer"},
+		{"newest block", "eth_feeHistory", `[2,"bad"]`, `hex string without 0x prefix`},
+		{"percentiles type", "eth_feeHistory", `[2,"latest","bad"]`, "cannot unmarshal string"},
 		{"percentiles order", "eth_feeHistory", `[2,"latest",[90,10]]`, "rewardPercentiles must be sorted numbers between 0 and 100"},
 		{"percentiles range", "eth_feeHistory", `[2,"latest",[101]]`, "rewardPercentiles must be sorted numbers between 0 and 100"},
 	} {
@@ -159,7 +182,7 @@ func TestEthServerInvalidParams(t *testing.T) {
 			response := ethServerRequest(t, handler, tt.method, tt.params)
 			require.NotNil(t, response.Error)
 			require.Equal(t, -32602, response.Error.Code)
-			require.Equal(t, tt.message, response.Error.Message)
+			require.Contains(t, response.Error.Message, tt.message)
 			require.Empty(t, response.Result)
 		})
 	}
@@ -169,9 +192,18 @@ func TestEthServerUnknownMethod(t *testing.T) {
 	ethTestRPCHandler(t)
 	handler, err := newEthRPCHandler(nil)
 	require.NoError(t, err)
-	response := ethServerRequest(t, handler, "eth_unknown", `[]`)
-	require.NotNil(t, response.Error)
-	require.Equal(t, -32601, response.Error.Code)
+	for _, method := range []string{
+		"eth_unknown", "eth_protocolVersion", "eth_coinbase", "eth_sign", "eth_signTransaction", "eth_signTypedData",
+		"eth_sendTransaction", "eth_getTransactionByHash", "eth_getTransactionReceipt", "eth_getLogs", "eth_newFilter",
+		"eth_newBlockFilter", "eth_newPendingTransactionFilter", "eth_getFilterChanges", "eth_getFilterLogs", "eth_uninstallFilter",
+		"eth_getUncleCountByBlockNumber", "eth_getUncleCountByBlockHash", "eth_getUncleByBlockNumberAndIndex", "eth_getUncleByBlockHashAndIndex",
+	} {
+		t.Run(method, func(t *testing.T) {
+			response := ethServerRequest(t, handler, method, `[]`)
+			require.NotNil(t, response.Error)
+			require.Equal(t, -32601, response.Error.Code)
+		})
+	}
 }
 
 func TestEthServerBackendErrors(t *testing.T) {
@@ -217,6 +249,32 @@ func TestEthServerBatch(t *testing.T) {
 		results[string(response.ID)] = string(response.Result)
 	}
 	require.Equal(t, map[string]string{"1": `"0xbea701"`, `"second"`: `"0x0"`}, results)
+}
+
+func TestEthServerBatchLimit(t *testing.T) {
+	handler, err := newEthRPCHandler(nil)
+	require.NoError(t, err)
+	for _, count := range []int{100, 101} {
+		requests := make([]string, count)
+		for i := range requests {
+			requests[i] = fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"eth_maxPriorityFeePerGas","params":[]}`, i+1)
+		}
+		body := ethServerPost(t, handler, "["+strings.Join(requests, ",")+"]")
+		var responses []ethServerTestResponse
+		require.NoError(t, json.Unmarshal(body, &responses))
+		if count == 100 {
+			require.Len(t, responses, count)
+			for _, response := range responses {
+				require.Nil(t, response.Error)
+				require.JSONEq(t, `"0x0"`, string(response.Result))
+			}
+		} else {
+			require.Len(t, responses, 1)
+			require.NotNil(t, responses[0].Error)
+			require.Equal(t, -32600, responses[0].Error.Code)
+			require.Equal(t, "batch too large", responses[0].Error.Message)
+		}
+	}
 }
 
 func TestEthServerCORS(t *testing.T) {
