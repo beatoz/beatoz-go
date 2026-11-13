@@ -16,9 +16,7 @@ type ethAccount struct {
 	Code    bytes.HexBytes `json:"code,omitempty"`
 }
 
-// Pending is latest: there is no mempool account view. MetaMask's keccak
-// addresses differ from BEATOZ addresses until the address policy in tickets
-// 5–6, so MetaMask accounts currently read as zero accounts.
+// Pending is latest: there is no mempool account view.
 func ethQueryAccount(ctx *tmrpctypes.Context, address common.Address, blockTag *ethBlockNumberOrHashParam) (*ethAccount, error) {
 	height, err := ethQueryHeight(ctx, blockTag)
 	if err != nil {
