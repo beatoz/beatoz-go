@@ -118,6 +118,7 @@ func TestTransfer_GasPayer(t *testing.T) {
 		defGas, defGasPrice,
 		trAmt,
 	)
+	tx.HasPayer = true
 	_, _, err := sender.SignTrxRLP(tx, bzweb3.ChainID())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())

@@ -518,6 +518,7 @@ func makeTransferCtx(
 		sender.Address(), receiver, nonce,
 		govMock.MinTrxGas(), govMock.GasPrice(), amount,
 	)
+	tx.HasPayer = payer != nil
 	_, _, err := sender.SignTrxRLP(tx, chainID)
 	require.NoError(t, err)
 	if payer != nil {

@@ -17,6 +17,7 @@ message TrxProto {
 
   bytes payer = 12;
   bytes payer_sig = 13;
+  bool has_payer = 14;
 }
 
 message TrxPayloadAssetTransferProto {}

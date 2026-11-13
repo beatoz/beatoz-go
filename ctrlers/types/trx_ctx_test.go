@@ -138,11 +138,89 @@ func Test_NewTrxContext(t *testing.T) {
 	// Payer: not Sender
 	payer := acctMock.RandWallet()
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.HasPayer = true
 	_, _, err := w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	txctx, xerr = newTrxCtx(tx, 1)
+	require.NoError(t, xerr)
+	require.NotNil(t, txctx.Payer())
+	require.Equal(t, payer.Address(), txctx.Payer().Address)
+}
+
+func Test_NewTrxContext_HasPayer(t *testing.T) {
+	w0 := acctMock.RandWallet()
+	w1 := web3.NewWallet(nil)
+	payer := acctMock.RandWallet()
+	other := acctMock.RandWallet()
+
+	//
+	// HasPayer without Payer and PayerSig
+	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.HasPayer = true
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, xerr := newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "does not match payer")
+
+	//
+	// HasPayer with Payer but without PayerSig
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.HasPayer = true
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	tx.Payer = payer.Address()
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer("+payer.Address().String()+")'s sig length is invalid")
+
+	//
+	// HasPayer with PayerSig signed by another account
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.HasPayer = true
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = other.SignPayerTrxRLP(tx, chainId.Hex())
+	tx.Payer = payer.Address()
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer signature is invalid")
+
+	//
+	// Strip Payer and PayerSig
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.HasPayer = true
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	tx.Payer, tx.PayerSig = nil, nil
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "does not match payer")
+
+	//
+	// Strip Payer and PayerSig, and clear HasPayer
+	tx.HasPayer = false
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
+
+	//
+	// Attach Payer to tx signed without HasPayer
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "does not match payer")
+
+	//
+	// Attach Payer to tx signed without HasPayer, and set HasPayer
+	tx.HasPayer = true
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
+
+	//
+	// Success
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.HasPayer = true
+	_, _, err := w0.SignTrxRLP(tx, chainId.Hex())
+	require.NoError(t, err)
+	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	require.NoError(t, err)
+	txctx, xerr := newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Payer())
 	require.Equal(t, payer.Address(), txctx.Payer().Address)

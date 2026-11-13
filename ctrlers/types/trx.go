@@ -50,6 +50,7 @@ type trxRLP struct {
 	Type     uint64
 	Payload  bytes.HexBytes
 	Sig      bytes.HexBytes
+	HasPayer bool `rlp:"optional"`
 
 	//Payer    types.Address  `rlp:"-"`
 	//PayerSig bytes.HexBytes `rlp:"-"`
@@ -76,6 +77,7 @@ type Trx struct {
 	Type     int32          `json:"type"`
 	Payload  ITrxPayload    `json:"payload,omitempty"`
 	Sig      bytes.HexBytes `json:"sig"`
+	HasPayer bool           `json:"hasPayer,omitempty"`
 
 	// Payer is the account covering the transaction fees, if it’s not the From address.
 	Payer    types.Address  `json:"payer,omitempty"`
@@ -131,6 +133,9 @@ func (tx *Trx) Equal(_tx *Trx) bool {
 	if bytes.Compare(tx.Sig, _tx.Sig) != 0 {
 		return false
 	}
+	if tx.HasPayer != _tx.HasPayer {
+		return false
+	}
 	if tx.Payload != nil {
 		return tx.Payload.Equal(_tx.Payload)
 	} else if _tx.Payload != nil {
@@ -162,6 +167,7 @@ func (tx *Trx) EncodeRLP(w io.Writer) error {
 		Type:     uint64(tx.Type),
 		Payload:  payload,
 		Sig:      tx.Sig,
+		HasPayer: tx.HasPayer,
 		//Payer:    tx.Payer,
 		//PayerSig: tx.PayerSig,
 	}
@@ -185,6 +191,7 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 	tx.GasPrice = new(uint256.Int).SetBytes(rtx.GasPrice)
 	tx.Type = int32(rtx.Type)
 	tx.Sig = rtx.Sig
+	tx.HasPayer = rtx.HasPayer
 	//tx.Payer = rtx.Payer
 	//tx.PayerSig = rtx.PayerSig
 
@@ -309,6 +316,7 @@ func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 	tx.Sig = txProto.Sig
 	tx.Payer = txProto.Payer
 	tx.PayerSig = txProto.PayerSig
+	tx.HasPayer = txProto.HasPayer
 	return nil
 }
 
@@ -336,6 +344,7 @@ func (tx *Trx) toProto() (*TrxProto, xerrors.XError) {
 		Sig:       tx.Sig,
 		Payer:     tx.Payer,
 		PayerSig:  tx.PayerSig,
+		HasPayer:  tx.HasPayer,
 	}, nil
 }
 

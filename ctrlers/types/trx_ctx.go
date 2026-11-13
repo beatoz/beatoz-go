@@ -58,6 +58,14 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 		return nil, xerrors.ErrInvalidGasPrice
 	}
 
+	if types.IsBTIP62(bctx.ChainID(), bctx.Height()) {
+		if tx.HasPayer != (tx.Payer != nil) {
+			return nil, xerrors.ErrInvalidTrx.Wrapf("hasPayer(%v) does not match payer(%v)", tx.HasPayer, tx.Payer)
+		}
+	} else {
+		tx.HasPayer = false
+	}
+
 	//
 	// verify signature.
 	_, pubKeyBytes, xerr := VerifyTrxRLP(tx)

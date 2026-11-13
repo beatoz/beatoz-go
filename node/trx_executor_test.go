@@ -116,6 +116,7 @@ func Test_commonValidation(t *testing.T) {
 		w0.Address(), w1.Address(), w0.GetNonce(),
 		govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1),
 	)
+	tx.HasPayer = true
 	_, _, err = w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	_, _, err = missingPayer.SignPayerTrxRLP(tx, chainId.Hex())
@@ -409,6 +410,7 @@ func Test_Payer(t *testing.T) {
 	payer := web3.NewWallet(nil)
 	acctMock.AddWallet(payer) // payer has no balance
 	tx := web3.NewTrxTransfer(sender.Address(), types.RandAddress(), sender.GetNonce(), govMock.MinTrxGas(), govMock.GasPrice(), amt)
+	tx.HasPayer = true
 	_, _, err := sender.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())

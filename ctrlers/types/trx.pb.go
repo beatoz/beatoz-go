@@ -36,6 +36,7 @@ type TrxProto struct {
 	Sig           []byte                 `protobuf:"bytes,11,opt,name=sig,proto3" json:"sig,omitempty"`
 	Payer         []byte                 `protobuf:"bytes,12,opt,name=payer,proto3" json:"payer,omitempty"`
 	PayerSig      []byte                 `protobuf:"bytes,13,opt,name=payer_sig,json=payerSig,proto3" json:"payer_sig,omitempty"`
+	HasPayer      bool                   `protobuf:"varint,14,opt,name=has_payer,json=hasPayer,proto3" json:"has_payer,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -159,6 +160,13 @@ func (x *TrxProto) GetPayerSig() []byte {
 		return x.PayerSig
 	}
 	return nil
+}
+
+func (x *TrxProto) GetHasPayer() bool {
+	if x != nil {
+		return x.HasPayer
+	}
+	return false
 }
 
 type TrxPayloadAssetTransferProto struct {
@@ -557,7 +565,7 @@ var File_trx_proto protoreflect.FileDescriptor
 
 const file_trx_proto_rawDesc = "" +
 	"\n" +
-	"\ttrx.proto\x12\x05types\"\xae\x02\n" +
+	"\ttrx.proto\x12\x05types\"\xcb\x02\n" +
 	"\bTrxProto\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x12\x12\n" +
 	"\x04time\x18\x02 \x01(\x03R\x04time\x12\x14\n" +
@@ -572,7 +580,8 @@ const file_trx_proto_rawDesc = "" +
 	" \x01(\fR\aPayload\x12\x10\n" +
 	"\x03sig\x18\v \x01(\fR\x03sig\x12\x14\n" +
 	"\x05payer\x18\f \x01(\fR\x05payer\x12\x1b\n" +
-	"\tpayer_sig\x18\r \x01(\fR\bpayerSig\"\x1e\n" +
+	"\tpayer_sig\x18\r \x01(\fR\bpayerSig\x12\x1b\n" +
+	"\thas_payer\x18\x0e \x01(\bR\bhasPayer\"\x1e\n" +
 	"\x1cTrxPayloadAssetTransferProto\"\x18\n" +
 	"\x16TrxPayloadStakingProto\"3\n" +
 	"\x18TrxPayloadUnstakingProto\x12\x17\n" +

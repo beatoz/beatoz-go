@@ -518,6 +518,7 @@ func testPayer_Deploy(t *testing.T, abiFile string, args []interface{}) {
 		uint256.NewInt(0),
 		data,
 	)
+	tx.HasPayer = true
 	_, _, err = sender.SignTrxRLP(tx, bzweb3.ChainID())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())
@@ -606,6 +607,7 @@ func testPayer_Receive(t *testing.T) {
 		bigGas, defGasPrice,
 		randAmt,
 	)
+	tx.HasPayer = true
 	_, _, err = sender.SignTrxRLP(tx, bzweb3.ChainID())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())
