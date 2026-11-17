@@ -11,7 +11,24 @@ import (
 )
 
 func (ctrler *GovCtrler) BeginBlock(blockCtx *types.BlockContext) ([]types2.Event, xerrors.XError) {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
 	var evts []types2.Event
+
+	if types3.IsBTIP63(blockCtx.ChainID(), blockCtx.Height()) {
+		applied, rejected, xerr := ctrler.applyProposals(blockCtx.Height())
+		if xerr != nil {
+			return nil, xerr
+		}
+		if ctrler.newGovParams != nil {
+			ctrler.GovParams = *ctrler.newGovParams
+			ctrler.newGovParams = nil
+			ctrler.logger.Debug("New governance parameters is applied", "gov_params", ctrler.GovParams.String())
+		}
+		evts = append(evts, proposalEvents("applied", applied)...)
+		evts = append(evts, proposalEvents("rejected", rejected)...)
+	}
 
 	byzantines := blockCtx.BlockInfo().ByzantineValidators
 	if byzantines != nil && len(byzantines) > 0 {
@@ -49,11 +66,6 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 		return nil, xerr
 	}
 
-	applied, rejected, xerr := ctrler.applyProposals(ctx.Height())
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	for _, k := range frozen {
 		evts = append(evts, types2.Event{
 			Type: "proposal",
@@ -70,24 +82,30 @@ func (ctrler *GovCtrler) EndBlock(ctx *types.BlockContext) ([]types2.Event, xerr
 			},
 		})
 	}
-	for _, k := range applied {
-		evts = append(evts, types2.Event{
-			Type: "proposal",
-			Attributes: []types2.EventAttribute{
-				{Key: []byte("applied"), Value: []byte(hex.EncodeToString(common.UnwrapKeyPrefix(k))), Index: true},
-			},
-		})
-	}
-	for _, k := range rejected {
-		evts = append(evts, types2.Event{
-			Type: "proposal",
-			Attributes: []types2.EventAttribute{
-				{Key: []byte("rejected"), Value: []byte(hex.EncodeToString(common.UnwrapKeyPrefix(k))), Index: true},
-			},
-		})
+
+	if !types3.IsBTIP63(ctx.ChainID(), ctx.Height()) {
+		applied, rejected, xerr := ctrler.applyProposals(ctx.Height())
+		if xerr != nil {
+			return nil, xerr
+		}
+		evts = append(evts, proposalEvents("applied", applied)...)
+		evts = append(evts, proposalEvents("rejected", rejected)...)
 	}
 
 	return evts, nil
+}
+
+func proposalEvents(status string, keys []common.LedgerKey) []types2.Event {
+	var evts []types2.Event
+	for _, k := range keys {
+		evts = append(evts, types2.Event{
+			Type: "proposal",
+			Attributes: []types2.EventAttribute{
+				{Key: []byte(status), Value: []byte(hex.EncodeToString(common.UnwrapKeyPrefix(k))), Index: true},
+			},
+		})
+	}
+	return evts
 }
 
 func (ctrler *GovCtrler) Commit() ([]byte, int64, xerrors.XError) {

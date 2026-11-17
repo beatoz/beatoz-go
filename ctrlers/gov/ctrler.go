@@ -318,7 +318,7 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]common.LedgerKey, []co
 	return frozenProps, removedProps, xerr
 }
 
-// applyProposals is called from EndBlock
+// applyProposals is called from BeginBlock after BTIP63, and from EndBlock before BTIP63.
 func (ctrler *GovCtrler) applyProposals(height int64) ([]common.LedgerKey, []common.LedgerKey, xerrors.XError) {
 	var applied []common.LedgerKey
 	var rejected []common.LedgerKey
