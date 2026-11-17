@@ -58,6 +58,18 @@ func NewTrxContext(txbz []byte, bctx *BlockContext, exec bool) (*TrxContext, xer
 		return nil, xerrors.ErrInvalidGasPrice
 	}
 
+	if types.IsBTIP62(bctx.ChainID(), bctx.Height()) {
+		if tx.HasPayerFlag() {
+			if tx.PayerSig == nil {
+				return nil, xerrors.ErrInvalidTrx.Wrapf("payer flag is set but payer sig is missing")
+			}
+		} else if tx.PayerSig != nil {
+			return nil, xerrors.ErrInvalidTrx.Wrapf("payer flag is not set but payer sig exists")
+		}
+	} else if tx.HasPayerFlag() {
+		return nil, xerrors.ErrInvalidTrxPayloadType.Wrapf("payer flag is not allowed before BTIP62")
+	}
+
 	//
 	// verify signature.
 	_, pubKeyBytes, xerr := VerifyTrxRLP(tx)

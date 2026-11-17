@@ -44,6 +44,80 @@ func TestTrxEncode(t *testing.T) {
 	require.Equal(t, bzTx0, bzTx1)
 }
 
+func TestTrxEncode_PayerFlag(t *testing.T) {
+	//
+	// Transfer with the flag
+	tx0 := &types2.Trx{
+		Version:  1,
+		Time:     time.Now().UnixNano(),
+		Nonce:    rand.Int63(),
+		From:     types.RandAddress(),
+		To:       types.RandAddress(),
+		Amount:   bytes.RandU256Int(),
+		Gas:      rand.Int63(),
+		GasPrice: uint256.NewInt(rand.Uint64()),
+		Type:     types2.TRX_TRANSFER | types2.TRX_PAYER_FLAG,
+	}
+	require.Equal(t, types2.TRX_TRANSFER, tx0.GetType())
+	require.True(t, tx0.HasPayerFlag())
+
+	bzTx0, err := tx0.Encode()
+	require.NoError(t, err)
+
+	tx1 := &types2.Trx{}
+	err = tx1.Decode(bzTx0)
+	require.NoError(t, err)
+	require.Equal(t, types2.TRX_TRANSFER|types2.TRX_PAYER_FLAG, tx1.Type)
+	require.Equal(t, types2.TRX_TRANSFER, tx1.GetType())
+	require.True(t, tx1.HasPayerFlag())
+	require.True(t, tx0.Equal(tx1))
+
+	bzTx1, err := tx1.Encode()
+	require.NoError(t, err)
+	require.Equal(t, bzTx0, bzTx1)
+
+	//
+	// Contract with the flag and payload
+	w := web3.NewWallet(nil)
+	tx0 = web3.NewTrxContract(w.Address(), nil, 0, 1_000_000, uint256.NewInt(1), uint256.NewInt(0), bytes.RandBytes(32))
+	tx0.Type |= types2.TRX_PAYER_FLAG
+	_, _, signErr := w.SignTrxRLP(tx0, "test_chain")
+	require.NoError(t, signErr)
+	require.NoError(t, tx0.Validate())
+
+	bzTx0, err = tx0.Encode()
+	require.NoError(t, err)
+
+	tx1 = &types2.Trx{}
+	err = tx1.Decode(bzTx0)
+	require.NoError(t, err)
+	require.Equal(t, types2.TRX_CONTRACT, tx1.GetType())
+	require.True(t, tx1.HasPayerFlag())
+	require.True(t, tx0.Payload.Equal(tx1.Payload))
+	require.NoError(t, tx1.Validate())
+
+	//
+	// Undefined type bit
+	tx0 = &types2.Trx{
+		Version:  1,
+		Time:     time.Now().UnixNano(),
+		Nonce:    rand.Int63(),
+		From:     types.RandAddress(),
+		To:       types.RandAddress(),
+		Amount:   bytes.RandU256Int(),
+		Gas:      rand.Int63(),
+		GasPrice: uint256.NewInt(rand.Uint64()),
+		Type:     types2.TRX_TRANSFER | (1 << 12),
+	}
+
+	bzTx0, err = tx0.Encode()
+	require.NoError(t, err)
+
+	tx1 = &types2.Trx{}
+	err = tx1.Decode(bzTx0)
+	require.ErrorContains(t, err, xerrors.ErrInvalidTrxPayloadType.Error())
+}
+
 func TestTrxValidateInvalidSignature(t *testing.T) {
 	validSig := bytes.HexBytes(bytes.ZeroBytes(65))
 	payerAddress := types.Address(bytes.ZeroBytes(types.AddrSize))
