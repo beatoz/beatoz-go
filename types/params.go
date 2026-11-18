@@ -7,6 +7,7 @@ type ForkBlocks struct {
 	BTIP48Block int64
 	BTIP60Block int64
 	BTIP61Block int64
+	BTIP62Block int64
 }
 
 var (
@@ -20,6 +21,7 @@ var (
 		BTIP48Block: 500_000,
 		BTIP60Block: 500_000,
 		BTIP61Block: 500_000,
+		BTIP62Block: 500_000,
 	}
 
 	mainnetForkBlocks = ForkBlocks{
@@ -84,6 +86,15 @@ func IsBTIP61(chainId string, height int64) bool {
 		h0 = forkBlocks.BTIP61Block
 	}
 	// If there is no forkBlocks then `h0` is 0; BTIP61 is enabled by default.
+	return isBlockForked(h0, height)
+}
+
+func IsBTIP62(chainId string, height int64) bool {
+	h0 := int64(0)
+	if forkBlocks, ok := chainForkBlocks[chainId]; ok {
+		h0 = forkBlocks.BTIP62Block
+	}
+	// If there is no forkBlocks then `h0` is 0; BTIP62 is enabled by default.
 	return isBlockForked(h0, height)
 }
 

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
 	"github.com/beatoz/beatoz-go/libs/jsonx"
 	"github.com/beatoz/beatoz-go/types"
 	"github.com/beatoz/beatoz-go/types/bytes"
@@ -518,6 +519,7 @@ func testPayer_Deploy(t *testing.T, abiFile string, args []interface{}) {
 		uint256.NewInt(0),
 		data,
 	)
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
 	_, _, err = sender.SignTrxRLP(tx, bzweb3.ChainID())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())
@@ -606,6 +608,7 @@ func testPayer_Receive(t *testing.T) {
 		bigGas, defGasPrice,
 		randAmt,
 	)
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
 	_, _, err = sender.SignTrxRLP(tx, bzweb3.ChainID())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, bzweb3.ChainID())

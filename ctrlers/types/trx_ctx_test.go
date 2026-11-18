@@ -138,6 +138,7 @@ func Test_NewTrxContext(t *testing.T) {
 	// Payer: not Sender
 	payer := acctMock.RandWallet()
 	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
 	_, _, err := w0.SignTrxRLP(tx, chainId.Hex())
 	require.NoError(t, err)
 	_, _, err = payer.SignPayerTrxRLP(tx, chainId.Hex())
@@ -145,6 +146,101 @@ func Test_NewTrxContext(t *testing.T) {
 	txctx, xerr = newTrxCtx(tx, 1)
 	require.NoError(t, xerr)
 	require.NotNil(t, txctx.Payer())
+	require.Equal(t, payer.Address(), txctx.Payer().Address)
+}
+
+func Test_NewTrxContext_PayerFlag(t *testing.T) {
+	w0 := acctMock.RandWallet()
+	w1 := web3.NewWallet(nil)
+	payer := acctMock.RandWallet()
+	other := acctMock.RandWallet()
+
+	//
+	// Flag without Payer and PayerSig
+	tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, xerr := newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer flag is set but")
+
+	//
+	// Flag with Payer but without PayerSig
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	tx.Payer = payer.Address()
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
+
+	//
+	// Flag with PayerSig signed by another account
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = other.SignPayerTrxRLP(tx, chainId.Hex())
+	tx.Payer = payer.Address()
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer signature is invalid")
+
+	//
+	// Strip Payer and PayerSig
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	tx.Payer = nil
+	tx.PayerSig = nil
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer flag is set but")
+
+	//
+	// Strip Payer and PayerSig, and clear the flag
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	tx.Payer = nil
+	tx.PayerSig = nil
+	tx.Type &^= ctrlertypes.TRX_PAYER_FLAG
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
+
+	//
+	// Attach Payer to tx signed without the flag
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer flag is not set but")
+
+	//
+	// Attach Payer to tx signed without the flag, and set the flag
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, xerrors.ErrInvalidTrxSig.Error())
+
+	//
+	// PayerSig without Payer and the flag
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	tx.Payer = nil
+	_, xerr = newTrxCtx(tx, 1)
+	require.ErrorContains(t, xerr, "payer flag is not set but")
+
+	//
+	// Success
+	tx = web3.NewTrxTransfer(w0.Address(), w1.Address(), 0, govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1000))
+	tx.Type |= ctrlertypes.TRX_PAYER_FLAG
+	_, _, _ = w0.SignTrxRLP(tx, chainId.Hex())
+	_, _, _ = payer.SignPayerTrxRLP(tx, chainId.Hex())
+	txctx, xerr := newTrxCtx(tx, 1)
+	require.NoError(t, xerr)
+	require.Equal(t, ctrlertypes.TRX_TRANSFER, txctx.Tx.GetType())
+	require.True(t, txctx.Tx.HasPayerFlag())
 	require.Equal(t, payer.Address(), txctx.Payer().Address)
 }
 

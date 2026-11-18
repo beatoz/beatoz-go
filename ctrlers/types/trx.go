@@ -25,6 +25,8 @@ const (
 	TRX_WITHDRAW
 	TRX_MIN_TYPE = TRX_TRANSFER
 	TRX_MAX_TYPE = TRX_WITHDRAW
+
+	TRX_PAYER_FLAG int32 = 1 << 8
 )
 
 const (
@@ -190,7 +192,7 @@ func (tx *Trx) DecodeRLP(s *rlp.Stream) error {
 
 	var payload ITrxPayload
 	if rtx.Payload != nil && len(rtx.Payload) > 0 {
-		switch int32(rtx.Type) {
+		switch int32(rtx.Type) &^ TRX_PAYER_FLAG {
 		case TRX_TRANSFER:
 			payload = &TrxPayloadAssetTransfer{}
 		case TRX_STAKING:
@@ -228,7 +230,11 @@ var _ rlp.Encoder = (*Trx)(nil)
 var _ rlp.Decoder = (*Trx)(nil)
 
 func (tx *Trx) GetType() int32 {
-	return tx.Type
+	return tx.Type &^ TRX_PAYER_FLAG
+}
+
+func (tx *Trx) HasPayerFlag() bool {
+	return tx.Type&TRX_PAYER_FLAG != 0
 }
 
 func (tx *Trx) TypeString() string {
@@ -257,7 +263,7 @@ func (tx *Trx) Encode() ([]byte, xerrors.XError) {
 
 func (tx *Trx) fromProto(txProto *TrxProto) xerrors.XError {
 	var payload ITrxPayload
-	switch txProto.Type {
+	switch txProto.Type &^ TRX_PAYER_FLAG {
 	case TRX_TRANSFER, TRX_STAKING:
 		if txProto.XPayload != nil {
 			return xerrors.ErrInvalidTrxPayloadType.Wrapf("the payload of tx type(%v) should be nil", txProto.Type)
@@ -344,7 +350,7 @@ func (tx *Trx) Validate() xerrors.XError {
 		return xerrors.ErrInvalidAddress
 	}
 	if len(tx.To) != types.AddrSize {
-		if tx.Type != TRX_CONTRACT || tx.To != nil {
+		if tx.GetType() != TRX_CONTRACT || tx.To != nil {
 			return xerrors.ErrInvalidAddress
 		}
 	}
@@ -357,7 +363,7 @@ func (tx *Trx) Validate() xerrors.XError {
 	if tx.Type < TRX_MIN_TYPE && tx.Type > TRX_MAX_TYPE {
 		return xerrors.ErrInvalidTrxType
 	}
-	if tx.Payload != nil && tx.Type != tx.Payload.Type() {
+	if tx.Payload != nil && tx.GetType() != tx.Payload.Type() {
 		return xerrors.ErrInvalidTrxPayloadType
 	}
 	if len(tx.Sig) != ethcrypto.SignatureLength {
