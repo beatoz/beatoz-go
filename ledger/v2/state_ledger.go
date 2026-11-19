@@ -50,6 +50,16 @@ func (ledger *StateLedger) Version() int64 {
 	return ledger.commitLedger.Version()
 }
 
+func (ledger *StateLedger) SetInitialVersion(ver int64) xerrors.XError {
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
+
+	if ledger.closed() {
+		return xerrors.NewOrdinary("state ledger is closed")
+	}
+	return ledger.commitLedger.SetInitialVersion(ver)
+}
+
 func (ledger *StateLedger) Get(key LedgerKey, exec bool) (ILedgerItem, xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()

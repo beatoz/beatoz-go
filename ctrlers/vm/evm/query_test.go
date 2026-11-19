@@ -30,6 +30,7 @@ func Test_Query(t *testing.T) {
 			Header: tmproto.Header{ChainID: config.ChainIdHex(), Height: 1, Time: time.Unix(1, 0)},
 		},
 		govMock, acctHandler, ctrler, nil, nil,
+		nil,
 	)
 	_, xerr := ctrler.BeginBlock(bctx)
 	require.NoError(t, xerr)

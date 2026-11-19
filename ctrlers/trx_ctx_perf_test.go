@@ -47,7 +47,7 @@ func BenchmarkNewTrxContext_Sync(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, xerr := types2.NewTrxContext(txbzs[i%len(txbzs)],
 			types2.TempBlockContext(
-				chainId.Hex(), rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil),
+				chainId.Hex(), rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil, nil),
 			true,
 		)
 		require.NoError(b, xerr, fmt.Sprintf("index: %v", i))
@@ -61,7 +61,7 @@ func BenchmarkNewTrxContext_ASync(b *testing.B) {
 		go func() {
 			_, xerr := types2.NewTrxContext(txbzs[i%len(txbzs)],
 				types2.TempBlockContext(
-					chainId.Hex(), rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil),
+					chainId.Hex(), rand.Int63(), time.Now(), govHandler, acctHandler, nil, nil, nil, nil),
 				true,
 			)
 			require.NoError(b, xerr, fmt.Sprintf("index: %v", i))

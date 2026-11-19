@@ -18,6 +18,8 @@ func AddRoutes() {
 	tmrpccore.Routes["proposal"] = tmrpccore_server.NewRPCFunc(QueryProposal, "txhash,height")
 	tmrpccore.Routes["rule"] = tmrpccore_server.NewRPCFunc(QueryGovParams, "height")
 	tmrpccore.Routes["gov_params"] = tmrpccore_server.NewRPCFunc(QueryGovParams, "height")
+	tmrpccore.Routes["upgrade_reserved"] = tmrpccore_server.NewRPCFunc(QueryUpgradeReserved, "height")
+	tmrpccore.Routes["upgrade_completed"] = tmrpccore_server.NewRPCFunc(QueryUpgradeCompleted, "name,height")
 	tmrpccore.Routes["subscribe"] = tmrpccore_server.NewRPCFunc(Subscribe, "query")
 	tmrpccore.Routes["unsubscribe"] = tmrpccore_server.NewRPCFunc(Unsubscribe, "query")
 	tmrpccore.Routes["tx_search"] = tmrpccore_server.NewRPCFunc(TxSearch, "query,prove,page,per_page,order_by")

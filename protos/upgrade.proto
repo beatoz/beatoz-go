@@ -1,0 +1,15 @@
+syntax = "proto3";
+package upgrade;
+option go_package = "github.com/beatoz/beatoz-go/ctrlers/upgrade";
+
+message UpgradePlanProto {
+  string name = 1;
+  int64 height = 2;
+  string info = 3;
+  bytes proposal_tx_hash = 4;
+}
+
+message UpgradeDoneProto {
+  string name = 1;
+  int64 height = 2;
+}

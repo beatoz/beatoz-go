@@ -28,6 +28,7 @@ const (
 type IStateLedger interface {
 	// Version returns the persisted IAVL tree version used as the committed state height.
 	Version() int64
+	SetInitialVersion(int64) xerrors.XError
 
 	Get(LedgerKey, bool) (ILedgerItem, xerrors.XError)
 	Iterate(FuncIterate, bool) xerrors.XError
@@ -127,6 +128,16 @@ func (manager *StateLedgerManager) Version() int64 {
 		return 0
 	}
 	return manager.active.Version()
+}
+
+func (manager *StateLedgerManager) SetInitialVersion(ver int64) xerrors.XError {
+	manager.mtx.RLock()
+	defer manager.mtx.RUnlock()
+	active, xerr := manager.activeLedger()
+	if xerr != nil {
+		return xerr
+	}
+	return active.SetInitialVersion(ver)
 }
 
 func (manager *StateLedgerManager) Get(key LedgerKey, exec bool) (ILedgerItem, xerrors.XError) {

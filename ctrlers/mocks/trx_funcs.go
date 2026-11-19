@@ -15,7 +15,7 @@ func MakeTrxCtxWithTrx(
 	s ctrlertypes.ISupplyHandler,
 	v ctrlertypes.IVPowerHandler,
 ) (*ctrlertypes.TrxContext, xerrors.XError) {
-	bctx := ctrlertypes.TempBlockContext(chainId, height, btm, g, a, e, s, v)
+	bctx := ctrlertypes.TempBlockContext(chainId, height, btm, g, a, e, s, v, nil)
 	return MakeTrxCtxWithTrxBctx(tx, bctx, exec)
 }
 
@@ -39,7 +39,7 @@ func MakeTrxCtxWithBz(
 	s ctrlertypes.ISupplyHandler,
 	v ctrlertypes.IVPowerHandler,
 ) (*ctrlertypes.TrxContext, xerrors.XError) {
-	bctx := ctrlertypes.TempBlockContext(chainId, height, btm, g, a, e, s, v)
+	bctx := ctrlertypes.TempBlockContext(chainId, height, btm, g, a, e, s, v, nil)
 	return MakeTrxCtxWithBzBctx(txbz, bctx, exec)
 }
 

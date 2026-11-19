@@ -14,7 +14,7 @@ import (
 
 func TestUseBlockGas(t *testing.T) {
 	gasLimit := int64(10000)
-	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, govmock.NewGovHandlerMock(types.DefaultGovParams()), nil, nil, nil, nil)
+	blockCtx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, govmock.NewGovHandlerMock(types.DefaultGovParams()), nil, nil, nil, nil, nil)
 	blockCtx.SetBlockGasLimit(gasLimit)
 
 	sumGasUsed := int64(0)
@@ -38,7 +38,7 @@ func TestUseBlockGas(t *testing.T) {
 // This was reported in the security audit BEA-07.
 func TestExpectNextBlockContext_DoubleScalingBug(t *testing.T) {
 	gparams := types.DefaultGovParams()
-	bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, govmock.NewGovHandlerMock(gparams), nil, nil, nil, nil)
+	bctx := types.NewBlockContext(abcitypes.RequestBeginBlock{}, govmock.NewGovHandlerMock(gparams), nil, nil, nil, nil, nil)
 	start := time.Unix(1_000_000_000, 0) // seconds precision
 	bctx.SetBlockInfo(abcitypes.RequestBeginBlock{Header: bctx.BlockInfo().Header})
 	bctx.SetByzantine(nil)

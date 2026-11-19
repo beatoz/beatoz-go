@@ -1161,6 +1161,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /upgrade_completed:
+    get:
+      summary: Query completed upgrades (all upgrades if name is empty)
+      operationId: upgrade_completed
+      tags:
+        - Governance
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: "Upgrade name"
+          schema:
+            type: string
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /upgrade_reserved:
+    get:
+      summary: Query the reserved upgrade
+      operationId: upgrade_reserved
+      tags:
+        - Governance
+      parameters:
+        - name: height
+          in: query
+          required: false
+          description: "Block height (default: latest)"
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /stakes:
     get:
       summary: Query stakes information by address

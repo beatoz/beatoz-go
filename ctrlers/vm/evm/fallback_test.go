@@ -63,7 +63,7 @@ func Test_Fallback(t *testing.T) {
 	// BeginBlock
 	bctx := ctrlertypes.NewBlockContext(
 		abcitypes.RequestBeginBlock{Header: tmproto.Header{Height: fallbackEVM.lastBlockHeight + 1, Time: time.Now()}},
-		govMock, &acctHandler, nil, nil, nil)
+		govMock, &acctHandler, nil, nil, nil, nil)
 	_, xerr := fallbackEVM.BeginBlock(bctx)
 	require.NoError(t, xerr)
 

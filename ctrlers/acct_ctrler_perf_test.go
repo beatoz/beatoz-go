@@ -170,7 +170,7 @@ func Benchmark_AcctCtrler_Sync(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < mempoolSize; j++ {
-			bctx := types.TempBlockContext(bcfg.ChainId().Hex(), rand.Int63(), time.Now(), govHandler, acctCtrler, nil, nil, nil)
+			bctx := types.TempBlockContext(bcfg.ChainId().Hex(), rand.Int63(), time.Now(), govHandler, acctCtrler, nil, nil, nil, nil)
 			txbz := txs[rand.Intn(len(txs))]
 			txctx, xerr := types.NewTrxContext(txbz,
 				bctx, // issue #39: set block time expected to be executed.
@@ -216,7 +216,7 @@ func makeTrxCtxRoutineEx(chIn chan int, txs [][]byte, chainId string, g types.IG
 }
 
 func _makeTrxCtx(txbz []byte, chainId string, g types.IGovHandler, a types.IAccountHandler) *types.TrxContext {
-	_bctx := types.TempBlockContext(chainId, rand.Int63(), time.Now(), g, a, nil, nil, nil)
+	_bctx := types.TempBlockContext(chainId, rand.Int63(), time.Now(), g, a, nil, nil, nil, nil)
 	txctx, xerr := types.NewTrxContext(txbz,
 		_bctx, // issue #39: set block time expected to be executed.
 		true,

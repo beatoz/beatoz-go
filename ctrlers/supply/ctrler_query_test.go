@@ -41,7 +41,7 @@ func Test_Query_Reward(t *testing.T) {
 
 	for currHeight := int64(2); currHeight < localGovMock.InflationCycleBlocks()*30; currHeight++ {
 		if currHeight%localGovMock.InflationCycleBlocks() == 0 {
-			bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock)
+			bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock, nil)
 			ctrler.requestMint(bctx)
 			_, xerr = ctrler.waitMint(bctx)
 			require.NoError(t, xerr)

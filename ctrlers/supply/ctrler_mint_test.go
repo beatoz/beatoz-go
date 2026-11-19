@@ -87,7 +87,7 @@ func Test_Mint(t *testing.T) {
 		expectedTotalSupply := new(uint256.Int).Add(totalSupply, expectedChange)
 		//fmt.Println("expected", "height", currHeight, "wa", wa.String(), "adjustedHeight", adjustedHeight, "max", govMock.MaxTotalSupply(), "lamda", govMock.InflationWeightPermil(), "total", expectedTotalSupply, "pre.total", totalSupply, "change", expectedChange)
 
-		bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock)
+		bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock, nil)
 		ctrler.requestMint(bctx)
 		result, xerr := ctrler.waitMint(bctx)
 		require.NoError(t, xerr)
@@ -158,7 +158,7 @@ func Test_Mint_ZeroSignRate(t *testing.T) {
 	vpowMock.SetZeroSignRate(zeroSignRateAddr)
 
 	currHeight := govMock.InflationCycleBlocks()
-	bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock)
+	bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock, nil)
 	ctrler.requestMint(bctx)
 	result, xerr := ctrler.waitMint(bctx)
 	require.NoError(t, xerr)

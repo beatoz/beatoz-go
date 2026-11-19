@@ -24,21 +24,22 @@ type BlockContext struct {
 	txsCnt         int
 	appHash        bytes.HexBytes
 
-	GovHandler    IGovHandler
-	AcctHandler   IAccountHandler
-	EVMHandler    IEVMHandler
-	SupplyHandler ISupplyHandler
-	VPowerHandler IVPowerHandler
+	GovHandler     IGovHandler
+	AcctHandler    IAccountHandler
+	EVMHandler     IEVMHandler
+	SupplyHandler  ISupplyHandler
+	VPowerHandler  IVPowerHandler
+	UpgradeHandler IUpgradeHandler
 
 	ValUpdates abcitypes.ValidatorUpdates
 
 	mtx sync.RWMutex
 }
 
-func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler) *BlockContext {
+func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler, up IUpgradeHandler) *BlockContext {
 
 	// all handlers should implement ITrxHandler and IBlockHandler
-	for _, handler := range []interface{}{g, a, e, su, vp} {
+	for _, handler := range []interface{}{g, a, e, su, vp, up} {
 		if handler != nil {
 			_ = handler.(ITrxHandler)
 			_ = handler.(IBlockHandler)
@@ -47,16 +48,17 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 	}
 
 	ret := &BlockContext{
-		blockInfo:     bi,
-		feeSum:        uint256.NewInt(0),
-		txsCnt:        0,
-		appHash:       nil,
-		GovHandler:    g,
-		AcctHandler:   a,
-		EVMHandler:    e,
-		SupplyHandler: su,
-		VPowerHandler: vp,
-		ValUpdates:    nil,
+		blockInfo:      bi,
+		feeSum:         uint256.NewInt(0),
+		txsCnt:         0,
+		appHash:        nil,
+		GovHandler:     g,
+		AcctHandler:    a,
+		EVMHandler:     e,
+		SupplyHandler:  su,
+		VPowerHandler:  vp,
+		UpgradeHandler: up,
+		ValUpdates:     nil,
 	}
 	if g != nil {
 		ret.SetBlockSizeLimit(g.BlockSizeLimit())
@@ -65,7 +67,7 @@ func NewBlockContext(bi abcitypes.RequestBeginBlock, g IGovHandler, a IAccountHa
 	return ret
 }
 
-func TempBlockContext(chainId string, height int64, btime time.Time, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler) *BlockContext {
+func TempBlockContext(chainId string, height int64, btime time.Time, g IGovHandler, a IAccountHandler, e IEVMHandler, su ISupplyHandler, vp IVPowerHandler, up IUpgradeHandler) *BlockContext {
 	next := NewBlockContext(
 		abcitypes.RequestBeginBlock{
 			Header: tmprototypes.Header{
@@ -74,7 +76,7 @@ func TempBlockContext(chainId string, height int64, btime time.Time, g IGovHandl
 				Time:    btime,
 			},
 		},
-		g, a, e, su, vp,
+		g, a, e, su, vp, up,
 	)
 	return next
 }
@@ -94,6 +96,7 @@ func ExpectNextBlockContext(last *BlockContext, blockIntval time.Duration) *Bloc
 		last.EVMHandler,
 		last.SupplyHandler,
 		last.VPowerHandler,
+		last.UpgradeHandler,
 	)
 	return next
 }

@@ -17,6 +17,8 @@ var (
 	KeyPrefixTombstone        = []byte{0x24}
 	KeyPrefixTotalSupply      = []byte{0x30}
 	KeyPrefixReward           = []byte{0x32}
+	KeyPrefixUpgradePlan      = []byte{0x40}
+	KeyPrefixUpgradeDone      = []byte{0x41}
 )
 
 func LedgerKeyProposal(txhash []byte) LedgerKey {
@@ -85,6 +87,19 @@ func LedgerKeyTotalSupply() LedgerKey {
 
 func LedgerKeyReward(owner types.Address) LedgerKey {
 	return append(KeyPrefixReward, owner...)
+}
+
+func LedgerKeyUpgradePlan() LedgerKey {
+	_key := make([]byte, len(KeyPrefixUpgradePlan))
+	copy(_key, KeyPrefixUpgradePlan)
+	return _key
+}
+
+func LedgerKeyUpgradeDone(name string) LedgerKey {
+	_key := make([]byte, len(KeyPrefixUpgradeDone)+len(name))
+	copy(_key, KeyPrefixUpgradeDone)
+	copy(_key[len(KeyPrefixUpgradeDone):], name)
+	return _key
 }
 
 func UnwrapKeyPrefix(key LedgerKey) []byte {

@@ -92,6 +92,12 @@ func (ctrler *BeatozApp) Query(req abcitypes.RequestQuery) abcitypes.ResponseQue
 		response.Value, xerr = ctrler.govCtrler.Query(req)
 	case "vm_call", "vm_estimate_gas":
 		response.Value, xerr = ctrler.vmCtrler.Query(req)
+	case "upgrade_reserved", "upgrade_completed":
+		if !rtypes.IsBTIP64(ctrler.lastBlockCtx.ChainID(), req.Height) {
+			xerr = xerrors.ErrQuery.Wrapf("upgrade is not activated at height %d", req.Height)
+			break
+		}
+		response.Value, xerr = ctrler.upgradeCtrler.Query(req)
 	case "txn":
 		txn := ctrler.metaDB.Txn()
 		response.Value, xerr = []byte(fmt.Sprintf("\"%d\"", txn)), nil

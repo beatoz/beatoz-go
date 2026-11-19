@@ -171,6 +171,11 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 		if len(txpayload.Options) == 0 || txpayload.Options == nil {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("wrong options: must have at least one value")
 		}
+
+		// check upgrade proposal
+		if xerr := ctrler.validateUpgradeProposal(ctx, txpayload); xerr != nil {
+			return xerr
+		}
 	case ctrlertypes.TRX_VOTING:
 		if bytes.Compare(ctx.Tx.To, types.ZeroAddress()) != 0 {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrap(errors.New("wrong address: the 'to' field in TRX_VOTING should be zero address"))
@@ -315,7 +320,8 @@ func (ctrler *GovCtrler) freezeProposals(height int64) ([]common.LedgerKey, []co
 }
 
 // applyProposals is called from EndBlock
-func (ctrler *GovCtrler) applyProposals(height int64) ([]common.LedgerKey, []common.LedgerKey, xerrors.XError) {
+func (ctrler *GovCtrler) applyProposals(bctx *ctrlertypes.BlockContext) ([]common.LedgerKey, []common.LedgerKey, xerrors.XError) {
+	height := bctx.Height()
 	var applied []common.LedgerKey
 	var rejected []common.LedgerKey
 
@@ -365,6 +371,16 @@ func (ctrler *GovCtrler) applyProposals(height int64) ([]common.LedgerKey, []com
 					return nil
 				}
 				ctrler.newGovParams = newGovParams
+			case proposal.PROPOSAL_UPGRADE, proposal.PROPOSAL_CANCEL_UPGRADE:
+				if !types.IsBTIP64(bctx.ChainID(), height) {
+					ctrler.logger.Debug("Apply proposal", "key(txHash)", prop.Header().TxHash, "type", prop.Header().PropType)
+					break
+				}
+				if xerr := ctrler.applyUpgradeProposal(bctx, prop); xerr != nil {
+					ctrler.logger.Error("Apply proposal", "error", xerr, "option", string(prop.MajorOption().Option))
+					rejected = append(rejected, key)
+					return nil
+				}
 			default:
 				ctrler.logger.Debug("Apply proposal", "key(txHash)", prop.Header().TxHash, "type", prop.Header().PropType)
 			}
@@ -455,6 +471,23 @@ func (ctrler *GovCtrler) InitMaxVotingStartDelayBlocks() xerrors.XError {
 		v.MaxVotingStartDelayBlocks = defaultParams.MaxVotingStartDelayBlocks()
 	})
 	ctrler.logger.Info("MaxVotingStartDelayBlocks is initialized", "value", ctrler.MaxVotingStartDelayBlocks())
+
+	return ctrler.govState.Set(common.LedgerKeyGovParams(), &ctrler.GovParams, true)
+}
+
+func (ctrler *GovCtrler) InitMinUpgradeDelayBlocks() xerrors.XError {
+	ctrler.mtx.Lock()
+	defer ctrler.mtx.Unlock()
+
+	if ctrler.MinUpgradeDelayBlocks() > 0 {
+		return nil
+	}
+
+	defaultParams := ctrlertypes.NewGovParams(int(ctrler.EmptyBlockIntervalSecs()))
+	ctrler.GovParams.SetValue(func(v *ctrlertypes.GovParamsProto) {
+		v.MinUpgradeDelayBlocks = defaultParams.MinUpgradeDelayBlocks()
+	})
+	ctrler.logger.Info("MinUpgradeDelayBlocks is initialized", "value", ctrler.MinUpgradeDelayBlocks())
 
 	return ctrler.govState.Set(common.LedgerKeyGovParams(), &ctrler.GovParams, true)
 }

@@ -245,7 +245,7 @@ func Test_NewTrxContext_PayerFlag(t *testing.T) {
 }
 
 func newTrxCtx(tx *ctrlertypes.Trx, height int64) (*ctrlertypes.TrxContext, xerrors.XError) {
-	bctx := ctrlertypes.TempBlockContext(chainId.Hex(), height, time.Now(), govMock, acctMock, nil, nil, nil)
+	bctx := ctrlertypes.TempBlockContext(chainId.Hex(), height, time.Now(), govMock, acctMock, nil, nil, nil, nil)
 	bz, _ := tx.Encode()
 	return ctrlertypes.NewTrxContext(bz, bctx, true)
 }
@@ -410,7 +410,7 @@ func Test_TrxContext_EventRoot_ForkBoundaries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("height_%d", tt.height), func(t *testing.T) {
 			txctx := &ctrlertypes.TrxContext{
-				BlockContext: ctrlertypes.TempBlockContext("0xbea701", tt.height, time.Now(), govMock, acctMock, nil, nil, nil),
+				BlockContext: ctrlertypes.TempBlockContext("0xbea701", tt.height, time.Now(), govMock, acctMock, nil, nil, nil, nil),
 				Events: []abcitypes.Event{
 					{Type: "tx", Attributes: []abcitypes.EventAttribute{
 						{Key: []byte("from"), Value: []byte("A")},
@@ -476,7 +476,7 @@ func Test_TrxContext_EventRootBTIP48(t *testing.T) {
 				}
 			}
 			txctx := &ctrlertypes.TrxContext{
-				BlockContext: ctrlertypes.TempBlockContext("0xbea701", 500_000, time.Now(), govMock, acctMock, nil, nil, nil),
+				BlockContext: ctrlertypes.TempBlockContext("0xbea701", 500_000, time.Now(), govMock, acctMock, nil, nil, nil, nil),
 				Events:       events,
 			}
 			tree, root := txctx.EventRoot()

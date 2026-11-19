@@ -53,7 +53,7 @@ func Test_commonValidation(t *testing.T) {
 		},
 		govMock,
 		acctMock,
-		nil, nil, nil)
+		nil, nil, nil, nil)
 	bctx.SetBlockGasLimit(blockGasLimit)
 	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 	// expected success
@@ -135,7 +135,7 @@ func Test_commonValidation(t *testing.T) {
 	newOverflowTxCtx := func(chainID string, gasPrice, amt *uint256.Int) *ctrlertypes.TrxContext {
 		bctx := ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainID, Height: 1, Time: blockTime}},
-			govMock, acctMock, nil, nil, nil)
+			govMock, acctMock, nil, nil, nil, nil)
 		bctx.SetBlockGasLimit(blockGasLimit)
 		tx := web3.NewTrxTransfer(w0.Address(), w1.Address(), w0.GetNonce(), govMock.MinTrxGas(), gasPrice, amt)
 		return &ctrlertypes.TrxContext{BlockContext: bctx, Tx: tx, Exec: true}
@@ -168,7 +168,7 @@ func Test_ExecuteSync(t *testing.T) {
 		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
 		govMock,
 		acctHandler,
-		nil, supplyHandler, vpowerHandler)
+		nil, supplyHandler, vpowerHandler, nil)
 
 	txe := NewTrxExecutor(log.NewNopLogger())
 	gas := govMock.MinTrxGas()
@@ -235,7 +235,7 @@ func Test_Gas_FailedTx(t *testing.T) {
 		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
 		govMock,
 		acctMock,
-		nil, supplyHandler, vpowerHandler)
+		nil, supplyHandler, vpowerHandler, nil)
 	bctx.SetBlockGasLimit(blockGasLimit)
 	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 	require.Equal(t, int64(0), bctx.GetBlockGasUsed())
@@ -321,7 +321,7 @@ func Test_Gas_FailedTx(t *testing.T) {
 //		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
 //		govMock,
 //		acctMock,
-//		nil, nil, nil)
+//		nil, nil, nil, nil)
 //	bctx.SetBlockGasLimit(blockGasLimit)
 //	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 //	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
@@ -364,7 +364,7 @@ func Test_Gas_FailedTx(t *testing.T) {
 //		abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainId.Hex(), Height: 1}},
 //		govMock,
 //		acctMock,
-//		nil, nil, nil)
+//		nil, nil, nil, nil)
 //	bctx.SetBlockGasLimit(blockGasLimit)
 //	require.Equal(t, blockGasLimit, bctx.GetBlockGasLimit())
 //	require.Equal(t, blockGasUsed, bctx.GetBlockGasUsed())
@@ -471,7 +471,7 @@ func Test_TransferToContract(t *testing.T) {
 		evmMock := evmock.NewEVMHandlerMock()
 		bctx := ctrlertypes.NewBlockContext(
 			abcitypes.RequestBeginBlock{Header: tmtypes.Header{ChainID: chainID, Height: 1}},
-			govMock, acctHandler, evmMock, nil, nil)
+			govMock, acctHandler, evmMock, nil, nil, nil)
 		bctx.SetBlockGasLimit(govMock.MinTrxGas() * 10)
 		tx := web3.NewTrxTransfer(sender.Address(), to, sender.GetNonce(), govMock.MinTrxGas(), govMock.GasPrice(), uint256.NewInt(1))
 		return &ctrlertypes.TrxContext{BlockContext: bctx, Tx: tx, Exec: true}

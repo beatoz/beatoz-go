@@ -14,6 +14,7 @@ import (
 	"github.com/beatoz/beatoz-go/ctrlers/gov"
 	"github.com/beatoz/beatoz-go/ctrlers/supply"
 	ctrlertypes "github.com/beatoz/beatoz-go/ctrlers/types"
+	"github.com/beatoz/beatoz-go/ctrlers/upgrade"
 	"github.com/beatoz/beatoz-go/ctrlers/vm/evm"
 	"github.com/beatoz/beatoz-go/ctrlers/vpower"
 	"github.com/beatoz/beatoz-go/genesis"
@@ -40,13 +41,14 @@ type BeatozApp struct {
 	lastBlockCtx *ctrlertypes.BlockContext
 	currBlockCtx *ctrlertypes.BlockContext
 
-	metaDB       *MetaDB
-	acctCtrler   *account.AcctCtrler
-	govCtrler    *gov.GovCtrler
-	vpowCtrler   *vpower.VPowerCtrler
-	supplyCtrler *supply.SupplyCtrler
-	vmCtrler     *evm.EVMCtrler
-	txExecutor   *TrxExecutor
+	metaDB        *MetaDB
+	acctCtrler    *account.AcctCtrler
+	govCtrler     *gov.GovCtrler
+	vpowCtrler    *vpower.VPowerCtrler
+	supplyCtrler  *supply.SupplyCtrler
+	vmCtrler      *evm.EVMCtrler
+	upgradeCtrler *upgrade.UpgradeCtrler
+	txExecutor    *TrxExecutor
 
 	localClient abcicli.Client
 	rootConfig  *cfg.Config
@@ -84,18 +86,24 @@ func NewBeatozApp(config *cfg.Config, logger log.Logger) *BeatozApp {
 
 	vmCtrler := evm.NewEVMCtrler(config, acctCtrler, logger)
 
+	upgradeCtrler, err := upgrade.NewUpgradeCtrler(config, logger)
+	if err != nil {
+		panic(err)
+	}
+
 	txExecutor := NewTrxExecutor(logger)
 
 	return &BeatozApp{
-		metaDB:       metaDB,
-		acctCtrler:   acctCtrler,
-		govCtrler:    govCtrler,
-		vpowCtrler:   vpowCtrler,
-		supplyCtrler: supplyCtrler,
-		vmCtrler:     vmCtrler,
-		txExecutor:   txExecutor,
-		rootConfig:   config,
-		logger:       logger,
+		metaDB:        metaDB,
+		acctCtrler:    acctCtrler,
+		govCtrler:     govCtrler,
+		vpowCtrler:    vpowCtrler,
+		supplyCtrler:  supplyCtrler,
+		vmCtrler:      vmCtrler,
+		upgradeCtrler: upgradeCtrler,
+		txExecutor:    txExecutor,
+		rootConfig:    config,
+		logger:        logger,
 	}
 }
 
@@ -125,6 +133,9 @@ func (ctrler *BeatozApp) Stop() error {
 	if err := ctrler.vmCtrler.Close(); err != nil {
 		return err
 	}
+	if err := ctrler.upgradeCtrler.Close(); err != nil {
+		return err
+	}
 	if err := ctrler.metaDB.Close(); err != nil {
 		return err
 	}
@@ -152,6 +163,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 				},
 			},
 			ctrler.govCtrler, ctrler.acctCtrler, ctrler.vmCtrler, ctrler.supplyCtrler, ctrler.vpowCtrler,
+			ctrler.upgradeCtrler,
 		)
 	} else {
 		ctrler.lastBlockCtx.GovHandler = ctrler.govCtrler
@@ -159,6 +171,7 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 		ctrler.lastBlockCtx.EVMHandler = ctrler.vmCtrler
 		ctrler.lastBlockCtx.SupplyHandler = ctrler.supplyCtrler
 		ctrler.lastBlockCtx.VPowerHandler = ctrler.vpowCtrler
+		ctrler.lastBlockCtx.UpgradeHandler = ctrler.upgradeCtrler
 	}
 
 	// get chain_id
@@ -195,6 +208,19 @@ func (ctrler *BeatozApp) Info(info abcitypes.RequestInfo) abcitypes.ResponseInfo
 			ctrler.logger.Error("failed to apply BTIP61 governance parameters", "error", xerr)
 			panic(xerr)
 		}
+	}
+
+	if ctrler.lastBlockCtx.Height() > 0 &&
+		types.IsBTIP64(ctrler.lastBlockCtx.ChainID(), ctrler.lastBlockCtx.Height()+1) {
+		if xerr := ctrler.govCtrler.InitMinUpgradeDelayBlocks(); xerr != nil {
+			ctrler.logger.Error("failed to apply BTIP64 governance parameters", "error", xerr)
+			panic(xerr)
+		}
+	}
+
+	if xerr := ctrler.checkUpgradeBinary(ctrler.lastBlockCtx.Height()); xerr != nil {
+		ctrler.logger.Error("failed to check upgrade binary", "error", xerr)
+		panic(xerr)
 	}
 
 	// create signers
@@ -250,6 +276,11 @@ func (ctrler *BeatozApp) InitChain(req abcitypes.RequestInitChain) abcitypes.Res
 
 	if xerr := ctrler.vmCtrler.InitLedger(req.ChainId); xerr != nil {
 		ctrler.logger.Error("fail to initialize vm controller", "error", xerr)
+		panic(xerr)
+	}
+
+	if xerr := ctrler.upgradeCtrler.InitLedger(nil); xerr != nil {
+		ctrler.logger.Error("fail to initialize upgrade controller", "error", xerr)
 		panic(xerr)
 	}
 
@@ -455,11 +486,21 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 		ctrler.vmCtrler,
 		ctrler.supplyCtrler,
 		ctrler.vpowCtrler,
+		ctrler.upgradeCtrler,
 	)
 	ctrler.currBlockCtx.SetBlockSizeLimit(ctrler.govCtrler.BlockSizeLimit())
 	ctrler.currBlockCtx.SetBlockGasLimit(ctrler.govCtrler.BlockGasLimit())
 
 	var beginBlockEvents []abcitypes.Event
+
+	if types.IsBTIP64(ctrler.currBlockCtx.ChainID(), ctrler.currBlockCtx.Height()) {
+		evs, xerr := ctrler.executeUpgrade(ctrler.currBlockCtx)
+		if xerr != nil {
+			ctrler.logger.Error("failed to execute upgrade", "error", xerr)
+			panic(xerr)
+		}
+		beginBlockEvents = append(beginBlockEvents, evs...)
+	}
 
 	evs, xerr := ctrler.govCtrler.BeginBlock(ctrler.currBlockCtx)
 	if xerr != nil {
@@ -496,6 +537,15 @@ func (ctrler *BeatozApp) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.R
 	}
 	beginBlockEvents = append(beginBlockEvents, evs...)
 
+	if types.IsBTIP64(ctrler.currBlockCtx.ChainID(), ctrler.currBlockCtx.Height()) {
+		evs, xerr = ctrler.upgradeCtrler.BeginBlock(ctrler.currBlockCtx)
+		if xerr != nil {
+			ctrler.logger.Error("failed to execute BeginBlock of upgradeCtrler", "error", xerr)
+			panic(xerr)
+		}
+		beginBlockEvents = append(beginBlockEvents, evs...)
+	}
+
 	return abcitypes.ResponseBeginBlock{
 		Events: beginBlockEvents,
 	}
@@ -507,6 +557,7 @@ func (ctrler *BeatozApp) upgradeLedgerVersion(target ledger.LedgerVersion) xerro
 		ctrler.govCtrler,
 		ctrler.supplyCtrler,
 		ctrler.vpowCtrler,
+		ctrler.upgradeCtrler,
 	}
 	for _, h := range handlers {
 		if xerr := h.UpgradeLedgerVersion(target); xerr != nil {
@@ -741,6 +792,15 @@ func (ctrler *BeatozApp) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Respo
 	}
 	beginBlockEvents = append(beginBlockEvents, evts...)
 
+	if types.IsBTIP64(ctrler.currBlockCtx.ChainID(), ctrler.currBlockCtx.Height()) {
+		evts, xerr = ctrler.upgradeCtrler.EndBlock(ctrler.currBlockCtx)
+		if xerr != nil {
+			ctrler.logger.Error("fail to execute EndBlock of upgradeCtrler", "error", xerr)
+			panic(xerr)
+		}
+		beginBlockEvents = append(beginBlockEvents, evts...)
+	}
+
 	var consensusParams *abcitypes.ConsensusParams
 	nxBlockSizeLimit := ctrler.govCtrler.BlockSizeLimit()
 	nxBlockGasLimit := ctrler.govCtrler.BlockGasLimit()
@@ -788,6 +848,9 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 		ctrler.vpowCtrler,
 		ctrler.vmCtrler,
 	}
+	if types.IsBTIP64(ctrler.currBlockCtx.ChainID(), height) {
+		ctrlers = append(ctrlers, ctrler.upgradeCtrler)
+	}
 
 	for _, ctr := range ctrlers {
 		hash, ver, xerr := ctr.Commit()
@@ -822,6 +885,13 @@ func (ctrler *BeatozApp) Commit() abcitypes.ResponseCommit {
 	if types.IsBTIP61(ctrler.lastBlockCtx.ChainID(), height+1) {
 		if xerr := ctrler.govCtrler.InitMaxVotingStartDelayBlocks(); xerr != nil {
 			ctrler.logger.Error("failed to apply BTIP61 governance parameters", "error", xerr)
+			panic(xerr)
+		}
+	}
+
+	if types.IsBTIP64(ctrler.lastBlockCtx.ChainID(), height+1) {
+		if xerr := ctrler.govCtrler.InitMinUpgradeDelayBlocks(); xerr != nil {
+			ctrler.logger.Error("failed to apply BTIP64 governance parameters", "error", xerr)
 			panic(xerr)
 		}
 	}

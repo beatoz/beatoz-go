@@ -371,7 +371,7 @@ func TestStartVotingHeightUpperBound(t *testing.T) {
 		txctx := &ctrlertypes.TrxContext{
 			BlockContext: ctrlertypes.TempBlockContext(
 				"0xbea701", test.height, time.Now(),
-				govCtrler, acctMock, nil, supplymock.NewSupplyHandlerMock(), vpowMock),
+				govCtrler, acctMock, nil, supplymock.NewSupplyHandlerMock(), vpowMock, nil),
 			Tx:     tx,
 			TxHash: bytes.RandBytes(32),
 			Exec:   true,

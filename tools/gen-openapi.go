@@ -137,6 +137,25 @@ var endpoints = []Endpoint{
 		Response: "QueryResult",
 	},
 	{
+		Name:        "upgrade_reserved",
+		Method:      "GET",
+		Description: "Query the reserved upgrade",
+		Parameters: []Parameter{
+			{Name: "height", Type: "integer", Required: false, Description: "Block height (default: latest)"},
+		},
+		Response: "QueryResult",
+	},
+	{
+		Name:        "upgrade_completed",
+		Method:      "GET",
+		Description: "Query completed upgrades (all upgrades if name is empty)",
+		Parameters: []Parameter{
+			{Name: "name", Type: "string", Required: false, Description: "Upgrade name"},
+			{Name: "height", Type: "integer", Required: false, Description: "Block height (default: latest)"},
+		},
+		Response: "QueryResult",
+	},
+	{
 		Name:        "subscribe",
 		Method:      "GET",
 		Description: "Subscribe to events (WebSocket only)",
@@ -682,7 +701,7 @@ func getTag(name string) string {
 		return "WebSocket"
 	case "stakes", "stakes/total_power", "stakes/voting_power":
 		return "Staking"
-	case "gov_params", "rule", "proposal", "proposals":
+	case "gov_params", "rule", "proposal", "proposals", "upgrade_reserved", "upgrade_completed":
 		return "Governance"
 	default:
 		return "BEATOZ RPC"

@@ -230,6 +230,7 @@ func newAcctExecutorFixture(
 		govMock, acctCtrler, nil,
 		supplymock.NewSupplyHandlerMock(),
 		vpowermock.NewVPowerHandlerMock(nil, 0),
+		nil,
 	)
 	cleanup := func() {
 		closeErr := acctCtrler.Close()

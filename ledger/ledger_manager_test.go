@@ -45,6 +45,7 @@ type managerStateLedgerStub struct {
 	commitFn           func() ([]byte, int64, xerrors.XError)
 	closeFn            func() xerrors.XError
 	imitableLedgerAtFn func(int64) (IImitable, xerrors.XError)
+	setInitialVerFn    func(int64) xerrors.XError
 }
 
 func (stub *managerStateLedgerStub) Version() int64 {
@@ -52,6 +53,13 @@ func (stub *managerStateLedgerStub) Version() int64 {
 		return 0
 	}
 	return stub.versionFn()
+}
+
+func (stub *managerStateLedgerStub) SetInitialVersion(ver int64) xerrors.XError {
+	if stub.setInitialVerFn == nil {
+		return nil
+	}
+	return stub.setInitialVerFn(ver)
 }
 
 func (stub *managerStateLedgerStub) Get(key LedgerKey, exec bool) (ILedgerItem, xerrors.XError) {

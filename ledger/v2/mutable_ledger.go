@@ -2,6 +2,7 @@ package v2
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 
 	bytes2 "github.com/beatoz/beatoz-go/types/bytes"
@@ -318,6 +319,23 @@ func (ledger *MutableLedger) Commit() ([]byte, int64, xerrors.XError) {
 
 	ledger.logger.Debug("tree save version", "hash", hash, "version", version)
 	return hash, version, nil
+}
+
+func (ledger *MutableLedger) SetInitialVersion(ver int64) xerrors.XError {
+	ledger.mtx.Lock()
+	defer ledger.mtx.Unlock()
+
+	if ledger.closed() {
+		return xerrors.NewOrdinary("mutable ledger is closed")
+	}
+	if ver <= 0 {
+		return xerrors.NewOrdinary(fmt.Sprintf("invalid initial version: %d", ver))
+	}
+	if ledger.tree.Version() != 0 {
+		return xerrors.NewOrdinary(fmt.Sprintf("initial version can not be set on a saved tree: version %d", ledger.tree.Version()))
+	}
+	ledger.tree.SetInitialVersion(uint64(ver))
+	return nil
 }
 
 func (ledger *MutableLedger) Version() int64 {

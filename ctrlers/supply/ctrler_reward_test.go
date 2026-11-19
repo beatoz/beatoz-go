@@ -36,7 +36,7 @@ func Test_Withdraw(t *testing.T) {
 	// generate rewards
 	preRewards := make(map[string]*uint256.Int)
 	for currHeight := int64(2); currHeight < govMock.InflationCycleBlocks()*30; currHeight += govMock.InflationCycleBlocks() {
-		bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock)
+		bctx := types.TempBlockContext("mint-test-chain", currHeight, time.Now(), govMock, acctMock, nil, nil, vpowMock, nil)
 		ctrler.requestMint(bctx)
 		result, xerr := ctrler.waitMint(bctx)
 		require.NoError(t, xerr)

@@ -48,6 +48,10 @@ func (ledger *StateLedger) Version() int64 {
 	return ledger.commitLedger.Version()
 }
 
+func (ledger *StateLedger) SetInitialVersion(_ int64) xerrors.XError {
+	panic("ledger v1: SetInitialVersion must not be called")
+}
+
 func (ledger *StateLedger) Get(key LedgerKey, exec bool) (ILedgerItem, xerrors.XError) {
 	ledger.mtx.RLock()
 	defer ledger.mtx.RUnlock()

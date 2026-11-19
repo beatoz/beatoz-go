@@ -45,6 +45,7 @@ func Test_Blockhash(t *testing.T) {
 			},
 		},
 		govMock, acctHandler, ctrler, nil, nil,
+		nil,
 	)
 
 	_, xerr := ctrler.BeginBlock(block1Ctx)
@@ -62,6 +63,7 @@ func Test_Blockhash(t *testing.T) {
 			},
 		},
 		govMock, acctHandler, ctrler, nil, nil,
+		nil,
 	)
 
 	_, xerr = ctrler.BeginBlock(block2Ctx)

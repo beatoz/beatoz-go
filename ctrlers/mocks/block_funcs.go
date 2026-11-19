@@ -19,7 +19,7 @@ func InitBlockCtxWith(chainId string, h int64, g ctrlertypes.IGovHandler, a ctrl
 			Height:  h,
 			Time:    time.Now(),
 		},
-	}, g, a, e, su, vp)
+	}, g, a, e, su, vp, nil)
 	return currBlockCtx
 }
 

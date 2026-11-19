@@ -113,6 +113,26 @@ func QueryGovParams(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, er
 	}
 }
 
+func QueryUpgradeReserved(ctx *tmrpctypes.Context, heightPtr *int64) (*QueryResult, error) {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, nil, height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
+func QueryUpgradeCompleted(ctx *tmrpctypes.Context, name string, heightPtr *int64) (*QueryResult, error) {
+	height := parseHeight(heightPtr)
+	path := parsePath(ctx)
+	if resp, err := tmrpccore.ABCIQuery(ctx, path, tmbytes.HexBytes(name), height, false); err != nil {
+		return nil, err
+	} else {
+		return &QueryResult{resp.Response}, nil
+	}
+}
+
 func QueryVM(
 	ctx *tmrpctypes.Context,
 	addr abytes.HexBytes,

@@ -74,6 +74,7 @@ type IGovParams interface {
 	MinVotingPeriodBlocks() int64
 	LazyApplyingBlocks() int64
 	MaxVotingStartDelayBlocks() int64
+	MinUpgradeDelayBlocks() int64
 }
 
 type IGovHandler interface {
@@ -129,4 +130,12 @@ type ISupplyHandler interface {
 	TotalSupply() *uint256.Int
 	RequestMint(bctx *BlockContext)
 	Burn(bctx *BlockContext, amt *uint256.Int) xerrors.XError
+}
+
+type IUpgradeHandler interface {
+	ITrxHandler
+	IBlockHandler
+	ValidateUpgrade(opt *UpgradePlanOption, applyHeight, minDelayBlocks int64, exec bool) xerrors.XError
+	ReserveUpgrade(opt *UpgradePlanOption, txhash []byte, applyHeight, minDelayBlocks int64) xerrors.XError
+	CancelUpgrade(name string) xerrors.XError
 }
