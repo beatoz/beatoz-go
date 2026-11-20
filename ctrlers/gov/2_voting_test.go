@@ -254,8 +254,9 @@ func TestApplyingProposal(t *testing.T) {
 	runHeight := txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks() - 1
 	bctx := &ctrlertypes.BlockContext{}
 	bctx.SetHeight(runHeight)
-	_, xerr := govCtrler.EndBlock(bctx)
+	_, xerr := govCtrler.BeginBlock(bctx)
 	require.NoError(t, xerr)
+	require.True(t, oriParams.Equal(&govCtrler.GovParams))
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
 	frozenProp, xerr := govCtrler.govState.Get(common.LedgerKeyFrozenProp(trxCtxProposal.TxHash), false)
@@ -267,9 +268,15 @@ func TestApplyingProposal(t *testing.T) {
 	runHeight = txProposalPayload.StartVotingHeight + txProposalPayload.VotingPeriodBlocks + govCtrler.LazyApplyingBlocks()
 	bctx = &ctrlertypes.BlockContext{}
 	bctx.SetHeight(runHeight)
-	_, xerr = govCtrler.EndBlock(bctx)
+	evts, xerr := govCtrler.BeginBlock(bctx)
 	require.NoError(t, xerr)
-	require.NotNil(t, govCtrler.newGovParams)
+	require.Nil(t, govCtrler.newGovParams)
+	require.True(t, govParams1.Equal(&govCtrler.GovParams))
+
+	require.Len(t, evts, 1)
+	require.Equal(t, "proposal", evts[0].Type)
+	require.Len(t, evts[0].Attributes, 1)
+	require.Equal(t, "applied", string(evts[0].Attributes[0].Key))
 
 	_, _, xerr = govCtrler.Commit()
 	require.NoError(t, xerr)
@@ -304,7 +311,7 @@ func TestApplyInvalidGovParamsProposalRejected(t *testing.T) {
 
 	bctx := &ctrlertypes.BlockContext{}
 	bctx.SetHeight(applyHeight)
-	evts, xerr := govCtrler.EndBlock(bctx)
+	evts, xerr := govCtrler.BeginBlock(bctx)
 	require.NoError(t, xerr)
 	require.Nil(t, govCtrler.newGovParams)
 	require.True(t, oriParams.Equal(&govCtrler.GovParams))
