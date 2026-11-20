@@ -157,6 +157,10 @@ func (ctrler *GovCtrler) ValidateTrx(ctx *ctrlertypes.TrxContext) xerrors.XError
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: startHeight:%v, endVotingHeight:%v",
 				txpayload.StartVotingHeight, endVotingHeight)
 		}
+		if endVotingHeight > minApplyingHeight {
+			return xerrors.ErrInvalidTrxPayloadParams.Wrapf("overflow occurs: endVotingHeight:%v, minApplyingHeight:%v",
+				endVotingHeight, minApplyingHeight)
+		}
 		// check applying blocks
 		if txpayload.ApplyingHeight < minApplyingHeight || endVotingHeight > txpayload.ApplyingHeight {
 			return xerrors.ErrInvalidTrxPayloadParams.Wrapf(
